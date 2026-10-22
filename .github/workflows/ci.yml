@@ -22,7 +22,7 @@ jobs:
     outputs:
       version: ${{ steps.check.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: check
         name: Check VERSION and CHANGES.md
         run: echo "version=$(python3 scripts/check_version.py)" >> "$GITHUB_OUTPUT"
@@ -31,11 +31,11 @@ jobs:
     name: Unit tests (PC)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.platformio
           key: pio-native-${{ hashFiles('platformio.ini') }}
@@ -46,11 +46,11 @@ jobs:
     name: Lint (cppcheck, clang-format)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.platformio
           key: pio-check-${{ hashFiles('platformio.ini') }}
@@ -67,11 +67,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: version
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.platformio
           key: pio-s3-${{ hashFiles('platformio.ini') }}
@@ -79,7 +79,7 @@ jobs:
       - run: pio run -e s3
       - name: Firmware size
         run: pio run -e s3 -t size | tail -5
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: usr-modem-v${{ needs.version.outputs.version }}-${{ github.sha }}
           path: |
