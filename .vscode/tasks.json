@@ -1,0 +1,89 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Modem: run unit tests (PC)",
+      "type": "shell",
+      "command": "pio test -e native",
+      "group": "test",
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Modem: build firmware",
+      "type": "shell",
+      "command": "pio run -e s3",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Modem: upload over USB (tests first)",
+      "type": "shell",
+      "command": "pio run -e s3 -t upload",
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Modem: upload over Wi-Fi / OTA (tests first)",
+      "type": "shell",
+      "command": "pio run -e s3_ota -t upload",
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Modem: upload sound files (LittleFS)",
+      "type": "shell",
+      "command": "pio run -e s3 -t uploadfs",
+      "problemMatcher": []
+    },
+    {
+      "label": "Modem: USB console (115200)",
+      "type": "shell",
+      "command": "pio device monitor -e s3",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Modem: on-board tests",
+      "type": "shell",
+      "command": "pio test -e s3",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Modem: end-to-end tests",
+      "type": "shell",
+      "command": "python -m pytest test/e2e --console-port ${input:consolePort}",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Modem: lint (cppcheck)",
+      "type": "shell",
+      "command": "pio check -e native",
+      "problemMatcher": []
+    },
+    {
+      "label": "Modem: bump version (minor, +0.1)",
+      "type": "shell",
+      "command": "python scripts/bump_version.py minor \"${input:changeSummary}\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "Modem: bump version (major, +1.0)",
+      "type": "shell",
+      "command": "python scripts/bump_version.py major \"${input:changeSummary}\"",
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "consolePort",
+      "type": "promptString",
+      "description": "USB console serial port (e.g. COM5)",
+      "default": "COM5"
+    },
+    {
+      "id": "changeSummary",
+      "type": "promptString",
+      "description": "One-line description for CHANGES.md"
+    }
+  ]
+}

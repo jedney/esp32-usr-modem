@@ -1,0 +1,90 @@
+name: CI
+
+# Every push and pull request: check the version/change log, run the PC unit tests,
+# lint, and build the ESP32-S3 firmware. The firmware image is kept as a build artifact.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  version:
+    name: Version and change log
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        name: Check VERSION and CHANGES.md
+        run: echo "version=$(python3 scripts/check_version.py)" >> "$GITHUB_OUTPUT"
+
+  unit-tests:
+    name: Unit tests (PC)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-native-${{ hashFiles('platformio.ini') }}
+      - run: pip install platformio
+      - run: pio test -e native
+
+  lint:
+    name: Lint (cppcheck, clang-format)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-check-${{ hashFiles('platformio.ini') }}
+      - run: pip install platformio
+      - name: cppcheck
+        run: pio check -e native --fail-on-defect=medium
+      - name: clang-format
+        run: |
+          files=$(git ls-files '*.cpp' '*.h')
+          clang-format --dry-run --Werror $files
+
+  build:
+    name: Build ESP32-S3 firmware
+    runs-on: ubuntu-latest
+    needs: version
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-s3-${{ hashFiles('platformio.ini') }}
+      - run: pip install platformio
+      - run: pio run -e s3
+      - name: Firmware size
+        run: pio run -e s3 -t size | tail -5
+      - uses: actions/upload-artifact@v4
+        with:
+          name: usr-modem-v${{ needs.version.outputs.version }}-${{ github.sha }}
+          path: |
+            .pio/build/s3/firmware.bin
+            .pio/build/s3/bootloader.bin
+            .pio/build/s3/partitions.bin
+            .pio/build/s3/firmware.elf
+          retention-days: 30

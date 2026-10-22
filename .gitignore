@@ -1,0 +1,18 @@
+# PlatformIO
+.pio/
+
+# VS Code files the PlatformIO extension regenerates per machine
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+.vscode/ipch/
+.vscode/.browse.c_cpp.db*
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db
