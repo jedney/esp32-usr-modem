@@ -1,11 +1,10 @@
 name: CI
 
-# Every push and pull request: check the version/change log, run the PC unit tests,
+# Every push (any branch): check the version/change log, run the PC unit tests,
 # lint, and build the ESP32-S3 firmware. The firmware image is kept as a build artifact.
 
 on:
-  push:
-  pull_request:
+  push:              # every branch; results also show on the branch's pull request
   workflow_dispatch:
 
 permissions:
