@@ -20,6 +20,7 @@ Status: **v0.1, prototyping.** The full requirements are in the project brief
 | `3d-model/`, `images/` | Case model and label art |
 | `sound/` | Audio files |
 | `credits/` | Attribution and the licensing record (`LICENSES.md`) |
+| `web/` | Web interface page (`src/`), third-party files (`vendor/`), tests and `PROTOCOL.md` |
 | `.github/workflows/` | GitHub Actions: CI and release tagging |
 
 ## Getting started in VS Code
@@ -60,6 +61,20 @@ The `native` unit tests compile on your PC, so they need `gcc`/`g++`. The simple
 option is MSYS2 (<https://www.msys2.org>): install it, run
 `pacman -S mingw-w64-ucrt-x86_64-gcc`, and add `C:\msys64\ucrt64\bin` to the PATH.
 The ESP32 build itself does not need this.
+
+## Web interface
+
+The modem serves a page with an 80 × 25 terminal (the configuration screen) and a status
+bar with the live front-panel lights, call status, remote host, connection time and modem
+clock. Source is in `web/`; see `web/PROTOCOL.md`.
+
+- **Preview without hardware:** run **Modem: web interface preview (demo)** (or
+  `python scripts/make_preview.py`) and open `web/preview.html`. Press **D** to fake a
+  call, **H** to hang up. Every CI run also attaches the preview as a downloadable artifact.
+- **On the modem:** the page files are gzipped into `data/www/` and uploaded with the
+  LittleFS image (**Modem: upload sounds and web files (LittleFS)**). The firmware side
+  of the web server comes in a later version.
+- **Tests:** **Modem: web interface tests** (`cd web && npm test`) needs Node.js 20 or later.
 
 ## Versioning
 

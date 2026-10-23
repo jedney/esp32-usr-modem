@@ -14,7 +14,7 @@ indent_size = 2
 [*.md]
 trim_trailing_whitespace = false
 
-[*.{stl,3mf,wav,png,PNG,jpg,jpeg}]
+[*.{stl,3mf,wav,png,PNG,jpg,jpeg,woff2,mjs}]
 charset = unset
 end_of_line = unset
 insert_final_newline = unset

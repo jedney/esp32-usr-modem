@@ -52,7 +52,9 @@ jobs:
         run: |
           pip install platformio
           pio test -e native
+          (cd web && npm test)
           pio run -e s3
+          pio run -e s3 -t buildfs
 
       - if: steps.version.outputs.exists == 'false'
         name: Tag and publish release
@@ -70,6 +72,7 @@ jobs:
           cp .pio/build/s3/firmware.bin   "dist/usr-modem-v$VERSION-firmware.bin"
           cp .pio/build/s3/bootloader.bin "dist/usr-modem-v$VERSION-bootloader.bin"
           cp .pio/build/s3/partitions.bin "dist/usr-modem-v$VERSION-partitions.bin"
+          cp .pio/build/s3/littlefs.bin   "dist/usr-modem-v$VERSION-littlefs.bin"
           gh release create "v$VERSION" dist/* \
             --target "$GITHUB_SHA" \
             --title "v$VERSION" \

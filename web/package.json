@@ -1,0 +1,9 @@
+{
+  "name": "usr-modem-web",
+  "private": true,
+  "type": "module",
+  "description": "Web interface for the USR Modem Emulator (served from the modem's LittleFS)",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

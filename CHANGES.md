@@ -14,6 +14,21 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [0.2] - 2026-10-23
+
+### Added
+
+- Web interface page (`web/`): a full-window 80 x 25 terminal (xterm.js 6.0.0, IBM Plex Mono,
+  VGA colour palette) for the configuration screen, with a status bar showing the live
+  front-panel lights, connection status, remote host and IP, connection time, Wi-Fi, modem
+  clock and the page-to-modem link. The WebSocket protocol the firmware will implement is
+  in `web/PROTOCOL.md`.
+- Demo mode (`index.html?demo`) and a single-file preview (`python scripts/make_preview.py`)
+  that simulate the modem, so the page can be checked without hardware.
+- `scripts/build_web.py` gzips the page into `data/www/` when the LittleFS image is built.
+- Web unit tests (`cd web && npm test`), run by CI; CI also uploads the preview as an artifact.
+- VS Code tasks for the web tests and preview.
+
 ## [0.1] - 2026-10-22
 
 ### Added
