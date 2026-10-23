@@ -12,3 +12,4 @@ Jon can raise them in those chats.
 | Date | Version | Decision | Why | By |
 |---|---|---|---|---|
 | 2026-10-24 | — | Firmware work moves to Claude Code in VS Code, following `CLAUDE.md` and `docs/ROADMAP.md` | Hand-over from the Firmware chat | Jon |
+| 2026-10-24 | — | **Where the hardware tests run (Q79):** USB console and web page run all tests, with the RS232 line, loopback and bridge tests only while the modem is idle; an RS232 session runs everything except those three (shown as unavailable with the reason); a remote caller runs none. Already merged into the master brief (6.14) | The three RS232 tests take over the port an RS232 session uses; the web page doesn't use that port | Jon (proposed by Claude) |
