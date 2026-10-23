@@ -22,7 +22,9 @@ hardware tests for the electronics build (`AT*HWTEST`); the modem itself comes n
 | `sound/` | Audio files |
 | `credits/` | Attribution and the licensing record (`LICENSES.md`) |
 | `web/` | Web interface page (`src/`), third-party files (`vendor/`), tests and `PROTOCOL.md` |
+| `docs/` | Project brief snapshot, firmware roadmap, decisions log |
 | `.github/workflows/` | GitHub Actions: CI and release tagging |
+| `CLAUDE.md` | Rules and commands for Claude Code working in this repo |
 
 ## Getting started in VS Code (Windows)
 
