@@ -14,6 +14,34 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [0.3] - 2026-10-24
+
+### Added
+
+- Hardware tests for the electronics build, on the USB console (brief 6.14). `AT*HWTEST`
+  is a guided walk-through (LEDs, speaker, volume cap, pot, RS232 lines, loopback) with a
+  pass/fail summary. Single tests: `AT*HWLED`, `AT*HWAMP`, `AT*HWVOL`, `AT*HWTONE`,
+  `AT*HWDTMF`, `AT*HWPULSE`, `AT*HWPOT`, `AT*HWLINES`, `AT*HWSIG`, `AT*HWLOOP`,
+  `AT*HWBRIDGE` (console <-> RS232 pass-through), `AT*HWPINS`, `AT*HWINFO`, `AT*HWFILES`.
+  `AT*HW?` lists them.
+- GPIO pin map in `lib/hw/src/pins.h`. **Proposed, not yet confirmed by Electronics**; the
+  only file to change if the wiring differs.
+- Hardware layer `lib/hw` (LEDs, I2S audio for the MAX98357A, amp shutdown, pot ADC,
+  RS232 handshake lines, UART1). Pins are only driven when a test uses them.
+- Tone generator `lib/sounds`: UK dial, busy and ring tones, DTMF, UK pulse clicks, test
+  tones and sweeps; volume curve with the -7 dB speaker cap applied last.
+- `AT*HELP` and `AT*?` list the console commands; the boot banner names the reset reason.
+- Tests: 24 unit tests for tones, volume and argument parsing; a pin-map check against
+  the S3's reserved pins (runs before every upload); on-board driver tests (`test_hw`);
+  end-to-end tests for the `AT*HW` commands, including a console <-> RS232 bridge test.
+- CI also compiles the on-board tests.
+
+### Changed
+
+- VS Code tasks put PlatformIO's own `pio` on the PATH, so they work without a separate
+  PlatformIO Core install.
+- README: full first-time setup, build and upload steps for Windows.
+
 ## [0.2] - 2026-10-23
 
 ### Added

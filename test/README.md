@@ -13,6 +13,9 @@ Feature logic lives in `lib/` with no direct hardware calls, so most of it can b
 unit-tested on the PC. On-board tests cover the hardware layer; end-to-end tests cover
 behaviour as a user sees it, including a live call to the Amiga Retro BBS.
 
+Running the on-board tests replaces the firmware on the board with the test program.
+Upload the firmware again afterwards (**Modem: upload over USB (tests first)**).
+
 ## Feature matrix
 
 Status: ✅ tests written, ⬜ planned. Section numbers refer to the project brief.
@@ -20,6 +23,7 @@ Status: ✅ tests written, ⬜ planned. Section numbers refer to the project bri
 | Feature (brief §) | Unit | On-board | End-to-end | Status |
 |---|---|---|---|---|
 | Board: 16 MB flash, 8 MB PSRAM, OTA partitions (5.2) | — | `test_board` | — | ✅ |
+| Pin map avoids the S3's reserved pins, no pin used twice, pot on ADC1 (5.2) | `test_pins` | — | — | ✅ |
 | Dial-string rules: IP + port, hostnames, phonebook, reserved numbers, invalid → ERROR (6.3) | `test_dialstring` | `test_board` | `test_console.py` (`AT*DIALTEST`) | ✅ |
 | Version in banner / `AT*VER` (6.9) | — | — | `test_console.py` | ✅ |
 | AT command parser, S-registers, `&F` / `&W` / `&V` (6.2, 6.6) | ⬜ | — | ⬜ | ⬜ |
@@ -34,10 +38,11 @@ Status: ✅ tests written, ⬜ planned. Section numbers refer to the project bri
 | Answer mode: port 23, RI, ring, `ATA` / `S0` (6.6) | ⬜ | — | ⬜ | ⬜ |
 | Remote callers can't reach command mode (6.6) | ⬜ | — | ⬜ | ⬜ |
 | PPP (`ATDT666`) and SLIP (`ATDT667`), NAT, hang-up (6.6) | — | ⬜ | ⬜ | ⬜ |
-| Tones: UK dial, busy, ring, DTMF, pulse clicks (6.4) | ⬜ frequency/timing | ⬜ I2S | manual listen | ⬜ |
+| Tones: UK dial, busy, ring, DTMF, pulse clicks (6.4) | `test_hwtest` (frequency, cadence, timing) | `test_hw` (I2S) | `test_hwtest.py`; listen with `AT*HWTEST` | ✅ generator; ⬜ call sequence |
 | Handshake WAV playback per speed (6.4) | ⬜ WAV header | ⬜ LittleFS + I2S | manual listen | ⬜ |
-| Volume: pot, `ATL`, `ATM`, hard cap (5.3, 6.4) | ⬜ scaling | ⬜ ADC | manual | ⬜ |
-| LEDs per table 5.4 | ⬜ state logic | ⬜ GPIO | manual look | ⬜ |
+| Volume: pot, `ATL`, `ATM`, hard cap (5.3, 6.4) | `test_hwtest` (curve, cap, pot dead zones) | `test_hw` (ADC) | `AT*HWPOT=TONE`, `AT*HWTEST` step 3 | ✅ curve and cap; ⬜ `ATL`/`ATM` |
+| LEDs per table 5.4 | ⬜ state logic | `test_hw` (GPIO) | `AT*HWLED`, `AT*HWTEST` step 1 | ⬜ state logic |
+| Hardware tests `AT*HW...`: LEDs, amp, tones, pot, RS232 lines, loopback, bridge, pin map (6.14) | `test_hwtest`, `test_pins` | `test_hw` | `test_hwtest.py` (bridge test needs `--rs232-port`) | ✅ |
 | Wi-Fi: join, static IP, mDNS name, loss → NO CARRIER (6.6) | — | ⬜ | ⬜ | ⬜ |
 | OTA: password required, on-demand mode (6.6) | ⬜ settings | — | ⬜ | ⬜ |
 | USB console, `AT&F`, `AT*FACTORY` (6.7) | ⬜ | ⬜ NVS wipe | ⬜ | ⬜ |

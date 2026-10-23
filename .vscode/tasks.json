@@ -1,5 +1,17 @@
 {
   "version": "2.0.0",
+  "options": {
+    "env": {
+      "PATH": "${env:HOME}/.platformio/penv/bin:${env:PATH}"
+    }
+  },
+  "windows": {
+    "options": {
+      "env": {
+        "PATH": "${env:USERPROFILE}\\.platformio\\penv\\Scripts;${env:PATH}"
+      }
+    }
+  },
   "tasks": [
     {
       "label": "Modem: run unit tests (PC)",
