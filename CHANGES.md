@@ -14,6 +14,12 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+### Added
+
+- `CLAUDE.md` (project rules for Claude Code in VS Code), `docs/ROADMAP.md` (remaining
+  firmware versions v0.4-v1.0), `docs/decisions-log.md`, and a snapshot of the project
+  brief in `docs/project-brief.md`. Documentation only; no firmware change.
+
 ## [0.3] - 2026-10-24
 
 ### Added
