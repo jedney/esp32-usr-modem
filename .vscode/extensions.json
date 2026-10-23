@@ -1,18 +1,21 @@
 {
-  "recommendations": [
-    "platformio.platformio-ide",
-    "ms-vscode.cpptools",
-    "xaver.clang-format",
-    "editorconfig.editorconfig",
-    "ms-python.python",
-    "ms-python.flake8",
-    "davidanson.vscode-markdownlint",
-    "eamodio.gitlens",
-    "github.vscode-github-actions",
-    "redhat.vscode-yaml"
-  ],
-  "unwantedRecommendations": [
-    "ms-vscode.cpptools-extension-pack",
-    "espressif.esp-idf-extension"
-  ]
+    // See http://go.microsoft.com/fwlink/?LinkId=827846
+    // for the documentation about the extensions.json format
+    "recommendations": [
+        "davidanson.vscode-markdownlint",
+        "eamodio.gitlens",
+        "editorconfig.editorconfig",
+        "github.vscode-github-actions",
+        "ms-python.flake8",
+        "ms-python.python",
+        "ms-vscode.cpptools",
+        "platformio.platformio-ide",
+        "redhat.vscode-yaml",
+        "xaver.clang-format"
+    ],
+    "unwantedRecommendations": [
+        "espressif.esp-idf-extension",
+        "ms-vscode.cpptools-extension-pack",
+        "pioarduino.pioarduino-ide"
+    ]
 }
