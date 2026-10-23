@@ -61,6 +61,27 @@ jobs:
           files=$(git ls-files '*.cpp' '*.h')
           clang-format --dry-run --Werror $files
 
+  web:
+    name: Web interface tests and preview
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Unit tests
+        working-directory: web
+        run: npm test
+      - name: Build gzipped files and single-file preview
+        run: |
+          python3 scripts/build_web.py
+          python3 scripts/make_preview.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: web-preview-${{ github.sha }}
+          path: web/preview.html
+          retention-days: 30
+
   build:
     name: Build ESP32-S3 firmware
     runs-on: ubuntu-latest
@@ -76,6 +97,8 @@ jobs:
           key: pio-s3-${{ hashFiles('platformio.ini') }}
       - run: pip install platformio
       - run: pio run -e s3
+      - name: LittleFS image (web files)
+        run: pio run -e s3 -t buildfs
       - name: Firmware size
         run: pio run -e s3 -t size | tail -5
       - uses: actions/upload-artifact@v7
@@ -85,5 +108,6 @@ jobs:
             .pio/build/s3/firmware.bin
             .pio/build/s3/bootloader.bin
             .pio/build/s3/partitions.bin
+            .pio/build/s3/littlefs.bin
             .pio/build/s3/firmware.elf
           retention-days: 30

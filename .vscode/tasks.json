@@ -6,29 +6,40 @@
       "type": "shell",
       "command": "pio test -e native",
       "group": "test",
-      "problemMatcher": ["$gcc"]
+      "problemMatcher": [
+        "$gcc"
+      ]
     },
     {
       "label": "Modem: build firmware",
       "type": "shell",
       "command": "pio run -e s3",
-      "group": { "kind": "build", "isDefault": true },
-      "problemMatcher": ["$gcc"]
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [
+        "$gcc"
+      ]
     },
     {
       "label": "Modem: upload over USB (tests first)",
       "type": "shell",
       "command": "pio run -e s3 -t upload",
-      "problemMatcher": ["$gcc"]
+      "problemMatcher": [
+        "$gcc"
+      ]
     },
     {
       "label": "Modem: upload over Wi-Fi / OTA (tests first)",
       "type": "shell",
       "command": "pio run -e s3_ota -t upload",
-      "problemMatcher": ["$gcc"]
+      "problemMatcher": [
+        "$gcc"
+      ]
     },
     {
-      "label": "Modem: upload sound files (LittleFS)",
+      "label": "Modem: upload sounds and web files (LittleFS)",
       "type": "shell",
       "command": "pio run -e s3 -t uploadfs",
       "problemMatcher": []
@@ -53,6 +64,23 @@
       "command": "python -m pytest test/e2e --console-port ${input:consolePort}",
       "group": "test",
       "problemMatcher": []
+    },
+    {
+      "label": "Modem: web interface tests",
+      "type": "shell",
+      "command": "npm test",
+      "options": {
+        "cwd": "${workspaceFolder}/web"
+      },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Modem: web interface preview (demo)",
+      "type": "shell",
+      "command": "python scripts/make_preview.py",
+      "problemMatcher": [],
+      "detail": "Writes web/preview.html; open it in a browser. D fakes a call, H hangs up."
     },
     {
       "label": "Modem: lint (cppcheck)",

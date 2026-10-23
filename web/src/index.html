@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'">
+<title>USR Modem</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='5' width='14' height='6' rx='1' fill='%23d8cfb8'/%3E%3Crect x='3' y='7' width='3' height='1.5' fill='%23ff3b30'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="xterm.css">
+<link rel="stylesheet" href="style.css">
+<script type="module" src="app.js"></script>
+</head>
+<body class="offline">
+<main id="screen"><div id="term" aria-label="Modem terminal"></div></main>
+<footer id="bar">
+  <div class="item leds" id="leds" title="Front panel lights"></div>
+  <div class="item" id="call" title="Connection status">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2l2.5 3-1.5 1.5a8 8 0 004.5 4.5L11 9.5l3 2.5-1.5 2.5C7 14 2 9 1.5 3.5z"/></svg>
+    <span id="call-label">Idle</span>
+  </div>
+  <div class="item" id="remote" title="Remote host">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c2 2 2.5 4 2.5 6.5S10 12.5 8 14.5M8 1.5C6 3.5 5.5 5.5 5.5 8S6 12.5 8 14.5"/></svg>
+    <span id="remote-label">—</span>
+  </div>
+  <div class="item" id="uptime" title="Connection time">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="9" r="5.5"/><path d="M8 9V6M6.5 1.5h3M12.5 4l1-1"/></svg>
+    <span id="uptime-label">--:--:--</span>
+  </div>
+  <div class="item" id="wifi" title="Modem Wi-Fi">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><path class="b1" d="M7 13h2v1.5H7z"/><path class="b2" d="M5.2 10.5a4 4 0 015.6 0"/><path class="b3" d="M3.4 8.5a6.5 6.5 0 019.2 0"/><path class="b4" d="M1.6 6.5a9 9 0 0112.8 0"/></svg>
+    <span id="wifi-label">—</span>
+  </div>
+  <div class="spacer"></div>
+  <div class="item" id="clock" title="Modem time">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 4v4l2.5 1.5"/></svg>
+    <span id="clock-label">—</span>
+  </div>
+  <div class="item" id="link" title="Link between this page and the modem">
+    <span class="dot"></span><span id="link-label">Connecting</span>
+  </div>
+</footer>
+</body>
+</html>

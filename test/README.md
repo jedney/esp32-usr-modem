@@ -7,6 +7,7 @@ Every modem feature has tests. Three levels:
 | **Unit** (`test/native/`) | PC, no board | `pio test -e native` | Every push (GitHub Actions) and automatically before every upload |
 | **On-board** (`test/embedded/`) | ESP32-S3 bench prototype | `pio test -e s3` | Before each tagged release |
 | **End-to-end** (`test/e2e/`) | PC driving the modem's serial ports | `python -m pytest test/e2e --console-port COMx [--rs232-port COMy]` | Before each tagged release |
+| **Web unit** (`web/test/`) | PC, Node.js | `cd web && npm test` | Every push (GitHub Actions) |
 
 Feature logic lives in `lib/` with no direct hardware calls, so most of it can be
 unit-tested on the PC. On-board tests cover the hardware layer; end-to-end tests cover
@@ -44,3 +45,6 @@ Status: ✅ tests written, ⬜ planned. Section numbers refer to the project bri
 | Wi-Fi password never displayed or exported (6.6, 6.8) | ⬜ | — | ⬜ | ⬜ |
 | `ATI0`–`ATI7` Sportster identity, fax handling (6.6) | ⬜ | — | ⬜ | ⬜ |
 | Call log, NTP clock (6.8) | ⬜ | ⬜ | ⬜ | ⬜ |
+| Web page status bar: LED decode, clock in the modem's time zone, call label, remote host/IP, uptime, Wi-Fi bars, reconnect back-off, 80 × 25 font fit (6.11) | `web/test/status.test.mjs` | — | demo-mode check in a browser | ✅ |
+| Web server: Digest login, session token, Host check, CSRF, WebSocket messages per `web/PROTOCOL.md`, browser firmware upload (6.11) | ⬜ | ⬜ | ⬜ | ⬜ |
+| Client Tests: display, screen size, X/Y/ZMODEM, keyboard, cable check (6.13) | ⬜ | — | ⬜ with `lrzsz` | ⬜ |

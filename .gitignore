@@ -16,3 +16,8 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# Generated web interface files (scripts/build_web.py, scripts/make_preview.py)
+data/www/
+web/preview.html
+web/node_modules/
