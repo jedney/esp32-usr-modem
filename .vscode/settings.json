@@ -1,0 +1,36 @@
+{
+  "editor.formatOnSave": true,
+  "editor.rulers": [100],
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.eol": "\n",
+  "files.associations": {
+    "*.ino": "cpp",
+    "*.h": "cpp"
+  },
+  "[cpp]": {
+    "editor.defaultFormatter": "xaver.clang-format"
+  },
+  "[c]": {
+    "editor.defaultFormatter": "xaver.clang-format"
+  },
+  "[python]": {
+    "editor.formatOnSave": false
+  },
+  "[markdown]": {
+    "editor.formatOnSave": false
+  },
+  "C_Cpp.clang_format_style": "file",
+  "C_Cpp.formatting": "clangFormat",
+  "flake8.args": ["--max-line-length=100"],
+  "platformio-ide.autoRebuildAutocompleteIndex": true,
+  "platformio-ide.activateOnlyOnPlatformIOProject": true,
+  "markdownlint.config": {
+    "MD013": false,
+    "MD024": { "siblings_only": true }
+  },
+  "search.exclude": {
+    ".pio": true,
+    "3d-model": true
+  }
+}

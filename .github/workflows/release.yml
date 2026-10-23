@@ -1,0 +1,77 @@
+name: Release
+
+# On each merge (push) to main: if VERSION has no tag yet, run the unit tests, build the
+# firmware, tag the commit vX.Y and publish a GitHub release with the firmware images
+# and the CHANGES.md entry. Pushes that don't change VERSION are skipped.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - id: version
+        name: Read VERSION
+        run: |
+          version=$(python3 scripts/check_version.py)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Tag v$version already exists - nothing to release. Bump VERSION to release."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.version.outputs.exists == 'false'
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - if: steps.version.outputs.exists == 'false'
+        uses: actions/cache@v6
+        with:
+          path: ~/.platformio
+          key: pio-release-${{ hashFiles('platformio.ini') }}
+
+      - if: steps.version.outputs.exists == 'false'
+        name: Unit tests and firmware build
+        run: |
+          pip install platformio
+          pio test -e native
+          pio run -e s3
+
+      - if: steps.version.outputs.exists == 'false'
+        name: Tag and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # Release notes = this version's section of CHANGES.md
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" {grab=1; next}
+            grab && /^## \[/ {exit}
+            grab {print}
+          ' CHANGES.md > release-notes.md
+          mkdir dist
+          cp .pio/build/s3/firmware.bin   "dist/usr-modem-v$VERSION-firmware.bin"
+          cp .pio/build/s3/bootloader.bin "dist/usr-modem-v$VERSION-bootloader.bin"
+          cp .pio/build/s3/partitions.bin "dist/usr-modem-v$VERSION-partitions.bin"
+          gh release create "v$VERSION" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "v$VERSION" \
+            --notes-file release-notes.md \
+            $( [ "${VERSION%%.*}" = "0" ] && echo --prerelease )
