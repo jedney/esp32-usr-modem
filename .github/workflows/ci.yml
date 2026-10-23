@@ -111,3 +111,6 @@ jobs:
             .pio/build/s3/littlefs.bin
             .pio/build/s3/firmware.elf
           retention-days: 30
+      # Last: the test programs are built in the same folder and replace firmware.bin
+      - name: Compile the on-board tests (not run; no board in CI)
+        run: pio test -e s3 --without-uploading --without-testing

@@ -4,15 +4,16 @@ An ESP32-S3 Wi-Fi "modem" in a 3D-printed replica of a 1990s US Robotics Sportst
 33.6 Faxmodem. It has a real DB25 RS232 port, speaks the Hayes AT command set, plays the
 dial, DTMF and handshake sounds, and connects to Telnet BBSes over Wi-Fi.
 
-Status: **v0.1, prototyping.** The full requirements are in the project brief
+Status: **v0.3, prototyping.** The firmware has the USB maintenance console and the
+hardware tests for the electronics build (`AT*HWTEST`); the modem itself comes next. The full requirements are in the project brief
 (`claude/project-brief.md` in the Claude project).
 
 ## Repository layout
 
 | Path | Contents |
 |---|---|
-| `src/` | Firmware entry point |
-| `lib/` | Firmware modules, kept free of hardware access where possible so they can be unit-tested on the PC |
+| `src/` | Firmware entry point and console commands |
+| `lib/` | Firmware modules. `lib/hw` is the hardware layer and holds the GPIO pin map (`lib/hw/src/pins.h`); the others have no hardware access so they can be unit-tested on the PC |
 | `test/native/` | Unit tests that run on the PC (no board) |
 | `test/embedded/` | Tests that run on the ESP32-S3 |
 | `test/e2e/` | End-to-end tests (Python) that drive the modem through its serial ports |
@@ -23,21 +24,63 @@ Status: **v0.1, prototyping.** The full requirements are in the project brief
 | `web/` | Web interface page (`src/`), third-party files (`vendor/`), tests and `PROTOCOL.md` |
 | `.github/workflows/` | GitHub Actions: CI and release tagging |
 
-## Getting started in VS Code
+## Getting started in VS Code (Windows)
 
-1. Install VS Code and open this folder. Accept the prompt to install the recommended
-   extensions (PlatformIO IDE is the important one; it installs the ESP32 toolchain on
-   first build).
-2. Run **Terminal → Run Task → Modem: run unit tests (PC)**. On Windows this needs a C++
-   compiler on the PATH (MinGW-w64 or MSYS2 `gcc`); see "Windows compiler" below.
-3. Connect the board's **USB-C port marked for the USB-serial chip** (UART0) and run
-   **Modem: upload over USB (tests first)**.
-4. Run **Modem: USB console (115200)**. You should see the boot banner and can type `AT`,
-   `AT*VER` or `AT*DIALTEST 170064142064`.
+### One-time setup
 
-Other tasks: build only, upload over Wi-Fi, upload sound files, on-board tests,
-end-to-end tests, lint, and version bumps. All are under **Run Task**, and PlatformIO's
-own sidebar has the same actions.
+1. Install **Git for Windows** (<https://git-scm.com>) and **VS Code**
+   (<https://code.visualstudio.com>).
+2. Install a C++ compiler for the PC unit tests, which run before every upload:
+   1. Install MSYS2 from <https://www.msys2.org>.
+   2. In the **MSYS2 UCRT64** window, run `pacman -S --needed mingw-w64-ucrt-x86_64-gcc`.
+   3. Add `C:\msys64\ucrt64\bin` to your user `Path` (Start → "Edit environment variables
+      for your account" → Path → Edit → New).
+   4. Open a new PowerShell window and check that `gcc --version` works.
+3. Optional: Node.js 20 or later (<https://nodejs.org>) for the web page tests, and Python
+   3.12 (<https://www.python.org>) for the end-to-end tests.
+4. Clone the repo (skip if you already have it):
+   `git clone https://github.com/jedney/esp32-usr-modem.git C:\repo\esp32-usr-modem`
+5. In VS Code: **File → Open Folder… → `C:\repo\esp32-usr-modem`**, choose **Trust**, and
+   accept **Install** on the "recommended extensions" prompt. PlatformIO IDE is the one that
+   matters. Restart VS Code when it asks. The PlatformIO (alien head) icon then appears in
+   the left-hand bar.
+
+### Build and upload
+
+1. **Terminal → Run Task… → Modem: build firmware.** The first build downloads the
+   ESP32-S3 toolchain (several hundred MB) and takes a few minutes. It ends with
+   `SUCCESS`.
+2. Plug a USB-C cable into the S3 board's **UART / COM** port (the one wired to the
+   USB-serial chip, not the one marked **USB**). In Device Manager → Ports it shows as a
+   `USB-SERIAL CH34x` (or similar) COM port. If no COM port appears, install the WCH CH34x
+   driver. Unplug other USB-serial adapters for the first upload, or choose the port in
+   PlatformIO's status-bar port selector.
+3. **Run Task → Modem: upload over USB (tests first).** The PC unit tests run first; then
+   the firmware is written (`SUCCESS`). If it stops at "Connecting…", hold **BOOT**, press
+   and release **RST**, release **BOOT**, and run the task again.
+4. **Run Task → Modem: upload sounds and web files (LittleFS).** This writes the files
+   partition (only the web page for now).
+5. **Run Task → Modem: USB console (115200).** Press **RST** on the board to see the
+   banner with the version, flash and PSRAM size. Type `AT*VER`, `AT*HELP`, `AT*HWINFO`.
+   Press **Ctrl+C** in the console terminal before the next upload (only one program can
+   use the COM port).
+
+The same actions are in PlatformIO's sidebar under **s3 → General / Platform**.
+
+### Hardware tests
+
+With the console open, `AT*HWTEST` walks through every part of the electronics in
+turn (LEDs, speaker, volume cap, pot, RS232 lines, loopback) and prints a pass/fail
+summary. `AT*HW?` lists the single tests. The GPIO pin map is in `lib/hw/src/pins.h`
+(**proposed, not yet confirmed by Electronics**); `AT*HWPINS` prints it. Pins are
+only driven when a test uses them.
+
+Loopback plug for `AT*HWLOOP`: join RXD–TXD, CTS–RTS and DCD–DTR (DB25 pins 3–2, 5–4,
+8–20; bench DB9 pins 2–3, 8–7, 1–4).
+
+Other tasks: upload over Wi-Fi, on-board tests, end-to-end tests, web tests and preview,
+lint, and version bumps. Running the on-board tests replaces the firmware on the board
+with the test program, so upload the firmware again afterwards.
 
 ### Debugging
 
@@ -57,10 +100,11 @@ The modem must have Wi-Fi configured and an OTA password set on the device.
 
 ### Windows compiler
 
-The `native` unit tests compile on your PC, so they need `gcc`/`g++`. The simplest
-option is MSYS2 (<https://www.msys2.org>): install it, run
-`pacman -S mingw-w64-ucrt-x86_64-gcc`, and add `C:\msys64\ucrt64\bin` to the PATH.
-The ESP32 build itself does not need this.
+The `native` unit tests compile on your PC, so they need `gcc`/`g++` (setup step 2). The
+ESP32 build itself does not. For an emergency upload without the tests, set
+`USR_MODEM_SKIP_TESTS=1` first: open PlatformIO's terminal (sidebar → **Quick Access →
+Miscellaneous → PlatformIO Core CLI**), run `$env:USR_MODEM_SKIP_TESTS = "1"`, then
+`pio run -e s3 -t upload` in the same terminal.
 
 ## Web interface
 
@@ -78,7 +122,7 @@ clock. Source is in `web/`; see `web/PROTOCOL.md`.
 
 ## Versioning
 
-- `VERSION` holds the current version (`0.1`). It is built into the firmware together
+- `VERSION` holds the current version (`0.3`). It is built into the firmware together
   with the git commit, and shown in the boot banner and by `AT*VER`.
 - **+0.1** for small enhancements and bug fixes. After 0.9 comes 0.10.
 - **+1.0** for a major feature or a hardware change. **v1.0** is the first production

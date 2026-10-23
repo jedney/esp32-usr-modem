@@ -1,10 +1,12 @@
 // USR Modem Emulator - firmware entry point.
 //
-// v0.1 prototype: USB maintenance console (UART0, 115200 8N1) with a boot banner and a
-// few commands. The modem itself (RS232 on UART1, Wi-Fi, sounds) follows in later versions.
+// Prototype: USB maintenance console (UART0, 115200 8N1) with a boot banner, a few
+// commands and, from v0.3, the AT*HW... hardware tests for the electronics build
+// (hwconsole.cpp). The modem itself (AT parser on RS232, Wi-Fi, calls) follows later.
 #include <Arduino.h>
 
 #include "dialstring.h"
+#include "hwconsole.h"
 
 #ifndef FW_VERSION
 #define FW_VERSION "0.0"
@@ -27,11 +29,12 @@ void printBanner() {
     Serial.print(" | |_| |___) |  _ <  | |  | | (_) | (_| |  __/ | | | | |\r\n");
     Serial.print("  \\___/|____/|_| \\_\\ |_|  |_|\\___/ \\__,_|\\___|_| |_| |_|\r\n");
     Serial.printf("\r\nUSR Modem Emulator v%s (%s)\r\n", FW_VERSION, FW_COMMIT);
-    Serial.printf("ESP32-S3, flash %u MB, PSRAM %u KB, reset reason %d\r\n",
+    Serial.printf("ESP32-S3, flash %u MB, PSRAM %u KB, reset: %s\r\n",
                   static_cast<unsigned>(ESP.getFlashChipSize() / (1024 * 1024)),
                   static_cast<unsigned>(ESP.getPsramSize() / 1024),
-                  static_cast<int>(esp_reset_reason()));
-    Serial.print("Prototype console. Commands: AT, AT*VER, AT*DIALTEST <dial string>\r\n");
+                  hwconsole::resetReasonName(static_cast<int>(esp_reset_reason())));
+    Serial.print(
+        "Prototype console. AT*HELP lists the commands; AT*HWTEST tests the hardware.\r\n");
 }
 
 void dialTest(const char *arg) {
@@ -65,11 +68,26 @@ bool startsWithNoCase(const char *s, const char *prefix) {
     return true;
 }
 
+void printHelp() {
+    Serial.print("  AT                                                   OK\r\n");
+    Serial.print("  AT*VER                                               firmware version\r\n");
+    Serial.print("  AT*HELP or AT*?                                      this list\r\n");
+    Serial.print(
+        "  AT*DIALTEST <dial string>                            show how a number is dialled\r\n");
+    hwconsole::printHelp();
+    Serial.print("OK\r\n");
+}
+
 void handleLine(const char *cmd) {
     if (cmd[0] == '\0') {
         return;
     }
-    if (startsWithNoCase(cmd, "AT*DIALTEST")) {
+    if (startsWithNoCase(cmd, "AT*HW")) {
+        hwconsole::handle(cmd + strlen("AT*HW"));
+    } else if ((startsWithNoCase(cmd, "AT*HELP") && cmd[7] == '\0') ||
+               (startsWithNoCase(cmd, "AT*?") && cmd[4] == '\0')) {
+        printHelp();
+    } else if (startsWithNoCase(cmd, "AT*DIALTEST")) {
         const char *arg = cmd + strlen("AT*DIALTEST");
         dialTest(arg);
     } else if (startsWithNoCase(cmd, "AT*VER") && cmd[6] == '\0') {
