@@ -15,9 +15,9 @@ console end-to-end tests pass; the RS232 end-to-end tests (`test/e2e/test_rs232.
 wait for the MAX3232s and DB9 to be wired.
 
 Built, check outstanding: **v0.7** device password, authenticated OTA and factory reset.
-Native, on-board and console checks pass. OTA authenticates, but the Windows firewall
-blocks its return TCP connection; the complete upload check awaits approval to run
-`scripts/allow_ota.ps1` (PlatformIO Python, TCP 32320, local subnet, Domain/Private).
+Native, on-board and console checks pass. OTA authenticates; the approved scoped
+Windows callback rule is applied. The complete upload check still needs a reachable
+TCP 32320 path from the modem's subnet (10.66.66.x) to the PC's subnet (10.0.0.x).
 
 | Version | Feature | Brief | Done when |
 |---|---|---|---|

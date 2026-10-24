@@ -154,6 +154,11 @@ PlatformIO's Python on that callback port, from the local subnet, on Domain/Priv
 networks. Existing TCP blocks for that interpreter are restricted to Public networks;
 public-network access stays blocked. It does not disable the firewall.
 
+If the PC and modem are on different subnets/VLANs, the network firewall must also
+permit **modem → PC TCP 32320**. Allowing it in Windows alone does not open that routed
+path. Use a rule limited to those two devices, or put both on the same network.
+Successful UDP authentication does not prove the return TCP path is reachable.
+
 `AT*FACTORY` asks Y/N, followed by Enter, with a 30-second timeout. Y erases all stored
 modem settings, Wi-Fi and the device password, then reboots with a new password.
 An interrupted reset resumes on the next boot. `AT&F1` loads modem defaults only;

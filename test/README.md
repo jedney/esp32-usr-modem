@@ -23,7 +23,7 @@ Upload the firmware again afterwards (**Modem: upload over USB (tests first)**).
 | v0.4 | 2026-10-24 | Bare board, console COM15 | `test_board` 5/5; `test_hw` not run (nothing wired) | 34 passed, 1 skipped (bridge test, no RS232 port) |
 | v0.5 | 2026-10-24 | Bare board, console COM15 | `test_board` 5/5, `test_rs232` 8/8 (no wires needed); `test_hw` not run | 46 passed, 22 skipped (`test_rs232.py` and the bridge test: no RS232 port yet) |
 | v0.6 | 2026-10-24 | Bare board, console COM15, Jon's Wi-Fi (`.env`) | `test_board` 5/5, `test_rs232` 8/8, `test_wifi` 6/6 | 61 passed, 22 skipped (`test_rs232.py` and the bridge test: RS232 not wired) |
-| v0.7 | 2026-10-25 | Console COM15, Wi-Fi, LED and pot; Unitek COM18, RS232/audio unwired | `test_board` 5/5, `test_device` 5/5, internal `test_rs232` 8/8, `test_wifi` 6/6 | Regression: 63 passed, 27 skipped. Opt-in device checks: 6 passed; full reset/authenticated-upload check reaches OTA authentication but transfer is blocked by Windows firewall |
+| v0.7 | 2026-10-25 | Console COM15, Wi-Fi, LED and pot; Unitek COM18, RS232/audio unwired | `test_board` 5/5, `test_device` 5/5, internal `test_rs232` 8/8, `test_wifi` 6/6 | Regression: 63 passed, 27 skipped. Opt-in device checks: 6 passed; full reset/authenticated-upload check reaches OTA authentication but the return TCP connection still fails across subnets after the approved Windows allow rule was applied |
 
 ## Feature matrix
 
