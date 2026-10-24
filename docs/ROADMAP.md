@@ -14,10 +14,11 @@ Built, check outstanding: **v0.5** RS232 host port and LED driver. Unit, on-boar
 console end-to-end tests pass; the RS232 end-to-end tests (`test/e2e/test_rs232.py`)
 wait for the MAX3232s and DB9 to be wired.
 
-Built, check outstanding: **v0.7** device password, authenticated OTA and factory reset.
-Native, on-board and console checks pass. OTA authenticates; the approved scoped
-Windows callback rule is applied. The complete upload check still needs a reachable
-TCP 32320 path from the modem's subnet (10.66.66.x) to the PC's subnet (10.0.0.x).
+Done: **v0.7** device password, authenticated OTA and factory reset (bench 25 Oct).
+After reconnecting the modem to the PC's network at 10.0.0.221, OTA uploads work with
+the device password, wrong/old passwords are refused, and `AT*FACTORY` generates a new
+password. The initial password disappears from the boot banner after authenticated
+use. All seven device acceptance checks have passed.
 
 | Version | Feature | Brief | Done when |
 |---|---|---|---|
