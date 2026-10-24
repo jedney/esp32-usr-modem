@@ -35,8 +35,9 @@ Owner: Jon Edney. Windows 11 PC, VS Code + PlatformIO, repo at `C:\repo\esp32-us
   - Update the matrix in `test/README.md`.
   - Uploads run the native tests first and stop if any fail. Don't bypass this
     (`USR_MODEM_SKIP_TESTS=1`) unless Jon asks.
-- **Pins only in `lib/hw/src/pins.h`.** The map is *proposed* (Q76) until Electronics
-  confirms it. TTL side of the MAX3232 is inverted: asserted = LOW. DSR is hard-wired on.
+- **Pins only in `lib/hw/src/pins.h`.** The map is **confirmed** by Electronics (Q76,
+  schematic rev A, 24 Oct 2026); `test_pins` locks the values in, so change both together
+  and only when Electronics changes the board. TTL side of the MAX3232 is inverted: asserted = LOW. DSR is hard-wired on.
 - **Volume cap** (`lib/sounds/src/volume.h`, −7 dB for the 0.25 W speaker) is applied
   last to every sound. Never add a path that skips it.
 - **Secrets.** The Wi-Fi password and device password are never printed, logged,

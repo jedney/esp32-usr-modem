@@ -5,6 +5,7 @@ the pins whether or not anything is connected). The bridge test also needs the R
 port (--rs232-port) through the bench DB9 or the DB25 and the Unitek adapter.
 """
 
+import re
 import time
 
 import pytest
@@ -26,6 +27,17 @@ def test_pins_are_shown(console):
     lines = console.command("AT*HWPINS")
     assert lines[-1] == "OK"
     assert any("DB25 20" in line for line in lines)
+
+
+def test_pins_are_the_confirmed_map(console):
+    """The map Electronics confirmed (Q76, schematic rev A)."""
+    text = "\n".join(console.command("AT*HWPINS"))
+    assert "confirmed (schematic rev A)" in text
+    assert re.search(r"\bAA=GPIO1\b", text)  # not GPIO10
+    assert re.search(r"\bARQ=GPIO38\b", text)
+    assert "pot wiper: GPIO10" in text
+    assert "LRC GPIO11" in text
+    assert "BCLK GPIO12" in text
 
 
 def test_info_shows_chip_and_memory(console):

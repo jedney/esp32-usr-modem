@@ -23,6 +23,7 @@
 #include "autobaud.h"
 #include "hw.h"
 #include "pins.h"
+#include "wifi_radio.h"
 
 namespace {
 
@@ -278,6 +279,9 @@ void setup() {
     if (!fitted) {
         hw::hostBegin(current);
         hw::captureBegin();  // first: setting up the RMT makes TXD-in an input-only pin
+        // The on-board RGB LED (v0.6) uses an RMT transmit channel; light it so every
+        // capture below runs with both RMT users active, as in the firmware.
+        hw::rgbSet(0, 8, 8);
         Serial2.begin(current, SERIAL_8N1, pins::kTestUartRx, pins::kTestUartTx);
         uart_internal_loopback(2, pins::kTxd);         // "computer" -> TXD in
         uart_internal_loopback(1, pins::kTestUartRx);  // RXD out -> "computer"

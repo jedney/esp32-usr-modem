@@ -14,6 +14,45 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [0.6] - 2026-10-24
+
+### Added
+
+- Wi-Fi (brief 6.6): one saved network, joined at boot and rejoined when it drops
+  (retries after 5, 10, 20, 30 s, then every minute). `AT*WIFISCAN` lists the networks in
+  range; `AT*WIFIJOIN=<n|"name">` joins one, asking for the password at a masked prompt
+  (each character shows as `*`; it is never on the command line, so `A/` doesn't repeat
+  it). The network is saved only once it connects; otherwise the old one is rejoined.
+  `AT*WIFI?` shows the state, network, signal, address, MAC and name, and the password
+  only as "set" / "not set". `AT*WIFI=ON|OFF`, `AT*WIFIFORGET`.
+- Static IP: `AT*WIFIIP=<ip>,<mask>,<gateway>[,<dns>]`, `AT*WIFIIP=DHCP`.
+- mDNS name, `usr-modem.local` by default: `AT*HOSTNAME=<name>`.
+- Clock from NTP, shown in New Zealand time by default: `AT*TIME`, `AT*TZ=<zone|POSIX
+  rule>` (`AT*TZ=?` lists the zones), `AT*NTP=<server>` (default `pool.ntp.org`).
+- Wi-Fi lights: the front ARQ LED is off with no network set up, blinks while connecting
+  and is on when connected; the on-board RGB LED is red, flashing green and green.
+  Both are off when Wi-Fi is switched off.
+- The boot banner shows Wi-Fi, IP, network name and the clock, waiting up to 8 s for the
+  network. Later changes (connected, lost, clock set) are printed on the USB console
+  between commands, never on the RS232 port.
+- Wi-Fi settings are stored on their own (NVS namespace `net`), so `AT&F`, `ATZ` and
+  `&W` don't touch them. The ESP-IDF's own copy of the network is switched off.
+- `.env` (git-ignored, see `.env.example`) holds the Wi-Fi details for the end-to-end
+  tests and the OTA password for `s3_ota` uploads.
+- Tests: 42 unit tests (`test_netcfg`: settings, checks, time zones and NZ daylight
+  saving, retry rules, lights, join and scan, every command, and a check that the
+  password never appears in any output), 6 for the masked prompt and late results
+  (`test_atcmd`); on-board `test_wifi`; end-to-end `test_wifi.py` (join, `ping
+  usr-modem.local`, clock against the PC, password never shown).
+
+### Changed
+
+- Pin map confirmed by Electronics (Q76, schematic rev A): I2S LRC GPIO11 and BCLK
+  GPIO12, pot GPIO10, LEDs AA CD RD SD TR CS ARQ on GPIO1, 2, 42, 41, 40, 39, 38.
+  `AT*HWPINS` says "confirmed"; a unit test locks the values in.
+- AT commands can now ask for a secret at a masked prompt and send their result later,
+  so a Wi-Fi join or scan doesn't hold up the other port (any key cancels).
+
 ## [0.5] - 2026-10-24
 
 ### Added

@@ -12,6 +12,8 @@ is generated from the same list.
 | `sound/dial-up.wav`, `sound/busy-signal.wav` | Reference sounds | caiot5, RetroExternalModem, <https://github.com/caiot5/retroexternalmodem> | GPL-3.0 | Source must be offered if distributed; GPL applies to the combined work if bundled in firmware | In repo; not yet used in firmware |
 | Zimodem (PPP/SLIP and Telnet code, to be ported) | Firmware modules | Bo Zimmerman, <https://github.com/bozimmerman/Zimodem> | Apache-2.0 | Keep LICENSE and NOTICE; mark every ported or modified file as changed | Planned |
 | Arduino-ESP32 core 2.0.x | Firmware framework | Espressif Systems | LGPL-2.1 (core), Apache-2.0 (ESP-IDF) | Allow relinking if distributed as a binary | Used |
+| Time-zone rules (`lib/netcfg/src/net_tz.cpp`, the POSIX rules in the zone table) | Local time for the clock (`AT*TZ`) | IANA Time Zone Database, <https://www.iana.org/time-zones> | Public domain | None | Used |
+| Calendar date algorithms (`daysFromCivil`, `civilFromDays` in `net_tz.cpp`) | Date from a UTC timestamp | Howard Hinnant, <https://howardhinnant.github.io/date_algorithms.html> | Public domain | None (credited in the source) | Used |
 | Unity test framework | Unit tests | ThrowTheSwitch.org | MIT | Keep copyright notice | Used (tests only) |
 | xterm.js 6.0.0 (`web/vendor/xterm.mjs`, `xterm.css`) | Web interface terminal | The xterm.js authors, <https://github.com/xtermjs/xterm.js> | MIT | Keep `web/vendor/LICENSE-xterm.txt` | Used |
 | IBM Plex Mono (`web/vendor/ibm-plex-mono-*.woff2`, via Fontsource 5.3.0) | Web interface font | IBM Corp., <https://github.com/IBM/plex> | SIL OFL-1.1 | Keep `web/vendor/LICENSE-ibm-plex-mono.txt`; don't sell the font on its own | Used |

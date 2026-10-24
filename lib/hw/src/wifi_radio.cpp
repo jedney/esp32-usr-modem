@@ -1,0 +1,312 @@
+// The S3's Wi-Fi, mDNS and NTP: see wifi_radio.h.
+#include "wifi_radio.h"
+
+#include <Arduino.h>
+#include <ESPmDNS.h>
+#include <WiFi.h>
+#include <esp_sntp.h>
+#include <esp_wifi.h>
+#include <sys/time.h>
+
+#include <cstdio>
+#include <cstring>
+
+#include "pins.h"
+
+namespace hw {
+
+using netcfg::LinkState;
+using netcfg::Reason;
+
+namespace {
+
+// Written by the Wi-Fi event task (core 0), read by loop() (core 1).
+volatile LinkState linkState = LinkState::kOff;
+volatile Reason linkReason = Reason::kNone;
+volatile int64_t syncedAt = 0;
+volatile bool scanFinished = false;
+
+// Our own scan limit. The core's scanNetworks() gives up after 20 x the channel time (6 s),
+// which the first scan after the radio starts can take longer than; its results then
+// turn up as the answer to the next scan.
+constexpr uint32_t kScanLimitMs = 15000;
+bool scanning = false;
+uint32_t scanStartedAt = 0;
+
+bool started = false;
+bool mdnsRunning = false;
+char appliedHost[netcfg::kHostMax + 1] = "";  // the name the STA interface started with
+char ntpServer[netcfg::kNtpMax + 1] = "";     // lwIP keeps a pointer to this
+
+Reason mapReason(uint8_t r, bool wasUp) {
+    switch (r) {
+        case WIFI_REASON_AUTH_FAIL:
+        case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+        case WIFI_REASON_HANDSHAKE_TIMEOUT:
+            return wasUp ? Reason::kLost : Reason::kWrongPassword;
+        case WIFI_REASON_NO_AP_FOUND:
+            return wasUp ? Reason::kLost : Reason::kNotFound;
+        case WIFI_REASON_AUTH_EXPIRE:
+        case WIFI_REASON_ASSOC_EXPIRE:
+        case WIFI_REASON_CONNECTION_FAIL:
+            return wasUp ? Reason::kLost : Reason::kNoAnswer;
+        default:
+            return wasUp ? Reason::kLost : Reason::kOther;
+    }
+}
+
+void onWifiEvent(arduino_event_id_t event, arduino_event_info_t info) {
+    switch (event) {
+        case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+            linkReason = Reason::kNone;
+            linkState = LinkState::kUp;
+            break;
+        case ARDUINO_EVENT_WIFI_STA_LOST_IP:
+            if (linkState == LinkState::kUp) {
+                linkReason = Reason::kLost;
+                linkState = LinkState::kDown;
+            }
+            break;
+        case ARDUINO_EVENT_WIFI_STA_DISCONNECTED: {
+            const uint8_t r = info.wifi_sta_disconnected.reason;
+            if (r == WIFI_REASON_ASSOC_LEAVE) {
+                break;  // our own leave() or a new connect()
+            }
+            const LinkState s = linkState;
+            if (s == LinkState::kConnecting || s == LinkState::kUp) {
+                linkReason = mapReason(r, s == LinkState::kUp);
+                linkState = LinkState::kDown;
+            }
+            break;
+        }
+        case ARDUINO_EVENT_WIFI_SCAN_DONE:
+            // The core has already copied the results (WiFi.SSID(i) ...) before this runs.
+            scanFinished = true;
+            break;
+        default:
+            break;
+    }
+}
+
+void onTimeSync(struct timeval *tv) {
+    syncedAt = tv->tv_sec;
+}
+
+void start() {
+    if (started) {
+        return;
+    }
+    started = true;
+    WiFi.persistent(false);  // no ESP-IDF copy of the network or password in flash
+    WiFi.onEvent(onWifiEvent);
+    sntp_set_time_sync_notification_cb(onTimeSync);
+}
+
+IPAddress toIp(uint32_t v) {
+    return IPAddress(static_cast<uint8_t>(v >> 24), static_cast<uint8_t>(v >> 16),
+                     static_cast<uint8_t>(v >> 8), static_cast<uint8_t>(v));
+}
+
+uint32_t fromIp(const IPAddress &a) {
+    return static_cast<uint32_t>(a[0]) << 24 | static_cast<uint32_t>(a[1]) << 16 |
+           static_cast<uint32_t>(a[2]) << 8 | static_cast<uint32_t>(a[3]);
+}
+
+netcfg::Security mapSecurity(wifi_auth_mode_t m) {
+    switch (m) {
+        case WIFI_AUTH_OPEN:
+            return netcfg::Security::kOpen;
+        case WIFI_AUTH_WEP:
+            return netcfg::Security::kWep;
+        case WIFI_AUTH_WPA_PSK:
+            return netcfg::Security::kWpa;
+        case WIFI_AUTH_WPA2_PSK:
+        case WIFI_AUTH_WPA_WPA2_PSK:
+            return netcfg::Security::kWpa2;
+        case WIFI_AUTH_WPA3_PSK:
+        case WIFI_AUTH_WPA2_WPA3_PSK:
+            return netcfg::Security::kWpa3;
+        case WIFI_AUTH_WPA2_ENTERPRISE:
+            return netcfg::Security::kEnterprise;
+        default:
+            return netcfg::Security::kOther;
+    }
+}
+
+void mdnsStop() {
+    if (mdnsRunning) {
+        MDNS.end();
+        mdnsRunning = false;
+    }
+}
+
+}  // namespace
+
+void EspRadio::connect(const netcfg::Settings &s) {
+    start();
+    // The name is given to the STA interface when it starts, so restart it for a new one.
+    if (strcmp(appliedHost, s.host) != 0 && WiFi.getMode() != WIFI_OFF) {
+        mdnsStop();
+        WiFi.mode(WIFI_OFF);
+    }
+    WiFi.setHostname(s.host);
+    snprintf(appliedHost, sizeof appliedHost, "%s", s.host);
+    WiFi.mode(WIFI_STA);
+    WiFi.setSleep(false);          // no power-save delays on Telnet traffic
+    WiFi.setAutoReconnect(false);  // netcfg::Net decides when to try again
+    WiFi.disconnect(false, false);
+    if (s.dhcp) {
+        WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE);
+    } else {
+        WiFi.config(toIp(s.ip), toIp(s.gateway), toIp(s.mask), toIp(s.dns));
+    }
+    WiFi.setMinSecurity(s.pass[0] != '\0' ? WIFI_AUTH_WPA_PSK : WIFI_AUTH_OPEN);
+    linkReason = Reason::kNone;
+    linkState = LinkState::kConnecting;
+    WiFi.begin(s.ssid, s.pass[0] != '\0' ? s.pass : nullptr);
+}
+
+void EspRadio::leave() {
+    start();
+    mdnsStop();
+    linkReason = Reason::kNone;
+    linkState = LinkState::kDown;
+    if (WiFi.getMode() != WIFI_OFF) {
+        WiFi.disconnect(false, false);
+    }
+}
+
+void EspRadio::off() {
+    start();
+    mdnsStop();
+    linkReason = Reason::kNone;
+    linkState = LinkState::kOff;
+    WiFi.disconnect(true, false);
+    WiFi.mode(WIFI_OFF);
+}
+
+netcfg::LinkInfo EspRadio::link() {
+    netcfg::LinkInfo l = {};
+    l.state = linkState;
+    l.reason = linkReason;
+    if (l.state == LinkState::kUp) {
+        l.rssi = static_cast<int8_t>(WiFi.RSSI());
+        l.channel = static_cast<uint8_t>(WiFi.channel());
+        l.ip = fromIp(WiFi.localIP());
+        l.mask = fromIp(WiFi.subnetMask());
+        l.gateway = fromIp(WiFi.gatewayIP());
+        l.dns = fromIp(WiFi.dnsIP(0));
+    }
+    return l;
+}
+
+bool EspRadio::scanStart() {
+    start();
+    if (WiFi.getMode() == WIFI_OFF) {
+        WiFi.mode(WIFI_STA);  // netcfg::Net turns it off again after the scan
+    }
+    if (scanning) {
+        esp_wifi_scan_stop();  // an earlier scan that ran out of time
+    }
+    WiFi.scanDelete();
+    // Started here rather than with WiFi.scanNetworks() (see kScanLimitMs). The core
+    // still collects the results when the scan ends, for WiFi.SSID(i) and the rest.
+    wifi_scan_config_t cfg = {};
+    cfg.show_hidden = false;
+    cfg.scan_type = WIFI_SCAN_TYPE_ACTIVE;
+    cfg.scan_time.active.min = 0;
+    cfg.scan_time.active.max = 300;
+    scanFinished = false;
+    if (esp_wifi_scan_start(&cfg, false) != ESP_OK) {
+        scanning = false;
+        return false;
+    }
+    scanning = true;
+    scanStartedAt = millis();
+    return true;
+}
+
+int EspRadio::scanResult(netcfg::ScanEntry *out, int max) {
+    if (!scanning) {
+        return -2;
+    }
+    if (!scanFinished) {
+        if (millis() - scanStartedAt < kScanLimitMs) {
+            return -1;
+        }
+        esp_wifi_scan_stop();
+        scanning = false;
+        return -2;
+    }
+    scanning = false;
+    const int16_t n = WiFi.scanComplete();
+    if (n < 0) {
+        return -2;
+    }
+    int count = 0;
+    for (int16_t i = 0; i < n && count < max; ++i) {
+        netcfg::ScanEntry &e = out[count++];
+        snprintf(e.ssid, sizeof e.ssid, "%s", WiFi.SSID(i).c_str());
+        e.rssi = static_cast<int8_t>(WiFi.RSSI(i));
+        e.channel = static_cast<uint8_t>(WiFi.channel(i));
+        e.security = mapSecurity(WiFi.encryptionType(i));
+    }
+    WiFi.scanDelete();
+    return count;
+}
+
+void EspRadio::startServices(const netcfg::Settings &s) {
+    mdnsStop();
+    mdnsRunning = MDNS.begin(s.host);
+    snprintf(ntpServer, sizeof ntpServer, "%s", s.ntp);
+    configTime(0, 0, ntpServer);  // the clock runs in UTC; netcfg::tz does the local time
+}
+
+int64_t EspRadio::utcNow() {
+    const time_t t = time(nullptr);
+    return t > 1600000000 ? static_cast<int64_t>(t) : 0;  // before 2020: not set yet
+}
+
+int64_t EspRadio::lastSync() {
+    return syncedAt;
+}
+
+void EspRadio::mac(uint8_t out[6]) {
+    WiFi.macAddress(out);
+}
+
+// --- On-board RGB LED -----------------------------------------------------------------------
+
+namespace {
+bool rgbKnown = false;
+uint8_t rgbLast[3] = {0, 0, 0};
+constexpr uint8_t kRgbLevel = 24;  // of 255: plenty for a status light, not dazzling
+}  // namespace
+
+void rgbSet(uint8_t r, uint8_t g, uint8_t b) {
+    if (rgbKnown && rgbLast[0] == r && rgbLast[1] == g && rgbLast[2] == b) {
+        return;
+    }
+    neopixelWrite(pins::kRgbLed, r, g, b);
+    rgbLast[0] = r;
+    rgbLast[1] = g;
+    rgbLast[2] = b;
+    rgbKnown = true;
+}
+
+void rgbShow(netcfg::Rgb colour) {
+    switch (colour) {
+        case netcfg::Rgb::kRed:
+            rgbSet(kRgbLevel, 0, 0);
+            break;
+        case netcfg::Rgb::kGreen:
+            rgbSet(0, kRgbLevel, 0);
+            break;
+        case netcfg::Rgb::kOff:
+        default:
+            rgbSet(0, 0, 0);
+            break;
+    }
+}
+
+}  // namespace hw

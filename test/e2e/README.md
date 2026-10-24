@@ -24,3 +24,11 @@ console: it makes `AT*TESTCALL` calls and checks `+++`, `ATO`, `ATH` and `AT*BAU
 The live-dial tests (later versions) call the Amiga Retro BBS,
 `www.amigaretro.com:23` (170.64.142.64:23), and need Wi-Fi configured on the modem.
 A local test server will cover `BUSY`, `NO ANSWER` and `NO CARRIER`.
+
+`test_wifi.py` (v0.6) needs only the console, plus the Wi-Fi name and password in `.env`
+at the repository root (`USR_MODEM_WIFI_SSID`, `USR_MODEM_WIFI_PASS`; copy
+`.env.example`). Without them it is skipped. It joins that network through the masked
+password prompt (the network stays saved on the modem), pings `usr-modem.local` from the
+PC, compares the modem's clock with the PC's, and checks the password appears nowhere:
+not in the boot banner, `AT*HELP`, `AT*WIFI?`, `ATI0`-`ATI7`, `AT&V` or any other show
+command. The password is never printed, even when a test fails.

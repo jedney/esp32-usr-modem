@@ -1,0 +1,8 @@
+{
+  "name": "netcfg",
+  "version": "0.6.0",
+  "description": "USR Modem Emulator Wi-Fi and clock logic: saved network settings, connect and retry rules, Wi-Fi lights, time zones, and the AT* Wi-Fi and clock commands (brief 5.4, 6.6, 6.7)",
+  "frameworks": "*",
+  "platforms": "*",
+  "dependencies": [{"name": "atcmd"}, {"name": "modemcfg"}, {"name": "hwtest"}]
+}
