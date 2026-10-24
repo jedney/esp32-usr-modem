@@ -27,5 +27,4 @@ Notes:
   (Q76) changes, only `lib/hw/src/pins.h` changes.
 - USB CDC serial on the native USB port is a v2 feature (Q25); keep GPIO19/20 free.
 - The order can change; record any change in `docs/decisions-log.md`.
-- Before v0.5: Jon to decide the `&B` meaning (USR vs brief 6.2) and confirm `AT&F` = `&F0`
-  (decisions log, v0.4).
+- Before v0.5: Jon to decide the `&B` meaning (USR vs brief 6.2) (decisions log, v0.4).
