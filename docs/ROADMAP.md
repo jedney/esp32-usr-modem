@@ -5,16 +5,14 @@ must leave the modem working, with its tests written and passing. Section number
 refer to `docs/project-brief.md`.
 
 Done: **v0.1** scaffold, versioning, CI · **v0.2** web page (`web/`) · **v0.3**
-hardware tests (`AT*HW…`) · **v0.4** settings store and AT command parser.
+hardware tests (`AT*HW…`) · **v0.4** settings store and AT command parser · **v0.6**
+Wi-Fi and clock (joins Jon's Wi-Fi, `ping usr-modem.local` works, password absent from
+every output; checked on the bench 24 Oct). The pin map is confirmed (Q76) and applied
+in v0.6.
 
 Built, check outstanding: **v0.5** RS232 host port and LED driver. Unit, on-board and
 console end-to-end tests pass; the RS232 end-to-end tests (`test/e2e/test_rs232.py`)
 wait for the MAX3232s and DB9 to be wired.
-
-Built, check outstanding: **v0.6** Wi-Fi and clock. Unit, on-board and console
-end-to-end tests pass on the bare board; joining Jon's Wi-Fi, `ping usr-modem.local`
-and the password check (`test/e2e/test_wifi.py`) need the network details in `.env`.
-The pin map is confirmed (Q76) and applied in this version.
 
 | Version | Feature | Brief | Done when |
 |---|---|---|---|

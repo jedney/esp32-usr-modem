@@ -96,7 +96,10 @@ def test_mdns_name_answers_ping(console, wifi):
     name = match.group(2)
     count = ["-n", "2", "-w", "3000"] if sys.platform == "win32" else ["-c", "2", "-W", "3"]
     for _ in range(3):  # mDNS can take a moment after joining
-        result = subprocess.run(["ping", *count, name], capture_output=True, timeout=30)
+        # stdin from DEVNULL: without a console, Windows can't hand ping an input handle.
+        result = subprocess.run(
+            ["ping", *count, name], stdin=subprocess.DEVNULL, capture_output=True, timeout=30
+        )
         if result.returncode == 0:
             return
         time.sleep(2)

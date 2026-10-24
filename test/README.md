@@ -22,7 +22,7 @@ Upload the firmware again afterwards (**Modem: upload over USB (tests first)**).
 |---|---|---|---|---|
 | v0.4 | 2026-10-24 | Bare board, console COM15 | `test_board` 5/5; `test_hw` not run (nothing wired) | 34 passed, 1 skipped (bridge test, no RS232 port) |
 | v0.5 | 2026-10-24 | Bare board, console COM15 | `test_board` 5/5, `test_rs232` 8/8 (no wires needed); `test_hw` not run | 46 passed, 22 skipped (`test_rs232.py` and the bridge test: no RS232 port yet) |
-| v0.6 | 2026-10-24 | Bare board, console COM15, no Wi-Fi saved | `test_board` 5/5, `test_rs232` 8/8, `test_wifi` 1 passed, 5 skipped (no network saved) | 56 passed, 27 skipped (`test_wifi.py`: no `.env` yet; RS232 not wired) |
+| v0.6 | 2026-10-24 | Bare board, console COM15, Jon's Wi-Fi (`.env`) | `test_board` 5/5, `test_rs232` 8/8, `test_wifi` 6/6 | 61 passed, 22 skipped (`test_rs232.py` and the bridge test: RS232 not wired) |
 
 ## Feature matrix
 
