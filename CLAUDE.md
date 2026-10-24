@@ -55,6 +55,9 @@ Owner: Jon Edney. Windows 11 PC, VS Code + PlatformIO, repo at `C:\repo\esp32-us
 
 PlatformIO's `pio` is on the PATH inside VS Code tasks and the PlatformIO terminal. In
 a plain PowerShell terminal use `$env:USERPROFILE\.platformio\penv\Scripts\pio.exe`.
+The PC unit tests need GCC: WinLibs (winget `BrechtSanders.WinLibs.POSIX.UCRT.LLVM`, which
+also has clang-format) is installed for Jon's user and on the user PATH. End-to-end tests
+use the Python in `%LOCALAPPDATA%\Pythonin` (pytest and pyserial installed).
 
 | What | Command | VS Code task |
 |---|---|---|

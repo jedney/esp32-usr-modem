@@ -5,7 +5,7 @@ must leave the modem working, with its tests written and passing. Section number
 refer to `docs/project-brief.md`.
 
 Done: **v0.1** scaffold, versioning, CI · **v0.2** web page (`web/`) · **v0.3**
-hardware tests (`AT*HW…`).
+hardware tests (`AT*HW…`) · **v0.4** settings store and AT command parser.
 
 | Version | Feature | Brief | Done when |
 |---|---|---|---|
@@ -27,3 +27,5 @@ Notes:
   (Q76) changes, only `lib/hw/src/pins.h` changes.
 - USB CDC serial on the native USB port is a v2 feature (Q25); keep GPIO19/20 free.
 - The order can change; record any change in `docs/decisions-log.md`.
+- Before v0.5: Jon to decide the `&B` meaning (USR vs brief 6.2) and confirm `AT&F` = `&F0`
+  (decisions log, v0.4).

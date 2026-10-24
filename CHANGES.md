@@ -14,11 +14,40 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [0.4] - 2026-10-24
+
 ### Added
 
+- AT command parser on the USB console (`lib/atcmd`), following the USR Sportster 33.6
+  (brief 6.2, 6.5-6.7): several commands per line, `A/` repeat, `AT`/`at` only, S3/S5
+  line end and backspace, `E F L M Q V X B`, `P`/`T`, `H`, `Sr=n`, `Sr?`, `Sr.b=n`,
+  `AT=n`/`AT?`, `Y`, `Z0`-`Z5`, `&F0`-`&F2`, `&W0`/`&W1`, `&Z0`-`&Z3` stored numbers,
+  `&A &B &C &D &G &H &I &K &M &N &P &R &S &T &U &Y`, and `+FCLASS` (data only; fax
+  classes give ERROR). The first bad command stops the line with ERROR.
+- Result codes with Sportster numbers and words, X0-X4 sets, verbal/numeric (`V`) and
+  quiet (`Q`) modes, ready for the call results in v0.8.
+- `ATI0`-`ATI7` and `ATI9` with the text of a real Sportster 33600/Fax V2.31; `ATI4`
+  current settings, `ATI5` stored templates and numbers, `AT&V` both together.
+- Settings store (`lib/modemcfg`): two stored templates (Y0, Y1), factory templates
+  &F0-&F2, four stored numbers, kept in NVS with a version number and CRC; damaged or
+  old saved settings fall back to factory settings, and the boot banner says which.
+- Boot banner shows where the settings came from and the host-serial, echo, quiet,
+  verbal and result-code settings (brief 6.7).
+- Tests: 66 unit tests for the parser and settings; an on-board NVS test; end-to-end
+  tests for echo, numeric and quiet modes, `A/`, `ATI`, `+FCLASS` and settings kept
+  across a restart.
 - `CLAUDE.md` (project rules for Claude Code in VS Code), `docs/ROADMAP.md` (remaining
   firmware versions v0.4-v1.0), `docs/decisions-log.md`, and a snapshot of the project
-  brief in `docs/project-brief.md`. Documentation only; no firmware change.
+  brief in `docs/project-brief.md`.
+
+### Changed
+
+- `AT*` commands come from one table, and `AT*HELP` lists it. `AT*VER` and
+  `AT*DIALTEST` output now follows the `V` and `Q` settings.
+- Unknown-command end-to-end test uses `ATJ`: `ATXYZZY` is now valid (`X`, `Y`, `Z`).
+- PC unit tests are linked statically on Windows, so they run during an upload, when
+  PlatformIO's ESP32 compiler folder (with an older `libstdc++-6.dll`) is first on
+  PATH.
 
 ## [0.3] - 2026-10-24
 

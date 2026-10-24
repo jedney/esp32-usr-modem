@@ -35,4 +35,6 @@ def test_dialtest_invalid(console):
 
 
 def test_unknown_command_is_error(console):
-    assert console.command("ATXYZZY")[-1] == "ERROR"
+    # J and G are not Sportster commands. (Since v0.4 "ATXYZZY" is valid: X, Y, Z.)
+    assert console.command("ATJ")[-1] == "ERROR"
+    assert console.command("ATG1")[-1] == "ERROR"
