@@ -14,6 +14,12 @@ Built, check outstanding: **v0.5** RS232 host port and LED driver. Unit, on-boar
 console end-to-end tests pass; the RS232 end-to-end tests (`test/e2e/test_rs232.py`)
 wait for the MAX3232s and DB9 to be wired.
 
+Done: **v0.7** device password, authenticated OTA and factory reset (bench 25 Oct).
+After reconnecting the modem to the PC's network at 10.0.0.221, OTA uploads work with
+the device password, wrong/old passwords are refused, and `AT*FACTORY` generates a new
+password. The initial password disappears from the boot banner after authenticated
+use. All seven device acceptance checks have passed.
+
 | Version | Feature | Brief | Done when |
 |---|---|---|---|
 | v0.4 | **Settings store and AT command parser** (console first): command-line parsing (several commands per line, `A/` repeat), S-registers, `E Q V X`, `&F &W &V &Z`, `Z`, `ATI0`–`ATI7` (authentic Sportster text), `+FCLASS`, result codes (verbose/numeric/quiet), `AT*` commands in one table, `AT*HELP`. Stored in NVS, logic in `lib/` | 6.2, 6.5, 6.6, 6.7 | Parser and settings unit-tested on the PC; `AT&V` shows the saved profile after a restart |

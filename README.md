@@ -123,14 +123,46 @@ S3's built-in USB-JTAG is used (`debug_tool = esp-builtin`).
 
 ### Over-the-air uploads
 
-Put the OTA password in `.env` (`USR_MODEM_OTA_PASSWORD`, see above), then use the OTA
-task. An environment variable works too:
+The first boot generates a random 12-character **device password**, shared by OTA and
+the future web login (`admin`). It is printed only on the USB console at each boot
+until the first authenticated upload or password change. After that only hashes are
+kept. `AT*PASS` replaces it with a random password shown once on the requesting local
+port; `AT*PASS=<text>` sets 8–32 printable characters, including spaces. Arguments are
+masked and cannot be repeated with `A/`.
+
+Put the device password in `.env` (`USR_MODEM_OTA_PASSWORD`, see above), then use
+**Modem: upload over Wi-Fi / OTA (tests first)**, or:
 
 ```powershell
-setx USR_MODEM_OTA_PASSWORD "your-ota-password"   # Windows, then restart VS Code
+pio run -e s3_ota -t upload
 ```
 
-The modem must be on Wi-Fi. OTA itself arrives in v0.7 (with the device password).
+The modem must be on Wi-Fi and idle. The upload hook passes the password in memory,
+so even verbose PlatformIO output has no password argument. Environment variables
+override `.env`. If the hostname has changed, add `--upload-port <name>.local`.
+
+OTA listens by default. `AT*OTA=DEMAND` saves demand mode, normally closed;
+`AT*OTA=ON` opens it for 10 minutes and `AT*OTA=OFF` closes it early. `AT*OTA?` shows
+policy, state and remaining time. A reboot closes a demand window; reconnecting Wi-Fi
+does not extend it. `AT*OTA=ALWAYS` restores the default policy. An upload already
+accepted can finish after the window expires.
+
+On Windows, OTA authenticates over UDP 3232, then the modem connects back to the PC
+on TCP **32320**. If authentication says OK but transfer says "No response from device",
+run `scripts/allow_ota.ps1` once from an **Administrator PowerShell**. It permits only
+PlatformIO's Python on that callback port, from the local subnet, on Domain/Private
+networks. Existing TCP blocks for that interpreter are restricted to Public networks;
+public-network access stays blocked. It does not disable the firewall.
+
+If the PC and modem are on different subnets/VLANs, the network firewall must also
+permit **modem → PC TCP 32320**. Allowing it in Windows alone does not open that routed
+path. Use a rule limited to those two devices, or put both on the same network.
+Successful UDP authentication does not prove the return TCP path is reachable.
+
+`AT*FACTORY` asks Y/N, followed by Enter, with a 30-second timeout. Y erases all stored
+modem settings, Wi-Fi and the device password, then reboots with a new password.
+An interrupted reset resumes on the next boot. `AT&F1` loads modem defaults only;
+Wi-Fi and device credentials are kept.
 
 ### Windows compiler
 
@@ -156,7 +188,7 @@ clock. Source is in `web/`; see `web/PROTOCOL.md`.
 
 ## Versioning
 
-- `VERSION` holds the current version (`0.3`). It is built into the firmware together
+- `VERSION` holds the current version (`0.7`). It is built into the firmware together
   with the git commit, and shown in the boot banner and by `AT*VER`.
 - **+0.1** for small enhancements and bug fixes. After 0.9 comes 0.10.
 - **+1.0** for a major feature or a hardware change. **v1.0** is the first production
@@ -172,6 +204,7 @@ clock. Source is in `web/`; see `web/PROTOCOL.md`.
 - **Unit tests (PC):** `pio test -e native`. These run automatically before every upload
   (USB or OTA); a failure cancels the upload. Emergency override:
   `USR_MODEM_SKIP_TESTS=1`.
+- **Host uploader tests:** `python -m pytest test/scripts` (also run by CI).
 - **On-board tests:** `pio test -e s3` with the bench prototype connected.
 - **End-to-end tests:** `python -m pytest test/e2e --console-port COM5` (see
   `test/e2e/README.md`). The live dial test uses the Amiga Retro BBS

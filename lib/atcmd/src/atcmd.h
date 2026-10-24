@@ -64,7 +64,11 @@ struct StarCommand {
     const char *usage;  // for AT*HELP, e.g. "AT*VER"
     const char *help;   // one line for AT*HELP
     StarHandler fn;
-    bool prefix;  // true: matches any command starting with `name` (e.g. "HW" for AT*HWLED)
+    bool prefix;     // true: matches any command starting with `name` (e.g. "HW" for AT*HWLED)
+    bool sensitive;  // mask arguments, wipe input, refuse A/ (passwords/destructive commands)
+    constexpr StarCommand(const char *n, const char *u, const char *h, StarHandler f, bool p,
+                          bool s = false)
+        : name(n), usage(u), help(h), fn(f), prefix(p), sensitive(s) {}
 };
 
 constexpr size_t kLineMax = 128;   // characters after "AT"
@@ -92,6 +96,8 @@ public:
 
     const StarCommand *starTable() const { return star_; }
     size_t starCount() const { return starCount_; }
+    void stopCommands() { stopped_ = true; }  // factory reset is awaiting reboot
+    bool commandsStopped() const { return stopped_; }
     // Finds the AT* command for `text` (the part after "AT*"); *args is set to the text
     // after the command's name. Longest name wins. nullptr if none.
     const StarCommand *findStar(const char *text, const char **args) const;
@@ -103,6 +109,7 @@ private:
     modemcfg::Nvram nvram_;
     modemcfg::Profile active_;
     char lastDialed_[modemcfg::kPhoneLen + 1];
+    bool stopped_ = false;
 };
 
 class Port {
@@ -130,6 +137,9 @@ public:
     // with E1), Backspace/DEL delete, Enter hands the text to `fn`, Esc or Ctrl-C cancels
     // with ERROR. The text is never echoed, never kept for A/, and wiped after `fn`.
     void askSecret(const char *prompt, SecretHandler fn, void *ctx);
+    // A visible line prompt for Y/N confirmation; uses the same cancellation rules.
+    void askConfirmation(const char *prompt, SecretHandler fn, void *ctx);
+    bool cancelPrompt();  // timeout: wipe the pending input and send ERROR
     // The final result comes later, through finish(). Meanwhile typing is not a command;
     // any key (not LF) cancels: `cancel` is called and ERROR sent.
     void wait(CancelHandler cancel, void *ctx);
@@ -169,6 +179,8 @@ private:
     char line_[kLineMax + 1] = {};
     size_t len_ = 0;
     bool overflow_ = false;
+    bool privateLine_ = false;
+    bool repeatAllowed_ = true;
     char last_[kLineMax + 1] = {};
     unsigned selected_ = 0;  // register for "AT=n" / "AT?"
     // Masked prompt and wait (askSecret, wait)
@@ -178,6 +190,7 @@ private:
     char secret_[kSecretMax + 1] = {};
     size_t secretLen_ = 0;
     bool secretOverflow_ = false;
+    bool maskSecret_ = true;
 };
 
 // --- ATI and settings screens (identity.cpp) -----------------------------------------------

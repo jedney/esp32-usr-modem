@@ -14,6 +14,31 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [0.7] - 2026-10-25
+
+### Added
+
+- Device credentials: random 12-character first-boot password, USB-console boot display
+  until first use or change, and OTA/HTTP Digest hashes in their own NVS record.
+  `AT*PASS` generates a replacement shown once; `AT*PASS=<text>` accepts 8–32 printable
+  characters. Secret input is masked, wiped and excluded from `A/` repeat.
+- Authenticated ArduinoOTA with `AT*OTA?`, saved `ALWAYS`/`DEMAND` policy, and `ON`/`OFF`
+  for a 10-minute demand window. Listener follows Wi-Fi, credentials and idle state;
+  first authenticated use removes the temporary plaintext password.
+- `AT*FACTORY`: local Y/N confirmation, 30-second timeout, project-settings wipe and
+  reboot with a fresh password. A durable marker recovers interrupted resets.
+- 26 native lifecycle/command/reset tests, five on-board checks (including real MD5
+  vectors and offline password generation after pot ADC initialization), opt-in
+  serial/OTA acceptance tests, and three host uploader tests run in CI.
+
+### Fixed
+
+- OTA upload passwords stay out of process arguments and PlatformIO/espota debug
+  output. The upload hook reads `.env` or the environment and invokes the installed
+  uploader in memory, preserving native tests before every upload.
+- End-to-end timeout failures omit raw boot output and command text that can contain
+  credentials.
+
 ## [0.6] - 2026-10-24
 
 ### Added

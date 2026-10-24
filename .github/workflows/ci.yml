@@ -38,8 +38,9 @@ jobs:
         with:
           path: ~/.platformio
           key: pio-native-${{ hashFiles('platformio.ini') }}
-      - run: pip install platformio
+      - run: pip install platformio pytest
       - run: pio test -e native
+      - run: python -m pytest test/scripts -q
 
   lint:
     name: Lint (cppcheck, clang-format)

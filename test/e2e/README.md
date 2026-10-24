@@ -32,3 +32,23 @@ password prompt (the network stays saved on the modem), pings `usr-modem.local` 
 PC, compares the modem's clock with the PC's, and checks the password appears nowhere:
 not in the boot banner, `AT*HELP`, `AT*WIFI?`, `ATI0`-`ATI7`, `AT&V` or any other show
 command. The password is never printed, even when a test fails.
+
+`test_device.py` (v0.7) checks the password, OTA policy and factory reset. Its default
+checks are read-only. Password changes require `--device-tests`; the reset additionally
+requires `--factory-reset`, and real firmware uploads require `--ota-upload`. The reset
+erases all settings, rejoins the Wi-Fi in `.env`, and leaves modem settings at defaults.
+The configured OTA password is restored afterwards; if none exists, one is generated.
+`--save-ota-password` saves that final credential to the git-ignored `.env`, preserving
+the other entries, so the VS Code OTA task works afterwards.
+
+```powershell
+python -m pytest test/e2e/test_device.py --console-port COM15 --device-tests --factory-reset --ota-upload --save-ota-password --tb=short
+```
+
+Uploads use `pio run -e s3_ota -t upload`, including the native-test gate for each
+attempt. The suite verifies wrong/old credentials fail, correct/new credentials work,
+and the first successful authenticated upload removes the first-boot password. The
+10-minute boundary and millisecond rollover are tested with a fake clock on the PC.
+Do not enable pytest `--showlocals`: test locals hold credentials. Failure messages
+omit boot banners and upload output. COM18 is the current Unitek port; pass it only
+after the MAX3232/DB9 section is wired.
