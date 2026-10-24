@@ -36,11 +36,15 @@ use. All seven device acceptance checks have passed.
 
 Notes:
 
-- **v0.8 identity/speed update (Jon, 25 Oct):** identify as a Sportster 14400 while
-  retaining the command set and emulated speeds through 56000. Factory call speed is
-  14400 (`&N8`), `&N0` selects 56000; host serial rates still reach 115200. The
-  identity/speed preparation is implemented on the v0.8 branch; outgoing calls remain
-  pending. See `docs/v0.8-plan.md` for implementation and bench acceptance scope.
+- **v0.8 model update (Jon, 25 Oct):** plan `AT*MODEL=` for Sportster 14.4k, 28.8k,
+  33.6k and 56k Series; factory default remains 14.4k. Selection affects ATI identity
+  and default reported CONNECT speed only; speed options and features remain.
+  Persistence, speed precedence and command values await Jon's answers. Also plan
+  the `AT*PASS=` echo fix: the separator stays visible, its value is masked.
+  v0.10's config and v0.11's web interface must offer the model selector and show
+  the selected model prominently on the first config page, optionally with ASCII
+  art above the menu. Fixed-14400 identity/speed preparation is implemented; model
+  selection and outgoing calls remain pending. See `docs/v0.8-plan.md`.
 - v0.5 needs the RS232 section wired on the bench (MAX3232s, DB9).
 - The pin map is confirmed by Electronics (Q76, schematic rev A, 24 Oct 2026) and applied
   in v0.6. If the board ever changes, `lib/hw/src/pins.h` and the values locked in by

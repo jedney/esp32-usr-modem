@@ -16,6 +16,15 @@ configuration screen, with a **status bar** along the bottom:
 On narrow windows the bar drops Wi-Fi, then the remote host, then the connection time,
 then the clock.
 
+Planned model presentation (Jon, 25 Oct 2026): the first configuration page must
+prominently display the selected Sportster 14.4k, 28.8k, 33.6k or 56k Series, with
+a model selector in the shared menu (equivalent to `AT*MODEL=`). Consider an ASCII
+art rendition of the selected modem above the menu. This is future configuration
+and web work (v0.10/v0.11); it does not change the current wire protocol or demo.
+The factory model remains 14.4k. Selection affects ATI identity and default CONNECT
+reporting only, not the supported commands, speeds or other features. See
+`docs/v0.8-plan.md` for unresolved command/storage/precedence details.
+
 ## Files
 
 `web/src/` holds the page; `web/vendor/` holds third-party files (xterm.js 6.0.0, MIT;
