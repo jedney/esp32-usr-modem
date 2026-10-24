@@ -4,7 +4,11 @@
 #include <esp_partition.h>
 #include <unity.h>
 
+#include <cstring>
+
 #include "dialstring.h"
+#include "modemcfg.h"
+#include "nvs_store.h"
 
 void setUp() {}
 void tearDown() {}
@@ -30,6 +34,34 @@ void test_dialstring_runs_on_target() {
     TEST_ASSERT_EQUAL_INT(static_cast<int>(dialstring::Kind::IpAddress), static_cast<int>(r.kind));
 }
 
+// NVS keeps the modem settings across a restart (v0.4). The saved settings are put back
+// afterwards, so running the tests doesn't change the modem's configuration.
+void test_settings_survive_in_nvs() {
+    hw::NvsStore store;
+    uint8_t before[modemcfg::kBlobSize + 1];
+    size_t beforeLen = store.load(before, sizeof before);
+
+    modemcfg::Nvram n = modemcfg::factoryNvram();
+    n.tmpl[0].s[7] = 45;
+    strcpy(n.phone[0], "170064142064");
+    TEST_ASSERT_TRUE(modemcfg::saveNvram(store, n));
+
+    hw::NvsStore again;  // a fresh handle, as after a restart
+    modemcfg::Nvram out;
+    TEST_ASSERT_EQUAL(static_cast<int>(modemcfg::LoadResult::kOk),
+                      static_cast<int>(modemcfg::loadNvram(again, &out)));
+    TEST_ASSERT_EQUAL(45, out.tmpl[0].s[7]);
+    TEST_ASSERT_EQUAL_STRING("170064142064", out.phone[0]);
+
+    TEST_ASSERT_TRUE(store.erase());
+    TEST_ASSERT_EQUAL(static_cast<int>(modemcfg::LoadResult::kEmpty),
+                      static_cast<int>(modemcfg::loadNvram(store, &out)));
+
+    if (beforeLen > 0) {
+        TEST_ASSERT_TRUE(store.save(before, beforeLen));
+    }
+}
+
 void setup() {
     delay(2000);  // give the USB-serial monitor time to attach
     UNITY_BEGIN();
@@ -37,6 +69,7 @@ void setup() {
     RUN_TEST(test_psram_is_8mb);
     RUN_TEST(test_two_ota_slots_exist);
     RUN_TEST(test_dialstring_runs_on_target);
+    RUN_TEST(test_settings_survive_in_nvs);
     UNITY_END();
 }
 

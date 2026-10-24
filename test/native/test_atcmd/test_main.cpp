@@ -1,0 +1,712 @@
+// Unit tests for the AT command parser, result codes and ATI screens (brief 6.2, 6.5,
+// 6.6, 6.7, 6.8). Run with: pio test -e native
+#include <unity.h>
+
+#include <cstring>
+#include <string>
+
+#include "atcmd.h"
+
+using namespace atcmd;
+using modemcfg::Profile;
+
+void setUp() {}
+void tearDown() {}
+
+// --- Test rig ---------------------------------------------------------------------------
+
+class MemStore : public modemcfg::Store {
+public:
+    size_t load(uint8_t *buf, size_t cap) override {
+        size_t n = len < cap ? len : cap;
+        memcpy(buf, data, n);
+        return n;
+    }
+    bool save(const uint8_t *d, size_t n) override {
+        memcpy(data, d, n);
+        len = n;
+        ++saves;
+        return true;
+    }
+    bool erase() override {
+        len = 0;
+        return true;
+    }
+    uint8_t data[1024] = {};
+    size_t len = 0;
+    int saves = 0;
+};
+
+class StrSink : public Sink {
+public:
+    void write(const char *d, size_t n) override { s.append(d, n); }
+    std::string s;
+};
+
+std::string lastArgs;
+
+Reply cmdVer(Port &port, const char *) {
+    port.beginInfo();
+    port.line("v9.9");
+    return Reply::kOk;
+}
+Reply cmdHw(Port &, const char *args) {
+    lastArgs = args;
+    return Reply::kOk;
+}
+Reply cmdHelp(Port &port, const char *) {
+    showStarHelp(port);
+    return Reply::kOk;
+}
+Reply cmdOwn(Port &port, const char *) {
+    port.print("own result\r\n");
+    return Reply::kDone;
+}
+Reply cmdFail(Port &, const char *) {
+    return Reply::kError;
+}
+
+const StarCommand kStar[] = {
+    {"VER", "AT*VER", "firmware version", cmdVer, false},
+    {"HELP", "AT*HELP", "this list", cmdHelp, false},
+    {"?", "AT*?", "this list", cmdHelp, false},
+    {"HW", "AT*HW...", "hardware tests", cmdHw, true},
+    {"OWN", "AT*OWN", "prints its own result", cmdOwn, false},
+    {"FAIL", "AT*FAIL", "always fails", cmdFail, false},
+};
+
+struct Rig {
+    MemStore &store;
+    StrSink out;
+    Modem modem;
+    Port port;
+    explicit Rig(MemStore &s)
+        : store(s), modem(s, kStar, sizeof kStar / sizeof kStar[0]), port(modem, out, 115200) {
+        modem.begin();
+    }
+    // Types `typed` into the port; returns what the modem sent back.
+    std::string type(const char *typed) {
+        out.s.clear();
+        for (const char *p = typed; *p != '\0'; ++p) {
+            port.feed(*p);
+        }
+        return out.s;
+    }
+    const Profile &a() const { return modem.active(); }
+};
+
+#define CONTAINS(haystack, needle) \
+    TEST_ASSERT_TRUE_MESSAGE((haystack).find(needle) != std::string::npos, (haystack).c_str())
+#define NOT_CONTAINS(haystack, needle) \
+    TEST_ASSERT_TRUE_MESSAGE((haystack).find(needle) == std::string::npos, (haystack).c_str())
+
+bool endsWith(const std::string &s, const std::string &tail) {
+    return s.size() >= tail.size() && s.compare(s.size() - tail.size(), tail.size(), tail) == 0;
+}
+#define ENDS_WITH(s, tail) TEST_ASSERT_TRUE_MESSAGE(endsWith((s), (tail)), (s).c_str())
+
+// --- Line input, echo and result formats -------------------------------------------------
+
+void test_at_gives_ok_with_echo() {
+    MemStore st;
+    Rig r(st);
+    TEST_ASSERT_EQUAL_STRING("AT\r\r\nOK\r\n", r.type("AT\r").c_str());
+}
+
+void test_lower_case_works_mixed_case_is_ignored() {
+    MemStore st;
+    Rig r(st);
+    ENDS_WITH(r.type("at\r"), "\r\nOK\r\n");
+    TEST_ASSERT_EQUAL_STRING("At\r", r.type("At\r").c_str());  // no result
+    TEST_ASSERT_EQUAL_STRING("aT\r", r.type("aT\r").c_str());
+}
+
+void test_text_before_at_is_ignored() {
+    MemStore st;
+    Rig r(st);
+    ENDS_WITH(r.type("hello\rxxAT\r"), "\r\nOK\r\n");
+}
+
+void test_lf_after_cr_is_ignored() {
+    MemStore st;
+    Rig r(st);
+    TEST_ASSERT_EQUAL_STRING("AT\r\r\nOK\r\n", r.type("AT\r\n").c_str());
+}
+
+void test_echo_off() {
+    MemStore st;
+    Rig r(st);
+    ENDS_WITH(r.type("ATE0\r"), "OK\r\n");
+    TEST_ASSERT_EQUAL_STRING("\r\nOK\r\n", r.type("AT\r").c_str());
+    r.type("ATE1\r");
+    TEST_ASSERT_EQUAL(1, r.a().get(modemcfg::kE));
+}
+
+void test_numeric_results() {
+    MemStore st;
+    Rig r(st);
+    TEST_ASSERT_EQUAL_STRING("ATV0\r0\r", r.type("ATV0\r").c_str());
+    TEST_ASSERT_EQUAL_STRING("ATX9\r4\r", r.type("ATX9\r").c_str());
+}
+
+void test_quiet_mode() {
+    MemStore st;
+    Rig r(st);
+    TEST_ASSERT_EQUAL_STRING("ATQ1\r", r.type("ATQ1\r").c_str());
+    TEST_ASSERT_EQUAL_STRING("ATX9\r", r.type("ATX9\r").c_str());  // even ERROR is silent
+    ENDS_WITH(r.type("ATQ0\r"), "\r\nOK\r\n");
+}
+
+void test_quiet_still_shows_information() {
+    MemStore st;
+    Rig r(st);
+    r.type("ATQ1\r");
+    CONTAINS(r.type("ATI3\r"), "Sportster 33600/Fax V2.31");
+}
+
+void test_backspace_and_delete() {
+    MemStore st;
+    Rig r(st);
+    std::string out = r.type("ATE5\b0\r");
+    CONTAINS(out, "\b \b");
+    ENDS_WITH(out, "OK\r\n");
+    TEST_ASSERT_EQUAL(0, r.a().get(modemcfg::kE));
+    r.type(
+        "ATE1X7\x7f"
+        "3\r");
+    TEST_ASSERT_EQUAL(3, r.a().get(modemcfg::kX));
+}
+
+void test_backspace_cannot_delete_at() {
+    MemStore st;
+    Rig r(st);
+    ENDS_WITH(r.type("AT\b\b\b\r"), "\r\nOK\r\n");
+}
+
+void test_repeat_last_line_with_a_slash() {
+    MemStore st;
+    Rig r(st);
+    r.type("ATI3\r");
+    std::string out = r.type("A/");  // no Enter
+    CONTAINS(out, "Sportster 33600/Fax V2.31");
+    ENDS_WITH(out, "OK\r\n");
+    ENDS_WITH(r.type("a/"), "OK\r\n");
+}
+
+void test_a_slash_with_nothing_before_is_plain_ok() {
+    MemStore st;
+    Rig r(st);
+    TEST_ASSERT_EQUAL_STRING("A/\r\r\nOK\r\n", r.type("A/").c_str());
+}
+
+void test_line_too_long_is_error() {
+    MemStore st;
+    Rig r(st);
+    std::string cmd = "AT" + std::string(kLineMax + 5, 'E') + "\r";
+    ENDS_WITH(r.type(cmd.c_str()), "ERROR\r\n");
+    std::string ok = "AT" + std::string(kLineMax, ' ') + "\r";
+    ENDS_WITH(r.type(ok.c_str()), "OK\r\n");
+}
+
+void test_s3_and_s4_change_the_line_end() {
+    MemStore st;
+    Rig r(st);
+    r.type("ATS3=64S4=33\r");
+    std::string out = r.type("ATE0@");
+    TEST_ASSERT_EQUAL_STRING("ATE0@@!OK@!", out.c_str());
+    TEST_ASSERT_EQUAL_STRING("", r.type("AT\r").c_str());  // CR no longer ends a line
+    r.type("@");
+    r.type("ATS3=13S4=10@");
+    TEST_ASSERT_EQUAL_STRING("\r\nOK\r\n", r.type("AT\r").c_str());
+}
+
+void test_s5_changes_backspace() {
+    MemStore st;
+    Rig r(st);
+    r.type("ATS5=35\r");  // '#'
+    r.type("ATX2#1\r");
+    TEST_ASSERT_EQUAL(1, r.a().get(modemcfg::kX));
+}
+
+// --- Several commands per line --------------------------------------------------------------
+
+void test_several_commands_per_line() {
+    MemStore st;
+    Rig r(st);
+    ENDS_WITH(r.type("ATE1 V1 X3 M2 L3 S7=45 &C0 &N16 Q0\r"), "\r\nOK\r\n");
+    TEST_ASSERT_EQUAL(3, r.a().get(modemcfg::kX));
+    TEST_ASSERT_EQUAL(2, r.a().get(modemcfg::kM));
+    TEST_ASSERT_EQUAL(3, r.a().get(modemcfg::kL));
+    TEST_ASSERT_EQUAL(45, r.a().s[7]);
+    TEST_ASSERT_EQUAL(0, r.a().get(modemcfg::kAmpC));
+    TEST_ASSERT_EQUAL(16, r.a().get(modemcfg::kAmpN));
+}
+
+void test_first_bad_command_stops_the_line() {
+    MemStore st;
+    Rig r(st);
+    ENDS_WITH(r.type("ATX3K1E0\r"), "\r\nERROR\r\n");
+    TEST_ASSERT_EQUAL(3, r.a().get(modemcfg::kX));  // before the error: done
+    TEST_ASSERT_EQUAL(1, r.a().get(modemcfg::kE));  // after it: not run
+}
+
+void test_missing_number_is_zero() {
+    MemStore st;
+    Rig r(st);
+    r.type("ATE\r");
+    TEST_ASSERT_EQUAL(0, r.a().get(modemcfg::kE));
+}
+
+void test_out_of_range_settings_are_errors() {
+    MemStore st;
+    Rig r(st);
+    const char *bad[] = {"ATX5\r",  "ATQ3\r",  "ATM4\r", "AT&N17\r", "AT&S1\r", "AT&D1\r",
+                         "AT&R0\r", "AT&M2\r", "ATH2\r", "AT&Q0\r",  "ATB2\r"};
+    for (const char *cmd : bad) {
+        std::string out = r.type(cmd);
+        TEST_ASSERT_TRUE_MESSAGE(endsWith(out, "ERROR\r\n"), cmd);
+    }
+}
+
+void test_hang_up_and_dial_method() {
+    MemStore st;
+    Rig r(st);
+    ENDS_WITH(r.type("ATH0\r"), "OK\r\n");
+    ENDS_WITH(r.type("ATH\r"), "OK\r\n");
+    ENDS_WITH(r.type("ATP\r"), "OK\r\n");
+    TEST_ASSERT_EQUAL(0, r.a().get(modemcfg::kTone));
+    CONTAINS(r.type("ATI4\r"), "DIAL=PULSE  ON HOOK");
+    r.type("ATT\r");
+    TEST_ASSERT_EQUAL(1, r.a().get(modemcfg::kTone));
+}
+
+void test_dial_answer_online_wait_for_later_versions() {
+    MemStore st;
+    Rig r(st);
+    ENDS_WITH(r.type("ATDT1\r"), "ERROR\r\n");
+    ENDS_WITH(r.type("ATA\r"), "ERROR\r\n");
+    ENDS_WITH(r.type("ATO\r"), "ERROR\r\n");
+}
+
+// --- S-registers ------------------------------------------------------------------------
+
+void test_s_register_set_and_query() {
+    MemStore st;
+    Rig r(st);
+    TEST_ASSERT_EQUAL_STRING("ATS7?\r\r\n060\r\n\r\nOK\r\n", r.type("ATS7?\r").c_str());
+    r.type("ATS7=45\r");
+    TEST_ASSERT_EQUAL(45, r.a().s[7]);
+    ENDS_WITH(r.type("ATS7=256\r"), "ERROR\r\n");
+    ENDS_WITH(r.type("ATS64=1\r"), "ERROR\r\n");
+    TEST_ASSERT_EQUAL(45, r.a().s[7]);
+}
+
+void test_s_register_select_then_equals_and_query() {
+    MemStore st;
+    Rig r(st);
+    r.type("ATS7\r");
+    r.type("AT=30\r");
+    TEST_ASSERT_EQUAL(30, r.a().s[7]);
+    CONTAINS(r.type("AT?\r"), "\r\n030\r\n");
+}
+
+void test_s_register_bit() {
+    MemStore st;
+    Rig r(st);
+    r.type("ATS13.7=1\r");
+    TEST_ASSERT_EQUAL(128, r.a().s[13]);
+    r.type("ATS13.0=1S13.7=0\r");
+    TEST_ASSERT_EQUAL(1, r.a().s[13]);
+    ENDS_WITH(r.type("ATS13.8=1\r"), "ERROR\r\n");
+}
+
+// --- Result codes -------------------------------------------------------------------------
+
+void test_result_texts_and_numbers() {
+    TEST_ASSERT_EQUAL_STRING("NO DIAL TONE", resultText(Result::kNoDialTone));
+    TEST_ASSERT_EQUAL(6, static_cast<int>(Result::kNoDialTone));
+    TEST_ASSERT_EQUAL(7, static_cast<int>(Result::kBusy));
+    TEST_ASSERT_EQUAL(155, static_cast<int>(Result::kConnect33600));
+    TEST_ASSERT_EQUAL_STRING("CONNECT 33600", resultText(Result::kConnect33600));
+}
+
+void test_x_levels() {
+    TEST_ASSERT_EQUAL(static_cast<int>(Result::kConnect),
+                      static_cast<int>(filterForX(Result::kConnect33600, 0)));
+    TEST_ASSERT_EQUAL(static_cast<int>(Result::kConnect33600),
+                      static_cast<int>(filterForX(Result::kConnect33600, 1)));
+    TEST_ASSERT_EQUAL(static_cast<int>(Result::kNoCarrier),
+                      static_cast<int>(filterForX(Result::kBusy, 2)));
+    TEST_ASSERT_EQUAL(static_cast<int>(Result::kBusy),
+                      static_cast<int>(filterForX(Result::kBusy, 3)));
+    TEST_ASSERT_EQUAL(static_cast<int>(Result::kNoDialTone),
+                      static_cast<int>(filterForX(Result::kNoDialTone, 2)));
+    TEST_ASSERT_EQUAL(static_cast<int>(Result::kNoCarrier),
+                      static_cast<int>(filterForX(Result::kNoDialTone, 3)));
+    TEST_ASSERT_EQUAL(static_cast<int>(Result::kNoDialTone),
+                      static_cast<int>(filterForX(Result::kNoDialTone, 4)));
+    TEST_ASSERT_EQUAL(static_cast<int>(Result::kNoCarrier),
+                      static_cast<int>(filterForX(Result::kNoAnswer, 1)));
+    TEST_ASSERT_EQUAL(static_cast<int>(Result::kNoAnswer),
+                      static_cast<int>(filterForX(Result::kNoAnswer, 4)));
+}
+
+void test_port_result_uses_v_q_and_x() {
+    MemStore st;
+    Rig r(st);
+    r.out.s.clear();
+    r.port.result(Result::kBusy);
+    TEST_ASSERT_EQUAL_STRING("\r\nBUSY\r\n", r.out.s.c_str());  // X4 by default
+    r.type("ATX0V0\r");
+    r.out.s.clear();
+    r.port.result(Result::kBusy);
+    TEST_ASSERT_EQUAL_STRING("3\r", r.out.s.c_str());
+    r.type("ATX4\r");
+    r.out.s.clear();
+    r.port.result(Result::kConnect33600);
+    TEST_ASSERT_EQUAL_STRING("155\r", r.out.s.c_str());
+}
+
+void test_connect_codes_for_speeds() {
+    TEST_ASSERT_EQUAL(static_cast<int>(Result::kConnect33600), static_cast<int>(connectFor(33600)));
+    TEST_ASSERT_EQUAL(static_cast<int>(Result::kConnect2400), static_cast<int>(connectFor(2400)));
+    TEST_ASSERT_EQUAL(static_cast<int>(Result::kConnect), static_cast<int>(connectFor(300)));
+    TEST_ASSERT_EQUAL(static_cast<int>(Result::kConnect33600), static_cast<int>(connectFor(56000)));
+    TEST_ASSERT_EQUAL(static_cast<int>(Result::kConnect9600), static_cast<int>(connectFor(9601)));
+    TEST_ASSERT_EQUAL_UINT32(0, lineSpeedForN(0));
+    TEST_ASSERT_EQUAL_UINT32(300, lineSpeedForN(1));
+    TEST_ASSERT_EQUAL_UINT32(14400, lineSpeedForN(8));
+    TEST_ASSERT_EQUAL_UINT32(33600, lineSpeedForN(16));
+    TEST_ASSERT_EQUAL_UINT32(0, lineSpeedForN(17));
+}
+
+// --- Factory, stored templates, reset ---------------------------------------------------
+
+void test_ampersand_f_loads_factory_templates() {
+    MemStore st;
+    Rig r(st);
+    r.type("ATX2S7=1\r");
+    r.type("AT&F\r");  // = &F0, as on the Sportster
+    TEST_ASSERT_TRUE(r.a() == modemcfg::factoryProfile(0));
+    r.type("AT&F1\r");
+    TEST_ASSERT_TRUE(r.a() == modemcfg::factoryProfile(1));
+    r.type("AT&F2\r");
+    TEST_ASSERT_TRUE(r.a() == modemcfg::factoryProfile(2));
+    ENDS_WITH(r.type("AT&F3\r"), "ERROR\r\n");
+}
+
+void test_write_then_reset_and_restart() {
+    MemStore st;
+    {
+        Rig r(st);
+        ENDS_WITH(r.type("ATS7=45X3&W\r"), "OK\r\n");
+        TEST_ASSERT_EQUAL(1, st.saves);
+        r.type("ATS7=10\r");
+        r.type("ATZ\r");
+        TEST_ASSERT_EQUAL(45, r.a().s[7]);
+    }
+    Rig after(st);  // a restart: new modem on the same store
+    TEST_ASSERT_EQUAL(45, after.a().s[7]);
+    TEST_ASSERT_EQUAL(3, after.a().get(modemcfg::kX));
+    CONTAINS(after.type("AT&V\r"), "S07=045");
+}
+
+void test_z_ignores_the_rest_of_the_line() {
+    MemStore st;
+    Rig r(st);
+    ENDS_WITH(r.type("ATZE0\r"), "\r\nOK\r\n");
+    TEST_ASSERT_EQUAL(1, r.a().get(modemcfg::kE));
+}
+
+void test_z_numbers() {
+    MemStore st;
+    Rig r(st);
+    r.type("ATZ2\r");  // NVRAM template 1 = &F2 as shipped
+    TEST_ASSERT_TRUE(r.a() == modemcfg::factoryProfile(2));
+    r.type("ATZ3\r");
+    TEST_ASSERT_TRUE(r.a() == modemcfg::factoryProfile(0));
+    r.type("ATZ4\r");
+    TEST_ASSERT_TRUE(r.a() == modemcfg::factoryProfile(1));
+    ENDS_WITH(r.type("ATZ6\r"), "ERROR\r\n");
+}
+
+void test_y_selects_power_on_template_and_saves() {
+    MemStore st;
+    {
+        Rig r(st);
+        r.type("AT&F2X1&W1Y1\r");
+        TEST_ASSERT_EQUAL(1, r.modem.nvram().y);
+    }
+    Rig after(st);
+    TEST_ASSERT_EQUAL(1, after.a().get(modemcfg::kX));
+    TEST_ASSERT_EQUAL(2, after.a().get(modemcfg::kAmpH));  // from &F2
+    CONTAINS(after.type("ATI4\r"), "X1  Y1");
+    ENDS_WITH(after.type("ATY5\r"), "ERROR\r\n");
+}
+
+void test_w_out_of_range() {
+    MemStore st;
+    Rig r(st);
+    ENDS_WITH(r.type("AT&W2\r"), "ERROR\r\n");
+    TEST_ASSERT_EQUAL(0, st.saves);
+}
+
+void test_stored_phone_numbers() {
+    MemStore st;
+    Rig r(st);
+    ENDS_WITH(r.type("AT&Z1=555-1234\r"), "OK\r\n");
+    TEST_ASSERT_EQUAL_STRING("555-1234", r.modem.nvram().phone[1]);
+    TEST_ASSERT_EQUAL_STRING("AT&Z1?\r\r\n555-1234\r\n\r\nOK\r\n", r.type("AT&Z1?\r").c_str());
+    ENDS_WITH(r.type("AT&Z4=1\r"), "ERROR\r\n");
+    std::string longer = "AT&Z0=" + std::string(modemcfg::kPhoneLen + 1, '9') + "\r";
+    ENDS_WITH(r.type(longer.c_str()), "ERROR\r\n");
+    std::string full = "AT&Z0=" + std::string(modemcfg::kPhoneLen, '9') + "\r";
+    ENDS_WITH(r.type(full.c_str()), "OK\r\n");
+    CONTAINS(r.type("ATI5\r"), "#1: 555-1234");
+    r.type("AT&Z1=\r");  // empty clears it
+    TEST_ASSERT_EQUAL_STRING("", r.modem.nvram().phone[1]);
+}
+
+// --- +FCLASS -----------------------------------------------------------------------------
+
+void test_fclass() {
+    MemStore st;
+    Rig r(st);
+    ENDS_WITH(r.type("AT+FCLASS=0\r"), "\r\nOK\r\n");
+    ENDS_WITH(r.type("at+fclass=0\r"), "\r\nOK\r\n");
+    ENDS_WITH(r.type("AT+FCLASS=1\r"), "ERROR\r\n");
+    ENDS_WITH(r.type("AT+FCLASS=2.0\r"), "ERROR\r\n");
+    ENDS_WITH(r.type("AT+FCLASS=2\r"), "ERROR\r\n");
+    ENDS_WITH(r.type("AT+FCLASS=\r"), "ERROR\r\n");
+    TEST_ASSERT_EQUAL_STRING("AT+FCLASS?\r\r\n0\r\n\r\nOK\r\n", r.type("AT+FCLASS?\r").c_str());
+    CONTAINS(r.type("AT+FCLASS=?\r"), "\r\n0\r\n");
+    ENDS_WITH(r.type("AT+FAA=1\r"), "ERROR\r\n");
+}
+
+// --- ATI and settings screens -----------------------------------------------------------
+
+void test_ati_identity_lines() {
+    MemStore st;
+    Rig r(st);
+    TEST_ASSERT_EQUAL_STRING("ATI3\r\r\nSportster 33600/Fax V2.31\r\n\r\nOK\r\n",
+                             r.type("ATI3\r").c_str());
+    TEST_ASSERT_EQUAL_STRING("ATI0\r\r\n3361\r\n\r\nOK\r\n", r.type("ATI0\r").c_str());
+    TEST_ASSERT_EQUAL_STRING("ATI2\r\r\nOK\r\n\r\nOK\r\n", r.type("ATI2\r").c_str());
+    CONTAINS(r.type("ATI9\r"), "(1.0USR0003\\\\Modem\\PNPC107\\Sportster 33.6 FAX EXT)FF");
+    ENDS_WITH(r.type("ATI8\r"), "ERROR\r\n");
+    ENDS_WITH(r.type("ATI10\r"), "ERROR\r\n");
+}
+
+void test_every_inquiry_0_to_7_answers() {
+    MemStore st;
+    Rig r(st);
+    for (int i = 0; i <= 7; ++i) {
+        char cmd[8];
+        snprintf(cmd, sizeof cmd, "ATI%d\r", i);
+        std::string out = r.type(cmd);
+        TEST_ASSERT_TRUE_MESSAGE(endsWith(out, "\r\nOK\r\n"), cmd);
+    }
+}
+
+void test_ati4_current_settings_layout() {
+    MemStore st;
+    Rig r(st);
+    std::string out = r.type("ATI4\r");
+    const char *expected =
+        "ATI4\r"
+        "\r\n"
+        "\r\n"
+        "USRobotics Sportster 33600 Fax Settings...\r\n"
+        "\r\n"
+        "B0  E1  F1  L2  M1  Q0  V1  X4  Y0\r\n"
+        "BAUD=115200  PARITY=N  WORDLEN=8\r\n"
+        "DIAL=TONE  ON HOOK\r\n"
+        "\r\n"
+        "&A0  &B0  &C1  &D2  &G0  &H1  &I0  &K1  &M4  &N0\r\n"
+        "&P1  &R2  &S0  &T5  &U0  &Y1\r\n"
+        "\r\n"
+        "S00=000  S01=000  S02=043  S03=013  S04=010  S05=008  S06=002\r\n"
+        "S07=060  S08=002  S09=006  S10=014  S11=070  S12=050  S13=000\r\n"
+        "S15=000  S16=000  S18=000  S19=000  S21=010  S22=017  S23=019\r\n"
+        "S25=005  S27=000  S28=008  S29=020  S30=000  S31=128  S32=002\r\n"
+        "S33=000  S34=000  S36=014  S38=000\r\n"
+        "\r\n"
+        "LAST DIALED #:\r\n"
+        "\r\n"
+        "OK\r\n";
+    TEST_ASSERT_EQUAL_STRING(expected, out.c_str());
+}
+
+void test_ati5_stored_settings_layout() {
+    MemStore st;
+    Rig r(st);
+    r.type("AT&Z0=170064142064\r");
+    std::string out = r.type("ATI5\r");
+    CONTAINS(out,
+             "\r\nUSRobotics Sportster 33600 Fax NVRAM Settings...\r\n\r\nTemplate Y0\r\n\r\n"
+             "DIAL=TONE  B0  E1  F1  L2  M1  Q0  V1  X4\r\n"
+             "BAUD=38400  PARITY=N  WORDLEN=8\r\n\r\n"
+             "&A0  &B0  &C1  &D2  &G0  &H1  &I0  &K1  &M4  &N0\r\n");
+    CONTAINS(out, "S00=000  S02=043  S03=013  S04=010  S05=008  S06=002  S07=060\r\n");
+    CONTAINS(out, "S38=000\r\n\r\n\r\nTemplate Y1\r\n");
+    CONTAINS(out, "&A0  &B0  &C1  &D2  &G0  &H2  &I2  &K1  &M4  &N0\r\n&P1  &R1");
+    CONTAINS(out, "\r\nSTORED PHONE #0: 170064142064\r\n#1:\r\n#2:\r\n#3:\r\n\r\nOK\r\n");
+}
+
+void test_ati6_and_ati7_layout() {
+    MemStore st;
+    Rig r(st);
+    std::string i6 = r.type("ATI6\r");
+    CONTAINS(i6, "\r\n\r\nUSRobotics Sportster 33600 Fax Link Diagnostics...\r\n\r\n");
+    CONTAINS(i6, "Chars sent                    0      Chars Received                0\r\n");
+    CONTAINS(i6, "Chars lost                    0\r\n");
+    CONTAINS(i6, "Speed                  0/0\r\n");
+    std::string i7 = r.type("ATI7\r");
+    CONTAINS(i7,
+             "\r\nConfiguration Profile...\r\n\r\nProduct type           US/Canada External\r\n");
+    CONTAINS(i7, "DSP rev                2.31\r\n\r\nOK\r\n");
+}
+
+void test_several_inquiries_on_one_line() {
+    MemStore st;
+    Rig r(st);
+    std::string out = r.type("ATI3I7\r");
+    CONTAINS(out, "V2.31\r\n\r\nConfiguration Profile...");
+}
+
+void test_ampersand_v_shows_current_and_stored() {
+    MemStore st;
+    Rig r(st);
+    std::string out = r.type("AT&V\r");
+    CONTAINS(out, "Fax Settings...");
+    CONTAINS(out, "Fax NVRAM Settings...");
+    ENDS_WITH(out, "\r\nOK\r\n");
+    ENDS_WITH(r.type("AT&V1\r"), "ERROR\r\n");
+}
+
+void test_numeric_mode_has_no_leading_blank_line() {
+    MemStore st;
+    Rig r(st);
+    r.type("ATV0\r");
+    TEST_ASSERT_EQUAL_STRING("ATI3\rSportster 33600/Fax V2.31\r\n0\r", r.type("ATI3\r").c_str());
+}
+
+// --- AT* commands ---------------------------------------------------------------------------
+
+void test_star_command_runs_handler() {
+    MemStore st;
+    Rig r(st);
+    TEST_ASSERT_EQUAL_STRING("AT*VER\r\r\nv9.9\r\n\r\nOK\r\n", r.type("AT*VER\r").c_str());
+    ENDS_WITH(r.type("at*ver\r"), "OK\r\n");
+}
+
+void test_star_name_must_end_unless_prefix() {
+    MemStore st;
+    Rig r(st);
+    ENDS_WITH(r.type("AT*VERX\r"), "ERROR\r\n");
+    ENDS_WITH(r.type("AT*VER?\r"), "OK\r\n");
+    ENDS_WITH(r.type("AT*HWLED=CD\r"), "OK\r\n");
+    TEST_ASSERT_EQUAL_STRING("LED=CD", lastArgs.c_str());
+    r.type("AT*hw\r");
+    TEST_ASSERT_EQUAL_STRING("", lastArgs.c_str());
+}
+
+void test_star_unknown_is_error() {
+    MemStore st;
+    Rig r(st);
+    ENDS_WITH(r.type("AT*NOPE\r"), "ERROR\r\n");
+    ENDS_WITH(r.type("AT*\r"), "ERROR\r\n");
+}
+
+void test_star_takes_rest_of_line_after_other_commands() {
+    MemStore st;
+    Rig r(st);
+    std::string out = r.type("ATE0*HW E1\r");
+    TEST_ASSERT_EQUAL(0, r.a().get(modemcfg::kE));
+    TEST_ASSERT_EQUAL_STRING(" E1", lastArgs.c_str());
+    ENDS_WITH(out, "OK\r\n");
+}
+
+void test_star_reply_kinds() {
+    MemStore st;
+    Rig r(st);
+    TEST_ASSERT_EQUAL_STRING("AT*OWN\rown result\r\n", r.type("AT*OWN\r").c_str());
+    ENDS_WITH(r.type("AT*FAIL\r"), "\r\nERROR\r\n");
+}
+
+void test_star_help_lists_every_command() {
+    MemStore st;
+    Rig r(st);
+    std::string out = r.type("AT*HELP\r");
+    for (const StarCommand &c : kStar) {
+        CONTAINS(out, c.usage);
+        CONTAINS(out, c.help);
+    }
+    ENDS_WITH(r.type("AT*?\r"), "OK\r\n");
+}
+
+void test_find_star_prefers_longest_name() {
+    MemStore st;
+    Rig r(st);
+    const char *args = nullptr;
+    const StarCommand *c = r.modem.findStar("HELP", &args);
+    TEST_ASSERT_NOT_NULL(c);
+    TEST_ASSERT_EQUAL_STRING("HELP", c->name);
+    TEST_ASSERT_NULL(r.modem.findStar("HEL", &args));
+}
+
+int main() {
+    UNITY_BEGIN();
+    RUN_TEST(test_at_gives_ok_with_echo);
+    RUN_TEST(test_lower_case_works_mixed_case_is_ignored);
+    RUN_TEST(test_text_before_at_is_ignored);
+    RUN_TEST(test_lf_after_cr_is_ignored);
+    RUN_TEST(test_echo_off);
+    RUN_TEST(test_numeric_results);
+    RUN_TEST(test_quiet_mode);
+    RUN_TEST(test_quiet_still_shows_information);
+    RUN_TEST(test_backspace_and_delete);
+    RUN_TEST(test_backspace_cannot_delete_at);
+    RUN_TEST(test_repeat_last_line_with_a_slash);
+    RUN_TEST(test_a_slash_with_nothing_before_is_plain_ok);
+    RUN_TEST(test_line_too_long_is_error);
+    RUN_TEST(test_s3_and_s4_change_the_line_end);
+    RUN_TEST(test_s5_changes_backspace);
+    RUN_TEST(test_several_commands_per_line);
+    RUN_TEST(test_first_bad_command_stops_the_line);
+    RUN_TEST(test_missing_number_is_zero);
+    RUN_TEST(test_out_of_range_settings_are_errors);
+    RUN_TEST(test_hang_up_and_dial_method);
+    RUN_TEST(test_dial_answer_online_wait_for_later_versions);
+    RUN_TEST(test_s_register_set_and_query);
+    RUN_TEST(test_s_register_select_then_equals_and_query);
+    RUN_TEST(test_s_register_bit);
+    RUN_TEST(test_result_texts_and_numbers);
+    RUN_TEST(test_x_levels);
+    RUN_TEST(test_port_result_uses_v_q_and_x);
+    RUN_TEST(test_connect_codes_for_speeds);
+    RUN_TEST(test_ampersand_f_loads_factory_templates);
+    RUN_TEST(test_write_then_reset_and_restart);
+    RUN_TEST(test_z_ignores_the_rest_of_the_line);
+    RUN_TEST(test_z_numbers);
+    RUN_TEST(test_y_selects_power_on_template_and_saves);
+    RUN_TEST(test_w_out_of_range);
+    RUN_TEST(test_stored_phone_numbers);
+    RUN_TEST(test_fclass);
+    RUN_TEST(test_ati_identity_lines);
+    RUN_TEST(test_every_inquiry_0_to_7_answers);
+    RUN_TEST(test_ati4_current_settings_layout);
+    RUN_TEST(test_ati5_stored_settings_layout);
+    RUN_TEST(test_ati6_and_ati7_layout);
+    RUN_TEST(test_several_inquiries_on_one_line);
+    RUN_TEST(test_ampersand_v_shows_current_and_stored);
+    RUN_TEST(test_numeric_mode_has_no_leading_blank_line);
+    RUN_TEST(test_star_command_runs_handler);
+    RUN_TEST(test_star_name_must_end_unless_prefix);
+    RUN_TEST(test_star_unknown_is_error);
+    RUN_TEST(test_star_takes_rest_of_line_after_other_commands);
+    RUN_TEST(test_star_reply_kinds);
+    RUN_TEST(test_star_help_lists_every_command);
+    RUN_TEST(test_find_star_prefers_longest_name);
+    return UNITY_END();
+}

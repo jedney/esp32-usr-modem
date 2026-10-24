@@ -48,6 +48,32 @@ class Port:
                         return lines
         raise AssertionError(f"No final result for {text!r}; got {lines!r}")
 
+    def raw(self, data, wait=0.6):
+        """Send bytes as they are and return every byte received within `wait` seconds."""
+        self.ser.reset_input_buffer()
+        self.ser.write(data)
+        received = b""
+        deadline = time.monotonic() + wait
+        while time.monotonic() < deadline:
+            received += self.ser.read(self.ser.in_waiting or 1)
+        return received
+
+    def restart(self, banner=b"USR Modem Emulator v", timeout=8.0):
+        """Reset the ESP32 through the USB-serial chip's RTS line (EN), as esptool does,
+        and return the boot output once the banner has been printed."""
+        self.ser.dtr = False  # IO0 high: normal boot, not the bootloader
+        self.ser.rts = True  # EN low: reset
+        time.sleep(0.1)
+        self.ser.reset_input_buffer()
+        self.ser.rts = False
+        received = b""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            received += self.ser.read(self.ser.in_waiting or 1)
+            if banner in received and received.rstrip().endswith(b"hardware."):
+                return received
+        raise AssertionError(f"No boot banner after reset; got {received[-300:]!r}")
+
 
 def _open(request, option, baud):
     port_name = request.config.getoption(option)

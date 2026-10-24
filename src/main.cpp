@@ -1,12 +1,16 @@
 // USR Modem Emulator - firmware entry point.
 //
-// Prototype: USB maintenance console (UART0, 115200 8N1) with a boot banner, a few
-// commands and, from v0.3, the AT*HW... hardware tests for the electronics build
-// (hwconsole.cpp). The modem itself (AT parser on RS232, Wi-Fi, calls) follows later.
+// v0.4: the USB maintenance console (UART0, 115200 8N1) runs the Sportster AT command
+// parser (lib/atcmd) on the settings stored in NVS (lib/modemcfg, hw::NvsStore). Project
+// commands are in the AT* table below; AT*HW... are the hardware tests (hwconsole.cpp).
+// The RS232 port follows in v0.5, Wi-Fi in v0.6 and calls in v0.8.
 #include <Arduino.h>
 
+#include "atcmd.h"
 #include "dialstring.h"
 #include "hwconsole.h"
+#include "modemcfg.h"
+#include "nvs_store.h"
 
 #ifndef FW_VERSION
 #define FW_VERSION "0.0"
@@ -17,11 +21,103 @@
 
 namespace {
 
-constexpr size_t kLineMax = 128;
-char line[kLineMax + 1];
-size_t lineLen = 0;
+constexpr uint32_t kConsoleBaud = 115200;
 
-void printBanner() {
+class SerialSink : public atcmd::Sink {
+public:
+    void write(const char *data, size_t len) override {
+        Serial.write(reinterpret_cast<const uint8_t *>(data), len);
+    }
+};
+
+// --- AT* commands -----------------------------------------------------------------------
+
+atcmd::Reply cmdVer(atcmd::Port &port, const char *args) {
+    if (*args != '\0' && *args != '?') {
+        return atcmd::Reply::kError;
+    }
+    port.beginInfo();
+    port.printf("v%s (%s)", FW_VERSION, FW_COMMIT);
+    port.newline();
+    return atcmd::Reply::kOk;
+}
+
+atcmd::Reply cmdHelp(atcmd::Port &port, const char *args) {
+    if (*args != '\0') {
+        return atcmd::Reply::kError;
+    }
+    atcmd::showStarHelp(port);
+    hwconsole::printHelp();
+    return atcmd::Reply::kOk;
+}
+
+atcmd::Reply cmdDialTest(atcmd::Port &port, const char *args) {
+    dialstring::Result r = dialstring::classify(args);
+    port.beginInfo();
+    port.printf("kind=%s", dialstring::kindName(r.kind));
+    switch (r.kind) {
+        case dialstring::Kind::IpAddress:
+        case dialstring::Kind::Host:
+            port.printf(" host=%s port=%u", r.host, static_cast<unsigned>(r.port));
+            break;
+        case dialstring::Kind::Phonebook:
+            port.printf(" number=%s", r.number);
+            break;
+        case dialstring::Kind::Special:
+            port.printf(" number=%s special=%s", r.number, dialstring::specialName(r.special));
+            break;
+        case dialstring::Kind::Invalid:
+        default:
+            break;
+    }
+    port.newline();
+    return r.kind == dialstring::Kind::Invalid ? atcmd::Reply::kError : atcmd::Reply::kOk;
+}
+
+atcmd::Reply cmdHw(atcmd::Port &port, const char *args) {
+    port.beginInfo();
+    hwconsole::handle(args);  // prints its own OK / ERROR
+    return atcmd::Reply::kDone;
+}
+
+const atcmd::StarCommand kStarCommands[] = {
+    {"HELP", "AT*HELP", "this list", cmdHelp, false},
+    {"?", "AT*?", "same as AT*HELP", cmdHelp, false},
+    {"VER", "AT*VER", "firmware version", cmdVer, false},
+    {"DIALTEST", "AT*DIALTEST <dial string>", "show how a number is dialled", cmdDialTest, false},
+    {"HW", "AT*HW...", "hardware tests (AT*HW? lists them)", cmdHw, true},
+};
+
+hw::NvsStore store;
+SerialSink consoleSink;
+atcmd::Modem modem(store, kStarCommands, sizeof kStarCommands / sizeof kStarCommands[0]);
+atcmd::Port console(modem, consoleSink, kConsoleBaud);
+
+// --- Boot banner ------------------------------------------------------------------------
+
+void printSettings(modemcfg::LoadResult loaded) {
+    const modemcfg::Profile &p = modem.active();
+    Serial.printf("Settings: %s, power-on template Y%u\r\n", modemcfg::loadResultText(loaded),
+                  static_cast<unsigned>(modem.nvram().y));
+    char speed[40];
+    if (p.get(modemcfg::kAmpB) == 1) {
+        snprintf(speed, sizeof speed, "fixed %u (&B1)", static_cast<unsigned>(p.baud));
+    } else {
+        snprintf(speed, sizeof speed, "from \"AT\" (&B%u)",
+                 static_cast<unsigned>(p.get(modemcfg::kAmpB)));
+    }
+    Serial.printf("Host serial (from v0.5): speed %s, flow control &H%u&R%u, &C%u &D%u\r\n", speed,
+                  static_cast<unsigned>(p.get(modemcfg::kAmpH)),
+                  static_cast<unsigned>(p.get(modemcfg::kAmpR)),
+                  static_cast<unsigned>(p.get(modemcfg::kAmpC)),
+                  static_cast<unsigned>(p.get(modemcfg::kAmpD)));
+    Serial.printf(
+        "Echo E%u, quiet Q%u, verbal V%u, results X%u\r\n",
+        static_cast<unsigned>(p.get(modemcfg::kE)), static_cast<unsigned>(p.get(modemcfg::kQ)),
+        static_cast<unsigned>(p.get(modemcfg::kV)), static_cast<unsigned>(p.get(modemcfg::kX)));
+}
+
+void printBanner(modemcfg::LoadResult loaded) {
     Serial.print("\r\n");
     Serial.print("  _   _ ____  ____    __  __           _\r\n");
     Serial.print(" | | | / ___||  _ \\  |  \\/  | ___   __| | ___ _ __ ___\r\n");
@@ -33,101 +129,24 @@ void printBanner() {
                   static_cast<unsigned>(ESP.getFlashChipSize() / (1024 * 1024)),
                   static_cast<unsigned>(ESP.getPsramSize() / 1024),
                   hwconsole::resetReasonName(static_cast<int>(esp_reset_reason())));
+    printSettings(loaded);
     Serial.print(
-        "Prototype console. AT*HELP lists the commands; AT*HWTEST tests the hardware.\r\n");
-}
-
-void dialTest(const char *arg) {
-    dialstring::Result r = dialstring::classify(arg);
-    Serial.printf("kind=%s", dialstring::kindName(r.kind));
-    switch (r.kind) {
-        case dialstring::Kind::IpAddress:
-        case dialstring::Kind::Host:
-            Serial.printf(" host=%s port=%u", r.host, static_cast<unsigned>(r.port));
-            break;
-        case dialstring::Kind::Phonebook:
-            Serial.printf(" number=%s", r.number);
-            break;
-        case dialstring::Kind::Special:
-            Serial.printf(" number=%s special=%s", r.number, dialstring::specialName(r.special));
-            break;
-        case dialstring::Kind::Invalid:
-        default:
-            break;
-    }
-    Serial.print("\r\n");
-    Serial.print(r.kind == dialstring::Kind::Invalid ? "ERROR\r\n" : "OK\r\n");
-}
-
-bool startsWithNoCase(const char *s, const char *prefix) {
-    for (; *prefix; ++s, ++prefix) {
-        if (toupper(static_cast<unsigned char>(*s)) != *prefix) {
-            return false;
-        }
-    }
-    return true;
-}
-
-void printHelp() {
-    Serial.print("  AT                                                   OK\r\n");
-    Serial.print("  AT*VER                                               firmware version\r\n");
-    Serial.print("  AT*HELP or AT*?                                      this list\r\n");
-    Serial.print(
-        "  AT*DIALTEST <dial string>                            show how a number is dialled\r\n");
-    hwconsole::printHelp();
-    Serial.print("OK\r\n");
-}
-
-void handleLine(const char *cmd) {
-    if (cmd[0] == '\0') {
-        return;
-    }
-    if (startsWithNoCase(cmd, "AT*HW")) {
-        hwconsole::handle(cmd + strlen("AT*HW"));
-    } else if ((startsWithNoCase(cmd, "AT*HELP") && cmd[7] == '\0') ||
-               (startsWithNoCase(cmd, "AT*?") && cmd[4] == '\0')) {
-        printHelp();
-    } else if (startsWithNoCase(cmd, "AT*DIALTEST")) {
-        const char *arg = cmd + strlen("AT*DIALTEST");
-        dialTest(arg);
-    } else if (startsWithNoCase(cmd, "AT*VER") && cmd[6] == '\0') {
-        Serial.printf("v%s (%s)\r\nOK\r\n", FW_VERSION, FW_COMMIT);
-    } else if (startsWithNoCase(cmd, "AT") && cmd[2] == '\0') {
-        Serial.print("OK\r\n");
-    } else {
-        Serial.print("ERROR\r\n");
-    }
+        "Maintenance console. ATI4 shows the settings, AT*HELP the project commands,\r\n"
+        "AT*HWTEST tests the hardware.\r\n");
 }
 
 }  // namespace
 
 void setup() {
-    Serial.begin(115200);
+    Serial.begin(kConsoleBaud);
     delay(500);
-    printBanner();
+    modemcfg::LoadResult loaded = modem.begin();
+    printBanner(loaded);
 }
 
 void loop() {
-    static bool lastWasCr = false;
     while (Serial.available() > 0) {
-        char c = static_cast<char>(Serial.read());
-        bool crlfPair = (c == '\n' && lastWasCr);
-        lastWasCr = (c == '\r');
-        if (crlfPair) {
-            continue;  // second half of CR LF
-        }
-        if (c == '\r' || c == '\n') {
-            Serial.print("\r\n");
-            line[lineLen] = '\0';
-            handleLine(line);
-            lineLen = 0;
-        } else if ((c == '\b' || c == 0x7f) && lineLen > 0) {
-            --lineLen;
-            Serial.print("\b \b");
-        } else if (lineLen < kLineMax && c >= ' ') {
-            line[lineLen++] = c;
-            Serial.write(c);  // echo
-        }
+        console.feed(static_cast<char>(Serial.read()));
     }
     delay(1);
 }
