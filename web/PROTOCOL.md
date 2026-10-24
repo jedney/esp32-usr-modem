@@ -23,7 +23,10 @@ art rendition of the selected modem above the menu. This is future configuration
 and web work (v0.10/v0.11); it does not change the current wire protocol or demo.
 The factory model remains 14.4k. Selection affects ATI identity and default CONNECT
 reporting only, not the supported commands, speeds or other features. See
-`docs/v0.8-plan.md` for unresolved command/storage/precedence details.
+`docs/v0.8-plan.md` for the confirmed command, persistence and reporting rules.
+The selector maps to `AT*MODEL=14400|28800|33600|56000` and saves device-wide
+immediately. A change affects the next call's reporting default; an explicit
+phonebook/`&N` speed wins, and the current call's CONNECT/ATO speed stays stable.
 
 ## Files
 

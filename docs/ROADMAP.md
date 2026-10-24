@@ -39,8 +39,11 @@ Notes:
 - **v0.8 model update (Jon, 25 Oct):** plan `AT*MODEL=` for Sportster 14.4k, 28.8k,
   33.6k and 56k Series; factory default remains 14.4k. Selection affects ATI identity
   and default reported CONNECT speed only; speed options and features remain.
-  Persistence, speed precedence and command values await Jon's answers. Also plan
-  the `AT*PASS=` echo fix: the separator stays visible, its value is masked.
+  Use `AT*MODEL=14400|28800|33600|56000`, saved immediately device-wide, retained
+  by `AT&F`/`ATZ`, reset to 14.4k by `AT*FACTORY`. Explicit phonebook/`&N` speed
+  wins over the model fallback; changes apply next call and leave current-call
+  CONNECT/ATO reporting stable. Also plan the `AT*PASS=` echo fix: the separator
+  stays visible, its value is masked.
   v0.10's config and v0.11's web interface must offer the model selector and show
   the selected model prominently on the first config page, optionally with ASCII
   art above the menu. Fixed-14400 identity/speed preparation is implemented; model
