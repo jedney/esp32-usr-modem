@@ -279,7 +279,122 @@ void Port::feed(char c) {
                 overflow_ = true;
             }
             return;
+
+        case State::kSecret:
+            feedSecret(c, isBs);
+            return;
+
+        case State::kWait:
+            feedWait(c);
+            return;
     }
+}
+
+// --- Port: masked prompt and late results ---------------------------------------------------
+
+namespace {
+constexpr char kEsc = 0x1B;
+constexpr char kCtrlC = 0x03;
+}  // namespace
+
+void Port::askSecret(const char *prompt, SecretHandler fn, void *ctx) {
+    print(prompt);
+    wipeSecret();
+    secretFn_ = fn;
+    ctx_ = ctx;
+    state_ = State::kSecret;
+}
+
+void Port::wait(CancelHandler cancel, void *ctx) {
+    cancelFn_ = cancel;
+    ctx_ = ctx;
+    state_ = State::kWait;
+}
+
+bool Port::finish(Reply r) {
+    if (state_ != State::kWait) {
+        return false;
+    }
+    state_ = State::kIdle;
+    cancelFn_ = nullptr;
+    if (r == Reply::kOk || r == Reply::kError) {
+        result(r == Reply::kOk ? Result::kOk : Result::kError);
+    }
+    return true;
+}
+
+void Port::wipeSecret() {
+    volatile char *s = secret_;  // volatile: the compiler must not skip the wipe
+    for (size_t i = 0; i < sizeof secret_; ++i) {
+        s[i] = '\0';
+    }
+    secretLen_ = 0;
+    secretOverflow_ = false;
+}
+
+void Port::feedSecret(char c, bool isBs) {
+    const char cr = static_cast<char>(modem_.active().s[3]);
+    if (c == cr) {
+        echo(&c, 1);
+        state_ = State::kIdle;
+        if (secretOverflow_) {
+            wipeSecret();
+            result(Result::kError);
+            return;
+        }
+        char text[kSecretMax + 1];
+        memcpy(text, secret_, sizeof text);
+        wipeSecret();
+        SecretHandler fn = secretFn_;
+        secretFn_ = nullptr;
+        Reply r = fn != nullptr ? fn(*this, text, ctx_) : Reply::kError;
+        volatile char *t = text;
+        for (size_t i = 0; i < sizeof text; ++i) {
+            t[i] = '\0';
+        }
+        if (r == Reply::kOk || r == Reply::kError) {
+            result(r == Reply::kOk ? Result::kOk : Result::kError);
+        }
+        return;
+    }
+    if (c == kEsc || c == kCtrlC) {
+        wipeSecret();
+        secretFn_ = nullptr;
+        state_ = State::kIdle;
+        result(Result::kError);
+        return;
+    }
+    if (isBs) {
+        if (secretLen_ > 0) {
+            secret_[--secretLen_] = '\0';
+            echo("\b \b", 3);
+        }
+        return;
+    }
+    if (static_cast<unsigned char>(c) < ' ') {
+        return;  // LF and other control characters are ignored
+    }
+    echo("*", 1);
+    if (secretLen_ < kSecretMax) {
+        secret_[secretLen_++] = c;
+    } else {
+        secretOverflow_ = true;
+    }
+}
+
+void Port::feedWait(char c) {
+    const char cr = static_cast<char>(modem_.active().s[3]);
+    if (static_cast<unsigned char>(c) < ' ' && c != cr && c != kEsc && c != kCtrlC) {
+        return;  // LF after the command's CR, XON/XOFF: not a key press
+    }
+    CancelHandler cancel = cancelFn_;
+    void *ctx = ctx_;
+    cancelFn_ = nullptr;
+    state_ = State::kIdle;
+    if (cancel != nullptr) {
+        cancel(ctx);
+    }
+    result(Result::kError);
 }
 
 // --- Port: command execution ------------------------------------------------------------
@@ -301,6 +416,9 @@ void Port::execute(const char *line) {
                 return;
             }
             Reply r = cmd->fn(*this, args);
+            if (r == Reply::kPending) {
+                return;  // askSecret() or wait() sends the result later
+            }
             if (r != Reply::kDone) {
                 result(r == Reply::kOk ? Result::kOk : Result::kError);
             }

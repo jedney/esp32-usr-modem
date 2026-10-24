@@ -1,18 +1,26 @@
 // GPIO pin map (project brief 5.2, 6.14).
 //
-// *** PROPOSED by the Firmware chat, 24 Oct 2026, NOT YET CONFIRMED by Electronics. ***
-// If the wiring ends up different, change the numbers here (and only here): every
-// driver and test reads its pins from this file.
+// *** CONFIRMED by Electronics, 24 Oct 2026, schematic rev A (Q76). ***
+// Every driver and test reads its pins from this file; change them here and only here.
+// test/native/test_pins locks in these values, so a pin can't change by accident.
 //
-// Board: ESP32-S3 N16R8 DevKitC-1 clone (ePartners ST8002). Header pins as listed in
-// brief 5.2, from the antenna end (pin 1) to the USB-C end:
-//   Left:  3V3 3V3 RST [4 5 6 7 15 16 17] 18 8 (3) (46) 9 10 [11 12 13 14] 5V GND
-//   Right: GND (43) (44) [1] 2 [42 41 40 39 38] (37 36 35) (0) (45) [48] (47) [21]
-//          (20) (19) GND GND
+// Board: ESP32-S3 N16R8 DevKitC-1 clone (ePartners ST8002). Header pins from the antenna
+// end (pin 1) to the USB-C end:
+//   Left:  L1-3 3V3 3V3 RST | L4-L10 RS232 [4 5 6 7 15 16 17] | L11 18 | L12 8 | L13 (3)
+//          L14 (46) | L15 9 | L16 pot [10] | L17-L20 [11 LRC, 12 BCLK, 13 DIN, 14 SD]
+//          L21 5V | L22 GND
+//   Right: R1 GND | R2 (43) | R3 (44) | R4-R10 LEDs [1 AA, 2 CD, 42 RD, 41 SD, 40 TR,
+//          39 CS, 38 ARQ] | R11-13 (37 36 35) | R14 (0) | R15 (45) | R16 48 | R17 (47)
+//          R18 21 | R19 (20) | R20 (19) | R21-22 GND GND
 // [ ] = used below; ( ) = not usable (strapping, PSRAM, USB, UART0 console, RGB LED).
 // Grouping: the 7 RS232 lines are one run on the left (to Board B), the amp's 4 signals
-// sit next to 5V and GND so the 6-wire amp lead comes from one block, and the LEDs and
-// pot are on the right. Spare: 2 (ADC1), 8, 9 (ADC1), 10 (ADC1), 18.
+// sit next to 5V and GND so the 6-wire amp lead comes from one block, and the seven LEDs
+// are one run on the right in front-panel order. Spare: 8, 9, 18, 21, 48 (18 and 8 are
+// also the nominal pins of the test-only UART2 below; nothing is connected to them).
+//
+// Boot state (Q77): the board has 10 k pull-ups on the four MAX3232 driver inputs (RXD,
+// CTS, DCD, RI), so the computer sees idle and "off" while the S3 boots, and a 10 k
+// pull-down on amp SD, so the amp stays off until the firmware turns it on.
 //
 // Polarity: the MAX3232 inverts both ways, so on the TTL side an RS232 signal that is
 // asserted (ON, +V on the cable) is LOW at the GPIO (brief 6.2).
@@ -36,18 +44,17 @@ constexpr int kDtr = 15;  // DB25 20, data terminal ready          (GPIO)
 // DSR (DB25 6) is hard-wired asserted (brief 5.1): no pin.
 
 // --- Audio: MAX98357A (brief 5.3) --------------------------------------------------------
-constexpr int kI2sBclk = 11;
-constexpr int kI2sLrc = 12;
+constexpr int kI2sLrc = 11;
+constexpr int kI2sBclk = 12;
 constexpr int kI2sDin = 13;
-constexpr int kAmpSd = 14;  // HIGH = on (left channel), LOW = shutdown
+constexpr int kAmpSd = 14;  // HIGH = on (left channel), LOW = shutdown (10 k pull-down)
 
 // --- Volume pot wiper, must be ADC1 (GPIO1-10) because ADC2 can't be used with Wi-Fi ---
-constexpr int kPot = 1;
+constexpr int kPot = 10;
 
 // --- Front-panel LEDs, in the order of hwtest::Led (AA, CD, RD, SD, TR, CS, ARQ) -------
-constexpr int kLeds[7] = {42, 41, 40, 39, 38, 48, 21};
-// GPIO -> resistor -> LED -> GND, so HIGH = lit. Set false if the LEDs are wired to 3V3
-// and the GPIO sinks the current.
+constexpr int kLeds[7] = {1, 2, 42, 41, 40, 39, 38};
+// GPIO -> resistor -> LED -> GND, so HIGH = lit.
 constexpr bool kLedActiveHigh = true;
 
 // --- On-board RS232 test only (test/embedded/test_rs232) ---------------------------------
@@ -58,7 +65,7 @@ constexpr int kTestUartTx = 18;
 constexpr int kTestUartRx = 8;
 
 // --- On the S3 board itself -------------------------------------------------------------
-constexpr int kRgbLed = 47;     // WS2812-type RGB LED (Jon, 22 Oct)
+constexpr int kRgbLed = 47;     // WS2812-type RGB LED (Jon, 22 Oct): Wi-Fi status (v0.6)
 constexpr int kConsoleTx = 43;  // UART0 via the onboard USB-serial chip: console only
 constexpr int kConsoleRx = 44;
 

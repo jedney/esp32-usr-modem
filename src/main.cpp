@@ -8,7 +8,12 @@
 // Each port has a session (lib/hostport) with command, online and online-command modes;
 // AT*TESTCALL makes a test call to a built-in echo. The front-panel LEDs follow brief
 // table 5.4. Project commands are in the AT* table below; AT*HW... are the hardware
-// tests (hwconsole.cpp). Wi-Fi follows in v0.6 and real calls in v0.8.
+// tests (hwconsole.cpp).
+//
+// v0.6: Wi-Fi (one saved network, DHCP or static IP), mDNS name and the NTP clock
+// (lib/netcfg, hw::EspRadio). ARQ and the on-board RGB LED show the Wi-Fi state. The
+// boot banner waits up to 8 s for the network; later changes are printed on the console.
+// Real calls follow in v0.8.
 #include <Arduino.h>
 
 #include "atcmd.h"
@@ -17,10 +22,13 @@
 #include "hw.h"
 #include "hwconsole.h"
 #include "modemcfg.h"
+#include "net_commands.h"
+#include "netcfg.h"
 #include "nvs_store.h"
 #include "panel.h"
 #include "rs232.h"
 #include "session.h"
+#include "wifi_radio.h"
 
 #ifndef FW_VERSION
 #define FW_VERSION "0.0"
@@ -32,6 +40,7 @@
 namespace {
 
 constexpr uint32_t kConsoleBaud = 115200;
+constexpr uint32_t kBannerWaitMs = 8000;  // for Wi-Fi at boot (decided by Jon, v0.6)
 
 class SerialSink : public atcmd::Sink {
 public:
@@ -41,6 +50,9 @@ public:
 };
 
 hw::NvsStore store;
+hw::NvsStore netStore("net", "cfg");
+hw::EspRadio radio;
+netcfg::Net net(netStore, radio);
 SerialSink consoleSink;
 hostport::CallSlot callSlot;
 hostport::EchoConnection echoCall;  // AT*TESTCALL
@@ -200,8 +212,13 @@ const atcmd::StarCommand kStarCommands[] = {
     {"TESTCALL", "AT*TESTCALL[=<seconds>]", "test call to a built-in echo (+++ returns)",
      cmdTestCall, false},
     {"DIALTEST", "AT*DIALTEST <dial string>", "show how a number is dialled", cmdDialTest, false},
+    NETCFG_STAR_COMMANDS,
     {"HW", "AT*HW...", "hardware tests (AT*HW? lists them)", cmdHw, true},
 };
+
+uint32_t msNow() {
+    return millis();
+}
 
 // --- Boot banner ------------------------------------------------------------------------
 
@@ -229,7 +246,37 @@ void printSettings(modemcfg::LoadResult loaded) {
         static_cast<unsigned>(p.get(modemcfg::kV)), static_cast<unsigned>(p.get(modemcfg::kX)));
 }
 
-void printBanner(modemcfg::LoadResult loaded) {
+// Wi-Fi, network name and clock (brief 6.7). Never the Wi-Fi password.
+void printNetwork(netcfg::LoadResult netLoaded) {
+    const netcfg::Settings &s = net.settings();
+    if (netLoaded == netcfg::LoadResult::kDamaged) {
+        Serial.printf("Wi-Fi: %s\r\n", netcfg::loadResultText(netLoaded));
+    }
+    if (!s.enabled) {
+        Serial.print("Wi-Fi: off (AT*WIFI=ON switches it on)\r\n");
+    } else if (!s.hasNetwork()) {
+        Serial.print("Wi-Fi: not set up (AT*WIFISCAN, then AT*WIFIJOIN=<n>)\r\n");
+    } else if (net.up()) {
+        const netcfg::LinkInfo &l = net.link();
+        char ip[16];
+        netcfg::formatIp(l.ip, ip, sizeof ip);
+        Serial.printf("Wi-Fi: %s, %d dBm, IP %s (%s)\r\n", s.ssid, static_cast<int>(l.rssi), ip,
+                      s.dhcp ? "DHCP" : "static");
+    } else {
+        Serial.printf("Wi-Fi: %s, %s\r\n", s.ssid, net.stateText());
+    }
+    Serial.printf("Name: %s.local\r\n", s.host);
+    const int64_t utc = net.utcNow();
+    if (utc != 0) {
+        char t[48];
+        netcfg::tz::formatLocal(net.zone(), utc, t, sizeof t);
+        Serial.printf("Clock: %s\r\n", t);
+    } else {
+        Serial.printf("Clock: not set yet (NTP %s, zone %s)\r\n", s.ntp, s.tz);
+    }
+}
+
+void printBanner(modemcfg::LoadResult loaded, netcfg::LoadResult netLoaded) {
     Serial.print("\r\n");
     Serial.print("  _   _ ____  ____    __  __           _\r\n");
     Serial.print(" | | | / ___||  _ \\  |  \\/  | ___   __| | ___ _ __ ___\r\n");
@@ -241,6 +288,7 @@ void printBanner(modemcfg::LoadResult loaded) {
                   static_cast<unsigned>(ESP.getFlashChipSize() / (1024 * 1024)),
                   static_cast<unsigned>(ESP.getPsramSize() / 1024),
                   hwconsole::resetReasonName(static_cast<int>(esp_reset_reason())));
+    printNetwork(netLoaded);
     printSettings(loaded);
     Serial.print(
         "Maintenance console. ATI4 shows the settings, AT*HELP the project commands,\r\n"
@@ -271,9 +319,34 @@ void pollConsole(uint32_t now) {
     console->tick(now, true);  // the console has no DTR
 }
 
+// Wi-Fi and clock notices go to the console only, between commands: in command mode,
+// nothing typed, no join or scan waiting. Never to the RS232 port.
+void pollNotices() {
+    if (console->mode() != hostport::Mode::kCommand || !console->port().lineEmpty()) {
+        return;
+    }
+    char text[netcfg::Net::kNoticeMax];
+    if (net.takeNotice(text, sizeof text)) {
+        Serial.printf("%s\r\n", text);
+    }
+}
+
+hostport::WifiLed arqLed() {
+    switch (net.arq()) {
+        case netcfg::Arq::kOn:
+            return hostport::WifiLed::kConnected;
+        case netcfg::Arq::kBlink:
+            return hostport::WifiLed::kConnecting;
+        case netcfg::Arq::kOff:
+        default:
+            return hostport::WifiLed::kOff;
+    }
+}
+
 uint8_t ledMask = 0xFF;  // not yet set
 
 void pollLeds(uint32_t now) {
+    hw::rgbShow(net.rgb(now));  // on-board LED: not used by the hardware tests
     if (hwconsole::ledsHeld()) {
         ledMask = 0xFF;  // set again when the test gives them back
         return;
@@ -284,7 +357,7 @@ void pollLeds(uint32_t now) {
     in.cd = (!rs232::suspended() && rs232::session().dcd()) || console->callUp();
     in.tr = rs232::dtrOn() || p.get(modemcfg::kAmpD) == 0;
     in.cs = hw::ctsOutAsserted();
-    in.wifi = hostport::WifiLed::kOff;  // v0.6
+    in.wifi = arqLed();
     in.toComputer = rs232::bytesToComputer();
     in.fromComputer = rs232::bytesFromComputer();
     uint8_t mask = panel.update(in, now);
@@ -308,13 +381,30 @@ void setup() {
     console = new hostport::Session(*modem, consoleSink, kConsoleBaud, callSlot);
     rs232::begin(*modem, callSlot);
     hwconsole::setPortControl(hwconsole::PortControl{modemIdle, rs232::suspend, rs232::resume});
-    printBanner(loaded);
+    netcfg::LoadResult netLoaded = net.begin(millis());
+    netcfg::attachCommands(net, msNow);
+    // With a saved network, give it a few seconds so the banner can show the address.
+    const netcfg::Settings &s = net.settings();
+    const uint32_t start = millis();
+    while (s.enabled && s.hasNetwork() && !net.up() && millis() - start < kBannerWaitMs) {
+        const uint32_t now = millis();
+        net.tick(now);
+        pollLeds(now);
+        delay(10);
+    }
+    net.tick(millis());
+    printBanner(loaded, netLoaded);
+    char skip[netcfg::Net::kNoticeMax];
+    net.takeNotice(skip, sizeof skip);  // the banner has already said it
 }
 
 void loop() {
     const uint32_t now = millis();
     pollConsole(now);
     rs232::poll(now);
+    net.tick(now);
+    netcfg::pollCommands();  // a finished AT*WIFIJOIN or AT*WIFISCAN
+    pollNotices();
     pollLeds(now);
     delay(1);
 }

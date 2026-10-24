@@ -66,6 +66,31 @@ Reply cmdFail(Port &, const char *) {
     return Reply::kError;
 }
 
+// AT*SECRET asks for a secret; AT*LATER sends its result later (finish()).
+std::string secretGot;
+int secretCalls = 0;
+int cancels = 0;
+Reply onSecret(Port &port, const char *text, void *) {
+    secretGot = text;
+    ++secretCalls;
+    if (strcmp(text, "later") == 0) {
+        port.wait(nullptr, nullptr);
+        return Reply::kPending;
+    }
+    return strlen(text) >= 3 ? Reply::kOk : Reply::kError;
+}
+Reply cmdSecret(Port &port, const char *) {
+    port.askSecret("Secret: ", onSecret, nullptr);
+    return Reply::kPending;
+}
+void onCancel(void *) {
+    ++cancels;
+}
+Reply cmdLater(Port &port, const char *) {
+    port.wait(onCancel, nullptr);
+    return Reply::kPending;
+}
+
 const StarCommand kStar[] = {
     {"VER", "AT*VER", "firmware version", cmdVer, false},
     {"HELP", "AT*HELP", "this list", cmdHelp, false},
@@ -73,6 +98,8 @@ const StarCommand kStar[] = {
     {"HW", "AT*HW...", "hardware tests", cmdHw, true},
     {"OWN", "AT*OWN", "prints its own result", cmdOwn, false},
     {"FAIL", "AT*FAIL", "always fails", cmdFail, false},
+    {"SECRET", "AT*SECRET", "asks for a secret", cmdSecret, false},
+    {"LATER", "AT*LATER", "result later", cmdLater, false},
 };
 
 struct Rig {
@@ -722,8 +749,106 @@ void test_find_star_prefers_longest_name() {
     TEST_ASSERT_NULL(r.modem.findStar("HEL", &args));
 }
 
+// --- Masked prompt and late results (AT*WIFIJOIN, AT*WIFISCAN) ------------------------------
+
+void test_secret_prompt_echoes_stars() {
+    MemStore st;
+    Rig r(st);
+    secretCalls = 0;
+    std::string o = r.type("AT*SECRET\r");
+    ENDS_WITH(o, "Secret: ");
+    TEST_ASSERT_TRUE(r.port.busy());
+    TEST_ASSERT_EQUAL_STRING("*******", r.type("hunter2").c_str());
+    TEST_ASSERT_EQUAL_STRING("\b \b", r.type("\b").c_str());  // Backspace deletes
+    o = r.type("x\r\n");
+    NOT_CONTAINS(o, "hunter");
+    ENDS_WITH(o, "\r\nOK\r\n");
+    TEST_ASSERT_EQUAL(1, secretCalls);
+    TEST_ASSERT_EQUAL_STRING("hunterx", secretGot.c_str());
+    TEST_ASSERT_FALSE(r.port.busy());
+    ENDS_WITH(r.type("AT\r"), "\r\nOK\r\n");  // the LF after it was ignored
+}
+
+void test_secret_prompt_with_echo_off_shows_nothing() {
+    MemStore st;
+    Rig r(st);
+    r.type("ATE0\r");
+    r.type("AT*SECRET\r");
+    TEST_ASSERT_EQUAL_STRING("", r.type("abcdef").c_str());
+    ENDS_WITH(r.type("\r"), "\r\nOK\r\n");
+}
+
+void test_secret_prompt_cancel_and_overflow() {
+    MemStore st;
+    Rig r(st);
+    secretCalls = 0;
+    r.type("AT*SECRET\r");
+    ENDS_WITH(r.type("abc\x1b"), "\r\nERROR\r\n");  // Esc
+    r.type("AT*SECRET\r");
+    ENDS_WITH(r.type("abc\x03"), "\r\nERROR\r\n");  // Ctrl-C
+    TEST_ASSERT_EQUAL(0, secretCalls);
+    r.type("AT*SECRET\r");
+    std::string longer(kSecretMax + 1, 'z');
+    r.type(longer.c_str());
+    ENDS_WITH(r.type("\r"), "\r\nERROR\r\n");
+    TEST_ASSERT_EQUAL(0, secretCalls);
+}
+
+void test_secret_is_not_repeated_by_a_slash() {
+    MemStore st;
+    Rig r(st);
+    r.type("AT*SECRET\r");
+    r.type("topsecret\r");
+    secretCalls = 0;
+    std::string o = r.type("A/");
+    ENDS_WITH(o, "Secret: ");  // the command runs again and asks again
+    NOT_CONTAINS(o, "topsecret");
+    TEST_ASSERT_EQUAL(0, secretCalls);
+    r.type("\x1b");
+}
+
+void test_late_result_and_cancel() {
+    MemStore st;
+    Rig r(st);
+    cancels = 0;
+    std::string o = r.type("AT*LATER\r\n");
+    NOT_CONTAINS(o, "OK");
+    TEST_ASSERT_TRUE(r.port.busy());
+    TEST_ASSERT_FALSE(r.port.lineEmpty());
+    TEST_ASSERT_EQUAL_STRING("", r.type("\n").c_str());  // LF is not a key press
+    r.out.s.clear();
+    TEST_ASSERT_TRUE(r.port.finish(Reply::kOk));
+    TEST_ASSERT_EQUAL_STRING("\r\nOK\r\n", r.out.s.c_str());
+    TEST_ASSERT_FALSE(r.port.finish(Reply::kOk));  // only once
+    TEST_ASSERT_TRUE(r.port.lineEmpty());
+
+    r.type("AT*LATER\r");
+    ENDS_WITH(r.type("x"), "\r\nERROR\r\n");  // a key cancels
+    TEST_ASSERT_EQUAL(1, cancels);
+    TEST_ASSERT_FALSE(r.port.finish(Reply::kOk));  // too late: nothing is sent
+    ENDS_WITH(r.type("AT\r"), "\r\nOK\r\n");
+}
+
+void test_secret_handler_can_wait_for_a_late_result() {
+    MemStore st;
+    Rig r(st);
+    r.type("AT*SECRET\r");
+    std::string o = r.type("later\r");
+    NOT_CONTAINS(o, "OK");
+    TEST_ASSERT_TRUE(r.port.busy());
+    r.out.s.clear();
+    TEST_ASSERT_TRUE(r.port.finish(Reply::kError));
+    TEST_ASSERT_EQUAL_STRING("\r\nERROR\r\n", r.out.s.c_str());
+}
+
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_secret_prompt_echoes_stars);
+    RUN_TEST(test_secret_prompt_with_echo_off_shows_nothing);
+    RUN_TEST(test_secret_prompt_cancel_and_overflow);
+    RUN_TEST(test_secret_is_not_repeated_by_a_slash);
+    RUN_TEST(test_late_result_and_cancel);
+    RUN_TEST(test_secret_handler_can_wait_for_a_late_result);
     RUN_TEST(test_at_gives_ok_with_echo);
     RUN_TEST(test_lower_case_works_mixed_case_is_ignored);
     RUN_TEST(test_text_before_at_is_ignored);

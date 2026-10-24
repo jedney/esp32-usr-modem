@@ -11,6 +11,11 @@ Built, check outstanding: **v0.5** RS232 host port and LED driver. Unit, on-boar
 console end-to-end tests pass; the RS232 end-to-end tests (`test/e2e/test_rs232.py`)
 wait for the MAX3232s and DB9 to be wired.
 
+Built, check outstanding: **v0.6** Wi-Fi and clock. Unit, on-board and console
+end-to-end tests pass on the bare board; joining Jon's Wi-Fi, `ping usr-modem.local`
+and the password check (`test/e2e/test_wifi.py`) need the network details in `.env`.
+The pin map is confirmed (Q76) and applied in this version.
+
 | Version | Feature | Brief | Done when |
 |---|---|---|---|
 | v0.4 | **Settings store and AT command parser** (console first): command-line parsing (several commands per line, `A/` repeat), S-registers, `E Q V X`, `&F &W &V &Z`, `Z`, `ATI0`–`ATI7` (authentic Sportster text), `+FCLASS`, result codes (verbose/numeric/quiet), `AT*` commands in one table, `AT*HELP`. Stored in NVS, logic in `lib/` | 6.2, 6.5, 6.6, 6.7 | Parser and settings unit-tested on the PC; `AT&V` shows the saved profile after a restart |
@@ -23,12 +28,14 @@ wait for the MAX3232s and DB9 to be wired.
 | v0.11 | **Web interface firmware**: HTTP server, Digest login, Host check, CSRF, `/api/session` + WebSocket per `web/PROTOCOL.md`, config screen in the browser (including the Hardware tests screen: all tests, with line/loopback/bridge only while the modem is idle, bridge traffic shown in the browser terminal, on-screen DCD/RI/CTS toggles, Q79), live LEDs/status, browser firmware/LittleFS upload | 6.11, 6.14 | The v0.2 page works against the real modem with login |
 | v0.12 | **Internet dial-up**: PPP on `ATDT666` and SLIP on `ATDT667` (port from Zimodem), NAT, clean hang-up | 6.6 | Windows 9x or Amiga TCP stack browses the web through the modem |
 | v0.13 | **Client Tests**: display tests, screen size, keyboard, terminal ID, echo/line endings, flow control, cable check, bell, X/Y/ZMODEM up/downloads (port from Zimodem), save results as client settings | 6.13 | Tested against a PC terminal (with `lrzsz`) and the Amiga |
-| v1.0 | **Production**: pin map confirmed by Electronics (Q76), final build in the case, all on-board and end-to-end tests pass, README and About complete | all | Jon's sign-off |
+| v1.0 | **Production**: final build in the case (pin map already confirmed by Electronics, Q76, and applied in v0.6), all on-board and end-to-end tests pass, README and About complete | all | Jon's sign-off |
 
 Notes:
 
-- v0.5 needs the RS232 section wired on the bench (MAX3232s, DB9). If the final pin map
-  (Q76) changes, only `lib/hw/src/pins.h` changes.
+- v0.5 needs the RS232 section wired on the bench (MAX3232s, DB9).
+- The pin map is confirmed by Electronics (Q76, schematic rev A, 24 Oct 2026) and applied
+  in v0.6. If the board ever changes, `lib/hw/src/pins.h` and the values locked in by
+  `test/native/test_pins` change together.
 - USB CDC serial on the native USB port is a v2 feature (Q25); keep GPIO19/20 free.
 - The order can change; record any change in `docs/decisions-log.md`.
 - `&B` has the Sportster meaning and `AT*BAUD` fixes the speed (decisions log, v0.5).

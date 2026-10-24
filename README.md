@@ -74,8 +74,9 @@ The same actions are in PlatformIO's sidebar under **s3 → General / Platform**
 With the console open, `AT*HWTEST` walks through every part of the electronics in
 turn (LEDs, speaker, volume cap, pot, RS232 lines, loopback) and prints a pass/fail
 summary. `AT*HW?` lists the single tests. The GPIO pin map is in `lib/hw/src/pins.h`
-(**proposed, not yet confirmed by Electronics**); `AT*HWPINS` prints it. Pins are
-only driven when a test uses them.
+(**confirmed by Electronics, schematic rev A, Q76**); `AT*HWPINS` prints it, and the
+`test_pins` unit test stops a pin changing by accident. Pins are only driven when a
+test uses them.
 
 Loopback plug for `AT*HWLOOP`: join RXD–TXD, CTS–RTS and DCD–DTR (DB25 pins 3–2, 5–4,
 8–20; bench DB9 pins 2–3, 8–7, 1–4).
@@ -83,6 +84,36 @@ Loopback plug for `AT*HWLOOP`: join RXD–TXD, CTS–RTS and DCD–DTR (DB25 pin
 Other tasks: upload over Wi-Fi, on-board tests, end-to-end tests, web tests and preview,
 lint, and version bumps. Running the on-board tests replaces the firmware on the board
 with the test program, so upload the firmware again afterwards.
+
+### Wi-Fi and clock
+
+On the console (or the RS232 port):
+
+```text
+AT*WIFISCAN            list the networks in range
+AT*WIFIJOIN=1          join number 1 (or AT*WIFIJOIN="My Network")
+Password (Enter for none): ************
+Connected, IP 192.168.1.42
+```
+
+The password is typed at a masked prompt and never shown again: `AT*WIFI?` says only
+"set" or "not set". The network is saved only once it connects. The modem then answers
+as `usr-modem.local` (`ping usr-modem.local`; change it with `AT*HOSTNAME=<name>`) and
+sets its clock from NTP (`AT*TIME`). The time zone is Pacific/Auckland; `AT*TZ=?` lists
+others. `AT*WIFIIP=<ip>,<mask>,<gateway>[,<dns>]` sets a static address,
+`AT*WIFIIP=DHCP` goes back. `AT*WIFI=OFF` switches Wi-Fi off; `AT*WIFIFORGET` forgets the
+network.
+
+The front ARQ LED and the on-board RGB LED show the Wi-Fi state: no network set up = ARQ
+off, RGB red; connecting = ARQ blinking, RGB flashing green; connected = ARQ on, RGB
+green; switched off = both off.
+
+### Local secrets (`.env`)
+
+Copy `.env.example` to `.env` at the repository root and fill it in. `.env` is
+git-ignored. It holds the Wi-Fi name and password the end-to-end Wi-Fi tests use
+(`USR_MODEM_WIFI_SSID`, `USR_MODEM_WIFI_PASS`) and the OTA password
+(`USR_MODEM_OTA_PASSWORD`). Environment variables of the same names win over the file.
 
 ### Debugging
 
@@ -92,13 +123,14 @@ S3's built-in USB-JTAG is used (`debug_tool = esp-builtin`).
 
 ### Over-the-air uploads
 
-Set the OTA password once in your environment, then use the OTA task:
+Put the OTA password in `.env` (`USR_MODEM_OTA_PASSWORD`, see above), then use the OTA
+task. An environment variable works too:
 
 ```powershell
 setx USR_MODEM_OTA_PASSWORD "your-ota-password"   # Windows, then restart VS Code
 ```
 
-The modem must have Wi-Fi configured and an OTA password set on the device.
+The modem must be on Wi-Fi. OTA itself arrives in v0.7 (with the device password).
 
 ### Windows compiler
 

@@ -8,6 +8,8 @@
 //     & settings, +FCLASS. Project commands are AT* (one table, the rest of the line is
 //     the command's argument).
 //   - O (back online), H0 and Z hang-ups go to the port's Link (lib/hostport).
+//   - An AT* command can ask for a secret (the Wi-Fi password) at a masked prompt, and
+//     can send its result later (a Wi-Fi join or scan) without blocking the other port.
 //
 // One Modem holds the shared settings; each serial port has its own Port (own line
 // buffer and A/ memory). No Arduino dependencies: unit-tested on the PC.
@@ -46,9 +48,16 @@ enum class Reply : uint8_t {
     kOk,     // send OK
     kError,  // send ERROR
     kDone,   // the handler already sent its own final result
+    // The result comes later: the handler called Port::askSecret() or Port::wait().
+    kPending,
 };
 
 using StarHandler = Reply (*)(Port &port, const char *args);
+// Gets the text typed at a masked prompt. It may return kPending again (after
+// Port::wait()). The text is wiped as soon as it returns, so keep a copy if needed.
+using SecretHandler = Reply (*)(Port &port, const char *text, void *ctx);
+// Called when a key cancels a wait.
+using CancelHandler = void (*)(void *ctx);
 
 struct StarCommand {
     const char *name;   // after "AT*", e.g. "VER"
@@ -58,7 +67,8 @@ struct StarCommand {
     bool prefix;  // true: matches any command starting with `name` (e.g. "HW" for AT*HWLED)
 };
 
-constexpr size_t kLineMax = 128;  // characters after "AT"
+constexpr size_t kLineMax = 128;   // characters after "AT"
+constexpr size_t kSecretMax = 64;  // characters at a masked prompt (a WPA key is up to 64)
 
 // Shared state: active settings, stored templates, the AT* table.
 class Modem {
@@ -115,6 +125,21 @@ public:
     void beginInfo();             // starts an information response (S3 S4 in verbal mode)
     void result(Result r);        // applies V, Q and X
 
+    // --- Prompts and late results, for AT* handlers (return Reply::kPending after) -------
+    // Prints `prompt` and reads one line as a secret: each character echoes as '*' (only
+    // with E1), Backspace/DEL delete, Enter hands the text to `fn`, Esc or Ctrl-C cancels
+    // with ERROR. The text is never echoed, never kept for A/, and wiped after `fn`.
+    void askSecret(const char *prompt, SecretHandler fn, void *ctx);
+    // The final result comes later, through finish(). Meanwhile typing is not a command;
+    // any key (not LF) cancels: `cancel` is called and ERROR sent.
+    void wait(CancelHandler cancel, void *ctx);
+    // Sends the result of a wait (nothing for kDone). False if the port isn't waiting
+    // (the wait was cancelled).
+    bool finish(Reply r);
+    bool busy() const { return state_ == State::kSecret || state_ == State::kWait; }
+    // Nothing typed since the last result: an unsolicited message can be printed.
+    bool lineEmpty() const { return state_ == State::kIdle; }
+
     Modem &modem() { return modem_; }
     uint32_t baud() const { return baud_; }
     void setBaud(uint32_t baud) { baud_ = baud; }
@@ -123,8 +148,11 @@ public:
     bool callUp() const { return link_ != nullptr && link_->callUp(); }
 
 private:
-    enum class State : uint8_t { kIdle, kGotA, kLine };
+    enum class State : uint8_t { kIdle, kGotA, kLine, kSecret, kWait };
 
+    void feedSecret(char c, bool isBs);
+    void feedWait(char c);
+    void wipeSecret();
     bool runCommand(const char *&p, bool *stop);
     bool runAmpersand(const char *&p, bool *stop);
     bool runSRegister(const char *&p);
@@ -143,6 +171,13 @@ private:
     bool overflow_ = false;
     char last_[kLineMax + 1] = {};
     unsigned selected_ = 0;  // register for "AT=n" / "AT?"
+    // Masked prompt and wait (askSecret, wait)
+    SecretHandler secretFn_ = nullptr;
+    CancelHandler cancelFn_ = nullptr;
+    void *ctx_ = nullptr;
+    char secret_[kSecretMax + 1] = {};
+    size_t secretLen_ = 0;
+    bool secretOverflow_ = false;
 };
 
 // --- ATI and settings screens (identity.cpp) -----------------------------------------------
