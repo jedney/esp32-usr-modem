@@ -36,6 +36,11 @@ use. All seven device acceptance checks have passed.
 
 Notes:
 
+- **v0.8 identity/speed update (Jon, 25 Oct):** identify as a Sportster 14400 while
+  retaining the command set and emulated speeds through 56000. Factory call speed is
+  14400 (`&N8`), `&N0` selects 56000; host serial rates still reach 115200. The
+  identity/speed preparation is implemented on the v0.8 branch; outgoing calls remain
+  pending. See `docs/v0.8-plan.md` for implementation and bench acceptance scope.
 - v0.5 needs the RS232 section wired on the bench (MAX3232s, DB9).
 - The pin map is confirmed by Electronics (Q76, schematic rev A, 24 Oct 2026) and applied
   in v0.6. If the board ever changes, `lib/hw/src/pins.h` and the values locked in by

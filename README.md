@@ -1,12 +1,23 @@
 # USR Modem Emulator
 
 An ESP32-S3 Wi-Fi "modem" in a 3D-printed replica of a 1990s US Robotics Sportster
-33.6 Faxmodem. It has a real DB25 RS232 port, speaks the Hayes AT command set, plays the
+Faxmodem. It has a real DB25 RS232 port, speaks the Hayes AT command set, plays the
 dial, DTMF and handshake sounds, and connects to Telnet BBSes over Wi-Fi.
 
-Status: **v0.3, prototyping.** The firmware has the USB maintenance console and the
-hardware tests for the electronics build (`AT*HWTEST`); the modem itself comes next. The full requirements are in the project brief
-(`claude/project-brief.md` in the Claude project).
+Status: **v0.8 in progress.** Device identification is **USRobotics Sportster 14400
+Fax**, with factory call speed **14400** (`AT&N8`). The command set and emulated line
+speeds extend through **56000** (`AT&N38`, or `AT&N0` for the highest speed); host
+serial rates remain 300-115200 and the USB console remains 115200. `AT*TESTCALL`
+exercises these speeds now; real outgoing TCP/Telnet calls are the remaining v0.8 work.
+
+`AT&F1` loads the new factory profile; `AT&W` saves it. Upgrading keeps existing
+saved profiles, including an explicit `&N0` (which now selects 56000). Wi-Fi and device
+credentials are unaffected by `AT&F1`.
+
+The full requirements are in `docs/project-brief.md`; later decisions are recorded in
+`docs/decisions-log.md`. The identity is modeled rather than a verified ROM capture:
+`ATI0` is the placeholder `1441`, `ATI1` is `0000`, `ATI3` and `ATI9` show the model
+name, and `ATI7` marks physical ROM/DSP details as emulated or unavailable.
 
 ## Repository layout
 

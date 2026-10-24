@@ -27,6 +27,18 @@ Upload the firmware again afterwards (**Modem: upload over USB (tests first)**).
 
 ## Feature matrix
 
+v0.8 identity/speed preparation adds full USR V.90 `&N`/`&U` indexes 0-38, 14400
+factory profiles, 56000 CONNECT text/numbers and preserved saved profiles. Native
+coverage is in `test_atcmd`, `test_modemcfg` and `test_hostport`; `test_board` checks
+extended NVS values, and `test_session.py` checks 14400 defaults and 56k echo,
+escape/resume and numeric results through the console. Real outgoing calls are still
+planned in `docs/v0.8-plan.md`; these tests use `AT*TESTCALL`.
+
+Preparation validation (25 Oct): 237/237 native tests pass; the ESP32 firmware and
+updated `embedded/test_board` compile; clang-format and cppcheck pass (no high/medium
+findings). The end-to-end suite collects 94 tests. No firmware was flashed and the
+new on-board/serial checks have not yet run on the device.
+
 Status: ✅ tests written, ⬜ planned. Section numbers refer to the project brief.
 
 | Feature (brief §) | Unit | On-board | End-to-end | Status |

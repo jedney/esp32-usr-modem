@@ -37,6 +37,7 @@ def _reset(console, rs232):
         rs232.raw(b"ATH\r")
     console.raw(b"AT*BAUD=AUTO\r")
     console.raw(b"ATZ\r")
+    assert console.command("AT&N8")[-1] == "OK"
 
 
 def _at(rs232, baud, text="AT", timeout=None):
@@ -86,8 +87,8 @@ def test_cts_on_and_dcd_follows_the_call(console, rs232):
     assert _at(rs232, 38400)[-1] == "OK"
     assert rs232.ser.cts  # &H1: on while the modem can take data
     assert not rs232.ser.cd  # &C1, no call
-    lines = rs232.command("AT*TESTCALL", until=("CONNECT 33600", "ERROR"))
-    assert lines[-1] == "CONNECT 33600"
+    lines = rs232.command("AT*TESTCALL", until=("CONNECT 14400", "ERROR"))
+    assert lines[-1] == "CONNECT 14400"
     time.sleep(0.1)
     assert rs232.ser.cd
     time.sleep(GUARD)
@@ -103,7 +104,7 @@ def test_cts_on_and_dcd_follows_the_call(console, rs232):
 
 def test_dtr_drop_hangs_up(console, rs232):
     assert _at(rs232, 38400)[-1] == "OK"
-    rs232.command("AT*TESTCALL", until=("CONNECT 33600", "ERROR"))
+    rs232.command("AT*TESTCALL", until=("CONNECT 14400", "ERROR"))
     rs232.ser.reset_input_buffer()
     rs232.ser.dtr = False
     time.sleep(0.3)
@@ -114,7 +115,7 @@ def test_dtr_drop_hangs_up(console, rs232):
 
 def test_dtr_ignored_with_amp_d0(console, rs232):
     assert _at(rs232, 38400, "AT&D0")[-1] == "OK"
-    rs232.command("AT*TESTCALL", until=("CONNECT 33600", "ERROR"))
+    rs232.command("AT*TESTCALL", until=("CONNECT 14400", "ERROR"))
     rs232.ser.dtr = False
     time.sleep(0.3)
     rs232.ser.dtr = True
@@ -126,7 +127,7 @@ def test_bulk_echo_with_hardware_flow_control(console, rs232, baud):
     """More data than the modem's buffers hold, sent as fast as the port allows: RTS/CTS
     must keep every byte."""
     assert _at(rs232, baud)[-1] == "OK"
-    rs232.command("AT*TESTCALL", until=("CONNECT 33600", "ERROR"))
+    rs232.command("AT*TESTCALL", until=("CONNECT 14400", "ERROR"))
     data = bytes((i * 7 + 3) % 256 for i in range(16384)).replace(b"+", b"-")
     received = b""
     deadline = time.monotonic() + len(data) * 10 / baud * 2 + 5
@@ -151,7 +152,7 @@ def test_line_tests_refused_on_rs232(console, rs232):
 
 def test_console_call_blocks_rs232_call(console, rs232):
     assert _at(rs232, 38400)[-1] == "OK"
-    console.command("AT*TESTCALL", until=("CONNECT 33600", "ERROR"))
+    console.command("AT*TESTCALL", until=("CONNECT 14400", "ERROR"))
     try:
         assert rs232.command("AT*TESTCALL")[-1] == "ERROR"  # one call at a time
     finally:

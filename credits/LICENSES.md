@@ -28,6 +28,23 @@ pimodem), Jim Brain and FozzTexx (tcpser).
 
 ## Publication notes
 
+### v0.8 identity and extended speed references
+
+The Sportster 14400 identity is modeled from the USR product name and inquiry
+semantics in the [USR Sportster High Speed Modems Technical Reference Guide](https://www.rigacci.org/docs/biblio/online/usr/sportster_guide.txt)
+(manufacturer-authored guide, mirrored). The earlier 33600 capture remains the
+source for settings-screen layout, rather than a source for 14400 ROM details.
+No verified 14400 ROM capture was found: product code `1441` and checksum `0000`
+are emulator placeholders. `ATI3` has no ROM revision; `ATI7` marks physical
+ROM/DSP information as emulated or unavailable; `ATI9` returns the model name
+without the former 33.6 Plug and Play identifier. No new third-party code is copied.
+
+Speed indexes `&N1`-`&N38` and `&U1`-`&U38`, and numeric CONNECT results, follow
+the [USR V.90 Technical Quick Reference](https://support.usr.com/support/s-modem/s-modem-docs/v90tecrf.pdf),
+printed pages 10-11 and 15-18. Existing indexes 1-16 are preserved. The later
+indexes are not in increasing speed order; 38 selects 56000. These are factual
+command mappings reimplemented in this project; no code or manual pages are bundled.
+
 If the repository is ever made public, the mixed licences need a decision first:
 CC BY-NC (case) forbids commercial use, GPL-3.0 (reference sounds) would apply to any
 firmware image that bundles them, and Apache-2.0 (Zimodem) is compatible with GPL-3.0

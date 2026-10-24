@@ -14,6 +14,23 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [0.8] - 2026-10-25
+
+### Changed
+
+- Identify as a USRobotics Sportster 14400 Fax, with a 14400 factory call speed
+  (`&N8`). Keep the existing command set and host serial rates through 115200.
+  Existing stored profiles retain their settings.
+- Replace the previous 33.6 ROM and Plug and Play claims with documented emulator
+  identity values; no verified 14400 ROM capture is available yet.
+
+### Added
+
+- USR V.90 `&N`/`&U` speed indexes through 38 (56000), matching verbose and numeric
+  CONNECT results; `&N0` selects the highest emulated speed, 56000.
+- Native tests for every speed/index/result, settings above bit 31, profile persistence
+  and 56k escape/resume; on-board NVS and console acceptance coverage.
+
 ## [0.7] - 2026-10-25
 
 ### Added

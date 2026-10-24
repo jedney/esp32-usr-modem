@@ -492,7 +492,7 @@ void test_session_call_echo_and_connect_text() {
     Rig r;
     r.echo.open(0, 0);
     TEST_ASSERT_TRUE(r.s.startCall(r.echo));
-    TEST_ASSERT_EQUAL_STRING("\r\nCONNECT 33600\r\n", r.out.take().c_str());
+    TEST_ASSERT_EQUAL_STRING("\r\nCONNECT 14400\r\n", r.out.take().c_str());
     TEST_ASSERT_EQUAL(static_cast<int>(Mode::kOnline), static_cast<int>(r.s.mode()));
     TEST_ASSERT_TRUE(r.s.callUp());
     TEST_ASSERT_TRUE(r.s.dcd());
@@ -510,6 +510,21 @@ void test_session_connect_follows_amp_n() {
     TEST_ASSERT_EQUAL_STRING("\r\nCONNECT 9600\r\n", r.out.take().c_str());
 }
 
+void test_session_56k_and_auto_connect_after_escape() {
+    for (const char *cmd : {"AT&N38\r", "AT&N0\r"}) {
+        Rig r;
+        r.send(cmd);
+        r.out.take();
+        r.echo.open(0, 0);
+        TEST_ASSERT_TRUE(r.s.startCall(r.echo));
+        TEST_ASSERT_EQUAL_STRING("\r\nCONNECT 56000\r\n", r.out.take().c_str());
+        r.escape();
+        r.out.take();
+        r.send("ATO\r");
+        TEST_ASSERT_NOT_NULL(strstr(r.out.take().c_str(), "CONNECT 56000"));
+    }
+}
+
 void test_session_escape_ato_and_ath() {
     Rig r;
     r.call();
@@ -521,7 +536,7 @@ void test_session_escape_ato_and_ath() {
     r.send("ATI4\r");
     TEST_ASSERT_NOT_NULL(strstr(r.out.take().c_str(), "OFF HOOK"));
     r.send("ATO\r");
-    TEST_ASSERT_NOT_NULL(strstr(r.out.take().c_str(), "CONNECT 33600"));
+    TEST_ASSERT_NOT_NULL(strstr(r.out.take().c_str(), "CONNECT 14400"));
     TEST_ASSERT_EQUAL(static_cast<int>(Mode::kOnline), static_cast<int>(r.s.mode()));
     TEST_ASSERT_EQUAL_STRING("+++", r.fromCall().c_str());  // the escape went to the call
     r.escape();
@@ -733,6 +748,7 @@ int main() {
     RUN_TEST(test_echo_connection);
     RUN_TEST(test_session_call_echo_and_connect_text);
     RUN_TEST(test_session_connect_follows_amp_n);
+    RUN_TEST(test_session_56k_and_auto_connect_after_escape);
     RUN_TEST(test_session_escape_ato_and_ath);
     RUN_TEST(test_session_plus_without_guard_is_data);
     RUN_TEST(test_session_dtr_drop);

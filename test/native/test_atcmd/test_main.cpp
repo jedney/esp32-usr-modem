@@ -188,7 +188,7 @@ void test_quiet_still_shows_information() {
     MemStore st;
     Rig r(st);
     r.type("ATQ1\r");
-    CONTAINS(r.type("ATI3\r"), "Sportster 33600/Fax V2.31");
+    CONTAINS(r.type("ATI3\r"), "USRobotics Sportster 14400 Fax");
 }
 
 void test_backspace_and_delete() {
@@ -215,7 +215,7 @@ void test_repeat_last_line_with_a_slash() {
     Rig r(st);
     r.type("ATI3\r");
     std::string out = r.type("A/");  // no Enter
-    CONTAINS(out, "Sportster 33600/Fax V2.31");
+    CONTAINS(out, "USRobotics Sportster 14400 Fax");
     ENDS_WITH(out, "OK\r\n");
     ENDS_WITH(r.type("a/"), "OK\r\n");
 }
@@ -287,7 +287,7 @@ void test_missing_number_is_zero() {
 void test_out_of_range_settings_are_errors() {
     MemStore st;
     Rig r(st);
-    const char *bad[] = {"ATX5\r",  "ATQ3\r",  "ATM4\r", "AT&N17\r", "AT&S1\r", "AT&D1\r",
+    const char *bad[] = {"ATX5\r",  "ATQ3\r",  "ATM4\r", "AT&N39\r", "AT&S1\r", "AT&D1\r",
                          "AT&R0\r", "AT&M2\r", "ATH2\r", "AT&Q0\r",  "ATB2\r"};
     for (const char *cmd : bad) {
         std::string out = r.type(cmd);
@@ -465,13 +465,63 @@ void test_connect_codes_for_speeds() {
     TEST_ASSERT_EQUAL(static_cast<int>(Result::kConnect33600), static_cast<int>(connectFor(33600)));
     TEST_ASSERT_EQUAL(static_cast<int>(Result::kConnect2400), static_cast<int>(connectFor(2400)));
     TEST_ASSERT_EQUAL(static_cast<int>(Result::kConnect), static_cast<int>(connectFor(300)));
-    TEST_ASSERT_EQUAL(static_cast<int>(Result::kConnect33600), static_cast<int>(connectFor(56000)));
+    TEST_ASSERT_EQUAL(static_cast<int>(Result::kConnect33600), static_cast<int>(connectFor(33601)));
     TEST_ASSERT_EQUAL(static_cast<int>(Result::kConnect9600), static_cast<int>(connectFor(9601)));
     TEST_ASSERT_EQUAL_UINT32(0, lineSpeedForN(0));
     TEST_ASSERT_EQUAL_UINT32(300, lineSpeedForN(1));
     TEST_ASSERT_EQUAL_UINT32(14400, lineSpeedForN(8));
     TEST_ASSERT_EQUAL_UINT32(33600, lineSpeedForN(16));
-    TEST_ASSERT_EQUAL_UINT32(0, lineSpeedForN(17));
+    TEST_ASSERT_EQUAL_UINT32(0, lineSpeedForN(39));
+}
+
+void test_extended_line_speed_commands_and_results() {
+    // Published USR V.90 &N indexes and numeric results. These deliberately are not
+    // sorted by bps: &N17-&N20 fall below &N16.
+    const struct {
+        uint32_t bps;
+        unsigned code;
+    } speeds[] = {
+        {300, 1},     {1200, 5},    {2400, 10},   {4800, 18},   {7200, 20},   {9600, 13},
+        {12000, 21},  {14400, 25},  {16800, 43},  {19200, 85},  {21600, 91},  {24000, 99},
+        {26400, 103}, {28800, 107}, {31200, 151}, {33600, 155}, {28000, 256}, {29333, 260},
+        {30666, 264}, {32000, 268}, {33333, 180}, {34666, 272}, {36000, 276}, {37333, 184},
+        {38666, 280}, {40000, 284}, {41333, 188}, {42666, 192}, {44000, 196}, {45333, 200},
+        {46666, 204}, {48000, 208}, {49333, 212}, {50666, 216}, {52000, 220}, {53333, 224},
+        {54666, 228}, {56000, 232},
+    };
+    MemStore st;
+    Rig r(st);
+    for (unsigned i = 0; i < sizeof speeds / sizeof speeds[0]; ++i) {
+        char cmd[32];
+        snprintf(cmd, sizeof cmd, "AT&N%u&U%u\r", i + 1, i + 1);
+        ENDS_WITH(r.type(cmd), "OK\r\n");
+        TEST_ASSERT_EQUAL(i + 1, r.a().get(modemcfg::kAmpN));
+        TEST_ASSERT_EQUAL(i + 1, r.a().get(modemcfg::kAmpU));
+        TEST_ASSERT_EQUAL_UINT32(speeds[i].bps, lineSpeedForN(i + 1));
+        Result code = connectFor(speeds[i].bps);
+        TEST_ASSERT_EQUAL(speeds[i].code, static_cast<unsigned>(code));
+        char expected[32];
+        snprintf(expected, sizeof expected, "CONNECT %u", static_cast<unsigned>(speeds[i].bps));
+        TEST_ASSERT_EQUAL_STRING(i == 0 ? "CONNECT" : expected, resultText(code));
+        r.type("ATX4V0\r");
+        r.out.s.clear();
+        r.port.result(code);
+        snprintf(expected, sizeof expected, "%u\r", speeds[i].code);
+        TEST_ASSERT_EQUAL_STRING(expected, r.out.s.c_str());
+        TEST_ASSERT_EQUAL(static_cast<int>(Result::kConnect),
+                          static_cast<int>(filterForX(code, 0)));
+        TEST_ASSERT_EQUAL(static_cast<int>(code), static_cast<int>(filterForX(code, 4)));
+        r.type("ATV1\r");
+    }
+    ENDS_WITH(r.type("AT&N39\r"), "ERROR\r\n");
+    ENDS_WITH(r.type("AT&U39\r"), "ERROR\r\n");
+    ENDS_WITH(r.type("AT&N64\r"), "ERROR\r\n");
+    TEST_ASSERT_EQUAL(static_cast<int>(Result::kConnect33600), static_cast<int>(connectFor(33999)));
+    TEST_ASSERT_EQUAL(static_cast<int>(Result::kConnect56000), static_cast<int>(connectFor(57600)));
+    r.type("ATQ1\r");
+    r.out.s.clear();
+    r.port.result(Result::kConnect56000);
+    TEST_ASSERT_EQUAL_STRING("", r.out.s.c_str());
 }
 
 // --- Factory, stored templates, reset ---------------------------------------------------
@@ -582,11 +632,11 @@ void test_fclass() {
 void test_ati_identity_lines() {
     MemStore st;
     Rig r(st);
-    TEST_ASSERT_EQUAL_STRING("ATI3\r\r\nSportster 33600/Fax V2.31\r\n\r\nOK\r\n",
+    TEST_ASSERT_EQUAL_STRING("ATI3\r\r\nUSRobotics Sportster 14400 Fax\r\n\r\nOK\r\n",
                              r.type("ATI3\r").c_str());
-    TEST_ASSERT_EQUAL_STRING("ATI0\r\r\n3361\r\n\r\nOK\r\n", r.type("ATI0\r").c_str());
+    TEST_ASSERT_EQUAL_STRING("ATI0\r\r\n1441\r\n\r\nOK\r\n", r.type("ATI0\r").c_str());
     TEST_ASSERT_EQUAL_STRING("ATI2\r\r\nOK\r\n\r\nOK\r\n", r.type("ATI2\r").c_str());
-    CONTAINS(r.type("ATI9\r"), "(1.0USR0003\\\\Modem\\PNPC107\\Sportster 33.6 FAX EXT)FF");
+    CONTAINS(r.type("ATI9\r"), "USRobotics Sportster 14400 Fax");
     ENDS_WITH(r.type("ATI8\r"), "ERROR\r\n");
     ENDS_WITH(r.type("ATI10\r"), "ERROR\r\n");
 }
@@ -610,13 +660,13 @@ void test_ati4_current_settings_layout() {
         "ATI4\r"
         "\r\n"
         "\r\n"
-        "USRobotics Sportster 33600 Fax Settings...\r\n"
+        "USRobotics Sportster 14400 Fax Settings...\r\n"
         "\r\n"
         "B0  E1  F1  L2  M1  Q0  V1  X4  Y0\r\n"
         "BAUD=115200  PARITY=N  WORDLEN=8\r\n"
         "DIAL=TONE  ON HOOK\r\n"
         "\r\n"
-        "&A0  &B1  &C1  &D2  &G0  &H1  &I0  &K1  &M4  &N0\r\n"
+        "&A0  &B1  &C1  &D2  &G0  &H1  &I0  &K1  &M4  &N8\r\n"
         "&P1  &R2  &S0  &T5  &U0  &Y1\r\n"
         "\r\n"
         "S00=000  S01=000  S02=043  S03=013  S04=010  S05=008  S06=002\r\n"
@@ -637,13 +687,13 @@ void test_ati5_stored_settings_layout() {
     r.type("AT&Z0=170064142064\r");
     std::string out = r.type("ATI5\r");
     CONTAINS(out,
-             "\r\nUSRobotics Sportster 33600 Fax NVRAM Settings...\r\n\r\nTemplate Y0\r\n\r\n"
+             "\r\nUSRobotics Sportster 14400 Fax NVRAM Settings...\r\n\r\nTemplate Y0\r\n\r\n"
              "DIAL=TONE  B0  E1  F1  L2  M1  Q0  V1  X4\r\n"
              "BAUD=38400  PARITY=N  WORDLEN=8\r\n\r\n"
-             "&A0  &B1  &C1  &D2  &G0  &H1  &I0  &K1  &M4  &N0\r\n");
+             "&A0  &B1  &C1  &D2  &G0  &H1  &I0  &K1  &M4  &N8\r\n");
     CONTAINS(out, "S00=000  S02=043  S03=013  S04=010  S05=008  S06=002  S07=060\r\n");
     CONTAINS(out, "S38=000\r\n\r\n\r\nTemplate Y1\r\n");
-    CONTAINS(out, "&A0  &B1  &C1  &D2  &G0  &H2  &I2  &K1  &M4  &N0\r\n&P1  &R1");
+    CONTAINS(out, "&A0  &B1  &C1  &D2  &G0  &H2  &I2  &K1  &M4  &N8\r\n&P1  &R1");
     CONTAINS(out, "\r\nSTORED PHONE #0: 170064142064\r\n#1:\r\n#2:\r\n#3:\r\n\r\nOK\r\n");
 }
 
@@ -651,21 +701,21 @@ void test_ati6_and_ati7_layout() {
     MemStore st;
     Rig r(st);
     std::string i6 = r.type("ATI6\r");
-    CONTAINS(i6, "\r\n\r\nUSRobotics Sportster 33600 Fax Link Diagnostics...\r\n\r\n");
+    CONTAINS(i6, "\r\n\r\nUSRobotics Sportster 14400 Fax Link Diagnostics...\r\n\r\n");
     CONTAINS(i6, "Chars sent                    0      Chars Received                0\r\n");
     CONTAINS(i6, "Chars lost                    0\r\n");
     CONTAINS(i6, "Speed                  0/0\r\n");
     std::string i7 = r.type("ATI7\r");
     CONTAINS(i7,
              "\r\nConfiguration Profile...\r\n\r\nProduct type           US/Canada External\r\n");
-    CONTAINS(i7, "DSP rev                2.31\r\n\r\nOK\r\n");
+    CONTAINS(i7, "DSP rev                N/A\r\n\r\nOK\r\n");
 }
 
 void test_several_inquiries_on_one_line() {
     MemStore st;
     Rig r(st);
     std::string out = r.type("ATI3I7\r");
-    CONTAINS(out, "V2.31\r\n\r\nConfiguration Profile...");
+    CONTAINS(out, "14400 Fax\r\n\r\nConfiguration Profile...");
 }
 
 void test_ampersand_v_shows_current_and_stored() {
@@ -682,7 +732,8 @@ void test_numeric_mode_has_no_leading_blank_line() {
     MemStore st;
     Rig r(st);
     r.type("ATV0\r");
-    TEST_ASSERT_EQUAL_STRING("ATI3\rSportster 33600/Fax V2.31\r\n0\r", r.type("ATI3\r").c_str());
+    TEST_ASSERT_EQUAL_STRING("ATI3\rUSRobotics Sportster 14400 Fax\r\n0\r",
+                             r.type("ATI3\r").c_str());
 }
 
 // --- AT* commands ---------------------------------------------------------------------------
@@ -880,6 +931,7 @@ int main() {
     RUN_TEST(test_x_levels);
     RUN_TEST(test_port_result_uses_v_q_and_x);
     RUN_TEST(test_connect_codes_for_speeds);
+    RUN_TEST(test_extended_line_speed_commands_and_results);
     RUN_TEST(test_ampersand_f_loads_factory_templates);
     RUN_TEST(test_write_then_reset_and_restart);
     RUN_TEST(test_z_ignores_the_rest_of_the_line);

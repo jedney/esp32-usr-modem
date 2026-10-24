@@ -43,6 +43,8 @@ void test_settings_survive_in_nvs() {
 
     modemcfg::Nvram n = modemcfg::factoryNvram();
     n.tmpl[0].s[7] = 45;
+    n.tmpl[0].v[modemcfg::kAmpN] = 38;  // 56000, above the old 32-bit setting mask
+    n.tmpl[0].v[modemcfg::kAmpU] = 32;  // 48000
     strcpy(n.phone[0], "170064142064");
     TEST_ASSERT_TRUE(modemcfg::saveNvram(store, n));
 
@@ -51,6 +53,8 @@ void test_settings_survive_in_nvs() {
     TEST_ASSERT_EQUAL(static_cast<int>(modemcfg::LoadResult::kOk),
                       static_cast<int>(modemcfg::loadNvram(again, &out)));
     TEST_ASSERT_EQUAL(45, out.tmpl[0].s[7]);
+    TEST_ASSERT_EQUAL(38, out.tmpl[0].get(modemcfg::kAmpN));
+    TEST_ASSERT_EQUAL(32, out.tmpl[0].get(modemcfg::kAmpU));
     TEST_ASSERT_EQUAL_STRING("170064142064", out.phone[0]);
 
     TEST_ASSERT_TRUE(store.erase());

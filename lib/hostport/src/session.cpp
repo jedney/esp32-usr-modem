@@ -39,7 +39,7 @@ bool Session::startCall(Connection &conn) {
 
 void Session::sendConnect() {
     const unsigned n = profile().get(modemcfg::kAmpN);
-    const uint32_t bps = n == 0 ? 33600 : atcmd::lineSpeedForN(n);  // &N0 = highest
+    const uint32_t bps = n == 0 ? modemcfg::kMaxLineSpeed : atcmd::lineSpeedForN(n);
     port_.result(atcmd::connectFor(bps));
 }
 

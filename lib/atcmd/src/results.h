@@ -33,6 +33,28 @@ enum class Result : uint16_t {
     kConnect28800 = 107,
     kConnect31200 = 151,
     kConnect33600 = 155,
+    kConnect28000 = 256,
+    kConnect29333 = 260,
+    kConnect30666 = 264,
+    kConnect32000 = 268,
+    kConnect33333 = 180,
+    kConnect34666 = 272,
+    kConnect36000 = 276,
+    kConnect37333 = 184,
+    kConnect38666 = 280,
+    kConnect40000 = 284,
+    kConnect41333 = 188,
+    kConnect42666 = 192,
+    kConnect44000 = 196,
+    kConnect45333 = 200,
+    kConnect46666 = 204,
+    kConnect48000 = 208,
+    kConnect49333 = 212,
+    kConnect50666 = 216,
+    kConnect52000 = 220,
+    kConnect53333 = 224,
+    kConnect54666 = 228,
+    kConnect56000 = 232,
 };
 
 // "OK", "NO DIAL TONE", "CONNECT 33600" ...
@@ -43,11 +65,12 @@ const char *resultText(Result r);
 // set doesn't include becomes NO CARRIER (CONNECT for the connect codes).
 Result filterForX(Result r, unsigned x);
 
-// CONNECT code for a line speed in bps (300 ... 33600). Unknown speeds give the
+// CONNECT code for a line speed in bps (300 ... 56000). Unknown speeds give the
 // nearest lower one.
 Result connectFor(uint32_t bps);
 
-// Line speed for &N1-&N16 (0 for &N0 = highest, 33600).
+// Line speed for &N1-&N38 (0 for &N0 = highest, 56000). V.90 indexes after &N16
+// are not in ascending speed order; existing &N1-&N16 meanings stay unchanged.
 uint32_t lineSpeedForN(unsigned n);
 
 // Formats a result for profile `p` (V, Q, X, S3, S4) into buf. Returns the length;
