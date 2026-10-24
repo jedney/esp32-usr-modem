@@ -16,6 +16,12 @@ behaviour as a user sees it, including a live call to the Amiga Retro BBS.
 Running the on-board tests replaces the firmware on the board with the test program.
 Upload the firmware again afterwards (**Modem: upload over USB (tests first)**).
 
+## Last bench run
+
+| Version | Date | Bench | On-board | End-to-end |
+|---|---|---|---|---|
+| v0.4 | 2026-10-24 | Bare board, console COM15 | `test_board` 5/5; `test_hw` not run (nothing wired) | 34 passed, 1 skipped (bridge test, no RS232 port) |
+
 ## Feature matrix
 
 Status: ✅ tests written, ⬜ planned. Section numbers refer to the project brief.
