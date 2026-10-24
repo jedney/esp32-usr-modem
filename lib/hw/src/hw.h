@@ -1,5 +1,5 @@
 // Hardware layer for the modem's own electronics: front-panel LEDs, MAX98357A audio,
-// volume pot and the RS232 lines (pins in pins.h).
+// volume pot, the RS232 lines and data port, and the RMT speed capture (pins in pins.h).
 //
 // Nothing here touches a pin until it is first used, so a board with nothing (or
 // something different) wired up is never driven by surprise.
@@ -8,6 +8,7 @@
 
 #include <Arduino.h>
 
+#include "autobaud.h"
 #include "hwtest.h"
 #include "tones.h"
 
@@ -46,8 +47,33 @@ void lineSet(hwtest::OutSignal s, bool asserted);
 bool lineIsAsserted(hwtest::OutSignal s);
 
 // --- RS232 data on UART1 ------------------------------------------------------------------
-void uartBegin(uint32_t baud);  // 8N1, no flow control
+// Plain UART1 for the hardware tests (loopback, bridge): 8N1, no flow control.
+void uartBegin(uint32_t baud);
 void uartEnd();
 HardwareSerial &uart();
+
+// --- RS232 host port (v0.5): UART1 with its flow-control pins ------------------------------
+// UART1's RTS output drives our CTS (DB25 5) and its CTS input reads the computer's RTS
+// (DB25 4); both are active-low at the GPIO, which matches the MAX3232's inversion.
+constexpr size_t kHostRxBuffer = 8192;
+constexpr size_t kHostTxBuffer = 2048;
+void hostBegin(uint32_t baud);
+void hostEnd();  // UART1 off, CTS deasserted
+bool hostActive();
+void hostSetBaud(uint32_t baud);
+// ctsFromBuffer (&H1): CTS drops while the receive buffer is full; otherwise CTS is held
+// on. obeyRts (&R2): sending pauses while the computer's RTS is off.
+void hostSetFlow(bool ctsFromBuffer, bool obeyRts);
+bool ctsOutAsserted();  // the CTS output pin read back (for the CS LED)
+
+// --- Speed capture: RMT receiver on the TXD-in pin -------------------------------------------
+// Records the computer's data as runs of constant level (1 us steps); a burst is handed
+// over once the line has been idle for kCaptureIdleUs. See lib/hostport/src/autobaud.h.
+constexpr uint32_t kCaptureIdleUs = 32000;
+bool captureBegin();  // false if the RMT driver couldn't start
+void captureEnd();
+bool captureActive();
+// Copies the next finished burst. Returns the number of runs (0 if none is waiting).
+size_t captureRead(autobaud::Run *runs, size_t cap);
 
 }  // namespace hw

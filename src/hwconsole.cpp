@@ -7,6 +7,10 @@
 #include <LittleFS.h>
 #include <esp_system.h>
 
+#include <cstdarg>
+#include <cstdio>
+#include <cstring>
+
 #include "hw.h"
 #include "hwtest.h"
 #include "pins.h"
@@ -36,25 +40,70 @@ bool testVolumeFromPot = false;
 
 // --- Console helpers ---------------------------------------------------------------------
 
+Term *term = nullptr;  // the port running the current command
+PortControl control = {};
+bool portTaken = false;  // the RS232 session is suspended for a test
+bool sigHeld = false;    // AT*HWSIG keeps the port until AT*HWSIG=AUTO
+bool ledHold = false;    // AT*HWLED keeps the LEDs until AT*HWLED=AUTO
+
+Term &out() {
+    return *term;
+}
+
 // Throws away what's left of the command line (terminals send CR LF) so a test that stops
-// "on any key" doesn't stop at once.
+// "on any key" doesn't stop at once. On the RS232 port, keys arrive in bursts after the
+// line has been idle for 32 ms, so wait a little longer there.
 void drainInput() {
-    delay(30);
-    while (Serial.available() > 0) {
-        Serial.read();
+    delay(term->isRs232() ? 60 : 30);
+    while (term->read() >= 0) {
     }
 }
 
 int readKey() {
-    return Serial.available() > 0 ? Serial.read() : -1;
+    return term->read();
 }
 
 bool keyPressed() {
-    if (Serial.available() <= 0) {
+    if (term->read() < 0) {
         return false;
     }
     drainInput();
     return true;
+}
+
+// The RS232 line, loopback and bridge tests use the port itself (Q79): they run only on
+// the USB console, with no call up, and the RS232 session is suspended meanwhile.
+bool canTakePort(const char *what) {
+    if (term->isRs232()) {
+        out().printf(
+            "%s: not available on the RS232 port, because the test uses the port\r\n"
+            "itself. Run it on the USB console.\r\n",
+            what);
+        return false;
+    }
+    if (control.idle != nullptr && !control.idle()) {
+        out().printf("%s: not available during a call. Hang up first (ATH).\r\n", what);
+        return false;
+    }
+    return true;
+}
+
+bool takePort(const char *what) {
+    if (!canTakePort(what)) {
+        return false;
+    }
+    if (!portTaken && control.suspend != nullptr) {
+        control.suspend();
+    }
+    portTaken = true;
+    return true;
+}
+
+void givePort() {
+    if (portTaken && !sigHeld && control.resume != nullptr) {
+        control.resume();
+        portTaken = false;
+    }
 }
 
 int waitKey() {
@@ -67,10 +116,10 @@ int waitKey() {
 }
 
 void ok() {
-    Serial.print("OK\r\n");
+    out().print("OK\r\n");
 }
 void error() {
-    Serial.print("ERROR\r\n");
+    out().print("ERROR\r\n");
 }
 
 const char *yesNo(bool b) {
@@ -88,29 +137,28 @@ float testGain() {
 
 void printVolume() {
     if (testVolumeFromPot) {
-        Serial.print("Test volume: follows the pot");
+        out().print("Test volume: follows the pot");
     } else {
-        Serial.printf("Test volume: %u%%", static_cast<unsigned>(testVolumePct));
+        out().printf("Test volume: %u%%", static_cast<unsigned>(testVolumePct));
     }
     float g = volume::outputGain(testGain());
     if (g > 0.0f) {
-        Serial.printf(" (%.1f dB below full scale; cap %.1f dB)\r\n",
-                      static_cast<double>(-20.0f * log10f(g)),
-                      static_cast<double>(-volume::kCapDb));
+        out().printf(" (%.1f dB below full scale; cap %.1f dB)\r\n",
+                     static_cast<double>(-20.0f * log10f(g)), static_cast<double>(-volume::kCapDb));
     } else {
-        Serial.print(" (muted)\r\n");
+        out().print(" (muted)\r\n");
     }
 }
 
 bool play(tones::Source &src) {
-    Serial.print("Playing (any key stops)...\r\n");
+    out().print("Playing (any key stops)...\r\n");
     drainInput();
     if (!hw::audioPlay(src, testGain, keyPressed)) {
         if (!hw::audioReady()) {
-            Serial.print("I2S driver failed to start\r\n");
+            out().print("I2S driver failed to start\r\n");
             return false;
         }
-        Serial.print("Stopped\r\n");
+        out().print("Stopped\r\n");
     }
     return true;
 }
@@ -118,26 +166,26 @@ bool play(tones::Source &src) {
 // --- Pin map -----------------------------------------------------------------------------
 
 void printPins() {
-    Serial.print(
+    out().print(
         "GPIO pin map (lib/hw/src/pins.h) - PROPOSED, not yet confirmed by Electronics\r\n");
-    Serial.print("RS232 (DCE; asserted = LOW at the GPIO):\r\n");
-    Serial.printf("  RXD out  GPIO%-2d  DB25 3   UART1 TX\r\n", pins::kRxd);
-    Serial.printf("  TXD in   GPIO%-2d  DB25 2   UART1 RX\r\n", pins::kTxd);
-    Serial.printf("  CTS out  GPIO%-2d  DB25 5\r\n", pins::kCts);
-    Serial.printf("  RTS in   GPIO%-2d  DB25 4\r\n", pins::kRts);
-    Serial.printf("  DTR in   GPIO%-2d  DB25 20\r\n", pins::kDtr);
-    Serial.printf("  DCD out  GPIO%-2d  DB25 8\r\n", pins::kDcd);
-    Serial.printf("  RI  out  GPIO%-2d  DB25 22\r\n", pins::kRi);
-    Serial.print("  DSR      hard-wired on, DB25 6\r\n");
-    Serial.printf("Audio: I2S BCLK GPIO%d, LRC GPIO%d, DIN GPIO%d, amp SD GPIO%d (HIGH = on)\r\n",
-                  pins::kI2sBclk, pins::kI2sLrc, pins::kI2sDin, pins::kAmpSd);
-    Serial.printf("Volume pot wiper: GPIO%d (ADC1)\r\n", pins::kPot);
-    Serial.printf("LEDs (%s = lit):", pins::kLedActiveHigh ? "HIGH" : "LOW");
+    out().print("RS232 (DCE; asserted = LOW at the GPIO):\r\n");
+    out().printf("  RXD out  GPIO%-2d  DB25 3   UART1 TX\r\n", pins::kRxd);
+    out().printf("  TXD in   GPIO%-2d  DB25 2   UART1 RX\r\n", pins::kTxd);
+    out().printf("  CTS out  GPIO%-2d  DB25 5\r\n", pins::kCts);
+    out().printf("  RTS in   GPIO%-2d  DB25 4\r\n", pins::kRts);
+    out().printf("  DTR in   GPIO%-2d  DB25 20\r\n", pins::kDtr);
+    out().printf("  DCD out  GPIO%-2d  DB25 8\r\n", pins::kDcd);
+    out().printf("  RI  out  GPIO%-2d  DB25 22\r\n", pins::kRi);
+    out().print("  DSR      hard-wired on, DB25 6\r\n");
+    out().printf("Audio: I2S BCLK GPIO%d, LRC GPIO%d, DIN GPIO%d, amp SD GPIO%d (HIGH = on)\r\n",
+                 pins::kI2sBclk, pins::kI2sLrc, pins::kI2sDin, pins::kAmpSd);
+    out().printf("Volume pot wiper: GPIO%d (ADC1)\r\n", pins::kPot);
+    out().printf("LEDs (%s = lit):", pins::kLedActiveHigh ? "HIGH" : "LOW");
     for (uint8_t i = 0; i < hwtest::kLedCount; ++i) {
-        Serial.printf(" %s=GPIO%d", hwtest::ledName(i), pins::kLeds[i]);
+        out().printf(" %s=GPIO%d", hwtest::ledName(i), pins::kLeds[i]);
     }
-    Serial.printf("\r\nOn board: RGB LED GPIO%d; console UART0 GPIO%d/%d\r\n", pins::kRgbLed,
-                  pins::kConsoleTx, pins::kConsoleRx);
+    out().printf("\r\nOn board: RGB LED GPIO%d; console UART0 GPIO%d/%d\r\n", pins::kRgbLed,
+                 pins::kConsoleTx, pins::kConsoleRx);
 }
 
 // --- Info and files ----------------------------------------------------------------------
@@ -159,79 +207,83 @@ void listDir(const char *path, int *count) {
         if (f.isDirectory()) {
             listDir(f.path(), count);
         } else {
-            Serial.printf("  %-40s %8u\r\n", f.path(), static_cast<unsigned>(f.size()));
+            out().printf("  %-40s %8u\r\n", f.path(), static_cast<unsigned>(f.size()));
             ++*count;
         }
     }
 }
 
 void printInfo() {
-    Serial.printf("Firmware   v%s (%s)\r\n", FW_VERSION, FW_COMMIT);
-    Serial.printf("Chip       %s rev %d, %d cores, %u MHz\r\n", ESP.getChipModel(),
-                  static_cast<int>(ESP.getChipRevision()), static_cast<int>(ESP.getChipCores()),
-                  static_cast<unsigned>(ESP.getCpuFreqMHz()));
+    out().printf("Firmware   v%s (%s)\r\n", FW_VERSION, FW_COMMIT);
+    out().printf("Chip       %s rev %d, %d cores, %u MHz\r\n", ESP.getChipModel(),
+                 static_cast<int>(ESP.getChipRevision()), static_cast<int>(ESP.getChipCores()),
+                 static_cast<unsigned>(ESP.getCpuFreqMHz()));
     uint64_t mac = ESP.getEfuseMac();
-    Serial.printf(
+    out().printf(
         "MAC        %02X:%02X:%02X:%02X:%02X:%02X\r\n", static_cast<unsigned>(mac & 0xFF),
         static_cast<unsigned>((mac >> 8) & 0xFF), static_cast<unsigned>((mac >> 16) & 0xFF),
         static_cast<unsigned>((mac >> 24) & 0xFF), static_cast<unsigned>((mac >> 32) & 0xFF),
         static_cast<unsigned>((mac >> 40) & 0xFF));
-    Serial.printf("Flash      %u MB at %u MHz; firmware %u KB, OTA slot %u KB free\r\n",
-                  static_cast<unsigned>(ESP.getFlashChipSize() / (1024 * 1024)),
-                  static_cast<unsigned>(ESP.getFlashChipSpeed() / 1000000),
-                  static_cast<unsigned>(ESP.getSketchSize() / 1024),
-                  static_cast<unsigned>(ESP.getFreeSketchSpace() / 1024));
-    Serial.printf("PSRAM      %u KB, %u KB free\r\n",
-                  static_cast<unsigned>(ESP.getPsramSize() / 1024),
-                  static_cast<unsigned>(ESP.getFreePsram() / 1024));
-    Serial.printf("Heap       %u KB, %u KB free\r\n",
-                  static_cast<unsigned>(ESP.getHeapSize() / 1024),
-                  static_cast<unsigned>(ESP.getFreeHeap() / 1024));
-    Serial.printf("Reset      %s\r\n", resetReasonName(static_cast<int>(esp_reset_reason())));
-    Serial.printf("Uptime     %lu s\r\n", static_cast<unsigned long>(millis() / 1000));
+    out().printf("Flash      %u MB at %u MHz; firmware %u KB, OTA slot %u KB free\r\n",
+                 static_cast<unsigned>(ESP.getFlashChipSize() / (1024 * 1024)),
+                 static_cast<unsigned>(ESP.getFlashChipSpeed() / 1000000),
+                 static_cast<unsigned>(ESP.getSketchSize() / 1024),
+                 static_cast<unsigned>(ESP.getFreeSketchSpace() / 1024));
+    out().printf("PSRAM      %u KB, %u KB free\r\n",
+                 static_cast<unsigned>(ESP.getPsramSize() / 1024),
+                 static_cast<unsigned>(ESP.getFreePsram() / 1024));
+    out().printf("Heap       %u KB, %u KB free\r\n",
+                 static_cast<unsigned>(ESP.getHeapSize() / 1024),
+                 static_cast<unsigned>(ESP.getFreeHeap() / 1024));
+    out().printf("Reset      %s\r\n", resetReasonName(static_cast<int>(esp_reset_reason())));
+    out().printf("Uptime     %lu s\r\n", static_cast<unsigned long>(millis() / 1000));
     if (mountFs()) {
-        Serial.printf("LittleFS   %u KB used of %u KB\r\n",
-                      static_cast<unsigned>(LittleFS.usedBytes() / 1024),
-                      static_cast<unsigned>(LittleFS.totalBytes() / 1024));
+        out().printf("LittleFS   %u KB used of %u KB\r\n",
+                     static_cast<unsigned>(LittleFS.usedBytes() / 1024),
+                     static_cast<unsigned>(LittleFS.totalBytes() / 1024));
     } else {
-        Serial.print("LittleFS   not mounted: upload the sounds and web files image\r\n");
+        out().print("LittleFS   not mounted: upload the sounds and web files image\r\n");
     }
 }
 
 bool printFiles() {
     if (!mountFs()) {
-        Serial.print("LittleFS not mounted: upload the sounds and web files image\r\n");
+        out().print("LittleFS not mounted: upload the sounds and web files image\r\n");
         return false;
     }
     int count = 0;
     listDir("/", &count);
-    Serial.printf("%d files, %u KB used of %u KB\r\n", count,
-                  static_cast<unsigned>(LittleFS.usedBytes() / 1024),
-                  static_cast<unsigned>(LittleFS.totalBytes() / 1024));
+    out().printf("%d files, %u KB used of %u KB\r\n", count,
+                 static_cast<unsigned>(LittleFS.usedBytes() / 1024),
+                 static_cast<unsigned>(LittleFS.totalBytes() / 1024));
     return true;
 }
 
 // --- LEDs --------------------------------------------------------------------------------
 
 void ledChase() {
-    Serial.print("Chase (any key stops)\r\n");
+    out().print("Chase (any key stops)\r\n");
     drainInput();
+    ledHold = true;
     for (uint32_t step = 0; !keyPressed(); ++step) {
         hw::ledsSet(hwtest::chaseMask(step));
         delay(120);
     }
     hw::ledsSet(0);
+    ledHold = false;  // back to the modem's own LED states
 }
 
 void ledWalk() {
-    Serial.print("Each LED for 1 s, left to right (any key stops)\r\n");
+    out().print("Each LED for 1 s, left to right (any key stops)\r\n");
     drainInput();
+    ledHold = true;
     for (uint8_t i = 0;; i = static_cast<uint8_t>((i + 1) % hwtest::kLedCount)) {
         hw::ledsSet(static_cast<uint8_t>(1u << i));
-        Serial.printf("  %-3s GPIO%d\r\n", hwtest::ledName(i), pins::kLeds[i]);
+        out().printf("  %-3s GPIO%d\r\n", hwtest::ledName(i), pins::kLeds[i]);
         for (int t = 0; t < 100; ++t) {
             if (keyPressed()) {
                 hw::ledsSet(0);
+                ledHold = false;
                 return;
             }
             delay(10);
@@ -242,14 +294,20 @@ void ledWalk() {
 bool cmdLed(const char *arg) {
     int led = hwtest::parseLed(arg);
     if (led >= 0) {
+        ledHold = true;
         hw::ledsSet(static_cast<uint8_t>(1u << led));
-        Serial.printf("%s lit (GPIO%d)\r\n", hwtest::ledName(static_cast<uint8_t>(led)),
-                      pins::kLeds[led]);
+        out().printf("%s lit (GPIO%d). AT*HWLED=AUTO gives the LEDs back to the modem.\r\n",
+                     hwtest::ledName(static_cast<uint8_t>(led)), pins::kLeds[led]);
     } else if (wordIs(arg, "ALL")) {
+        ledHold = true;
         hw::ledsSet(0x7F);
-        Serial.print("All LEDs lit\r\n");
+        out().print("All LEDs lit. AT*HWLED=AUTO gives the LEDs back to the modem.\r\n");
     } else if (wordIs(arg, "OFF") || wordIs(arg, "NONE")) {
+        ledHold = true;
         hw::ledsSet(0);
+    } else if (wordIs(arg, "AUTO")) {
+        ledHold = false;
+        out().print("LEDs show the modem's state\r\n");
     } else if (wordIs(arg, "CHASE") || *arg == '\0') {
         ledChase();
     } else if (wordIs(arg, "WALK")) {
@@ -275,8 +333,8 @@ bool cmdAmp(const char *arg) {
     const char *mode = hw::ampMode() == hw::AmpMode::kOn    ? "ON"
                        : hw::ampMode() == hw::AmpMode::kOff ? "OFF (sounds muted; I2S still runs)"
                                                             : "AUTO (on only while a sound plays)";
-    Serial.printf("Amp %s, SD pin GPIO%d is %s\r\n", mode, pins::kAmpSd,
-                  hw::ampIsOn() ? "HIGH" : "LOW");
+    out().printf("Amp %s, SD pin GPIO%d is %s\r\n", mode, pins::kAmpSd,
+                 hw::ampIsOn() ? "HIGH" : "LOW");
     return true;
 }
 
@@ -308,7 +366,7 @@ bool cmdTone(const char *arg) {
         return play(src);
     }
     if (wordIs(arg, "SWEEP")) {
-        Serial.print("Sweep 200 Hz to 4 kHz over 6 s\r\n");
+        out().print("Sweep 200 Hz to 4 kHz over 6 s\r\n");
         tones::SweepSource src(200.0f, 4000.0f, 6000);
         return play(src);
     }
@@ -321,7 +379,7 @@ bool cmdTone(const char *arg) {
     if (*rest != '\0' && !hwtest::parseUint(rest, 10, 60000, &ms)) {
         return false;
     }
-    Serial.printf("%u Hz for %u ms\r\n", static_cast<unsigned>(hz), static_cast<unsigned>(ms));
+    out().printf("%u Hz for %u ms\r\n", static_cast<unsigned>(hz), static_cast<unsigned>(ms));
     tones::ToneSource src(static_cast<float>(hz), 0.0f, ms);
     return play(src);
 }
@@ -330,7 +388,7 @@ bool cmdDtmf(const char *arg) {
     if (*arg == '\0') {
         arg = "0123456789*#";
     }
-    Serial.printf("DTMF %s\r\n", arg);
+    out().printf("DTMF %s\r\n", arg);
     tones::DtmfSource src(arg);
     return play(src);
 }
@@ -339,7 +397,7 @@ bool cmdPulse(const char *arg) {
     if (*arg == '\0') {
         arg = "0123456789";
     }
-    Serial.printf("Pulse dialling (UK, 10 pps) %s\r\n", arg);
+    out().printf("Pulse dialling (UK, 10 pps) %s\r\n", arg);
     tones::PulseSource src(arg);
     return play(src);
 }
@@ -362,9 +420,9 @@ void printPotLine() {
     } else {
         snprintf(db, sizeof db, "   muted");
     }
-    Serial.printf("\r  raw %4u  %4lu mV  level %3d%%  %s   ", static_cast<unsigned>(raw),
-                  static_cast<unsigned long>(hw::potMillivolts()),
-                  static_cast<int>(level * 100.0f + 0.5f), db);
+    out().printf("\r  raw %4u  %4lu mV  level %3d%%  %s   ", static_cast<unsigned>(raw),
+                 static_cast<unsigned long>(hw::potMillivolts()),
+                 static_cast<int>(level * 100.0f + 0.5f), db);
 }
 
 bool potStop() {
@@ -383,8 +441,8 @@ float potGain() {
 bool runPot(bool withTone) {
     potMinSeen = hw::kPotMax;
     potMaxSeen = 0;
-    Serial.printf("Pot on GPIO%d. Turn it end to end%s (any key stops)\r\n", pins::kPot,
-                  withTone ? "; a 1 kHz tone follows it" : "");
+    out().printf("Pot on GPIO%d. Turn it end to end%s (any key stops)\r\n", pins::kPot,
+                 withTone ? "; a 1 kHz tone follows it" : "");
     drainInput();
     if (withTone) {
         tones::ToneSource src(1000.0f, 0.0f, 0);
@@ -396,9 +454,9 @@ bool runPot(bool withTone) {
     }
     float lo = volume::potLevel(potMinSeen, hw::kPotMax);
     float hi = volume::potLevel(potMaxSeen, hw::kPotMax);
-    Serial.printf("\r\nRange seen: raw %u to %u (level %d%% to %d%%)\r\n",
-                  static_cast<unsigned>(potMinSeen), static_cast<unsigned>(potMaxSeen),
-                  static_cast<int>(lo * 100.0f + 0.5f), static_cast<int>(hi * 100.0f + 0.5f));
+    out().printf("\r\nRange seen: raw %u to %u (level %d%% to %d%%)\r\n",
+                 static_cast<unsigned>(potMinSeen), static_cast<unsigned>(potMaxSeen),
+                 static_cast<int>(lo * 100.0f + 0.5f), static_cast<int>(hi * 100.0f + 0.5f));
     return lo <= 0.0f && hi >= 1.0f;
 }
 
@@ -406,7 +464,7 @@ bool runPot(bool withTone) {
 
 void printLines() {
     using hwtest::OutSignal;
-    Serial.printf(
+    out().printf(
         "\r  in: DTR %s  RTS %s   out: DCD %s  RI %s  CTS %s  (DSR on)  ", yesNo(hw::dtrAsserted()),
         yesNo(hw::rtsAsserted()), yesNo(hw::lineIsAsserted(OutSignal::kDCD)),
         yesNo(hw::lineIsAsserted(OutSignal::kRI)), yesNo(hw::lineIsAsserted(OutSignal::kCTS)));
@@ -415,8 +473,8 @@ void printLines() {
 void runLines() {
     using hwtest::OutSignal;
     hw::linesBegin();
-    Serial.print("Live RS232 handshake lines. In: from the computer. Out: from the modem.\r\n");
-    Serial.print("Keys: D = toggle DCD, R = toggle RI, C = toggle CTS, Q = quit\r\n");
+    out().print("Live RS232 handshake lines. In: from the computer. Out: from the modem.\r\n");
+    out().print("Keys: D = toggle DCD, R = toggle RI, C = toggle CTS, Q = quit\r\n");
     drainInput();
     uint32_t last = 0;
     for (;;) {
@@ -437,7 +495,7 @@ void runLines() {
     for (int i = 0; i < 3; ++i) {
         hw::lineSet(static_cast<OutSignal>(i), false);
     }
-    Serial.print("\r\nOutputs set back to off\r\n");
+    out().print("\r\nOutputs set back to off\r\n");
     drainInput();
 }
 
@@ -458,9 +516,9 @@ bool cmdSig(const char *arg) {
         return false;
     }
     hw::lineSet(s, on);
-    Serial.printf("%s %s (stays until changed, AT*HWLINES or a restart)\r\n",
-                  hwtest::outSignalName(s),
-                  on ? "asserted (+V on the cable)" : "off (-V on the cable)");
+    out().printf("%s %s (stays until changed, AT*HWSIG=AUTO or AT*HWLINES)\r\n",
+                 hwtest::outSignalName(s),
+                 on ? "asserted (+V on the cable)" : "off (-V on the cable)");
     return true;
 }
 
@@ -522,32 +580,32 @@ const char *passFail(bool b) {
 
 bool runLoop(const char *arg, bool quiet = false) {
     static const uint32_t kAll[] = {300, 1200, 2400, 9600, 19200, 38400, 57600, 115200, 230400};
-    uint32_t one = 115200;
-    const uint32_t *bauds = &one;
+    uint32_t one[1] = {115200};
+    const uint32_t *bauds = one;
     size_t n = 1;
     if (wordIs(arg, "ALL")) {
         bauds = kAll;
         n = sizeof kAll / sizeof kAll[0];
-    } else if (*arg != '\0' && !hwtest::parseUint(arg, 300, 921600, &one)) {
+    } else if (*arg != '\0' && !hwtest::parseUint(arg, 300, 921600, &one[0])) {
         return false;
     }
     if (!quiet) {
-        Serial.print("Loopback plug needed: RXD-TXD, CTS-RTS, DCD-DTR\r\n");
-        Serial.print("  (DB25 3-2, 5-4, 8-20; bench DB9 2-3, 8-7, 1-4)\r\n");
+        out().print("Loopback plug needed: RXD-TXD, CTS-RTS, DCD-DTR\r\n");
+        out().print("  (DB25 3-2, 5-4, 8-20; bench DB9 2-3, 8-7, 1-4)\r\n");
     }
     bool all = true;
     for (size_t i = 0; i < n; ++i) {
         LoopResult r = loopbackAt(bauds[i]);
-        Serial.printf("  %6lu baud: data %s (%u/%u bytes, %u wrong)  CTS->RTS %s  DCD->DTR %s\r\n",
-                      static_cast<unsigned long>(bauds[i]), passFail(r.data),
-                      static_cast<unsigned>(r.received), static_cast<unsigned>(r.sent),
-                      static_cast<unsigned>(r.errors), passFail(r.cts), passFail(r.dcd));
+        out().printf("  %6lu baud: data %s (%u/%u bytes, %u wrong)  CTS->RTS %s  DCD->DTR %s\r\n",
+                     static_cast<unsigned long>(bauds[i]), passFail(r.data),
+                     static_cast<unsigned>(r.received), static_cast<unsigned>(r.sent),
+                     static_cast<unsigned>(r.errors), passFail(r.cts), passFail(r.dcd));
         all = all && r.data && r.cts && r.dcd;
     }
-    Serial.print(
+    out().print(
         "  RI has no input to loop back to: check it with AT*HWLINES and the\r\n"
         "  terminal's RI light, or AT*HWSIG=RI,ON and a meter on DB25 22\r\n");
-    Serial.printf("Loopback %s\r\n", passFail(all));
+    out().printf("Loopback %s\r\n", passFail(all));
     return all;
 }
 
@@ -557,13 +615,13 @@ void runBridge(uint32_t baud) {
     hw::uartBegin(baud);
     hw::lineSet(OutSignal::kCTS, true);  // so terminals using RTS/CTS will send
     hw::lineSet(OutSignal::kDCD, true);
-    Serial.printf("Bridge: console <-> RS232 at %lu 8N1, CTS and DCD on. Ctrl-X ends.\r\n",
-                  static_cast<unsigned long>(baud));
+    out().printf("Bridge: console <-> RS232 at %lu 8N1, CTS and DCD on. Ctrl-X ends.\r\n",
+                 static_cast<unsigned long>(baud));
     drainInput();
     HardwareSerial &u = hw::uart();
     bool dtr = hw::dtrAsserted();
     bool rts = hw::rtsAsserted();
-    Serial.printf("[DTR %s, RTS %s]\r\n", yesNo(dtr), yesNo(rts));
+    out().printf("[DTR %s, RTS %s]\r\n", yesNo(dtr), yesNo(rts));
     for (;;) {
         int c = readKey();
         if (c == kCtrlX) {
@@ -573,12 +631,13 @@ void runBridge(uint32_t baud) {
             u.write(static_cast<uint8_t>(c));
         }
         while (u.available() > 0) {
-            Serial.write(static_cast<uint8_t>(u.read()));
+            char ch = static_cast<char>(u.read());
+            out().write(&ch, 1);
         }
         if (hw::dtrAsserted() != dtr || hw::rtsAsserted() != rts) {
             dtr = hw::dtrAsserted();
             rts = hw::rtsAsserted();
-            Serial.printf("\r\n[DTR %s, RTS %s]\r\n", yesNo(dtr), yesNo(rts));
+            out().printf("\r\n[DTR %s, RTS %s]\r\n", yesNo(dtr), yesNo(rts));
         }
         if (c < 0) {
             delay(1);
@@ -587,7 +646,7 @@ void runBridge(uint32_t baud) {
     hw::uartEnd();
     hw::lineSet(OutSignal::kCTS, false);
     hw::lineSet(OutSignal::kDCD, false);
-    Serial.print("\r\nBridge closed\r\n");
+    out().print("\r\nBridge closed\r\n");
 }
 
 // --- Guided test -------------------------------------------------------------------------
@@ -600,19 +659,19 @@ const char *stepName(Step s) {
 
 // Returns false to quit.
 bool prompt(const char *what, bool *skip) {
-    Serial.printf("\r\n%s\r\nEnter = start, S = skip, Q = quit: ", what);
+    out().printf("\r\n%s\r\nEnter = start, S = skip, Q = quit: ", what);
     int c = waitKey();
-    Serial.print("\r\n");
+    out().print("\r\n");
     *skip = c == 'S';
     return c != 'Q';
 }
 
 Step askYesNo(const char *question) {
-    Serial.printf("%s (Y/N/S): ", question);
+    out().printf("%s (Y/N/S): ", question);
     for (;;) {
         int c = waitKey();
         if (c == 'Y' || c == 'N' || c == 'S') {
-            Serial.printf("%c\r\n", c);
+            out().printf("%c\r\n", c);
             return c == 'Y' ? Step::kPass : c == 'N' ? Step::kFail : Step::kSkip;
         }
     }
@@ -625,7 +684,7 @@ void runGuided() {
     Step result[kSteps] = {Step::kSkip, Step::kSkip, Step::kSkip,
                            Step::kSkip, Step::kSkip, Step::kSkip};
     bool skip = false;
-    Serial.print("Guided hardware test. Each step says what to look or listen for.\r\n\r\n");
+    out().print("Guided hardware test. Each step says what to look or listen for.\r\n\r\n");
     printPins();
     drainInput();
 
@@ -690,10 +749,13 @@ void runGuided() {
                         : heard == Step::kSkip       ? Step::kSkip
                                                      : Step::kFail;
             if (!full) {
-                Serial.print("The pot didn't reach both ends (0% and 100%): check its wiring\r\n");
+                out().print("The pot didn't reach both ends (0% and 100%): check its wiring\r\n");
             }
         }
 
+        if (!takePort("\r\n5/6 RS232 lines and 6/6 Loopback")) {
+            break;  // listed as skipped
+        }
         if (!prompt("5/6 RS232 lines: connect the PC, open a terminal on its COM port and watch\r\n"
                     "its DTR/RTS/CD/RI/CTS indicators while you toggle them here.",
                     &skip)) {
@@ -715,10 +777,11 @@ void runGuided() {
         }
     } while (false);
 
+    givePort();
     hw::ledsSet(0);
-    Serial.print("\r\nSummary\r\n");
+    out().print("\r\nSummary\r\n");
     for (int i = 0; i < kSteps; ++i) {
-        Serial.printf("  %d %-12s %s\r\n", i + 1, kNames[i], stepName(result[i]));
+        out().printf("  %d %-12s %s\r\n", i + 1, kNames[i], stepName(result[i]));
     }
 }
 
@@ -736,6 +799,7 @@ const Command kCommands[] = {
     {"AT*HWINFO", "chip, memory, firmware, reset reason, LittleFS"},
     {"AT*HWFILES", "list the files in LittleFS (sounds and web page)"},
     {"AT*HWLED=<AA|CD|RD|SD|TR|CS|ARQ|ALL|OFF|CHASE|WALK>", "light LEDs"},
+    {"AT*HWLED=AUTO", "LEDs back to showing the modem's state"},
     {"AT*HWAMP=<AUTO|ON|OFF>", "amp shutdown pin (AUTO: on only while playing)"},
     {"AT*HWVOL=<0-100|POT>", "test volume, % of the speaker cap (default 75)"},
     {"AT*HWTONE=<Hz>[,<ms>] | DIAL | BUSY | RING | SWEEP", "play a tone"},
@@ -744,19 +808,44 @@ const Command kCommands[] = {
     {"AT*HWPOT[=TONE]", "live pot reading (TONE: a 1 kHz tone follows it)"},
     {"AT*HWLINES", "live DTR/RTS, toggle DCD/RI/CTS"},
     {"AT*HWSIG=<DCD|RI|CTS>,<ON|OFF>", "set one RS232 output (for a meter)"},
+    {"AT*HWSIG=AUTO", "RS232 outputs back to the modem (port in use again)"},
     {"AT*HWLOOP[=<baud>|ALL]", "loopback test (needs a loopback plug)"},
     {"AT*HWBRIDGE[=<baud>]", "console <-> RS232 pass-through (default 38400, Ctrl-X ends)"},
 };
 
 void printCommands() {
     for (const Command &c : kCommands) {
-        Serial.printf("  %-52s %s\r\n", c.usage, c.help);
+        out().printf("  %-52s %s\r\n", c.usage, c.help);
     }
 }
 
 }  // namespace
 
-void printHelp() {
+void Term::print(const char *s) {
+    write(s, strlen(s));
+}
+
+void Term::printf(const char *fmt, ...) {
+    char buf[256];
+    va_list ap;
+    va_start(ap, fmt);
+    int n = vsnprintf(buf, sizeof buf, fmt, ap);
+    va_end(ap);
+    if (n > 0) {
+        write(buf, static_cast<size_t>(n) < sizeof buf ? static_cast<size_t>(n) : sizeof buf - 1);
+    }
+}
+
+void setPortControl(const PortControl &pc) {
+    control = pc;
+}
+
+bool ledsHeld() {
+    return ledHold;
+}
+
+void printHelp(Term &t) {
+    term = &t;
     printCommands();
 }
 
@@ -788,7 +877,8 @@ const char *resetReasonName(int reason) {
     }
 }
 
-void handle(const char *rest) {
+void handle(Term &t, const char *rest) {
+    term = &t;
     // Command word: letters after "AT*HW"
     char name[8] = {};
     size_t n = 0;
@@ -838,17 +928,39 @@ void handle(const char *rest) {
             good = false;
         }
     } else if (strcmp(name, "LINES") == 0) {
-        runLines();
+        good = takePort("AT*HWLINES");
+        if (good) {
+            runLines();  // sets the outputs back to off
+            sigHeld = false;
+            givePort();
+        }
     } else if (strcmp(name, "SIG") == 0) {
-        good = cmdSig(arg);
+        if (wordIs(arg, "AUTO")) {
+            sigHeld = false;
+            givePort();
+            out().print("RS232 outputs back to the modem\r\n");
+        } else if ((good = takePort("AT*HWSIG"))) {
+            good = cmdSig(arg);
+            sigHeld = good;
+            if (good) {
+                out().print("The RS232 port is paused until AT*HWSIG=AUTO\r\n");
+            } else {
+                givePort();
+            }
+        }
     } else if (strcmp(name, "LOOP") == 0) {
-        good = runLoop(arg);
+        good = takePort("AT*HWLOOP");
+        if (good) {
+            good = runLoop(arg);
+            givePort();
+        }
     } else if (strcmp(name, "BRIDGE") == 0) {
         uint32_t baud = 38400;
         if (*arg != '\0' && !hwtest::parseUint(arg, 300, 921600, &baud)) {
             good = false;
-        } else {
+        } else if ((good = takePort("AT*HWBRIDGE"))) {
             runBridge(baud);
+            givePort();
         }
     } else {
         good = false;

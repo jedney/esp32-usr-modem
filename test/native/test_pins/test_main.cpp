@@ -29,6 +29,16 @@ void test_pin_map_avoids_reserved_pins() {
         }
     }
     TEST_ASSERT_TRUE_MESSAGE(pins::kPot >= 1 && pins::kPot <= 10, "pot must be on ADC1");
+    // The on-board RS232 test's UART2 pins must be spare ones.
+    const int testPins[] = {pins::kTestUartTx, pins::kTestUartRx};
+    for (int t : testPins) {
+        for (int u : used) {
+            TEST_ASSERT_NOT_EQUAL_MESSAGE(u, t, "test UART pin is a used GPIO");
+        }
+        for (int r : reserved) {
+            TEST_ASSERT_NOT_EQUAL_MESSAGE(r, t, "test UART pin is a reserved GPIO");
+        }
+    }
     for (int u : used) {
         TEST_ASSERT_TRUE_MESSAGE(u >= 0 && u <= 48, "not an ESP32-S3 GPIO");
         TEST_ASSERT_FALSE_MESSAGE(u >= 22 && u <= 34,

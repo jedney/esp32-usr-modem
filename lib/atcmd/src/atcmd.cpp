@@ -82,14 +82,26 @@ Modem::Modem(modemcfg::Store &store, const StarCommand *star, size_t starCount)
 modemcfg::LoadResult Modem::begin() {
     modemcfg::LoadResult r = modemcfg::loadNvram(store_, &nvram_);
     active_ = modemcfg::powerOnProfile(nvram_);
+    if (r == modemcfg::LoadResult::kMigrated) {
+        modemcfg::saveNvram(store_, nvram_);  // in the current format from now on
+    }
     return r;
 }
 
-bool Modem::writeTemplate(unsigned n) {
+bool Modem::writeTemplate(unsigned n, uint32_t baud) {
     if (n >= modemcfg::kTemplates) {
         return false;
     }
     nvram_.tmpl[n] = active_;
+    nvram_.tmpl[n].baud = baud;  // as on the Sportster, the template keeps the port speed
+    return modemcfg::saveNvram(store_, nvram_);
+}
+
+bool Modem::setHostBaud(uint32_t baud) {
+    if (baud != 0 && !modemcfg::isHostRate(baud)) {
+        return false;
+    }
+    nvram_.hostBaud = baud;
     return modemcfg::saveNvram(store_, nvram_);
 }
 
@@ -275,6 +287,7 @@ void Port::feed(char c) {
 void Port::execute(const char *line) {
     const char *p = line;
     bool stop = false;
+    resultSent_ = false;
     while (!stop) {
         skipSpaces(p);
         if (*p == '\0') {
@@ -298,7 +311,9 @@ void Port::execute(const char *line) {
             return;
         }
     }
-    result(Result::kOk);
+    if (!resultSent_) {
+        result(Result::kOk);
+    }
 }
 
 bool Port::runCommand(const char *&p, bool *stop) {
@@ -329,8 +344,22 @@ bool Port::runCommand(const char *&p, bool *stop) {
         case 'T':
             a.v[modemcfg::kTone] = 1;
             return true;
-        case 'H':  // on/off hook: nothing to do until calls exist (v0.8)
-            return number(p, 1, &n);
+        case 'H':  // H0 hangs up; H1 (off hook) has nothing to do
+            if (!number(p, 1, &n)) {
+                return false;
+            }
+            if (n == 0 && callUp()) {
+                link_->hangUp();
+            }
+            return true;
+        case 'O':  // back online; O1 (retrain) does the same
+            if (!number(p, 1, &n) || !callUp()) {
+                return false;
+            }
+            link_->resumeOnline();  // sends CONNECT
+            resultSent_ = true;
+            *stop = true;  // the rest of the line is ignored
+            return true;
         case 'I':
             return number(p, 255, &n) && showInfo(*this, n);
         case 'Y':
@@ -338,6 +367,9 @@ bool Port::runCommand(const char *&p, bool *stop) {
         case 'Z':
             if (!number(p, 5, &n)) {
                 return false;
+            }
+            if (callUp()) {
+                link_->hangUp();  // the Sportster hangs up on Z
             }
             modem_.reset(n);
             selected_ = 0;
@@ -354,7 +386,7 @@ bool Port::runCommand(const char *&p, bool *stop) {
         case '+':
             return runPlus(p);
         default:
-            return false;  // includes D, A and O until calls exist (v0.5, v0.8, v0.9)
+            return false;  // includes D and A until calls exist (v0.8, v0.9)
     }
 }
 
@@ -424,7 +456,7 @@ bool Port::runAmpersand(const char *&p, bool *stop) {
             a = modemcfg::factoryProfile(n);
             return true;
         case 'W':
-            return number(p, modemcfg::kTemplates - 1, &n) && modem_.writeTemplate(n);
+            return number(p, modemcfg::kTemplates - 1, &n) && modem_.writeTemplate(n, baud_);
         case 'V':  // project addition: ATI4 and ATI5 together
             if (!number(p, 0, &n)) {
                 return false;

@@ -7,6 +7,10 @@ refer to `docs/project-brief.md`.
 Done: **v0.1** scaffold, versioning, CI · **v0.2** web page (`web/`) · **v0.3**
 hardware tests (`AT*HW…`) · **v0.4** settings store and AT command parser.
 
+Built, check outstanding: **v0.5** RS232 host port and LED driver. Unit, on-board and
+console end-to-end tests pass; the RS232 end-to-end tests (`test/e2e/test_rs232.py`)
+wait for the MAX3232s and DB9 to be wired.
+
 | Version | Feature | Brief | Done when |
 |---|---|---|---|
 | v0.4 | **Settings store and AT command parser** (console first): command-line parsing (several commands per line, `A/` repeat), S-registers, `E Q V X`, `&F &W &V &Z`, `Z`, `ATI0`–`ATI7` (authentic Sportster text), `+FCLASS`, result codes (verbose/numeric/quiet), `AT*` commands in one table, `AT*HELP`. Stored in NVS, logic in `lib/` | 6.2, 6.5, 6.6, 6.7 | Parser and settings unit-tested on the PC; `AT&V` shows the saved profile after a restart |
@@ -27,4 +31,7 @@ Notes:
   (Q76) changes, only `lib/hw/src/pins.h` changes.
 - USB CDC serial on the native USB port is a v2 feature (Q25); keep GPIO19/20 free.
 - The order can change; record any change in `docs/decisions-log.md`.
-- Before v0.5: Jon to decide the `&B` meaning (USR vs brief 6.2) (decisions log, v0.4).
+- `&B` has the Sportster meaning and `AT*BAUD` fixes the speed (decisions log, v0.5).
+  `&B0` (serial speed follows the call) takes effect with real calls in v0.8.
+- `AT*TESTCALL` (v0.5) gives a call without a network; later versions can use it to
+  test their online features.
