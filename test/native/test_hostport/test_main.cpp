@@ -1,0 +1,750 @@
+// Unit tests for the host port logic (brief 5.4, 6.2): speed detection from "AT", 8N1
+// decoding of captured waveforms, the +++ escape, DTR/DCD rules, flow control, the
+// session modes and the front-panel LED rules. Run with: pio test -e native
+#include <unity.h>
+
+#include <cmath>
+#include <cstring>
+#include <string>
+#include <vector>
+
+#include "autobaud.h"
+#include "connection.h"
+#include "hwtest.h"
+#include "linectl.h"
+#include "panel.h"
+#include "session.h"
+
+using autobaud::Run;
+using modemcfg::Profile;
+using namespace hostport;
+
+void setUp() {}
+void tearDown() {}
+
+// --- Waveform generator -------------------------------------------------------------------
+// Builds the runs the RMT receiver would capture for `text` sent 8N1 at `baud`. `clock`
+// scales the sender's bit time (1.03 = 3 % slow); `jitterUs` moves each edge by up to
+// that much (deterministic); edges are rounded to whole microseconds like the RMT.
+
+struct Wave {
+    double clock = 1.0;
+    int jitterUs = 0;
+    uint32_t idleBeforeUs = 0;
+    unsigned gapBits = 0;  // idle bits between characters
+};
+
+std::vector<Run> wave(const std::string &text, uint32_t baud, const Wave &w = Wave()) {
+    const double bitUs = 1e6 / baud * w.clock;
+    std::vector<uint8_t> bits;  // one entry per bit time
+    for (unsigned char c : text) {
+        bits.push_back(0);
+        for (int k = 0; k < 8; ++k) {
+            bits.push_back((c >> k) & 1);
+        }
+        bits.push_back(1);
+        for (unsigned g = 0; g < w.gapBits; ++g) {
+            bits.push_back(1);
+        }
+    }
+    // Edge times (us) where the level changes.
+    std::vector<double> edges;
+    std::vector<uint8_t> levels;
+    uint32_t seed = 12345;
+    for (size_t i = 0; i < bits.size(); ++i) {
+        if (i == 0 || bits[i] != bits[i - 1]) {
+            double t = static_cast<double>(i) * bitUs;
+            if (w.jitterUs != 0 && i != 0) {
+                seed = seed * 1103515245u + 12345u;
+                int j = static_cast<int>((seed >> 16) % (2 * w.jitterUs + 1)) - w.jitterUs;
+                t += j;
+            }
+            edges.push_back(t);
+            levels.push_back(bits[i]);
+        }
+    }
+    std::vector<Run> runs;
+    if (w.idleBeforeUs != 0) {
+        runs.push_back(Run{w.idleBeforeUs, 1});
+    }
+    for (size_t i = 0; i < edges.size(); ++i) {
+        uint32_t us = 0;  // the last run lasts until the burst ends
+        if (i + 1 < edges.size()) {
+            us = static_cast<uint32_t>(std::lround(edges[i + 1]) - std::lround(edges[i]));
+        }
+        runs.push_back(Run{us, levels[i]});
+    }
+    if (runs.back().level == 0) {  // ended on a 0 data bit? can't: stop bits are 1
+        runs.push_back(Run{0, 1});
+    }
+    return runs;
+}
+
+std::string decodeAt(const std::vector<Run> &r, uint32_t baud) {
+    uint8_t out[512];
+    size_t n = autobaud::decode(r.data(), r.size(), baud, out, sizeof out);
+    return std::string(reinterpret_cast<char *>(out), n);
+}
+
+// --- Speed detection ---------------------------------------------------------------------
+
+void test_detects_at_every_rate_from_any_other() {
+    for (uint32_t rate : modemcfg::kHostRates) {
+        std::vector<Run> r = wave("AT\r", rate);
+        TEST_ASSERT_EQUAL_UINT32(rate, autobaud::rateOfA(r.data(), r.size()));
+        uint32_t other = rate == 38400 ? 2400 : 38400;
+        uint8_t out[16];
+        autobaud::Burst b = autobaud::decodeBurst(r.data(), r.size(), other, out, sizeof out);
+        TEST_ASSERT_TRUE(b.changed);
+        TEST_ASSERT_EQUAL_UINT32(rate, b.baud);
+        TEST_ASSERT_EQUAL_STRING_LEN("AT\r", reinterpret_cast<char *>(out), 3);
+        TEST_ASSERT_EQUAL(3, b.len);
+    }
+}
+
+void test_lower_case_at_is_detected() {
+    for (uint32_t rate : {300u, 9600u, 115200u}) {
+        std::vector<Run> r = wave("at\r", rate);
+        TEST_ASSERT_EQUAL_UINT32(rate, autobaud::rateOfA(r.data(), r.size()));
+    }
+}
+
+void test_detection_allows_clock_error_and_jitter() {
+    for (double clock : {0.97, 1.03}) {
+        Wave w;
+        w.clock = clock;
+        for (uint32_t rate : {300u, 2400u, 57600u, 115200u}) {
+            std::vector<Run> r = wave("ATZ\r", rate, w);
+            TEST_ASSERT_EQUAL_UINT32(rate, autobaud::rateOfA(r.data(), r.size()));
+            TEST_ASSERT_EQUAL_STRING("ATZ\r", decodeAt(r, rate).c_str());
+        }
+    }
+    Wave j;
+    j.jitterUs = 2;  // the RMT's 1 us steps plus interrupt-free capture: well within this
+    std::vector<Run> r = wave("AT&F1&W\r", 115200, j);
+    TEST_ASSERT_EQUAL_UINT32(115200, autobaud::rateOfA(r.data(), r.size()));
+    TEST_ASSERT_EQUAL_STRING("AT&F1&W\r", decodeAt(r, 115200).c_str());
+}
+
+void test_lone_a_switches_speed_for_typing() {
+    std::vector<Run> r = wave("A", 1200);
+    uint8_t out[4];
+    autobaud::Burst b = autobaud::decodeBurst(r.data(), r.size(), 38400, out, sizeof out);
+    TEST_ASSERT_TRUE(b.changed);
+    TEST_ASSERT_EQUAL_UINT32(1200, b.baud);
+    TEST_ASSERT_EQUAL(1, b.len);
+    TEST_ASSERT_EQUAL('A', out[0]);
+}
+
+void test_other_text_does_not_change_speed() {
+    uint8_t out[16];
+    for (const char *s : {"AB\r", "aT\r", "XYZ\r", "+++"}) {
+        std::vector<Run> r = wave(s, 2400);
+        autobaud::Burst b = autobaud::decodeBurst(r.data(), r.size(), 38400, out, sizeof out);
+        TEST_ASSERT_FALSE_MESSAGE(b.changed, s);
+        TEST_ASSERT_EQUAL_UINT32(38400, b.baud);
+    }
+}
+
+void test_same_speed_decodes_without_change() {
+    std::vector<Run> r = wave("ATI3\r", 19200);
+    uint8_t out[16];
+    autobaud::Burst b = autobaud::decodeBurst(r.data(), r.size(), 19200, out, sizeof out);
+    TEST_ASSERT_FALSE(b.changed);
+    TEST_ASSERT_EQUAL_STRING_LEN("ATI3\r", reinterpret_cast<char *>(out), 5);
+}
+
+void test_nonstandard_speed_is_not_detected() {
+    std::vector<Run> r = wave("AT\r", 74880);  // between 57600 and 115200
+    TEST_ASSERT_EQUAL_UINT32(0, autobaud::rateOfA(r.data(), r.size()));
+    TEST_ASSERT_EQUAL_UINT32(115200, autobaud::snapRate(1000000000ull / 115200 * 105 / 100));
+    TEST_ASSERT_EQUAL_UINT32(0, autobaud::snapRate(1000000000ull / 115200 * 108 / 100));
+}
+
+void test_leading_idle_is_skipped() {
+    Wave w;
+    w.idleBeforeUs = 20000;
+    std::vector<Run> r = wave("AT\r", 4800, w);
+    TEST_ASSERT_EQUAL_UINT32(4800, autobaud::rateOfA(r.data(), r.size()));
+    TEST_ASSERT_EQUAL_STRING("AT\r", decodeAt(r, 4800).c_str());
+}
+
+void test_long_line_decodes_exactly() {
+    std::string line = "AT*";
+    while (line.size() < 140) {
+        line += "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    }
+    line.resize(140);
+    line += "\r";
+    Wave w;
+    w.jitterUs = 1;
+    std::vector<Run> r = wave(line, 115200, w);
+    TEST_ASSERT_EQUAL_STRING(line.c_str(), decodeAt(r, 115200).c_str());
+}
+
+void test_gaps_between_characters_decode() {
+    Wave w;
+    w.gapBits = 7;
+    std::vector<Run> r = wave("ATDT1\r", 600, w);
+    TEST_ASSERT_EQUAL_STRING("ATDT1\r", decodeAt(r, 600).c_str());
+}
+
+void test_all_byte_values_decode() {
+    std::string all;
+    for (int c = 1; c < 256; ++c) {
+        all += static_cast<char>(c);
+    }
+    std::vector<Run> r = wave(all, 57600);
+    TEST_ASSERT_EQUAL(255, decodeAt(r, 57600).size());
+    TEST_ASSERT_TRUE(decodeAt(r, 57600) == all);
+}
+
+void test_break_is_dropped() {
+    std::vector<Run> r = wave("A", 9600);
+    r.back().us = 500;           // stop bit and a little idle
+    r.push_back(Run{20000, 0});  // a 20 ms break (no stop bit)
+    r.push_back(Run{1000, 1});   // idle
+    std::vector<Run> t = wave("T", 9600);
+    r.insert(r.end(), t.begin(), t.end());
+    TEST_ASSERT_EQUAL_STRING("AT", decodeAt(r, 9600).c_str());
+}
+
+void test_wrong_speed_decode_is_harmless() {
+    std::vector<Run> r = wave("ATZ\r", 300);
+    std::string s = decodeAt(r, 115200);  // garbage, but no crash and bounded
+    TEST_ASSERT_TRUE(s.size() < 20);
+    uint8_t out[2];
+    TEST_ASSERT_TRUE(autobaud::decode(r.data(), r.size(), 115200, out, sizeof out) <= 2);
+    TEST_ASSERT_EQUAL(0, autobaud::decode(r.data(), 0, 9600, out, sizeof out));
+}
+
+// --- +++ escape ---------------------------------------------------------------------------
+
+Profile f1() {
+    return modemcfg::factoryProfile(1);
+}
+
+void plus(EscapeDetector &e, uint32_t t, const Profile &p, char c = '+') {
+    e.onByte(static_cast<uint8_t>(c), t, p);
+}
+
+void test_escape_with_guard_times() {
+    Profile p = f1();  // S2 = '+', S12 = 50 (1 s)
+    EscapeDetector e;
+    e.reset(0);
+    plus(e, 1000, p);
+    plus(e, 1100, p);
+    plus(e, 1200, p);
+    TEST_ASSERT_FALSE(e.poll(2199, p));
+    TEST_ASSERT_TRUE(e.poll(2200, p));
+    TEST_ASSERT_FALSE(e.poll(3000, p));  // once only
+}
+
+void test_escape_needs_guard_before() {
+    Profile p = f1();
+    EscapeDetector e;
+    e.reset(0);
+    plus(e, 500, p, 'x');
+    plus(e, 1200, p);  // only 0.7 s after data
+    plus(e, 1300, p);
+    plus(e, 1400, p);
+    TEST_ASSERT_FALSE(e.poll(5000, p));
+}
+
+void test_escape_cancelled_by_data_after() {
+    Profile p = f1();
+    EscapeDetector e;
+    e.reset(0);
+    plus(e, 1000, p);
+    plus(e, 1100, p);
+    plus(e, 1200, p);
+    plus(e, 1500, p, 'x');
+    TEST_ASSERT_FALSE(e.poll(5000, p));
+}
+
+void test_fourth_plus_cancels() {
+    Profile p = f1();
+    EscapeDetector e;
+    e.reset(0);
+    for (uint32_t t : {1000u, 1100u, 1200u, 1300u}) {
+        plus(e, t, p);
+    }
+    TEST_ASSERT_FALSE(e.poll(5000, p));
+}
+
+void test_slow_plus_starts_again() {
+    Profile p = f1();
+    EscapeDetector e;
+    e.reset(0);
+    plus(e, 1000, p);
+    plus(e, 2100, p);  // too slow for the first; starts a new sequence
+    plus(e, 2200, p);
+    plus(e, 2300, p);
+    TEST_ASSERT_TRUE(e.poll(3300, p));
+}
+
+void test_escape_s12_zero_and_s2_off() {
+    Profile p = f1();
+    p.s[12] = 0;
+    EscapeDetector e;
+    e.reset(0);
+    plus(e, 1, p, 'x');
+    plus(e, 2, p);
+    plus(e, 3, p);
+    plus(e, 4, p);
+    TEST_ASSERT_TRUE(e.poll(4, p));
+
+    p = f1();
+    p.s[2] = 128;  // escape off
+    e.reset(0);
+    plus(e, 1000, p);
+    plus(e, 1100, p);
+    plus(e, 1200, p);
+    TEST_ASSERT_FALSE(e.poll(9000, p));
+
+    p = f1();
+    p.s[2] = '-';
+    e.reset(0);
+    plus(e, 1000, p, '-');
+    plus(e, 1100, p, '-');
+    plus(e, 1200, p, '-');
+    TEST_ASSERT_TRUE(e.poll(2200, p));
+}
+
+// --- DTR, DCD, flow control ------------------------------------------------------------------
+
+void test_dtr_filter_uses_s25() {
+    Profile p = f1();  // S25 = 5 (50 ms)
+    DtrFilter d;
+    d.reset(true);
+    TEST_ASSERT_FALSE(d.update(false, 0, p));
+    TEST_ASSERT_FALSE(d.update(false, 49, p));
+    TEST_ASSERT_TRUE(d.update(false, 50, p));
+    TEST_ASSERT_FALSE(d.on());
+    TEST_ASSERT_FALSE(d.update(false, 60, p));  // reported once
+
+    d.reset(true);
+    d.update(false, 100, p);
+    d.update(true, 130, p);  // a 30 ms glitch
+    TEST_ASSERT_FALSE(d.update(true, 200, p));
+    TEST_ASSERT_TRUE(d.on());
+
+    p.s[25] = 0;
+    d.reset(true);
+    TEST_ASSERT_TRUE(d.update(false, 0, p));
+}
+
+void test_dtr_actions_follow_amp_d() {
+    Profile p = f1();
+    p.v[modemcfg::kAmpD] = 0;
+    TEST_ASSERT_EQUAL(static_cast<int>(DtrAction::kNone), static_cast<int>(dtrAction(p)));
+    p.v[modemcfg::kAmpD] = 2;
+    TEST_ASSERT_EQUAL(static_cast<int>(DtrAction::kHangUp), static_cast<int>(dtrAction(p)));
+    p.v[modemcfg::kAmpD] = 3;
+    TEST_ASSERT_EQUAL(static_cast<int>(DtrAction::kReset), static_cast<int>(dtrAction(p)));
+}
+
+void test_dcd_follows_amp_c() {
+    Profile p = f1();
+    TEST_ASSERT_FALSE(dcdOn(p, false));
+    TEST_ASSERT_TRUE(dcdOn(p, true));
+    p.v[modemcfg::kAmpC] = 0;
+    TEST_ASSERT_TRUE(dcdOn(p, false));
+}
+
+void test_flow_modes_of_the_factory_templates() {
+    FlowMode f = flowMode(modemcfg::factoryProfile(1));  // &H1 &R2
+    TEST_ASSERT_TRUE(f.ctsFromBuffer);
+    TEST_ASSERT_TRUE(f.obeyRts);
+    TEST_ASSERT_FALSE(f.sendXonXoff);
+    TEST_ASSERT_FALSE(f.obeyXonXoff);
+
+    f = flowMode(modemcfg::factoryProfile(0));  // &H0 &R1
+    TEST_ASSERT_FALSE(f.ctsFromBuffer || f.obeyRts || f.sendXonXoff || f.obeyXonXoff);
+
+    f = flowMode(modemcfg::factoryProfile(2));  // &H2 &R1 &I2
+    TEST_ASSERT_FALSE(f.ctsFromBuffer || f.obeyRts);
+    TEST_ASSERT_TRUE(f.sendXonXoff && f.obeyXonXoff && f.stripXonXoff);
+
+    Profile p = f1();
+    p.v[modemcfg::kAmpH] = 3;
+    p.v[modemcfg::kAmpI] = 1;
+    f = flowMode(p);
+    TEST_ASSERT_TRUE(f.ctsFromBuffer && f.sendXonXoff && f.obeyXonXoff);
+    TEST_ASSERT_FALSE(f.stripXonXoff);
+    TEST_ASSERT_TRUE(flowMode(p) == f);
+    TEST_ASSERT_TRUE(flowMode(f1()) != f);
+}
+
+void test_xoff_sender_thresholds() {
+    Profile p = modemcfg::factoryProfile(2);
+    XoffSender x;
+    TEST_ASSERT_EQUAL(-1, x.update(10, 100, p));
+    TEST_ASSERT_EQUAL(19, x.update(75, 100, p));  // XOFF
+    TEST_ASSERT_TRUE(x.paused());
+    TEST_ASSERT_EQUAL(-1, x.update(80, 100, p));
+    TEST_ASSERT_EQUAL(-1, x.update(50, 100, p));
+    TEST_ASSERT_EQUAL(17, x.update(25, 100, p));  // XON
+    TEST_ASSERT_EQUAL(-1, x.update(0, 100, p));
+
+    TEST_ASSERT_EQUAL(19, x.update(90, 100, p));
+    TEST_ASSERT_EQUAL(17, x.update(90, 100, f1()));  // &H off while paused: release
+    TEST_ASSERT_EQUAL(-1, x.update(90, 100, f1()));
+}
+
+// --- Echo call ----------------------------------------------------------------------------
+
+void test_echo_connection() {
+    EchoConnection c;
+    TEST_ASSERT_FALSE(c.isOpen());
+    TEST_ASSERT_EQUAL(0, c.space());
+    c.open(0, 0);
+    const uint8_t hello[] = {'h', 'i'};
+    TEST_ASSERT_EQUAL(2, c.write(hello, 2));
+    uint8_t buf[8];
+    TEST_ASSERT_EQUAL(2, c.read(buf, sizeof buf));
+    TEST_ASSERT_EQUAL('h', buf[0]);
+    std::vector<uint8_t> big(5000, 'x');
+    TEST_ASSERT_EQUAL(EchoConnection::kSize, c.write(big.data(), big.size()));
+    TEST_ASSERT_EQUAL(0, c.space());
+    c.poll(1000000);
+    TEST_ASSERT_TRUE(c.isOpen());  // no timer
+    c.open(100, 500);
+    c.poll(599);
+    TEST_ASSERT_TRUE(c.isOpen());
+    c.poll(600);
+    TEST_ASSERT_FALSE(c.isOpen());
+}
+
+// --- Session ------------------------------------------------------------------------------
+
+class MemStore : public modemcfg::Store {
+public:
+    size_t load(uint8_t *buf, size_t cap) override {
+        size_t n = len < cap ? len : cap;
+        memcpy(buf, data, n);
+        return n;
+    }
+    bool save(const uint8_t *d, size_t n) override {
+        memcpy(data, d, n);
+        len = n;
+        return true;
+    }
+    bool erase() override {
+        len = 0;
+        return true;
+    }
+    uint8_t data[1024] = {};
+    size_t len = 0;
+};
+
+class StrSink : public atcmd::Sink {
+public:
+    void write(const char *d, size_t n) override { s.append(d, n); }
+    std::string take() {
+        std::string r = s;
+        s.clear();
+        return r;
+    }
+    std::string s;
+};
+
+struct Rig {
+    MemStore store;
+    atcmd::Modem modem{store, nullptr, 0};
+    CallSlot slot;
+    StrSink out;
+    Session s{modem, out, 38400, slot};
+    EchoConnection echo;
+    uint32_t now = 0;
+
+    Rig() {
+        modem.begin();
+        s.tick(now, true);
+    }
+    void send(const std::string &text) {
+        s.fromHost(reinterpret_cast<const uint8_t *>(text.data()), text.size(), now);
+    }
+    std::string fromCall() {
+        uint8_t buf[8192];
+        size_t n = s.toHost(buf, sizeof buf);
+        return std::string(reinterpret_cast<char *>(buf), n);
+    }
+    void wait(uint32_t ms, bool dtr = true) {
+        for (uint32_t i = 0; i < ms; i += 10) {
+            now += 10;
+            s.tick(now, dtr);
+        }
+    }
+    void call() {
+        echo.open(now, 0);
+        TEST_ASSERT_TRUE(s.startCall(echo));
+        out.take();
+    }
+    void escape() {
+        wait(1100);
+        send("+++");
+        wait(1100);
+    }
+};
+
+void test_session_call_echo_and_connect_text() {
+    Rig r;
+    r.echo.open(0, 0);
+    TEST_ASSERT_TRUE(r.s.startCall(r.echo));
+    TEST_ASSERT_EQUAL_STRING("\r\nCONNECT 33600\r\n", r.out.take().c_str());
+    TEST_ASSERT_EQUAL(static_cast<int>(Mode::kOnline), static_cast<int>(r.s.mode()));
+    TEST_ASSERT_TRUE(r.s.callUp());
+    TEST_ASSERT_TRUE(r.s.dcd());
+    r.send("hello");
+    TEST_ASSERT_EQUAL_STRING("hello", r.fromCall().c_str());
+    TEST_ASSERT_EQUAL_STRING("", r.out.take().c_str());  // data doesn't reach the parser
+}
+
+void test_session_connect_follows_amp_n() {
+    Rig r;
+    r.send("AT&N6\r");  // 9600
+    r.out.take();
+    r.echo.open(0, 0);
+    r.s.startCall(r.echo);
+    TEST_ASSERT_EQUAL_STRING("\r\nCONNECT 9600\r\n", r.out.take().c_str());
+}
+
+void test_session_escape_ato_and_ath() {
+    Rig r;
+    r.call();
+    r.escape();
+    TEST_ASSERT_EQUAL_STRING("\r\nOK\r\n", r.out.take().c_str());
+    TEST_ASSERT_EQUAL(static_cast<int>(Mode::kOnlineCommand), static_cast<int>(r.s.mode()));
+    TEST_ASSERT_TRUE(r.s.dcd());                         // still connected
+    TEST_ASSERT_EQUAL_STRING("", r.fromCall().c_str());  // call data is held meanwhile
+    r.send("ATI4\r");
+    TEST_ASSERT_NOT_NULL(strstr(r.out.take().c_str(), "OFF HOOK"));
+    r.send("ATO\r");
+    TEST_ASSERT_NOT_NULL(strstr(r.out.take().c_str(), "CONNECT 33600"));
+    TEST_ASSERT_EQUAL(static_cast<int>(Mode::kOnline), static_cast<int>(r.s.mode()));
+    TEST_ASSERT_EQUAL_STRING("+++", r.fromCall().c_str());  // the escape went to the call
+    r.escape();
+    r.out.take();
+    r.send("ATH\r");
+    TEST_ASSERT_NOT_NULL(strstr(r.out.take().c_str(), "OK"));
+    TEST_ASSERT_FALSE(r.s.callUp());
+    TEST_ASSERT_FALSE(r.s.dcd());
+    TEST_ASSERT_FALSE(r.echo.isOpen());
+    r.send("ATO\r");
+    TEST_ASSERT_NOT_NULL(strstr(r.out.take().c_str(), "ERROR"));  // no call
+    r.send("ATI4\r");
+    TEST_ASSERT_NOT_NULL(strstr(r.out.take().c_str(), "ON HOOK"));
+}
+
+void test_session_plus_without_guard_is_data() {
+    Rig r;
+    r.call();
+    r.send("a+++");
+    r.wait(2000);
+    TEST_ASSERT_EQUAL(static_cast<int>(Mode::kOnline), static_cast<int>(r.s.mode()));
+    TEST_ASSERT_EQUAL_STRING("a+++", r.fromCall().c_str());
+}
+
+void test_session_dtr_drop() {
+    {
+        Rig r;  // &D2: hang up
+        r.call();
+        r.wait(100, false);
+        TEST_ASSERT_EQUAL_STRING("\r\nNO CARRIER\r\n", r.out.take().c_str());
+        TEST_ASSERT_FALSE(r.s.callUp());
+        TEST_ASSERT_EQUAL(static_cast<int>(Mode::kCommand), static_cast<int>(r.s.mode()));
+    }
+    {
+        Rig r;  // &D0: ignored
+        r.send("AT&D0\r");
+        r.call();
+        r.wait(100, false);
+        TEST_ASSERT_TRUE(r.s.callUp());
+    }
+    {
+        Rig r;  // &D3: hang up and reset (ATZ)
+        r.send("AT&D3S7=45\r");
+        r.call();
+        r.wait(100, false);
+        TEST_ASSERT_FALSE(r.s.callUp());
+        TEST_ASSERT_EQUAL(60, r.modem.active().s[7]);
+        TEST_ASSERT_EQUAL(2, r.modem.active().get(modemcfg::kAmpD));
+    }
+    {
+        Rig r;  // a DTR glitch shorter than S25 does nothing
+        r.call();
+        r.now += 10;
+        r.s.tick(r.now, false);
+        r.now += 20;
+        r.s.tick(r.now, true);
+        r.wait(100);
+        TEST_ASSERT_TRUE(r.s.callUp());
+    }
+}
+
+void test_session_far_end_hangs_up() {
+    Rig r;
+    r.echo.open(r.now, 500);
+    r.s.startCall(r.echo);
+    r.out.take();
+    r.wait(600);
+    TEST_ASSERT_EQUAL_STRING("\r\nNO CARRIER\r\n", r.out.take().c_str());
+    TEST_ASSERT_FALSE(r.s.dcd());
+}
+
+void test_one_call_at_a_time() {
+    Rig r;
+    StrSink out2;
+    Session other(r.modem, out2, 115200, r.slot);
+    r.call();
+    EchoConnection e2;
+    e2.open(0, 0);
+    TEST_ASSERT_FALSE(other.startCall(e2));
+    TEST_ASSERT_FALSE(r.s.startCall(e2));  // this port already has one
+    r.escape();
+    r.send("ATH\r");
+    TEST_ASSERT_TRUE(other.startCall(e2));
+}
+
+void test_session_local_echo_f0() {
+    Rig r;
+    r.send("ATF0\r");
+    r.call();
+    r.send("ab");
+    TEST_ASSERT_EQUAL_STRING("abab", r.fromCall().c_str());
+}
+
+void test_session_xon_xoff_from_computer() {
+    Rig r;
+    r.send("AT&F2\r");  // &I2
+    r.call();
+    r.send(
+        "\x13"
+        "ab");  // XOFF, then data
+    TEST_ASSERT_TRUE(r.s.heldByXoff());
+    TEST_ASSERT_EQUAL_STRING("", r.fromCall().c_str());
+    r.send("\x11");                                        // XON
+    TEST_ASSERT_EQUAL_STRING("ab", r.fromCall().c_str());  // XON/XOFF not passed on
+}
+
+void test_session_full_call_holds_the_rest() {
+    Rig r;
+    r.call();
+    std::vector<uint8_t> big(5000, 'x');
+    TEST_ASSERT_EQUAL(EchoConnection::kSize, r.s.fromHost(big.data(), big.size(), r.now));
+    TEST_ASSERT_EQUAL(0, r.s.hostSpace());
+    r.fromCall();
+    TEST_ASSERT_EQUAL(EchoConnection::kSize, r.s.hostSpace());
+}
+
+void test_session_atz_hangs_up() {
+    Rig r;
+    r.call();
+    r.escape();
+    r.out.take();
+    r.send("ATZ\r");
+    TEST_ASSERT_FALSE(r.s.callUp());
+    TEST_ASSERT_NOT_NULL(strstr(r.out.take().c_str(), "OK"));
+}
+
+void test_session_amp_c0_dcd_always_on() {
+    Rig r;
+    r.send("AT&C0\r");
+    TEST_ASSERT_TRUE(r.s.dcd());
+}
+
+// --- Front-panel LEDs ---------------------------------------------------------------------
+
+uint8_t mask(hwtest::Led l) {
+    return static_cast<uint8_t>(1u << l);
+}
+
+void test_panel_mirrors_lines() {
+    Panel p;
+    PanelInput in = {};
+    TEST_ASSERT_EQUAL_HEX8(0, p.update(in, 0));
+    in.autoAnswer = true;
+    in.cd = true;
+    in.tr = true;
+    in.cs = true;
+    TEST_ASSERT_EQUAL_HEX8(
+        mask(hwtest::kAA) | mask(hwtest::kCD) | mask(hwtest::kTR) | mask(hwtest::kCS),
+        p.update(in, 10));
+}
+
+void test_panel_stretches_rd_and_sd() {
+    Panel p;
+    PanelInput in = {};
+    in.toComputer = 100;  // counts before the first update don't flash
+    TEST_ASSERT_EQUAL_HEX8(0, p.update(in, 0));
+    in.toComputer = 101;
+    TEST_ASSERT_EQUAL_HEX8(mask(hwtest::kRD), p.update(in, 1000));
+    TEST_ASSERT_EQUAL_HEX8(mask(hwtest::kRD), p.update(in, 1049));
+    TEST_ASSERT_EQUAL_HEX8(0, p.update(in, 1050));
+    in.fromComputer = 1;
+    TEST_ASSERT_EQUAL_HEX8(mask(hwtest::kSD), p.update(in, 2000));
+    in.fromComputer = 2;
+    TEST_ASSERT_EQUAL_HEX8(mask(hwtest::kSD), p.update(in, 2040));
+    TEST_ASSERT_EQUAL_HEX8(mask(hwtest::kSD), p.update(in, 2080));  // restarted at 2040
+    TEST_ASSERT_EQUAL_HEX8(0, p.update(in, 2090));
+}
+
+void test_panel_ring_and_wifi() {
+    Panel p;
+    PanelInput in = {};
+    in.ringing = true;
+    TEST_ASSERT_EQUAL_HEX8(mask(hwtest::kAA), p.update(in, 0));
+    TEST_ASSERT_EQUAL_HEX8(0, p.update(in, Panel::kRingFlashMs));
+    in.ringing = false;
+    in.wifi = WifiLed::kConnecting;
+    TEST_ASSERT_EQUAL_HEX8(mask(hwtest::kARQ), p.update(in, 0));
+    TEST_ASSERT_EQUAL_HEX8(0, p.update(in, Panel::kWifiBlinkMs));
+    in.wifi = WifiLed::kConnected;
+    TEST_ASSERT_EQUAL_HEX8(mask(hwtest::kARQ), p.update(in, Panel::kWifiBlinkMs));
+}
+
+int main() {
+    UNITY_BEGIN();
+    RUN_TEST(test_detects_at_every_rate_from_any_other);
+    RUN_TEST(test_lower_case_at_is_detected);
+    RUN_TEST(test_detection_allows_clock_error_and_jitter);
+    RUN_TEST(test_lone_a_switches_speed_for_typing);
+    RUN_TEST(test_other_text_does_not_change_speed);
+    RUN_TEST(test_same_speed_decodes_without_change);
+    RUN_TEST(test_nonstandard_speed_is_not_detected);
+    RUN_TEST(test_leading_idle_is_skipped);
+    RUN_TEST(test_long_line_decodes_exactly);
+    RUN_TEST(test_gaps_between_characters_decode);
+    RUN_TEST(test_all_byte_values_decode);
+    RUN_TEST(test_break_is_dropped);
+    RUN_TEST(test_wrong_speed_decode_is_harmless);
+    RUN_TEST(test_escape_with_guard_times);
+    RUN_TEST(test_escape_needs_guard_before);
+    RUN_TEST(test_escape_cancelled_by_data_after);
+    RUN_TEST(test_fourth_plus_cancels);
+    RUN_TEST(test_slow_plus_starts_again);
+    RUN_TEST(test_escape_s12_zero_and_s2_off);
+    RUN_TEST(test_dtr_filter_uses_s25);
+    RUN_TEST(test_dtr_actions_follow_amp_d);
+    RUN_TEST(test_dcd_follows_amp_c);
+    RUN_TEST(test_flow_modes_of_the_factory_templates);
+    RUN_TEST(test_xoff_sender_thresholds);
+    RUN_TEST(test_echo_connection);
+    RUN_TEST(test_session_call_echo_and_connect_text);
+    RUN_TEST(test_session_connect_follows_amp_n);
+    RUN_TEST(test_session_escape_ato_and_ath);
+    RUN_TEST(test_session_plus_without_guard_is_data);
+    RUN_TEST(test_session_dtr_drop);
+    RUN_TEST(test_session_far_end_hangs_up);
+    RUN_TEST(test_one_call_at_a_time);
+    RUN_TEST(test_session_local_echo_f0);
+    RUN_TEST(test_session_xon_xoff_from_computer);
+    RUN_TEST(test_session_full_call_holds_the_rest);
+    RUN_TEST(test_session_atz_hangs_up);
+    RUN_TEST(test_session_amp_c0_dcd_always_on);
+    RUN_TEST(test_panel_mirrors_lines);
+    RUN_TEST(test_panel_stretches_rd_and_sd);
+    RUN_TEST(test_panel_ring_and_wifi);
+    return UNITY_END();
+}

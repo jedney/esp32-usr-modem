@@ -50,6 +50,13 @@ constexpr int kLeds[7] = {42, 41, 40, 39, 38, 48, 21};
 // and the GPIO sinks the current.
 constexpr bool kLedActiveHigh = true;
 
+// --- On-board RS232 test only (test/embedded/test_rs232) ---------------------------------
+// UART2 plays the computer: its TX is routed inside the chip onto the TXD-in pin and
+// UART1's TX onto its RX, so the test needs no wires. These two spare pins are only
+// UART2's nominal pins; nothing is connected to them.
+constexpr int kTestUartTx = 18;
+constexpr int kTestUartRx = 8;
+
 // --- On the S3 board itself -------------------------------------------------------------
 constexpr int kRgbLed = 47;     // WS2812-type RGB LED (Jon, 22 Oct)
 constexpr int kConsoleTx = 43;  // UART0 via the onboard USB-serial chip: console only

@@ -1,0 +1,89 @@
+// One serial port's session (project brief 6.2): the RS232 port and the USB console each
+// have one. It owns the port's AT parser and moves between three modes:
+//   command        -> bytes from the computer go to the AT parser
+//   online         -> bytes go to the call; "+++" with guard time escapes
+//   online-command -> the call stays up; ATO goes back to it, ATH0 hangs up
+// DTR (&D), DCD (&C) and XON/XOFF (&I) are handled here; hardware flow control is the
+// board's UART (see linectl.h FlowMode).
+//
+// Only one port can have a call at a time (CallSlot). No Arduino dependencies.
+
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+
+#include "atcmd.h"
+#include "connection.h"
+#include "linectl.h"
+
+namespace hostport {
+
+enum class Mode : uint8_t { kCommand, kOnline, kOnlineCommand };
+
+// Shared by all sessions: who has the call.
+class CallSlot {
+public:
+    bool busy() const { return owner_ != nullptr; }
+    bool claim(const void *who);
+    void release(const void *who);
+
+private:
+    const void *owner_ = nullptr;
+};
+
+class Session : public atcmd::Link {
+public:
+    Session(atcmd::Modem &modem, atcmd::Sink &out, uint32_t baud, CallSlot &slot);
+    Session(const Session &) = delete;
+    Session &operator=(const Session &) = delete;
+
+    atcmd::Port &port() { return port_; }
+    Mode mode() const { return mode_; }
+
+    // Starts a call on `conn` (AT*TESTCALL now, ATD from v0.8): sends CONNECT and goes
+    // online. False if this or another port already has a call.
+    bool startCall(Connection &conn);
+
+    // Bytes from the computer. Returns how many were taken: online, fewer than `len`
+    // when the call can't take more (the caller keeps the rest, so flow control holds
+    // the computer).
+    size_t fromHost(const uint8_t *data, size_t len, uint32_t nowMs);
+    size_t hostSpace() const;  // how many bytes fromHost() would take now
+
+    // Bytes for the computer from the call (online only, and not after XOFF).
+    size_t toHost(uint8_t *buf, size_t cap);
+
+    // Call often (every loop): guard time, DTR, the far end hanging up. `dtr` is the
+    // raw DTR input (true = asserted); pass true for a port without DTR.
+    void tick(uint32_t nowMs, bool dtr);
+
+    bool dcd() const;  // DCD output, per &C
+    bool dtrOn() const { return dtr_.on(); }
+    bool heldByXoff() const { return xoff_; }
+
+    // atcmd::Link
+    bool callUp() const override { return conn_ != nullptr; }
+    void resumeOnline() override;
+    void hangUp() override;
+
+private:
+    void endCall(bool noCarrier);
+    void sendConnect();
+    const modemcfg::Profile &profile() const { return modem_.active(); }
+
+    atcmd::Modem &modem_;
+    atcmd::Port port_;
+    CallSlot &slot_;
+    Connection *conn_ = nullptr;
+    Mode mode_ = Mode::kCommand;
+    EscapeDetector esc_;
+    DtrFilter dtr_;
+    bool dtrKnown_ = false;
+    bool xoff_ = false;
+    uint32_t now_ = 0;
+    uint8_t echo_[256] = {};  // F0: online data echoed back to the computer
+    size_t echoLen_ = 0;
+};
+
+}  // namespace hostport

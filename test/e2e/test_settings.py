@@ -81,9 +81,9 @@ def test_fax_classes_are_refused(console):
 
 def test_factory_templates(console):
     assert console.command("AT&F0")[-1] == "OK"
-    assert any(line.startswith("&A1  &B0  &C1  &D2  &G0  &H0") for line in console.command("ATI4"))
+    assert any(line.startswith("&A1  &B1  &C1  &D2  &G0  &H0") for line in console.command("ATI4"))
     assert console.command("AT&F1")[-1] == "OK"
-    assert any(line.startswith("&A0  &B0  &C1  &D2  &G0  &H1") for line in console.command("ATI4"))
+    assert any(line.startswith("&A0  &B1  &C1  &D2  &G0  &H1") for line in console.command("ATI4"))
 
 
 def test_project_commands_still_work(console):

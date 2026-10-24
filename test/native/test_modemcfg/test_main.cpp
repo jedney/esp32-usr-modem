@@ -48,7 +48,7 @@ void test_factory_f1_has_the_decided_defaults() {
     TEST_ASSERT_EQUAL(1, p.get(kM));
     TEST_ASSERT_EQUAL(2, p.get(kL));
     TEST_ASSERT_EQUAL(0, p.get(kAmpA));  // plain CONNECT 33600 (Q34)
-    TEST_ASSERT_EQUAL(0, p.get(kAmpB));  // speed from "AT" (Q1)
+    TEST_ASSERT_EQUAL(1, p.get(kAmpB));  // speed stays as detected from "AT" (v0.5)
     TEST_ASSERT_EQUAL(1, p.get(kAmpC));  // Q33
     TEST_ASSERT_EQUAL(2, p.get(kAmpD));  // Q33
     TEST_ASSERT_EQUAL(1, p.get(kAmpH));  // Q33
@@ -216,6 +216,60 @@ void test_out_of_range_value_is_refused_even_with_good_crc() {
     assertLoadFails(blob, sizeof blob, LoadResult::kBadValue);
 }
 
+void test_host_baud_round_trip_and_range() {
+    Nvram in = factoryNvram();
+    TEST_ASSERT_EQUAL_UINT32(0, in.hostBaud);  // detect from "AT"
+    in.hostBaud = 9600;
+    uint8_t blob[kBlobSize];
+    serialize(in, blob);
+    Nvram out;
+    TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kOk),
+                      static_cast<int>(deserialize(blob, sizeof blob, &out)));
+    TEST_ASSERT_EQUAL_UINT32(9600, out.hostBaud);
+
+    in.hostBaud = 9601;  // not a host rate
+    serialize(in, blob);
+    assertLoadFails(blob, sizeof blob, LoadResult::kBadValue);
+    TEST_ASSERT_TRUE(isHostRate(300) && isHostRate(115200));
+    TEST_ASSERT_FALSE(isHostRate(230400) || isHostRate(0));
+}
+
+// A v0.4 (layout 1) blob: the layout 2 bytes without hostBaud, version 1, its own CRC.
+size_t makeV1Blob(const Nvram &n, uint8_t *v1) {
+    uint8_t v2[kBlobSize];
+    serialize(n, v2);
+    memcpy(v1, v2, kBlobSizeV1 - 4);
+    v1[4] = 1;
+    uint32_t crc = crc32(v1, kBlobSizeV1 - 4);
+    for (int i = 0; i < 4; ++i) {
+        v1[kBlobSizeV1 - 4 + i] = static_cast<uint8_t>(crc >> (8 * i));
+    }
+    return kBlobSizeV1;
+}
+
+void test_layout_1_is_migrated() {
+    Nvram old = sample();
+    old.tmpl[0].v[kAmpB] = 0;  // v0.4's "detect from AT"
+    old.tmpl[1].v[kAmpB] = 1;  // v0.4's "fixed"
+    uint8_t v1[kBlobSizeV1];
+    size_t len = makeV1Blob(old, v1);
+    Nvram out;
+    TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kMigrated),
+                      static_cast<int>(deserialize(v1, len, &out)));
+    TEST_ASSERT_EQUAL(1, out.tmpl[0].get(kAmpB));
+    TEST_ASSERT_EQUAL(1, out.tmpl[1].get(kAmpB));
+    TEST_ASSERT_EQUAL(0, out.tmpl[1].get(kE));  // everything else kept
+    TEST_ASSERT_EQUAL_UINT32(115200, out.tmpl[1].baud);
+    TEST_ASSERT_EQUAL(1, out.y);
+    TEST_ASSERT_EQUAL_STRING("170064142064", out.phone[0]);
+    TEST_ASSERT_EQUAL_UINT32(0, out.hostBaud);
+    TEST_ASSERT_NOT_NULL(strstr(loadResultText(LoadResult::kMigrated), "saved settings"));
+
+    v1[30] ^= 0x01;  // a damaged v1 blob is still refused
+    assertLoadFails(v1, len, LoadResult::kBadCrc);
+    assertLoadFails(v1, kBlobSize, LoadResult::kBadSize);  // v1 header, v2 size
+}
+
 void test_crc32_known_value() {
     const char *s = "123456789";
     TEST_ASSERT_EQUAL_HEX32(0xCBF43926u, crc32(reinterpret_cast<const uint8_t *>(s), 9));
@@ -252,6 +306,8 @@ int main() {
     RUN_TEST(test_full_length_phone_number_survives);
     RUN_TEST(test_damaged_blobs_fall_back_to_factory);
     RUN_TEST(test_out_of_range_value_is_refused_even_with_good_crc);
+    RUN_TEST(test_host_baud_round_trip_and_range);
+    RUN_TEST(test_layout_1_is_migrated);
     RUN_TEST(test_crc32_known_value);
     RUN_TEST(test_store_round_trip_is_the_restart_case);
     RUN_TEST(test_load_result_texts);

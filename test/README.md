@@ -21,6 +21,7 @@ Upload the firmware again afterwards (**Modem: upload over USB (tests first)**).
 | Version | Date | Bench | On-board | End-to-end |
 |---|---|---|---|---|
 | v0.4 | 2026-10-24 | Bare board, console COM15 | `test_board` 5/5; `test_hw` not run (nothing wired) | 34 passed, 1 skipped (bridge test, no RS232 port) |
+| v0.5 | 2026-10-24 | Bare board, console COM15 | `test_board` 5/5, `test_rs232` 8/8 (no wires needed); `test_hw` not run | 46 passed, 22 skipped (`test_rs232.py` and the bridge test: no RS232 port yet) |
 
 ## Feature matrix
 
@@ -34,10 +35,11 @@ Status: ✅ tests written, ⬜ planned. Section numbers refer to the project bri
 | Version in banner / `AT*VER` (6.9) | — | — | `test_console.py` | ✅ |
 | AT command parser: several commands per line, `A/`, echo, S3/S5, S-registers, `&F` / `&W` / `&V` / `&Z`, `Y` / `Z` (6.2, 6.6) | `test_atcmd` | — | `test_settings.py` | ✅ |
 | Result codes, X0–X4 sets, verbal/numeric/quiet modes (6.5) | `test_atcmd` | — | `test_settings.py` | ✅ codes; ⬜ call results (v0.8) |
-| Host speed auto-detect `&B0` / fixed `&B1` (6.2) | ⬜ timing maths | ⬜ | ⬜ | ⬜ |
-| RTS/CTS flow control, DTR hang-up `&D`, DCD `&C`, RI (6.2) | ⬜ state machine | ⬜ | ⬜ | ⬜ |
-| `+++` escape guard time and `ATO` (6.2) | ⬜ | — | ⬜ | ⬜ |
-| Line-speed emulation `&N`, optional throttling, `CONNECT` text (6.2) | ⬜ | — | ⬜ | ⬜ |
+| Host speed from "AT" at 300–115200, fixed with `AT*BAUD` (6.2) | `test_hostport` (waveforms at every rate, clock error, jitter, 140-character line) | `test_rs232` (every rate, inside the chip) | `test_rs232.py` (every rate through the Unitek adapter); `test_session.py` (`AT*BAUD`) | ✅; ⬜ RS232 end-to-end run (needs wiring) |
+| RTS/CTS and XON/XOFF flow control, DTR `&D` with S25, DCD `&C`, RI (6.2) | `test_hostport` | `test_rs232` (CTS drops with nothing lost, RTS pauses sending, DTR read) | `test_rs232.py` (CTS/DCD seen by the PC, DTR drop, 16 KB echo with RTS/CTS) | ✅; ⬜ RS232 end-to-end run (needs wiring) |
+| `+++` escape guard time (S2, S12), `ATO`, `ATH`, `ATZ` hang-up, `F0` (6.2) | `test_hostport`, `test_atcmd` | — | `test_session.py` | ✅ |
+| Test call `AT*TESTCALL`: echo, far end hangs up (NO CARRIER), one call at a time (6.2) | `test_hostport` | — | `test_session.py`, `test_rs232.py` | ✅ |
+| Line-speed emulation `&N`, optional throttling, `CONNECT` text (6.2) | `test_hostport` (CONNECT text follows `&N`) | — | `test_session.py` (CONNECT 9600) | ✅ CONNECT text; ⬜ throttling (v0.8) |
 | Phonebook storage and dialling (6.3) | ⬜ | ⬜ NVS | ⬜ | ⬜ |
 | Outgoing call: Telnet negotiation, 0xFF escaping, raw mode (6.6) | ⬜ | — | ⬜ live BBS | ⬜ |
 | Errors: refused → BUSY, timeout → NO ANSWER, DNS/Wi-Fi → NO DIALTONE, drop → NO CARRIER (6.5) | ⬜ | — | ⬜ local test server | ⬜ |
@@ -47,11 +49,11 @@ Status: ✅ tests written, ⬜ planned. Section numbers refer to the project bri
 | Tones: UK dial, busy, ring, DTMF, pulse clicks (6.4) | `test_hwtest` (frequency, cadence, timing) | `test_hw` (I2S) | `test_hwtest.py`; listen with `AT*HWTEST` | ✅ generator; ⬜ call sequence |
 | Handshake WAV playback per speed (6.4) | ⬜ WAV header | ⬜ LittleFS + I2S | manual listen | ⬜ |
 | Volume: pot, `ATL`, `ATM`, hard cap (5.3, 6.4) | `test_hwtest` (curve, cap, pot dead zones) | `test_hw` (ADC) | `AT*HWPOT=TONE`, `AT*HWTEST` step 3 | ✅ curve and cap; ⬜ `ATL`/`ATM` |
-| LEDs per table 5.4 | ⬜ state logic | `test_hw` (GPIO) | `AT*HWLED`, `AT*HWTEST` step 1 | ⬜ state logic |
-| Hardware tests `AT*HW...`: LEDs, amp, tones, pot, RS232 lines, loopback, bridge, pin map (6.14) | `test_hwtest`, `test_pins` | `test_hw` | `test_hwtest.py` (bridge test needs `--rs232-port`) | ✅ |
+| LEDs per table 5.4 (RD/SD stretched), hand-back with `AT*HWLED=AUTO` | `test_hostport` (panel rules) | `test_hw` (GPIO) | `AT*HWLED`, `AT*HWTEST` step 1; `test_session.py` | ✅ rules; ⬜ watched on the wired LEDs |
+| Hardware tests `AT*HW...`: LEDs, amp, tones, pot, RS232 lines, loopback, bridge, pin map (6.14); on the RS232 port the line, loopback and bridge tests are refused (Q79) | `test_hwtest`, `test_pins` | `test_hw` | `test_hwtest.py` (bridge test needs `--rs232-port`), `test_session.py`, `test_rs232.py` | ✅ |
 | Wi-Fi: join, static IP, mDNS name, loss → NO CARRIER (6.6) | — | ⬜ | ⬜ | ⬜ |
 | OTA: password required, on-demand mode (6.6) | ⬜ settings | — | ⬜ | ⬜ |
-| Settings kept across a restart, factory templates `&F0`–`&F2`, damaged saved settings → factory (6.7) | `test_modemcfg`, `test_atcmd` | `test_board` (NVS) | `test_settings.py` (restart) | ✅ |
+| Settings kept across a restart, factory templates `&F0`–`&F2`, damaged saved settings → factory, v0.4 settings converted (6.7) | `test_modemcfg`, `test_atcmd` | `test_board` (NVS) | `test_settings.py` (restart), `test_session.py` (`AT*BAUD` restart) | ✅ |
 | `AT*FACTORY` (6.7) | ⬜ | ⬜ NVS wipe | ⬜ | ⬜ |
 | Configuration screen and `AT*` parity, `AT*HELP` (6.8) | `test_atcmd` (`AT*HELP` lists the whole `AT*` table); ⬜ menu model | — | `test_settings.py` | ⬜ menu (v0.10) |
 | Wi-Fi password never displayed or exported (6.6, 6.8) | ⬜ | — | ⬜ | ⬜ |

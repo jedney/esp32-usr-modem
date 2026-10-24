@@ -285,7 +285,74 @@ void test_dial_answer_online_wait_for_later_versions() {
     Rig r(st);
     ENDS_WITH(r.type("ATDT1\r"), "ERROR\r\n");
     ENDS_WITH(r.type("ATA\r"), "ERROR\r\n");
-    ENDS_WITH(r.type("ATO\r"), "ERROR\r\n");
+    ENDS_WITH(r.type("ATO\r"), "ERROR\r\n");  // no call
+}
+
+// A stand-in for lib/hostport's session.
+class FakeLink : public Link {
+public:
+    explicit FakeLink(Port &p) : port(p) {}
+    bool callUp() const override { return up; }
+    void resumeOnline() override {
+        ++resumes;
+        port.result(Result::kConnect33600);
+    }
+    void hangUp() override {
+        ++hangUps;
+        up = false;
+    }
+    Port &port;
+    bool up = true;
+    int resumes = 0;
+    int hangUps = 0;
+};
+
+void test_o_h_and_z_go_to_the_link() {
+    MemStore st;
+    Rig r(st);
+    FakeLink link(r.port);
+    r.port.setLink(&link);
+    CONTAINS(r.type("ATI4\r"), "OFF HOOK");
+    std::string out = r.type("ATO E0\r");  // the rest of the line is ignored
+    TEST_ASSERT_EQUAL_STRING("ATO E0\r\r\nCONNECT 33600\r\n", out.c_str());
+    TEST_ASSERT_EQUAL(1, link.resumes);
+    TEST_ASSERT_EQUAL(1, r.a().get(modemcfg::kE));
+    ENDS_WITH(r.type("ATO1\r"), "CONNECT 33600\r\n");
+    ENDS_WITH(r.type("ATO2\r"), "ERROR\r\n");
+    ENDS_WITH(r.type("ATH1\r"), "OK\r\n");
+    TEST_ASSERT_EQUAL(0, link.hangUps);
+    ENDS_WITH(r.type("ATH0\r"), "OK\r\n");
+    TEST_ASSERT_EQUAL(1, link.hangUps);
+    ENDS_WITH(r.type("ATO\r"), "ERROR\r\n");  // hung up
+    link.up = true;
+    ENDS_WITH(r.type("ATZ\r"), "OK\r\n");
+    TEST_ASSERT_EQUAL(2, link.hangUps);
+    CONTAINS(r.type("ATI4\r"), "ON HOOK");
+}
+
+void test_w_keeps_the_port_speed_in_the_template() {
+    MemStore st;
+    Rig r(st);
+    r.port.setBaud(9600);
+    r.type("AT&W0\r");
+    TEST_ASSERT_EQUAL_UINT32(9600, r.modem.nvram().tmpl[0].baud);
+    CONTAINS(r.type("ATI5\r"), "BAUD=9600  PARITY=N  WORDLEN=8");
+    CONTAINS(r.type("ATI4\r"), "BAUD=9600  PARITY=N  WORDLEN=8");
+    TEST_ASSERT_EQUAL_UINT32(38400, r.modem.nvram().tmpl[1].baud);  // Y1 untouched
+}
+
+void test_host_baud_is_stored_at_once() {
+    MemStore st;
+    {
+        Rig r(st);
+        TEST_ASSERT_EQUAL_UINT32(0, r.modem.hostBaud());
+        TEST_ASSERT_TRUE(r.modem.setHostBaud(2400));
+        TEST_ASSERT_FALSE(r.modem.setHostBaud(2401));
+        TEST_ASSERT_FALSE(r.modem.setHostBaud(230400));
+    }
+    Rig after(st);
+    TEST_ASSERT_EQUAL_UINT32(2400, after.modem.hostBaud());
+    TEST_ASSERT_TRUE(after.modem.setHostBaud(0));
 }
 
 // --- S-registers ------------------------------------------------------------------------
@@ -522,7 +589,7 @@ void test_ati4_current_settings_layout() {
         "BAUD=115200  PARITY=N  WORDLEN=8\r\n"
         "DIAL=TONE  ON HOOK\r\n"
         "\r\n"
-        "&A0  &B0  &C1  &D2  &G0  &H1  &I0  &K1  &M4  &N0\r\n"
+        "&A0  &B1  &C1  &D2  &G0  &H1  &I0  &K1  &M4  &N0\r\n"
         "&P1  &R2  &S0  &T5  &U0  &Y1\r\n"
         "\r\n"
         "S00=000  S01=000  S02=043  S03=013  S04=010  S05=008  S06=002\r\n"
@@ -546,10 +613,10 @@ void test_ati5_stored_settings_layout() {
              "\r\nUSRobotics Sportster 33600 Fax NVRAM Settings...\r\n\r\nTemplate Y0\r\n\r\n"
              "DIAL=TONE  B0  E1  F1  L2  M1  Q0  V1  X4\r\n"
              "BAUD=38400  PARITY=N  WORDLEN=8\r\n\r\n"
-             "&A0  &B0  &C1  &D2  &G0  &H1  &I0  &K1  &M4  &N0\r\n");
+             "&A0  &B1  &C1  &D2  &G0  &H1  &I0  &K1  &M4  &N0\r\n");
     CONTAINS(out, "S00=000  S02=043  S03=013  S04=010  S05=008  S06=002  S07=060\r\n");
     CONTAINS(out, "S38=000\r\n\r\n\r\nTemplate Y1\r\n");
-    CONTAINS(out, "&A0  &B0  &C1  &D2  &G0  &H2  &I2  &K1  &M4  &N0\r\n&P1  &R1");
+    CONTAINS(out, "&A0  &B1  &C1  &D2  &G0  &H2  &I2  &K1  &M4  &N0\r\n&P1  &R1");
     CONTAINS(out, "\r\nSTORED PHONE #0: 170064142064\r\n#1:\r\n#2:\r\n#3:\r\n\r\nOK\r\n");
 }
 
@@ -678,6 +745,9 @@ int main() {
     RUN_TEST(test_out_of_range_settings_are_errors);
     RUN_TEST(test_hang_up_and_dial_method);
     RUN_TEST(test_dial_answer_online_wait_for_later_versions);
+    RUN_TEST(test_o_h_and_z_go_to_the_link);
+    RUN_TEST(test_w_keeps_the_port_speed_in_the_template);
+    RUN_TEST(test_host_baud_is_stored_at_once);
     RUN_TEST(test_s_register_set_and_query);
     RUN_TEST(test_s_register_select_then_equals_and_query);
     RUN_TEST(test_s_register_bit);

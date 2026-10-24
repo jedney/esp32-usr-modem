@@ -1,6 +1,10 @@
 #include "hw.h"
 
 #include <driver/i2s.h>
+#include <driver/rmt.h>
+#include <driver/uart.h>
+#include <hal/uart_ll.h>
+#include <soc/gpio_periph.h>
 
 #include "pins.h"
 #include "volume.h"
@@ -262,7 +266,27 @@ bool lineIsAsserted(hwtest::OutSignal s) {
 
 // --- UART1 (Arduino's Serial1) ---------------------------------------------------------
 
+namespace {
+
+bool hostOn = false;
+
+// On the S3 the UART runs from the 40 MHz crystal, not the 80 MHz bus clock, so changed
+// settings (speed, flow control) don't reach the UART core by themselves; Arduino core
+// 2.0.17 doesn't do this step (found on the bench, v0.5: a speed change ran at 1980
+// instead of 2400 baud). Copy them across by hand.
+void uartSync() {
+    uart_dev_t *u = UART_LL_GET_HW(1);
+    u->id.high_speed = 0;
+    u->id.reg_update = 1;
+    while (u->id.reg_update) {
+    }
+    u->id.high_speed = 1;
+}
+
+}  // namespace
+
 void uartBegin(uint32_t baud) {
+    hostOn = false;
     Serial1.end();
     Serial1.setRxBufferSize(2048);
     Serial1.begin(baud, SERIAL_8N1, pins::kTxd, pins::kRxd);  // RX pin, TX pin
@@ -274,6 +298,165 @@ void uartEnd() {
 
 HardwareSerial &uart() {
     return Serial1;
+}
+
+// --- RS232 host port ----------------------------------------------------------------------
+
+void hostBegin(uint32_t baud) {
+    linesBegin();
+    Serial1.end();
+    Serial1.setRxBufferSize(kHostRxBuffer);
+    Serial1.setTxBufferSize(kHostTxBuffer);
+    Serial1.begin(baud, SERIAL_8N1, pins::kTxd, pins::kRxd);
+    // Attach the flow-control pins through the IDF driver: the Arduino core remembers
+    // pins across end() and may skip attaching them again.
+    uart_set_pin(UART_NUM_1, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, pins::kCts, pins::kRts);
+    hostOn = true;
+    hostSetFlow(false, false);
+}
+
+void hostEnd() {
+    if (!hostOn) {
+        return;
+    }
+    Serial1.end();
+    hostOn = false;
+    // Back to plain GPIO, deasserted (HIGH).
+    pinMode(pins::kCts, OUTPUT);
+    digitalWrite(pins::kCts, HIGH);
+    pinMode(pins::kRts, INPUT_PULLUP);
+}
+
+bool hostActive() {
+    return hostOn;
+}
+
+void hostSetBaud(uint32_t baud) {
+    if (!hostOn) {
+        return;
+    }
+    Serial1.updateBaudRate(baud);
+    uartSync();
+}
+
+void hostSetFlow(bool ctsFromBuffer, bool obeyRts) {
+    if (!hostOn) {
+        return;
+    }
+    uart_hw_flowcontrol_t mode = UART_HW_FLOWCTRL_DISABLE;
+    if (ctsFromBuffer && obeyRts) {
+        mode = UART_HW_FLOWCTRL_CTS_RTS;
+    } else if (ctsFromBuffer) {
+        mode = UART_HW_FLOWCTRL_RTS;
+    } else if (obeyRts) {
+        mode = UART_HW_FLOWCTRL_CTS;
+    }
+    // RTS drops when the 128-byte FIFO holds 100 bytes, which only happens once the
+    // driver's buffer is full and it stops emptying the FIFO.
+    uart_set_hw_flow_ctrl(UART_NUM_1, mode, 100);
+    if (!ctsFromBuffer) {
+        uart_set_rts(UART_NUM_1, 1);  // 1 = RTS output low = our CTS asserted
+    }
+    uartSync();
+}
+
+bool ctsOutAsserted() {
+    if (!hostOn) {
+        return lineIsAsserted(hwtest::OutSignal::kCTS);
+    }
+    PIN_INPUT_ENABLE(GPIO_PIN_MUX_REG[pins::kCts]);  // read the pad the UART drives
+    return gpio_get_level(static_cast<gpio_num_t>(pins::kCts)) == 0;
+}
+
+// --- Speed capture (RMT) ------------------------------------------------------------------
+
+namespace {
+
+constexpr rmt_channel_t kRmtChannel = RMT_CHANNEL_4;  // the S3's receive channels are 4-7
+RingbufHandle_t rmtRing = nullptr;
+bool rmtInstalled = false;
+bool rmtRunning = false;
+
+void drainRing() {
+    size_t size = 0;
+    void *item = nullptr;
+    while ((item = xRingbufferReceive(rmtRing, &size, 0)) != nullptr) {
+        vRingbufferReturnItem(rmtRing, item);
+    }
+}
+
+}  // namespace
+
+bool captureBegin() {
+    if (!rmtInstalled) {
+        rmt_config_t c = {};
+        c.rmt_mode = RMT_MODE_RX;
+        c.channel = kRmtChannel;
+        c.gpio_num = static_cast<gpio_num_t>(pins::kTxd);  // shared with UART1 RX
+        c.clk_div = 80;                                    // 80 MHz / 80 = 1 us
+        c.mem_block_num = 4;                               // all of the receive memory
+        c.rx_config.idle_threshold = static_cast<uint16_t>(kCaptureIdleUs);
+        c.rx_config.filter_ticks_thresh = 80;  // ignore glitches under 1 us
+        c.rx_config.filter_en = true;
+        if (rmt_config(&c) != ESP_OK || rmt_driver_install(kRmtChannel, 8192, 0) != ESP_OK) {
+            return false;
+        }
+        // Ping-pong: the driver empties the memory as it fills, so a burst can be longer
+        // than the 192 items the memory holds (a full 128-character command line).
+        rmt_set_rx_thr_intr_en(kRmtChannel, true, 96);
+        rmt_get_ringbuf_handle(kRmtChannel, &rmtRing);
+        rmtInstalled = true;
+    }
+    if (!rmtRunning) {
+        drainRing();
+        rmt_rx_start(kRmtChannel, true);
+        rmtRunning = true;
+    }
+    return true;
+}
+
+void captureEnd() {
+    if (rmtRunning) {
+        rmt_rx_stop(kRmtChannel);
+        rmtRunning = false;
+    }
+}
+
+bool captureActive() {
+    return rmtRunning;
+}
+
+size_t captureRead(autobaud::Run *runs, size_t cap) {
+    if (!rmtRunning || rmtRing == nullptr || cap == 0) {
+        return 0;
+    }
+    size_t size = 0;
+    auto *items = static_cast<rmt_item32_t *>(xRingbufferReceive(rmtRing, &size, 0));
+    if (items == nullptr) {
+        return 0;
+    }
+    size_t n = 0;
+    const size_t count = size / sizeof(rmt_item32_t);
+    auto add = [&](uint32_t level, uint32_t us) {
+        if (n > 0 && runs[n - 1].level == level && runs[n - 1].us != 0) {
+            runs[n - 1].us += us;  // merge (doesn't happen with a clean capture)
+        } else if (n < cap) {
+            runs[n++] = autobaud::Run{us, static_cast<uint8_t>(level)};
+        }
+    };
+    for (size_t i = 0; i < count; ++i) {
+        // A zero duration marks the end: the line stayed at that level until idle.
+        add(items[i].level0, items[i].duration0);
+        if (items[i].duration0 == 0) {
+            break;
+        }
+        add(items[i].level1, items[i].duration1);
+        if (items[i].duration1 == 0) {
+            break;
+        }
+    }
+    vRingbufferReturnItem(rmtRing, items);
+    return n;  // the decoder treats the time after the last run as idle
 }
 
 }  // namespace hw

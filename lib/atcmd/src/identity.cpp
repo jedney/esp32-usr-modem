@@ -167,7 +167,7 @@ void showCurrent(Port &port) {
     snprintf(y, sizeof y, "Y%u", static_cast<unsigned>(port.modem().nvram().y));
     settingsLine(port, p, kLetters, sizeof kLetters / sizeof kLetters[0], nullptr, y);
     baudLine(port, port.baud());
-    port.printf("%s  ON HOOK", dialName(p));
+    port.printf("%s  %s", dialName(p), port.callUp() ? "OFF HOOK" : "ON HOOK");
     port.newline();
     port.newline();
     ampersandLines(port, p);

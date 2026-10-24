@@ -107,6 +107,15 @@ int findSetting(char prefix, char letter) {
     return -1;
 }
 
+bool isHostRate(uint32_t baud) {
+    for (uint32_t r : kHostRates) {
+        if (r == baud) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool settingAllows(Setting s, unsigned value) {
     return s < kSettingCount && value < 32 && (kInfo[s].allowed & (1u << value)) != 0;
 }
@@ -134,7 +143,7 @@ Profile factoryProfile(unsigned n) {
     p.v[kX] = 4;     // all result codes (Sportster default; Jon, v0.4)
     p.v[kTone] = 1;  // tone dialling (the Sportster ships with pulse)
     p.v[kAmpA] = 0;  // plain "CONNECT 33600" (brief 6.2, Q34)
-    p.v[kAmpB] = 0;  // detect speed from "AT" (brief 6.2, Q1)
+    p.v[kAmpB] = 1;  // speed stays as detected from "AT" (Sportster default; Jon, v0.5)
     p.v[kAmpC] = 1;  // brief 6.2, Q33
     p.v[kAmpD] = 2;  // brief 6.2, Q33
     p.v[kAmpG] = 0;
@@ -150,7 +159,7 @@ Profile factoryProfile(unsigned n) {
     p.v[kAmpU] = 0;
     p.v[kAmpY] = 1;
     factorySRegs(p.s);
-    p.baud = kDefaultFixedBaud;
+    p.baud = kFactoryBaud;
 
     if (n == 0) {  // no flow control, basic result codes
         p.v[kX] = 1;
@@ -211,6 +220,8 @@ void serialize(const Nvram &n, uint8_t *out) {
         memcpy(p, phone, strnlen(phone, kPhoneLen));
         p += kPhoneLen;
     }
+    putU32(p, n.hostBaud);
+    p += 4;
     putU32(p, crc32(out, static_cast<size_t>(p - out)));
 }
 
@@ -219,16 +230,21 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
     if (len == 0) {
         return LoadResult::kEmpty;
     }
-    if (len != kBlobSize) {
+    if (len < 5) {
         return LoadResult::kBadSize;
     }
     if (memcmp(in, kMagic, 4) != 0) {
         return LoadResult::kBadMagic;
     }
-    if (in[4] != kLayoutVersion) {
+    const uint8_t version = in[4];
+    if (version != 1 && version != kLayoutVersion) {
         return LoadResult::kBadVersion;
     }
-    if (crc32(in, kBlobSize - 4) != getU32(in + kBlobSize - 4)) {
+    const size_t size = version == 1 ? kBlobSizeV1 : kBlobSize;
+    if (len != size) {
+        return LoadResult::kBadSize;
+    }
+    if (crc32(in, size - 4) != getU32(in + size - 4)) {
         return LoadResult::kBadCrc;
     }
     Nvram n = {};
@@ -255,6 +271,20 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
         phone[kPhoneLen] = '\0';
         p += kPhoneLen;
     }
+    if (version == 1) {
+        // v0.4 stored &B with the brief's first meaning (0 = detect). Since v0.5 &B has
+        // the Sportster meaning, and the speed is always detected unless AT*BAUD is set.
+        for (Profile &t : n.tmpl) {
+            t.v[kAmpB] = 1;
+        }
+        n.hostBaud = 0;
+        *out = n;
+        return LoadResult::kMigrated;
+    }
+    n.hostBaud = getU32(p);
+    if (n.hostBaud != 0 && !isHostRate(n.hostBaud)) {
+        return LoadResult::kBadValue;
+    }
     *out = n;
     return LoadResult::kOk;
 }
@@ -263,6 +293,8 @@ const char *loadResultText(LoadResult r) {
     switch (r) {
         case LoadResult::kOk:
             return "saved settings";
+        case LoadResult::kMigrated:
+            return "saved settings (converted from an older firmware's format)";
         case LoadResult::kEmpty:
             return "factory settings (nothing saved yet)";
         case LoadResult::kBadVersion:

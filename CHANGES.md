@@ -14,6 +14,59 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [0.5] - 2026-10-24
+
+### Added
+
+- RS232 host port on UART1 (brief 6.2): the same AT parser and settings as the USB
+  console. Each port has its own session with command, online and online-command modes.
+- Speed detection from "AT" / "at" at 300-115200 baud, as on the Sportster. The RMT
+  receiver records the TXD-in pin, and in command mode the typing is decoded from that
+  recording, so the first "AT" at a new speed is already understood (`lib/hostport`
+  autobaud). `AT*BAUD=<300-115200>` fixes the speed instead; `AT*BAUD=AUTO` (default)
+  goes back to detection. Saved at once.
+- Hardware flow control: `&H1`/`&H3` drop CTS when the receive buffer is full, `&R2`
+  pauses sending while RTS is off (UART1's own RTS/CTS). Software flow control: `&I1`/
+  `&I2` obey XON/XOFF from the computer, `&H2`/`&H3` send XOFF/XON.
+- DTR (`&D0` ignored, `&D2` hang up with NO CARRIER, `&D3` hang up and reset, debounced
+  by S25), DCD (`&C0` always on, `&C1` follows the call), RI wired and held off until
+  answer mode (v0.9).
+- `+++` escape with guard time (S2, S12; S12=0 no guard, S2>127 off), `ATO`/`ATO1` back
+  online, `ATH0` and `ATZ` hang up, `F0` online local echo, `ATI4` shows OFF HOOK during
+  a call.
+- `AT*TESTCALL[=<seconds>]`: a test call to a built-in echo, so all of the above can be
+  tried without a network; with `<seconds>` the far end hangs up (NO CARRIER).
+- Front-panel LED driver (brief 5.4): AA, CD, RD and SD (each byte lit for 50 ms), TR,
+  CS from the real CTS pin, ARQ (Wi-Fi, from v0.6). `AT*HWLED=AUTO` gives the LEDs back
+  after a hardware test.
+- `AT*HW...` tests also run on the RS232 port. As decided in Q79, the line, loopback and
+  bridge tests say why they are unavailable there, and on the console they run only with
+  no call up, pausing the RS232 session. `AT*HWSIG=AUTO` ends a held `AT*HWSIG`.
+- Tests: 40 unit tests for speed detection (synthetic waveforms at every rate, clock
+  error, jitter), escape timing, DTR, flow control, sessions and LEDs; an on-board test
+  (`test_rs232`) that loops UART2 through the chip's own pins (no wires) to check
+  detection at every rate, a 140-character line, CTS flow control with nothing lost, RTS
+  and DTR; end-to-end tests for the console sessions (`test_session.py`) and for the
+  RS232 port through the Unitek adapter (`test_rs232.py`).
+
+### Changed
+
+- `&B` now has the Sportster meaning (`&B1` = the serial speed stays at the speed of
+  "AT", factory default; `&B0` = follows the call speed, from v0.8). The speed is always
+  detected unless `AT*BAUD` fixes it.
+- `&W` stores the port's current speed in the template (ATI5 `BAUD=`), as the Sportster
+  does.
+- Saved settings layout 2 (adds the `AT*BAUD` setting). Settings saved by v0.4 are
+  converted, not reset: `&B` becomes 1, everything else is kept.
+- The boot banner's host-serial line is now `RS232: speed ..., &B, flow control, &C &D`.
+- ESP-IDF driver messages are no longer printed on the console.
+
+### Fixed
+
+- Changing UART1's speed or flow control at run time now takes effect on the S3:
+  Arduino core 2.0.17 leaves the new settings unsynchronised (a change to 2400 baud ran
+  at 1980).
+
 ## [0.4] - 2026-10-24
 
 ### Added

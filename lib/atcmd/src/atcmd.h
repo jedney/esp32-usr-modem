@@ -4,9 +4,10 @@
 //     (DEL works too); E sets echo. "A/" repeats the last line at once, with no Enter.
 //   - Several commands per line ("ATE1V1X4S7=45&W"). The first bad command stops the
 //     line with ERROR; commands before it stay done.
-//   - B E F L M Q V X, P T, H, In, Sr=n Sr? Sr.b=n, Yn, Zn, &F &W &V &Z and the other
+//   - B E F L M Q V X, P T, H, O, In, Sr=n Sr? Sr.b=n, Yn, Zn, &F &W &V &Z and the other
 //     & settings, +FCLASS. Project commands are AT* (one table, the rest of the line is
 //     the command's argument).
+//   - O (back online), H0 and Z hang-ups go to the port's Link (lib/hostport).
 //
 // One Modem holds the shared settings; each serial port has its own Port (own line
 // buffer and A/ memory). No Arduino dependencies: unit-tested on the PC.
@@ -29,6 +30,16 @@ public:
 };
 
 class Port;
+
+// The call handling behind a port (lib/hostport). Optional: a port without one has no
+// calls, and ATO gives ERROR.
+class Link {
+public:
+    virtual ~Link() = default;
+    virtual bool callUp() const = 0;  // a call is connected (ATI4 shows OFF HOOK)
+    virtual void resumeOnline() = 0;  // ATO with a call up: send CONNECT, back to the call
+    virtual void hangUp() = 0;        // ATH0 or ATZ with a call up
+};
 
 // What an AT* command handler returns.
 enum class Reply : uint8_t {
@@ -61,8 +72,10 @@ public:
     const modemcfg::Profile &active() const { return active_; }
     const modemcfg::Nvram &nvram() const { return nvram_; }
 
-    bool writeTemplate(unsigned n);                    // &Wn
-    bool setPowerOn(unsigned y);                       // Yn (saved at once)
+    bool writeTemplate(unsigned n, uint32_t baud);  // &Wn from a port at `baud`
+    uint32_t hostBaud() const { return nvram_.hostBaud; }
+    bool setHostBaud(uint32_t baud);  // AT*BAUD: 0 = detect from "AT" (saved at once)
+    bool setPowerOn(unsigned y);      // Yn (saved at once)
     bool setPhone(unsigned slot, const char *number);  // &Zn=s (saved at once)
     void reset(unsigned z);                            // Zn
     const char *lastDialed() const { return lastDialed_; }
@@ -105,6 +118,9 @@ public:
     Modem &modem() { return modem_; }
     uint32_t baud() const { return baud_; }
     void setBaud(uint32_t baud) { baud_ = baud; }
+    void setLink(Link *link) { link_ = link; }
+    Link *link() const { return link_; }
+    bool callUp() const { return link_ != nullptr && link_->callUp(); }
 
 private:
     enum class State : uint8_t { kIdle, kGotA, kLine };
@@ -118,6 +134,8 @@ private:
     Modem &modem_;
     Sink &out_;
     uint32_t baud_;
+    Link *link_ = nullptr;
+    bool resultSent_ = false;  // a command (ATO) sent the line's final result itself
     State state_ = State::kIdle;
     char aCase_ = 'A';
     char line_[kLineMax + 1] = {};
