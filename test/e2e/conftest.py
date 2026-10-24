@@ -58,6 +58,10 @@ def pytest_addoption(parser):
     parser.addoption("--console-port", default=None, help="USB console serial port")
     parser.addoption("--rs232-port", default=None, help="RS232 serial port (Unitek adapter)")
     parser.addoption("--rs232-baud", default=38400, type=int, help="RS232 host speed")
+    parser.addoption("--device-tests", action="store_true", help="allow device password changes")
+    parser.addoption("--factory-reset", action="store_true", help="allow erasing all modem settings")
+    parser.addoption("--ota-upload", action="store_true", help="allow real OTA uploads (tests first)")
+    parser.addoption("--save-ota-password", action="store_true", help="save final OTA password in .env")
 
 
 class Port:
@@ -82,7 +86,8 @@ class Port:
                     lines.append(line)
                     if line in until:
                         return lines
-        raise AssertionError(f"No final result for {text!r}; got {lines!r}")
+        # A sensitive command or an unsolicited first-boot banner may contain secrets.
+        raise AssertionError("No final AT command result (response omitted for privacy)")
 
     def raw(self, data, wait=0.6):
         """Send bytes as they are and return every byte received within `wait` seconds."""
@@ -109,7 +114,7 @@ class Port:
             received += self.ser.read(self.ser.in_waiting or 1)
             if banner in received and received.rstrip().endswith(b"hardware."):
                 return received
-        raise AssertionError(f"No boot banner after reset; got {received[-300:]!r}")
+        raise AssertionError("No complete boot banner after reset (output omitted for privacy)")
 
 
 def _open(request, option, baud):

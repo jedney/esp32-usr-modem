@@ -23,6 +23,7 @@ Upload the firmware again afterwards (**Modem: upload over USB (tests first)**).
 | v0.4 | 2026-10-24 | Bare board, console COM15 | `test_board` 5/5; `test_hw` not run (nothing wired) | 34 passed, 1 skipped (bridge test, no RS232 port) |
 | v0.5 | 2026-10-24 | Bare board, console COM15 | `test_board` 5/5, `test_rs232` 8/8 (no wires needed); `test_hw` not run | 46 passed, 22 skipped (`test_rs232.py` and the bridge test: no RS232 port yet) |
 | v0.6 | 2026-10-24 | Bare board, console COM15, Jon's Wi-Fi (`.env`) | `test_board` 5/5, `test_rs232` 8/8, `test_wifi` 6/6 | 61 passed, 22 skipped (`test_rs232.py` and the bridge test: RS232 not wired) |
+| v0.7 | 2026-10-25 | Console COM15, Wi-Fi, LED and pot; Unitek COM18, RS232/audio unwired | `test_board` 5/5, `test_device` 5/5, internal `test_rs232` 8/8, `test_wifi` 6/6 | Regression: 63 passed, 27 skipped. Opt-in device checks: 6 passed; full reset/authenticated-upload check reaches OTA authentication but transfer is blocked by Windows firewall |
 
 ## Feature matrix
 
@@ -54,9 +55,10 @@ Status: ✅ tests written, ⬜ planned. Section numbers refer to the project bri
 | Hardware tests `AT*HW...`: LEDs, amp, tones, pot, RS232 lines, loopback, bridge, pin map (6.14); on the RS232 port the line, loopback and bridge tests are refused (Q79) | `test_hwtest`, `test_pins` | `test_hw` | `test_hwtest.py` (bridge test needs `--rs232-port`), `test_session.py`, `test_rs232.py` | ✅ |
 | Wi-Fi: scan, join (masked password, saved only on success), reconnect and retry timing, static IP, mDNS name, ARQ and RGB lights, boot banner (5.4, 6.6, 6.7) | `test_netcfg`, `test_atcmd` (masked prompt, late results) | `test_wifi` (join, scan, lights, NVS), `test_rs232` (RGB LED and speed capture together) | `test_wifi.py` (join, `ping usr-modem.local`) | ✅; ⬜ loss during a call → NO CARRIER (v0.8) |
 | Clock: NTP, time zones and daylight saving, `AT*TIME`/`AT*TZ`/`AT*NTP` (6.8, Q59) | `test_netcfg` (NZ, UK, US, Chatham changes) | `test_wifi` (NTP sets the clock) | `test_wifi.py` (clock within 2 min of the PC) | ✅ |
-| OTA: password required, on-demand mode (6.6) | ⬜ settings | — | ⬜ | ⬜ |
+| Device password: first boot, first use, replacement, hashes only afterwards, masked command input (6.6, Q62/Q69/Q70) | `test_devicecfg` | `test_device` (real MD5/realm vectors, entropy, NVS, offline pot ADC) | `test_device.py` (opt-in password changes and authenticated uploads) | ✅ |
+| OTA: password required, always/demand policy, 10-minute window, reconnect/idle gating (6.6) | `test_devicecfg` (fake clock, rollover); `test/scripts/test_ota_upload.py` (host secrecy and env precedence) | `test_device` (policy NVS) | `test_device.py` (listener opens/closes, reboot, wrong/old vs correct/new password) | ✅ |
 | Settings kept across a restart, factory templates `&F0`–`&F2`, damaged saved settings → factory, v0.4 settings converted (6.7) | `test_modemcfg`, `test_atcmd` | `test_board` (NVS) | `test_settings.py` (restart), `test_session.py` (`AT*BAUD` restart) | ✅ |
-| `AT*FACTORY` (6.7) | ⬜ | ⬜ NVS wipe | ⬜ | ⬜ |
+| `AT*FACTORY`: Y/N, timeout, all project namespaces, interrupted reset recovery (6.7) | `test_devicecfg` (failures and restart recovery) | `test_device` (scratch NVS wipe and fresh credential) | `test_device.py` (`--factory-reset`, restores Wi-Fi) | ✅ |
 | Configuration screen and `AT*` parity, `AT*HELP` (6.8) | `test_atcmd` (`AT*HELP` lists the whole `AT*` table); ⬜ menu model | — | `test_settings.py` | ⬜ menu (v0.10) |
 | Wi-Fi password never displayed or exported (6.6, 6.8) | `test_netcfg` (every command, `ATI`, `AT&V`, the prompt) | — | `test_wifi.py` (banner and every show command) | ✅; ⬜ config export (v0.10) |
 | `ATI0`–`ATI7` Sportster identity, `+FCLASS` fax handling (6.6) | `test_atcmd` | — | `test_settings.py` | ✅ |

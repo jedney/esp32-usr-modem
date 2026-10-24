@@ -13,11 +13,15 @@
 // v0.6: Wi-Fi (one saved network, DHCP or static IP), mDNS name and the NTP clock
 // (lib/netcfg, hw::EspRadio). ARQ and the on-board RGB LED show the Wi-Fi state. The
 // boot banner waits up to 8 s for the network; later changes are printed on the console.
+// v0.7: device credentials, password-authenticated OTA with an optional ten-minute
+// window, and a confirmed factory reset (lib/devicecfg, hw::EspCrypto/OtaService).
 // Real calls follow in v0.8.
 #include <Arduino.h>
 
 #include "atcmd.h"
 #include "connection.h"
+#include "device_commands.h"
+#include "device_crypto.h"
 #include "dialstring.h"
 #include "hw.h"
 #include "hwconsole.h"
@@ -25,6 +29,7 @@
 #include "net_commands.h"
 #include "netcfg.h"
 #include "nvs_store.h"
+#include "ota_service.h"
 #include "panel.h"
 #include "rs232.h"
 #include "session.h"
@@ -51,6 +56,10 @@ public:
 
 hw::NvsStore store;
 hw::NvsStore netStore("net", "cfg");
+hw::NvsStore deviceStore("device", "cfg");
+hw::EspCrypto crypto;
+devicecfg::Device device(deviceStore, crypto);
+hw::OtaService ota(device);
 hw::EspRadio radio;
 netcfg::Net net(netStore, radio);
 SerialSink consoleSink;
@@ -61,6 +70,26 @@ hostport::Panel panel;
 // Set up in setup(), once the AT* table below exists.
 atcmd::Modem *modem = nullptr;
 hostport::Session *console = nullptr;
+modemcfg::Store *resetStores[] = {&store, &netStore};
+bool restarting = false;
+uint32_t restartAt = 0;
+
+class DeviceControl : public devicecfg::Control {
+public:
+    uint32_t now() override { return millis(); }
+    bool idle() override {
+        return !callSlot.busy() && net.joinResult() != netcfg::JoinResult::kRunning &&
+               net.scanState() != netcfg::ScanState::kRunning;
+    }
+    bool wifiUp() override { return net.up(); }
+    void restart() override {
+        restarting = true;
+        restartAt = millis();
+    }
+};
+DeviceControl deviceControl;
+devicecfg::Commands deviceCommands(device, deviceControl, resetStores,
+                                   sizeof resetStores / sizeof resetStores[0]);
 
 hostport::Session &sessionOf(atcmd::Port &port) {
     return *static_cast<hostport::Session *>(port.link());
@@ -213,6 +242,7 @@ const atcmd::StarCommand kStarCommands[] = {
      cmdTestCall, false},
     {"DIALTEST", "AT*DIALTEST <dial string>", "show how a number is dialled", cmdDialTest, false},
     NETCFG_STAR_COMMANDS,
+    DEVICECFG_STAR_COMMANDS,
     {"HW", "AT*HW...", "hardware tests (AT*HW? lists them)", cmdHw, true},
 };
 
@@ -290,6 +320,16 @@ void printBanner(modemcfg::LoadResult loaded, netcfg::LoadResult netLoaded) {
                   hwconsole::resetReasonName(static_cast<int>(esp_reset_reason())));
     printNetwork(netLoaded);
     printSettings(loaded);
+    Serial.printf("OTA: %s, %s\r\n",
+                  device.policy() == devicecfg::Policy::kAlways ? "ALWAYS" : "DEMAND",
+                  device.wantsListener(millis(), net.up(), true) ? "listening" : "closed");
+    if (!device.ready()) {
+        Serial.print("Device credentials unavailable. Use AT*PASS or AT*FACTORY.\r\n");
+    } else if (*device.bootPassword() != '\0') {
+        Serial.print("Device login: admin\r\nDevice password: ");
+        Serial.print(device.bootPassword());
+        Serial.print("\r\nShown at boot until first use or change. AT*PASS replaces it.\r\n");
+    }
     Serial.print(
         "Maintenance console. ATI4 shows the settings, AT*HELP the project commands,\r\n"
         "AT*HWTEST tests the hardware.\r\n");
@@ -376,6 +416,15 @@ void setup() {
     // from its interrupt for every chunk it drops (switchable with AT*LOG in v0.10).
     esp_log_level_set("*", ESP_LOG_NONE);
     delay(500);
+    crypto.begin();
+    device.begin();
+    if (device.needsReset()) {
+        if (device.factoryReset(resetStores, sizeof resetStores / sizeof resetStores[0])) {
+            ESP.restart();
+        }
+        Serial.print("Pending factory reset could not finish. Retry AT*FACTORY.\r\n");
+    }
+    devicecfg::attachCommands(deviceCommands);
     modem = new atcmd::Modem(store, kStarCommands, sizeof kStarCommands / sizeof kStarCommands[0]);
     modemcfg::LoadResult loaded = modem->begin();
     console = new hostport::Session(*modem, consoleSink, kConsoleBaud, callSlot);
@@ -393,17 +442,30 @@ void setup() {
         delay(10);
     }
     net.tick(millis());
+    ota.poll(millis(), net.up(), true, net.settings().host, net.link().ip);
     printBanner(loaded, netLoaded);
     char skip[netcfg::Net::kNoticeMax];
     net.takeNotice(skip, sizeof skip);  // the banner has already said it
 }
 
 void loop() {
+    if (restarting) {
+        if (millis() - restartAt >= 500) {
+            Serial.flush();
+            ESP.restart();
+        }
+        delay(1);
+        return;  // no late Wi-Fi join or command may save settings after the wipe
+    }
     const uint32_t now = millis();
     pollConsole(now);
     rs232::poll(now);
     net.tick(now);
     netcfg::pollCommands();  // a finished AT*WIFIJOIN or AT*WIFISCAN
+    deviceCommands.poll();
+    // The command may have opened a window after this loop's timestamp was sampled.
+    ota.poll(millis(), net.up(), deviceControl.idle() && !restarting, net.settings().host,
+             net.link().ip);
     pollNotices();
     pollLeds(now);
     delay(1);

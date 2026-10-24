@@ -211,6 +211,9 @@ void Port::echo(const char *s, size_t len) {
 // --- Port: line input -----------------------------------------------------------------------
 
 void Port::feed(char c) {
+    if (modem_.commandsStopped()) {
+        return;
+    }
     const Profile &p = modem_.active();
     const char cr = static_cast<char>(p.s[3]);
     const bool bsOn = p.s[5] < 128;
@@ -223,6 +226,10 @@ void Port::feed(char c) {
                 echo(&c, 1);
                 echo(&cr, 1);
                 state_ = State::kIdle;
+                if (!repeatAllowed_) {
+                    result(Result::kError);
+                    return;
+                }
                 char again[kLineMax + 1];
                 memcpy(again, last_, sizeof again);
                 execute(again);
@@ -234,6 +241,7 @@ void Port::feed(char c) {
                 state_ = State::kLine;
                 len_ = 0;
                 overflow_ = false;
+                privateLine_ = false;
                 return;
             }
             if (c == 'A' || c == 'a') {
@@ -255,11 +263,23 @@ void Port::feed(char c) {
                 state_ = State::kIdle;
                 line_[len_] = '\0';
                 if (overflow_) {
+                    memset(line_, 0, sizeof line_);
+                    memset(last_, 0, sizeof last_);
+                    repeatAllowed_ = false;
                     result(Result::kError);
                     return;
                 }
-                memcpy(last_, line_, sizeof last_);
+                repeatAllowed_ = !privateLine_;
+                if (repeatAllowed_) {
+                    memcpy(last_, line_, sizeof last_);
+                } else {
+                    memset(last_, 0, sizeof last_);
+                }
                 execute(line_);
+                volatile char *wipe = line_;
+                for (size_t i = 0; i < sizeof line_; ++i) {
+                    wipe[i] = 0;
+                }
                 return;
             }
             if (isBs) {
@@ -270,11 +290,26 @@ void Port::feed(char c) {
                 return;
             }
             if (static_cast<unsigned char>(c) < ' ') {
+                if (privateLine_) {
+                    overflow_ = true;  // do not silently remove a control byte from a password
+                }
                 return;  // LF and other control characters are ignored
             }
-            echo(&c, 1);
+            if (privateLine_) {
+                echo("*", 1);
+            } else {
+                echo(&c, 1);
+            }
             if (len_ < kLineMax) {
                 line_[len_++] = c;
+                line_[len_] = '\0';
+                // Recognise a sensitive AT* command before its first argument is
+                // echoed, including a command after an ordinary init string.
+                const char *star = strchr(line_, '*');
+                if (star != nullptr) {
+                    const StarCommand *command = modem_.findStar(star + 1, nullptr);
+                    privateLine_ = privateLine_ || (command != nullptr && command->sensitive);
+                }
             } else {
                 overflow_ = true;
             }
@@ -303,6 +338,23 @@ void Port::askSecret(const char *prompt, SecretHandler fn, void *ctx) {
     secretFn_ = fn;
     ctx_ = ctx;
     state_ = State::kSecret;
+    maskSecret_ = true;
+}
+
+void Port::askConfirmation(const char *prompt, SecretHandler fn, void *ctx) {
+    askSecret(prompt, fn, ctx);
+    maskSecret_ = false;
+}
+
+bool Port::cancelPrompt() {
+    if (state_ != State::kSecret) {
+        return false;
+    }
+    wipeSecret();
+    secretFn_ = nullptr;
+    state_ = State::kIdle;
+    result(Result::kError);
+    return true;
 }
 
 void Port::wait(CancelHandler cancel, void *ctx) {
@@ -374,7 +426,11 @@ void Port::feedSecret(char c, bool isBs) {
     if (static_cast<unsigned char>(c) < ' ') {
         return;  // LF and other control characters are ignored
     }
-    echo("*", 1);
+    if (maskSecret_) {
+        echo("*", 1);
+    } else {
+        echo(&c, 1);
+    }
     if (secretLen_ < kSecretMax) {
         secret_[secretLen_++] = c;
     } else {
@@ -400,6 +456,10 @@ void Port::feedWait(char c) {
 // --- Port: command execution ------------------------------------------------------------
 
 void Port::execute(const char *line) {
+    if (modem_.commandsStopped()) {
+        result(Result::kError);
+        return;
+    }
     const char *p = line;
     bool stop = false;
     resultSent_ = false;

@@ -14,6 +14,11 @@ Built, check outstanding: **v0.5** RS232 host port and LED driver. Unit, on-boar
 console end-to-end tests pass; the RS232 end-to-end tests (`test/e2e/test_rs232.py`)
 wait for the MAX3232s and DB9 to be wired.
 
+Built, check outstanding: **v0.7** device password, authenticated OTA and factory reset.
+Native, on-board and console checks pass. OTA authenticates, but the Windows firewall
+blocks its return TCP connection; the complete upload check awaits approval to run
+`scripts/allow_ota.ps1` (PlatformIO Python, TCP 32320, local subnet, Domain/Private).
+
 | Version | Feature | Brief | Done when |
 |---|---|---|---|
 | v0.4 | **Settings store and AT command parser** (console first): command-line parsing (several commands per line, `A/` repeat), S-registers, `E Q V X`, `&F &W &V &Z`, `Z`, `ATI0`–`ATI7` (authentic Sportster text), `+FCLASS`, result codes (verbose/numeric/quiet), `AT*` commands in one table, `AT*HELP`. Stored in NVS, logic in `lib/` | 6.2, 6.5, 6.6, 6.7 | Parser and settings unit-tested on the PC; `AT&V` shows the saved profile after a restart |

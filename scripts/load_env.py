@@ -1,43 +1,25 @@
-"""PlatformIO pre-script for uploads over Wi-Fi (env s3_ota): the OTA password.
+"""PlatformIO post-script: authenticated espota without secrets in arguments/logs."""
 
-Reads USR_MODEM_OTA_PASSWORD from the environment or, if it isn't set there, from the
-git-ignored `.env` file at the project root (see `.env.example`), and passes it to
-espota as --auth. The password is never printed (except in PlatformIO's verbose mode,
-which shows the whole upload command).
-"""
-
-import os
 import pathlib
+import sys
+
+from SCons.Script import COMMAND_LINE_TARGETS
 
 Import("env")  # noqa: F821  (provided by PlatformIO/SCons)
 
-KEY = "USR_MODEM_OTA_PASSWORD"
-
-
-def read_env_file(path):
-    values = {}
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return values
-    for raw in text.splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        if key.startswith("export "):
-            key = key[len("export "):].strip()
-        value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-            value = value[1:-1]
-        values[key] = value
-    return values
-
-
 root = pathlib.Path(env.subst("$PROJECT_DIR"))  # noqa: F821
-password = os.environ.get(KEY) or read_env_file(root / ".env").get(KEY, "")
-if password:
-    env.Replace(UPLOAD_FLAGS=[f"--auth={password}"])  # noqa: F821
-else:
-    print(f"Note: {KEY} is not set (.env or environment); the OTA upload will be refused.")
+sys.path.insert(0, str(root / "scripts"))
+from ota_upload import password_from, upload  # noqa: E402
+
+
+def authenticated_upload(source, target, env):
+    framework = pathlib.Path(env.PioPlatform().get_package_dir("framework-arduinoespressif32"))
+    password = password_from(root / ".env")
+    filesystem = any(name in COMMAND_LINE_TARGETS for name in ("uploadfs", "uploadfsota"))
+    return upload(framework / "tools" / "espota.py", env.subst("$UPLOAD_PORT"),
+                  str(source[0]), password, filesystem)
+
+
+# The original action uses --debug and logs the parsed options, including --auth.
+# A callable action also works in verbose mode without displaying a password.
+env.Replace(UPLOADCMD=env.VerboseAction(authenticated_upload, "Uploading with device authentication"))  # noqa: F821
