@@ -81,6 +81,35 @@ void flushUart() {
     }
 }
 
+class CallBaud : public hostport::Session::BaudControl {
+public:
+    bool online(uint32_t speed) override {
+        if (modemPtr->hostBaud() || profile().get(modemcfg::kAmpB) == 1) {
+            return true;
+        }
+        commandBaud_ = currentBaud;
+        if (!hw::hostDrain(2000)) {
+            return false;  // CONNECT cannot leave while the computer holds RTS off
+        }
+        setBaud(speed);
+        following_ = true;
+        return true;
+    }
+    void command() override {
+        if (!following_) {
+            return;
+        }
+        hw::hostDrain(2000);
+        setBaud(commandBaud_);
+        following_ = false;
+    }
+
+private:
+    uint32_t commandBaud_ = modemcfg::kFactoryBaud;
+    bool following_ = false;
+};
+CallBaud callBaud;
+
 void feed(const uint8_t *data, size_t len, uint32_t nowMs) {
     fromComputer += len;
     sess->fromHost(data, len, nowMs);
@@ -167,6 +196,7 @@ void begin(atcmd::Modem &modem, hostport::CallSlot &slot) {
         runs = static_cast<autobaud::Run *>(malloc(kMaxRuns * sizeof(autobaud::Run)));
     }
     sess = new hostport::Session(modem, sink, modemcfg::kFactoryBaud, slot);
+    sess->setBaudControl(&callBaud);
     startPort();
 }
 
@@ -186,7 +216,7 @@ void applyHostBaud() {
     if (isSuspended || modemPtr->hostBaud() == 0) {
         return;  // back to detection: stay at the current speed until the next "AT"
     }
-    hw::uart().flush();  // let the OK go out at the old speed first
+    hw::hostDrain(2000);  // let OK leave at the old rate; never wait forever for RTS
     setBaud(modemPtr->hostBaud());
 }
 

@@ -1,4 +1,4 @@
-// Modem settings (project brief 6.2, 6.6, 6.7): the USR Sportster 33.6 settings, the
+// Modem settings: Sportster 14400 identity with the later USR speed range through 56k,
 // three read-only factory templates (&F0-&F2), the two stored templates (Y0/Y1, written
 // with &W0/&W1), the four stored phone numbers (&Z0-&Z3) and the saved format.
 //
@@ -37,7 +37,7 @@ enum Setting : uint8_t {
     kAmpI,  // &I  receive software flow control
     kAmpK,  // &K  data compression
     kAmpM,  // &M  error control
-    kAmpN,  // &N  line speed: 0 = highest (33600), 1-16 fixed (brief 6.2)
+    kAmpN,  // &N  line speed: 0 = highest (56000), 1-38 fixed; factory = 8 (14400)
     kAmpP,  // &P  pulse make/break ratio (1 = UK)
     kAmpR,  // &R  receive hardware flow control: 1 ignore RTS, 2 RTS
     kAmpS,  // &S  DSR: fixed at 0, DSR is hard-wired on (brief 6.2)
@@ -49,7 +49,7 @@ enum Setting : uint8_t {
 
 struct SettingInfo {
     const char *name;  // "E", "&C"
-    uint32_t allowed;  // bit n set = value n is accepted
+    uint64_t allowed;  // bit n set = value n is accepted (line-speed indexes reach 38)
 };
 
 const SettingInfo &settingInfo(Setting s);
@@ -68,6 +68,7 @@ struct Profile {
     uint8_t v[kSettingCount];
     uint8_t s[kSRegCount];
     uint32_t baud;  // serial speed when the template was written with &W (BAUD= in ATI5)
+    bool lineExplicit = false;  // factory uses model CONNECT fallback; explicit &N overrides it
 
     uint8_t get(Setting x) const { return v[x]; }
 };
@@ -84,6 +85,8 @@ Profile factoryProfile(unsigned n);
 // BAUD= of a template that was never written with &W. The RS232 port also starts at the
 // power-on template's speed, until the computer sends "AT".
 constexpr uint32_t kFactoryBaud = 38400;
+constexpr unsigned kMaxLineSpeedIndex = 38;
+constexpr uint32_t kMaxLineSpeed = 56000;
 
 // The host serial speeds the modem detects from "AT" and accepts for AT*BAUD (the
 // Sportster's range).
@@ -107,6 +110,8 @@ struct Nvram {
     // AT*BAUD: 0 = detect the RS232 speed from "AT" (default), otherwise the port stays at
     // this speed and nothing is detected. Not part of a template.
     uint32_t hostBaud;
+    uint32_t model = 14400;  // device-wide identity, not changed by &F/Z
+    bool throttle = false;
 };
 
 // As shipped: Y0 = &F1, Y1 = &F2, power-on from Y0, no stored numbers, speed from "AT".
@@ -120,10 +125,14 @@ Profile powerOnProfile(const Nvram &n);
 // before it. Multi-byte values are little-endian.
 //   Layout 1 (v0.4): y, templates, phone numbers.
 //   Layout 2 (v0.5): adds hostBaud after the phone numbers.
-constexpr uint8_t kLayoutVersion = 2;
+constexpr uint8_t kLayoutVersion = 3;
 constexpr size_t kBlobSizeV1 =
     4 + 1 + 1 + kTemplates * (kSettingCount + kSRegCount + 4) + kPhoneSlots * kPhoneLen + 4;
-constexpr size_t kBlobSize = kBlobSizeV1 + 4;
+constexpr size_t kBlobSizeV2 = kBlobSizeV1 + 4;
+constexpr size_t kBlobSize = kBlobSizeV2 + kTemplates + 4 + 1;
+
+bool validModel(uint32_t speed);
+const char *modelName(uint32_t speed);
 
 void serialize(const Nvram &n, uint8_t *out);  // writes kBlobSize bytes
 

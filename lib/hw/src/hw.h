@@ -33,6 +33,9 @@ using GainFn = float (*)();  // user gain 0..1, polled every block; the cap is a
 // last. Returns false if it was stopped early or the I2S driver couldn't start.
 bool audioPlay(tones::Source &src, GainFn gain, StopFn stop);
 bool audioReady();  // I2S driver started
+bool audioStreamBegin();
+size_t audioStreamWrite(const int16_t *samples, size_t count, float userGain);
+void audioStreamEnd();
 
 // --- Volume pot -------------------------------------------------------------------------
 constexpr uint16_t kPotMax = 4095;
@@ -60,6 +63,7 @@ constexpr size_t kHostTxBuffer = 2048;
 void hostBegin(uint32_t baud);
 void hostEnd();  // UART1 off, CTS deasserted
 bool hostActive();
+bool hostDrain(uint32_t timeoutMs);  // bounded even when the computer holds RTS off
 void hostSetBaud(uint32_t baud);
 // ctsFromBuffer (&H1): CTS drops while the receive buffer is full; otherwise CTS is held
 // on. obeyRts (&R2): sending pauses while the computer's RTS is off.

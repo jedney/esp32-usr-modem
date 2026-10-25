@@ -20,6 +20,7 @@ def clean_state(request):
     console = request.getfixturevalue("console")
     _hang_up(console)
     console.raw(b"ATZ\r")
+    assert console.command("AT&N8")[-1] == "OK"
     yield
     _hang_up(console)
     console.raw(b"ATZ\r")
@@ -36,8 +37,8 @@ def _hang_up(console):
 
 
 def _call(console, args=""):
-    lines = console.command(f"AT*TESTCALL{args}", until=("CONNECT 33600", "ERROR"))
-    assert lines[-1] == "CONNECT 33600"
+    lines = console.command(f"AT*TESTCALL{args}", until=("CONNECT 14400", "ERROR"))
+    assert lines[-1] == "CONNECT 14400"
 
 
 def _escape(console):
@@ -58,8 +59,8 @@ def test_escape_ato_and_ath(console):
     _escape(console)
     lines = console.command("ATI4")
     assert any("OFF HOOK" in line for line in lines)
-    lines = console.command("ATO", until=("CONNECT 33600", "ERROR"))
-    assert lines[-1] == "CONNECT 33600"
+    lines = console.command("ATO", until=("CONNECT 14400", "ERROR"))
+    assert lines[-1] == "CONNECT 14400"
     assert console.raw(b"back online", wait=0.4) == b"back online"
     _escape(console)
     assert console.command("ATH")[-1] == "OK"
@@ -101,6 +102,29 @@ def test_connect_text_follows_amp_n(console):
 def test_test_call_argument_range(console):
     assert console.command("AT*TESTCALL=0")[-1] == "ERROR"
     assert console.command("AT*TESTCALL=X")[-1] == "ERROR"
+
+
+@pytest.mark.parametrize("index", [0, 38])
+def test_56k_connect_escape_and_resume(console, index):
+    assert console.command(f"AT&N{index}")[-1] == "OK"
+    lines = console.command("AT*TESTCALL", until=("CONNECT 56000", "ERROR"))
+    assert lines[-1] == "CONNECT 56000"
+    assert console.raw(b"56k echo", wait=0.4) == b"56k echo"
+    _escape(console)
+    lines = console.command("ATO", until=("CONNECT 56000", "ERROR"))
+    assert lines[-1] == "CONNECT 56000"
+
+
+def test_factory_line_speed_is_14400(console):
+    assert console.command("AT&F1")[-1] == "OK"
+    assert any("&N8" in line for line in console.command("ATI4"))
+    _call(console)
+
+
+def test_56k_numeric_connect(console):
+    assert console.raw(b"AT&N38&U32V0\r").endswith(b"0\r")
+    received = console.raw(b"AT*TESTCALL\r")
+    assert received.endswith(b"232\r")
 
 
 def test_baud_setting_is_kept_across_a_restart(console):

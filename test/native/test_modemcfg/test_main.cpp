@@ -3,6 +3,7 @@
 #include <unity.h>
 
 #include <cstring>
+#include <initializer_list>
 
 #include "modemcfg.h"
 
@@ -47,14 +48,14 @@ void test_factory_f1_has_the_decided_defaults() {
     TEST_ASSERT_EQUAL(4, p.get(kX));  // all result codes (v0.4 decision)
     TEST_ASSERT_EQUAL(1, p.get(kM));
     TEST_ASSERT_EQUAL(2, p.get(kL));
-    TEST_ASSERT_EQUAL(0, p.get(kAmpA));  // plain CONNECT 33600 (Q34)
+    TEST_ASSERT_EQUAL(0, p.get(kAmpA));  // plain CONNECT result (Q34)
     TEST_ASSERT_EQUAL(1, p.get(kAmpB));  // speed stays as detected from "AT" (v0.5)
     TEST_ASSERT_EQUAL(1, p.get(kAmpC));  // Q33
     TEST_ASSERT_EQUAL(2, p.get(kAmpD));  // Q33
     TEST_ASSERT_EQUAL(1, p.get(kAmpH));  // Q33
     TEST_ASSERT_EQUAL(2, p.get(kAmpR));  // Q33
     TEST_ASSERT_EQUAL(0, p.get(kAmpS));  // DSR hard-wired
-    TEST_ASSERT_EQUAL(0, p.get(kAmpN));  // 33600
+    TEST_ASSERT_EQUAL(8, p.get(kAmpN));  // 14400
     TEST_ASSERT_EQUAL(1, p.get(kTone));
     TEST_ASSERT_EQUAL_UINT32(38400, p.baud);
 }
@@ -132,7 +133,11 @@ void test_ranges() {
     TEST_ASSERT_TRUE(settingAllows(kQ, 2));
     TEST_ASSERT_FALSE(settingAllows(kQ, 3));
     TEST_ASSERT_TRUE(settingAllows(kAmpN, 16));
-    TEST_ASSERT_FALSE(settingAllows(kAmpN, 17));
+    TEST_ASSERT_TRUE(settingAllows(kAmpN, 38));
+    TEST_ASSERT_FALSE(settingAllows(kAmpN, 39));
+    TEST_ASSERT_FALSE(settingAllows(kAmpN, 64));
+    TEST_ASSERT_TRUE(settingAllows(kAmpU, 38));
+    TEST_ASSERT_FALSE(settingAllows(kAmpU, 39));
     TEST_ASSERT_FALSE(settingAllows(kAmpS, 1));  // DSR is hard-wired on
     TEST_ASSERT_FALSE(settingAllows(kAmpD, 1));  // reserved
     TEST_ASSERT_FALSE(settingAllows(kAmpR, 0));  // reserved
@@ -292,8 +297,64 @@ void test_load_result_texts() {
     TEST_ASSERT_NOT_NULL(strstr(loadResultText(LoadResult::kBadCrc), "damaged"));
 }
 
+void test_extended_speed_profiles_survive_restart_and_keep_old_auto() {
+    MemStore store;
+    Nvram n = factoryNvram();
+    n.tmpl[0].v[kAmpN] = 38;
+    n.tmpl[0].v[kAmpU] = 32;
+    n.tmpl[1].v[kAmpN] = 0;  // old saved auto setting is kept, not rewritten to 8
+    n.tmpl[1].v[kAmpU] = 16;
+    TEST_ASSERT_TRUE(saveNvram(store, n));
+    Nvram out;
+    TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kOk), static_cast<int>(loadNvram(store, &out)));
+    TEST_ASSERT_TRUE(n.tmpl[0] == out.tmpl[0]);
+    TEST_ASSERT_TRUE(n.tmpl[1] == out.tmpl[1]);
+    TEST_ASSERT_EQUAL_UINT8(3, kLayoutVersion);  // explicit speed and device model metadata
+    n.tmpl[0].v[kAmpN] = 39;
+    uint8_t blob[kBlobSize];
+    serialize(n, blob);
+    assertLoadFails(blob, sizeof blob, LoadResult::kBadValue);
+    n.tmpl[0].v[kAmpN] = 38;
+    n.tmpl[0].v[kAmpU] = 64;
+    serialize(n, blob);
+    assertLoadFails(blob, sizeof blob, LoadResult::kBadValue);
+}
+
+void test_layout_2_migration_preserves_speeds_and_validates_new_metadata() {
+    Nvram n = factoryNvram();
+    n.tmpl[0].v[kAmpN] = 0;
+    n.tmpl[1].v[kAmpN] = 8;
+    uint8_t current[kBlobSize];
+    serialize(n, current);
+    uint8_t old[kBlobSizeV2];
+    memcpy(old, current, sizeof old);
+    old[4] = 2;
+    uint32_t crc = crc32(old, sizeof old - 4);
+    for (unsigned i = 0; i < 4; ++i) {
+        old[sizeof old - 4 + i] = crc >> (8 * i);
+    }
+    Nvram out;
+    TEST_ASSERT_EQUAL(int(LoadResult::kMigrated), int(deserialize(old, sizeof old, &out)));
+    TEST_ASSERT_TRUE(out.tmpl[0].lineExplicit && out.tmpl[1].lineExplicit);
+    TEST_ASSERT_EQUAL(0, out.tmpl[0].get(kAmpN));
+    TEST_ASSERT_EQUAL(8, out.tmpl[1].get(kAmpN));
+    TEST_ASSERT_EQUAL_UINT32(14400, out.model);
+    TEST_ASSERT_FALSE(out.throttle);
+    for (size_t index : {kBlobSizeV2 - 4, kBlobSize - 9, kBlobSize - 5}) {
+        serialize(n, current);
+        current[index] = 255;
+        crc = crc32(current, sizeof current - 4);
+        for (unsigned i = 0; i < 4; ++i) {
+            current[sizeof current - 4 + i] = crc >> (8 * i);
+        }
+        TEST_ASSERT_EQUAL(int(LoadResult::kBadValue),
+                          int(deserialize(current, sizeof current, &out)));
+    }
+}
+
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_layout_2_migration_preserves_speeds_and_validates_new_metadata);
     RUN_TEST(test_factory_f1_has_the_decided_defaults);
     RUN_TEST(test_factory_s_registers);
     RUN_TEST(test_factory_f0_and_f2_differ_only_in_flow_control_and_results);
@@ -311,5 +372,6 @@ int main() {
     RUN_TEST(test_crc32_known_value);
     RUN_TEST(test_store_round_trip_is_the_restart_case);
     RUN_TEST(test_load_result_texts);
+    RUN_TEST(test_extended_speed_profiles_survive_restart_and_keep_old_auto);
     return UNITY_END();
 }

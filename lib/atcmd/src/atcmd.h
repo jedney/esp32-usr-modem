@@ -41,6 +41,11 @@ public:
     virtual bool callUp() const = 0;  // a call is connected (ATI4 shows OFF HOOK)
     virtual void resumeOnline() = 0;  // ATO with a call up: send CONNECT, back to the call
     virtual void hangUp() = 0;        // ATH0 or ATZ with a call up
+    virtual bool dial(const char *text, bool pulse) {
+        (void)text;
+        (void)pulse;
+        return false;
+    }
 };
 
 // What an AT* command handler returns.
@@ -93,6 +98,11 @@ public:
     bool setPhone(unsigned slot, const char *number);  // &Zn=s (saved at once)
     void reset(unsigned z);                            // Zn
     const char *lastDialed() const { return lastDialed_; }
+    void setLastDialed(const char *text);
+    uint32_t model() const { return nvram_.model; }
+    bool setModel(uint32_t speed);
+    bool setThrottle(bool enabled);
+    bool throttle() const { return nvram_.throttle; }
 
     const StarCommand *starTable() const { return star_; }
     size_t starCount() const { return starCount_; }
@@ -108,7 +118,7 @@ private:
     size_t starCount_;
     modemcfg::Nvram nvram_;
     modemcfg::Profile active_;
-    char lastDialed_[modemcfg::kPhoneLen + 1];
+    char lastDialed_[kLineMax + 1];
     bool stopped_ = false;
 };
 
@@ -142,7 +152,7 @@ public:
     bool cancelPrompt();  // timeout: wipe the pending input and send ERROR
     // The final result comes later, through finish(). Meanwhile typing is not a command;
     // any key (not LF) cancels: `cancel` is called and ERROR sent.
-    void wait(CancelHandler cancel, void *ctx);
+    void wait(CancelHandler cancel, void *ctx, Result cancelResult = Result::kError);
     // Sends the result of a wait (nothing for kDone). False if the port isn't waiting
     // (the wait was cancelled).
     bool finish(Reply r);
@@ -180,12 +190,14 @@ private:
     size_t len_ = 0;
     bool overflow_ = false;
     bool privateLine_ = false;
+    size_t privateStart_ = 0;  // end of sensitive command name; delimiter is echoed once
     bool repeatAllowed_ = true;
     char last_[kLineMax + 1] = {};
     unsigned selected_ = 0;  // register for "AT=n" / "AT?"
     // Masked prompt and wait (askSecret, wait)
     SecretHandler secretFn_ = nullptr;
     CancelHandler cancelFn_ = nullptr;
+    Result cancelResult_ = Result::kError;
     void *ctx_ = nullptr;
     char secret_[kSecretMax + 1] = {};
     size_t secretLen_ = 0;
@@ -200,5 +212,7 @@ void showCurrent(Port &port);  // ATI4
 void showStored(Port &port);   // ATI5
 // AT*HELP: one line per AT* command, in table order.
 void showStarHelp(Port &port);
+Reply cmdModel(Port &port, const char *args);
+Reply cmdThrottle(Port &port, const char *args);
 
 }  // namespace atcmd

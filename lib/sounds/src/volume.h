@@ -33,6 +33,7 @@ float levelToGain(float level);
 // Pot ADC reading to level 0..1, with a small dead zone at each end so the end stops
 // reliably reach 0 and 1.
 float potLevel(uint32_t raw, uint32_t maxRaw);
+float speakerGain(float pot, unsigned level);  // ATL0/1 low, ATL2 medium, ATL3 high
 
 // The gain actually applied to the samples: user gain (clamped to 0..1) times the cap.
 float outputGain(float userGain);

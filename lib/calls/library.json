@@ -1,0 +1,1 @@
+{"name":"calls","version":"0.8.0","frameworks":"*","platforms":"*","dependencies":[{"name":"hostport"},{"name":"dialstring"},{"name":"modemcfg"}]}

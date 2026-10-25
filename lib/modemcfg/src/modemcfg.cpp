@@ -8,11 +8,11 @@ namespace modemcfg {
 
 namespace {
 
-constexpr uint32_t range(unsigned lo, unsigned hi) {
-    return ((hi >= 31 ? 0xFFFFFFFFu : ((1u << (hi + 1)) - 1u)) & ~((1u << lo) - 1u));
+constexpr uint64_t range(unsigned lo, unsigned hi) {
+    return ((hi >= 63 ? UINT64_MAX : ((UINT64_C(1) << (hi + 1)) - 1)) & ~((UINT64_C(1) << lo) - 1));
 }
-constexpr uint32_t bit(unsigned n) {
-    return 1u << n;
+constexpr uint64_t bit(unsigned n) {
+    return UINT64_C(1) << n;
 }
 
 // Values each setting accepts (Sportster technical reference; reserved values refused).
@@ -35,12 +35,12 @@ const SettingInfo kInfo[kSettingCount] = {
     {"&I", range(0, 2) | bit(5)},
     {"&K", range(0, 3)},
     {"&M", bit(0) | bit(4) | bit(5)},
-    {"&N", range(0, 16)},
+    {"&N", range(0, kMaxLineSpeedIndex)},
     {"&P", range(0, 1)},
     {"&R", range(1, 2)},
     {"&S", bit(0)},
     {"&T", range(4, 5)},
-    {"&U", range(0, 16)},
+    {"&U", range(0, kMaxLineSpeedIndex)},
     {"&Y", range(0, 3)},
 };
 
@@ -117,7 +117,7 @@ bool isHostRate(uint32_t baud) {
 }
 
 bool settingAllows(Setting s, unsigned value) {
-    return s < kSettingCount && value < 32 && (kInfo[s].allowed & (1u << value)) != 0;
+    return s < kSettingCount && value < 64 && (kInfo[s].allowed & (UINT64_C(1) << value)) != 0;
 }
 
 const uint8_t kSRegsCurrent[] = {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10,
@@ -128,7 +128,24 @@ const uint8_t kSRegsStored[] = {0,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 
 
 bool operator==(const Profile &a, const Profile &b) {
     return memcmp(a.v, b.v, sizeof a.v) == 0 && memcmp(a.s, b.s, sizeof a.s) == 0 &&
-           a.baud == b.baud;
+           a.baud == b.baud && a.lineExplicit == b.lineExplicit;
+}
+
+bool validModel(uint32_t speed) {
+    return speed == 14400 || speed == 28800 || speed == 33600 || speed == 56000;
+}
+
+const char *modelName(uint32_t speed) {
+    switch (speed) {
+        case 28800:
+            return "Sportster 28.8k Series";
+        case 33600:
+            return "Sportster 33.6k Series";
+        case 56000:
+            return "Sportster 56k Series";
+        default:
+            return "Sportster 14.4k Series";
+    }
 }
 
 Profile factoryProfile(unsigned n) {
@@ -142,7 +159,7 @@ Profile factoryProfile(unsigned n) {
     p.v[kV] = 1;
     p.v[kX] = 4;     // all result codes (Sportster default; Jon, v0.4)
     p.v[kTone] = 1;  // tone dialling (the Sportster ships with pulse)
-    p.v[kAmpA] = 0;  // plain "CONNECT 33600" (brief 6.2, Q34)
+    p.v[kAmpA] = 0;  // plain CONNECT result (Q34)
     p.v[kAmpB] = 1;  // speed stays as detected from "AT" (Sportster default; Jon, v0.5)
     p.v[kAmpC] = 1;  // brief 6.2, Q33
     p.v[kAmpD] = 2;  // brief 6.2, Q33
@@ -151,7 +168,7 @@ Profile factoryProfile(unsigned n) {
     p.v[kAmpI] = 0;
     p.v[kAmpK] = 1;
     p.v[kAmpM] = 4;
-    p.v[kAmpN] = 0;  // highest line speed, 33600 (brief 6.2)
+    p.v[kAmpN] = 8;  // 14400 default; higher speeds remain selectable (Jon, v0.8)
     p.v[kAmpP] = 1;  // UK pulse ratio (brief 6.4: UK tones)
     p.v[kAmpR] = 2;  // brief 6.2, Q33
     p.v[kAmpS] = 0;  // fixed (brief 6.2)
@@ -222,6 +239,12 @@ void serialize(const Nvram &n, uint8_t *out) {
     }
     putU32(p, n.hostBaud);
     p += 4;
+    for (const Profile &t : n.tmpl) {
+        *p++ = t.lineExplicit ? 1 : 0;
+    }
+    putU32(p, n.model);
+    p += 4;
+    *p++ = n.throttle ? 1 : 0;
     putU32(p, crc32(out, static_cast<size_t>(p - out)));
 }
 
@@ -237,10 +260,10 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
         return LoadResult::kBadMagic;
     }
     const uint8_t version = in[4];
-    if (version != 1 && version != kLayoutVersion) {
+    if (version != 1 && version != 2 && version != kLayoutVersion) {
         return LoadResult::kBadVersion;
     }
-    const size_t size = version == 1 ? kBlobSizeV1 : kBlobSize;
+    const size_t size = version == 1 ? kBlobSizeV1 : version == 2 ? kBlobSizeV2 : kBlobSize;
     if (len != size) {
         return LoadResult::kBadSize;
     }
@@ -254,6 +277,7 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
         return LoadResult::kBadValue;
     }
     for (Profile &t : n.tmpl) {
+        t.lineExplicit = version < 3;  // preserve old saved speed; its provenance is unknown
         memcpy(t.v, p, kSettingCount);
         p += kSettingCount;
         memcpy(t.s, p, kSRegCount);
@@ -282,11 +306,26 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
         return LoadResult::kMigrated;
     }
     n.hostBaud = getU32(p);
+    p += 4;
     if (n.hostBaud != 0 && !isHostRate(n.hostBaud)) {
         return LoadResult::kBadValue;
     }
+    if (version == 3) {
+        for (Profile &t : n.tmpl) {
+            if (*p > 1) {
+                return LoadResult::kBadValue;
+            }
+            t.lineExplicit = *p++ != 0;
+        }
+        n.model = getU32(p);
+        p += 4;
+        if (!validModel(n.model) || *p > 1) {
+            return LoadResult::kBadValue;
+        }
+        n.throttle = *p != 0;
+    }
     *out = n;
-    return LoadResult::kOk;
+    return version < 3 ? LoadResult::kMigrated : LoadResult::kOk;
 }
 
 const char *loadResultText(LoadResult r) {

@@ -272,6 +272,20 @@ void test_dtr_input() {
     release(pins::kDtr);
     TEST_ASSERT_FALSE(hw::dtrAsserted());  // pull-up: nothing connected = off
 }
+void test_idle_shutdown_and_drain_are_bounded_with_rts_off() {
+    rigBaud(115200);
+    portBaud(115200);
+    hw::hostSetFlow(false, true);
+    drive(pins::kRts, true);
+    Serial1.print("queued while RTS is off");
+    delay(10);
+    TEST_ASSERT_FALSE(hw::hostDrain(20));
+    uint32_t before = millis();
+    hw::hostEnd();
+    TEST_ASSERT_LESS_THAN_UINT32(500, millis() - before);
+    TEST_ASSERT_FALSE(hw::hostActive());
+    release(pins::kRts);
+}
 
 void setup() {
     delay(2000);
@@ -295,6 +309,7 @@ void setup() {
     RUN_TEST(test_sending_stops_while_rts_is_off);
     RUN_TEST(test_dtr_input);
     RUN_TEST(test_long_stream_in_command_mode_is_survived);
+    RUN_TEST(test_idle_shutdown_and_drain_are_bounded_with_rts_off);
     UNITY_END();
 }
 

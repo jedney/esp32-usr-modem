@@ -14,6 +14,46 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [0.8] - 2026-10-25
+
+### Added
+
+- Outgoing ATD/ATDT/ATDP calls, ATDS0-3 and ATDL through nonblocking DNS/TCP,
+  with a shared call slot, cancellation, S7 deadlines and modem error results.
+- Telnet BINARY, ANSI and 80x24 negotiation, incremental IAC parsing, raw TCP,
+  bounded queues/backpressure, guarded escape/resume and clean disconnects.
+- A persistent 64-entry phonebook, entry 1 preloaded with Amiga Retro's hostname,
+  AT*PHONEBOOK and AT*PHONEDELETE; included in recoverable factory reset.
+- AT*MODEL=14400/28800/33600/56000, query/list commands and four Sportster series
+  identities. Device-wide selection saves immediately and affects ATI/default
+  CONNECT reporting only; active-call reporting stays stable.
+- USR V.90 &N/&U indexes through 38 (56000), matching numeric/verbose CONNECT
+  results, explicit speed precedence, &U floor and optional &A result details.
+- Saved AT*THROTTLE policy, bidirectional rate limiting, and outgoing &B0/&B2
+  serial speed following independently of model reporting.
+- Streaming tone/digit/WAV call audio, strict 8 kHz mono PCM WAV validation,
+  live pot/ATL/ATM control, amp shutdown and the existing -7 dB final volume cap.
+- Licensed 1200-baud recording and the approved public-domain generic fallback
+  for five other speed files, with original sources and reproducible conversion.
+- Native call/model/storage/Telnet/audio tests, on-board integration checks and
+  a local-server serial acceptance harness. Future config/web model presentation
+  requirements remain documented for v0.10/v0.11.
+
+### Changed
+
+- Factory identity is Sportster 14.4k Series and operational speed remains 14400.
+  All speeds/features through 56k remain selectable; host serial reaches 115200.
+- Modem settings layout 3 stores explicit speed flags, model and throttle metadata;
+  layouts 1/2 migrate without discarding saved settings.
+- Firmware and filesystem uploads both run the native-test gate.
+
+### Fixed
+
+- TCP resets during connection setup report BUSY, including lwIP's ECONNRESET
+  form of active refusal; resets after connection still report NO CARRIER.
+- AT*PASS= leaves the equals sign visible and masks only the following value,
+  retaining secret buffer wiping, validation and the A/ repeat prohibition.
+
 ## [0.7] - 2026-10-25
 
 ### Added

@@ -1,14 +1,15 @@
-// ATI0-ATI7, ATI9 and the settings screens, as a USR Sportster 33.6 Faxmodem shows them
-// (brief 6.6, Q55: authentic text, so old operating systems detect the modem).
+// ATI0-ATI7, ATI9 and settings screens: selectable Sportster series (Jon, v0.8).
+// Commands and selectable speeds retain the later USR capabilities through 56000.
 //
 // Sources (credits/LICENSES.md):
-//   - Layout and text of ATI3, ATI4, ATI5, ATI6, ATI7, ATI9: a capture from a real
+//   - Settings and diagnostic screen layout: a capture from a real
 //     "Sportster 33600/Fax V2.31", posted in the fido7.ru.modem echo (2004), archived at
 //     https://fido7.ru.modem.narkive.com/YzTdiljZ/sportster-33600
 //   - What each inquiry shows: USR Sportster technical reference (techref_uk.pdf) and
 //     the Sportster user guide.
-//   - ATI0 and ATI1: no capture found. The values are placeholders in the documented
-//     format (four-digit product code, ROM checksum); see docs/decisions-log.md.
+//   - No verified complete ROM captures for the four series: ATI0/ATI1 are placeholders,
+//     ATI3 has no invented ROM revision, and ATI7 labels hardware details as emulated.
+//     ATI9 returns the model name, without claiming a manufacturer's PnP identifier.
 //
 // Changes from the capture (project settings that a real Sportster keeps on DIP
 // switches or doesn't have): ATI4 adds L; ATI5 adds E, L, Q, V, &C and &D; ATI5 doesn't
@@ -25,10 +26,22 @@ using modemcfg::Setting;
 
 namespace {
 
-const char kProductCode[] = "3361";  // ATI0 (placeholder, see above)
-const char kRomChecksum[] = "C2A4";  // ATI1 (placeholder, see above)
-const char kProductId[] = "Sportster 33600/Fax V2.31";
-const char kName[] = "USRobotics Sportster 33600 Fax";
+const char *identity(Port &port) {
+    return modemcfg::modelName(port.modem().model());
+}
+const char *productCode(Port &port) {
+    switch (port.modem().model()) {
+        case 28800:
+            return "2881";
+        case 33600:
+            return "3361";
+        case 56000:
+            return "5601";
+        default:
+            return "1441";
+    }
+}
+const char kRomChecksum[] = "0000";  // emulator placeholder; no physical ROM
 
 void settingsLine(Port &port, const Profile &p, const Setting *list, size_t count,
                   const char *before, const char *after) {
@@ -113,7 +126,7 @@ void field(Port &port, const char *label, const char *value) {
 void showDiagnostics(Port &port) {  // ATI6, with no call since power-on
     port.beginInfo();
     port.newline();
-    port.printf("%s Link Diagnostics...", kName);
+    port.printf("%s Link Diagnostics...", identity(port));
     port.newline();
     port.newline();
     counters(port, "Chars sent", "Chars Received");
@@ -139,17 +152,21 @@ void showConfiguration(Port &port) {  // ATI7
     port.line("Configuration Profile...");
     port.newline();
     field(port, "Product type", "US/Canada External");
-    field(port, "Options", "V32bis,V.FC,V.34+");
-    field(port, "Fax Options", "Class 1/Class 2.0");
-    field(port, "Clock Freq", "92.0Mhz");
-    field(port, "Eprom", "256k");
-    field(port, "Ram", "64k");
+    field(port, "Options",
+          port.modem().model() == 14400   ? "V32bis"
+          : port.modem().model() == 28800 ? "V34"
+          : port.modem().model() == 33600 ? "V34+"
+                                          : "V90");
+    field(port, "Fax Options", "NONE");
+    field(port, "Clock Freq", "Emulated");
+    field(port, "Eprom", "Emulated");
+    field(port, "Ram", "Emulated");
     port.newline();
-    field(port, "EPROM date", "3/4/96");
-    field(port, "DSP date", "3/4/96");
+    field(port, "EPROM date", "N/A");
+    field(port, "DSP date", "N/A");
     port.newline();
-    field(port, "EPROM rev", "2.31");
-    field(port, "DSP rev", "2.31");
+    field(port, "EPROM rev", "N/A");
+    field(port, "DSP rev", "N/A");
 }
 
 }  // namespace
@@ -158,7 +175,7 @@ void showCurrent(Port &port) {
     const Profile &p = port.modem().active();
     port.beginInfo();
     port.newline();
-    port.printf("%s Settings...", kName);
+    port.printf("%s Settings...", identity(port));
     port.newline();
     port.newline();
     static const Setting kLetters[] = {modemcfg::kB, modemcfg::kE, modemcfg::kF, modemcfg::kL,
@@ -182,7 +199,7 @@ void showCurrent(Port &port) {
 void showStored(Port &port) {
     const modemcfg::Nvram &n = port.modem().nvram();
     port.beginInfo();
-    port.printf("%s NVRAM Settings...", kName);
+    port.printf("%s NVRAM Settings...", identity(port));
     port.newline();
     static const Setting kLetters[] = {modemcfg::kB, modemcfg::kE, modemcfg::kF, modemcfg::kL,
                                        modemcfg::kM, modemcfg::kQ, modemcfg::kV, modemcfg::kX};
@@ -214,7 +231,7 @@ bool showInfo(Port &port, unsigned n) {
     switch (n) {
         case 0:
             port.beginInfo();
-            port.line(kProductCode);
+            port.line(productCode(port));
             return true;
         case 1:
             port.beginInfo();
@@ -226,7 +243,7 @@ bool showInfo(Port &port, unsigned n) {
             return true;
         case 3:
             port.beginInfo();
-            port.line(kProductId);
+            port.line(identity(port));
             return true;
         case 4:
             showCurrent(port);
@@ -240,9 +257,9 @@ bool showInfo(Port &port, unsigned n) {
         case 7:
             showConfiguration(port);
             return true;
-        case 9:  // Plug and Play identity
+        case 9:  // model inquiry; no unverified manufacturer PnP ID
             port.beginInfo();
-            port.line("(1.0USR0003\\\\Modem\\PNPC107\\Sportster 33.6 FAX EXT)FF");
+            port.line(identity(port));
             return true;
         default:
             return false;
