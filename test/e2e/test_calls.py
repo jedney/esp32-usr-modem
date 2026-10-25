@@ -4,6 +4,8 @@ Set --call-server-ip to the PC address reachable from the modem. These tests do
 not change firewall settings. --live-bbs additionally checks ATDT1 against the BBS.
 """
 import contextlib
+import ctypes
+import os
 import socket
 import threading
 import time
@@ -95,6 +97,69 @@ def echo(connection):
         connection.sendall(data)
 
 
+@contextlib.contextmanager
+def refusal_server():
+    """Reject on a listening Windows socket so the program-scoped rule applies.
+
+    SO_CONDITIONAL_ACCEPT and WSAAccept/CF_REJECT are documented at
+    https://learn.microsoft.com/windows/win32/winsock/so-conditional-accept
+    No application connection is accepted and no firewall policy is changed.
+    """
+    with socket.socket() as listener:
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if os.name != "nt":
+            listener.bind(("0.0.0.0", SERVER_PORT))
+            yield SERVER_PORT  # non-listening POSIX port: kernel sends refusal
+            return
+
+        winsock = ctypes.WinDLL("Ws2_32.dll")
+        condition_type = ctypes.WINFUNCTYPE(
+            ctypes.c_int, *([ctypes.c_void_p] * 7), ctypes.c_size_t
+        )
+        winsock.WSAAccept.argtypes = [
+            ctypes.c_size_t, ctypes.c_void_p, ctypes.c_void_p,
+            condition_type, ctypes.c_size_t,
+        ]
+        winsock.WSAAccept.restype = ctypes.c_size_t
+        winsock.WSAGetLastError.restype = ctypes.c_int
+        stopped, rejected = threading.Event(), threading.Event()
+        errors = []
+
+        @condition_type
+        def reject(*args):
+            rejected.set()
+            return 1  # CF_REJECT
+
+        listener.setsockopt(socket.SOL_SOCKET, 0x3002, 1)  # SO_CONDITIONAL_ACCEPT
+        listener.bind(("0.0.0.0", SERVER_PORT))
+        listener.listen(1)
+        listener.setblocking(False)
+
+        def run():
+            while not stopped.is_set():
+                result = winsock.WSAAccept(listener.fileno(), None, None, reject, 0)
+                if result != ctypes.c_size_t(-1).value:
+                    socket.close(result)
+                    errors.append("unexpected acceptance")
+                    return
+                error = winsock.WSAGetLastError()
+                if error not in (10035, 10061):  # WSAEWOULDBLOCK / WSAECONNREFUSED
+                    errors.append(str(error))
+                    return
+                stopped.wait(0.01)
+
+        thread = threading.Thread(target=run, daemon=True)
+        thread.start()
+        try:
+            yield SERVER_PORT
+        finally:
+            stopped.set()
+            thread.join(timeout=2)
+            assert not thread.is_alive(), "refusal server did not stop"
+            assert not errors, "conditional refusal server failed"
+            assert rejected.is_set(), "refusal server received no request"
+
+
 def dial(console, host, port, speed="14400"):
     lines = console.command(f"ATDT{host}:{port}", timeout=8,
                             until=("CONNECT " + speed, "ERROR", "BUSY", "NO ANSWER", "NO DIAL TONE", "NO CARRIER"))
@@ -167,17 +232,13 @@ def test_telnet_negotiation_ansi_naws_binary_and_ff(call_console, server_ip):
         assert console.command("AT")[-1] == "OK"
 
 
-def test_connection_refused(call_console, server_ip, request):
-    if not request.config.getoption("--refusal-probe"):
-        pytest.skip("Windows refusal probe needs the temporary rule in scripts/test_refusal.ps1")
+def test_connection_refused(call_console, server_ip):
     console = call_console
-    with socket.socket() as unused:
-        option = socket.SO_EXCLUSIVEADDRUSE if hasattr(socket, "SO_EXCLUSIVEADDRUSE") else socket.SO_REUSEADDR
-        unused.setsockopt(socket.SOL_SOCKET, option, 1)
-        unused.bind(("0.0.0.0", SERVER_PORT))
-        lines = console.command(f"ATDT{server_ip}:{SERVER_PORT}", timeout=8,
+    with refusal_server() as port:
+        lines = console.command(f"ATDT{server_ip}:{port}", timeout=8,
                                 until=("BUSY", "ERROR", "NO ANSWER"))
         assert lines[-1] == "BUSY"
+
 def test_dns_failure(call_console):
     console = call_console
     lines = console.command("ATDTmissing-v08.invalid:23", timeout=8,

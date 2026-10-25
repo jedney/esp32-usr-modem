@@ -1,5 +1,10 @@
 #include "tcp_connection.h"
+#include <cerrno>
 namespace calls {
+SocketState connectErrorState(int error) {
+    return error == ECONNREFUSED || error == ECONNRESET ? SocketState::kRefused
+                                                        : SocketState::kFailed;
+}
 void TcpConnection::begin(bool raw) {
     raw_ = raw;
     telnet_.begin();

@@ -4,7 +4,7 @@ An ESP32-S3 Wi-Fi "modem" in a 3D-printed replica of a 1990s US Robotics Sportst
 Faxmodem. It has a real DB25 RS232 port, speaks the Hayes AT command set, plays the
 dial, DTMF and handshake sounds, and connects to Telnet BBSes over Wi-Fi.
 
-Status: **v0.8 implementation; bench acceptance in progress.** Outgoing TCP/Telnet
+Status: **v0.8 software acceptance passed; external hardware checks pending.** Outgoing TCP/Telnet
 calls, a 64-entry phonebook, selectable Sportster identity, optional throttling and
 call audio are implemented. See `test/README.md` for actual validation and pending
 bench checks. The current bench has console COM15, Unitek COM18, LED and pot; the

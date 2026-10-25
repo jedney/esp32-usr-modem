@@ -49,6 +49,8 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ### Fixed
 
+- TCP resets during connection setup report BUSY, including lwIP's ECONNRESET
+  form of active refusal; resets after connection still report NO CARRIER.
 - AT*PASS= leaves the equals sign visible and masks only the following value,
   retaining secret buffer wiping, validation and the A/ repeat prohibition.
 

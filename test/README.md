@@ -24,7 +24,7 @@ Upload the firmware again afterwards (**Modem: upload over USB (tests first)**).
 | v0.5 | 2026-10-24 | Bare board, console COM15 | `test_board` 5/5, `test_rs232` 8/8 (no wires needed); `test_hw` not run | 46 passed, 22 skipped (`test_rs232.py` and the bridge test: no RS232 port yet) |
 | v0.6 | 2026-10-24 | Bare board, console COM15, Jon's Wi-Fi (`.env`) | `test_board` 5/5, `test_rs232` 8/8, `test_wifi` 6/6 | 61 passed, 22 skipped (`test_rs232.py` and the bridge test: RS232 not wired) |
 | v0.7 | 2026-10-25 | Console COM15, Wi-Fi at 10.0.0.221 on the PC's network, LED and pot; Unitek COM18, RS232/audio unwired | `test_board` 5/5, `test_device` 5/5, internal `test_rs232` 8/8, `test_wifi` 6/6 | Regression: 63 passed, 27 skipped. Device acceptance: 7/7 verified; the previously blocked factory/OTA case passed after reconnecting. Authenticated uploads work by IP and mDNS, wrong/old passwords fail, first-use password display stops, and Wi-Fi plus the saved credential are restored. Every upload attempt first passed 234 native checks |
-| v0.8 | 2026-10-25 | COM15, LED/pot, Wi-Fi; COM18 adapter only, RS232/audio unwired | Board 5, device 5, Wi-Fi 6, internal RS232 9, calls 4: all 29 pass | Console 68 passed / 27 skipped; nine call checks passed including live BBS, streaming audio and DNS. TCP-refusal probe awaits UAC retry; external RS232 and listening await wiring |
+| v0.8 | 2026-10-25 | COM15, LED/pot, Wi-Fi; COM18 adapter only, RS232/audio unwired | Board 5, device 5, Wi-Fi 6, internal RS232 9, calls 4: all 29 pass | Console 68 passed / 27 skipped; ten call checks passed including true refusal, live BBS, streaming audio and DNS; external RS232 and listening await wiring |
 
 ## Feature matrix
 
@@ -35,15 +35,16 @@ streaming call audio and the password echo boundary fix. Native coverage is in
 `embedded/test_calls` covers scratch NVS, all six LittleFS WAVs and ADC/I2S;
 `test/e2e/test_calls.py` drives local TCP servers and the opt-in live BBS.
 
-Validation (25 Oct): 262/262 native checks, 29 unique on-board checks and all
-five GitHub CI jobs pass. Console regression: 68 passed, 27 skipped. Outgoing call
-acceptance: nine checks passed across the regular suite and separate DNS check,
-including the approved live BBS and streamed handshake. True TCP-refusal acceptance
-remains pending an Administrator/UAC retry of `scripts/test_refusal.ps1`; the
-previous launch was canceled by Windows. Its temporary rule is not present.
+Validation (25 Oct): 263/263 native checks and 29 unique on-board checks pass.
+Console regression: 68 passed, 27 skipped. All ten outgoing-call acceptance checks
+pass, including true TCP refusal, DNS failure, the approved live BBS and streamed
+handshake. Windows refusal now uses conditional acceptance through the existing
+Python rule; no Administrator access or temporary firewall rule is needed. The
+previous temporary rule is absent. Formatting and cppcheck pass; current CI results
+are attached to PR #10. Firmware and LittleFS uploads retain the native-test gate.
 External RS232 and listening checks require the unwired electronics. Generic audio
 fallback provenance is in `credits/LICENSES.md`; speed authenticity is not claimed
-for fallback files. Firmware and LittleFS were uploaded with native gates enabled.
+for fallback files.
 
 Status: ✅ tests written, ⬜ planned. Section numbers refer to the project brief.
 
@@ -59,10 +60,10 @@ Status: ✅ tests written, ⬜ planned. Section numbers refer to the project bri
 | RTS/CTS and XON/XOFF flow control, DTR `&D` with S25, DCD `&C`, RI (6.2) | `test_hostport` | `test_rs232` (CTS drops with nothing lost, RTS pauses sending, DTR read) | `test_rs232.py` (CTS/DCD seen by the PC, DTR drop, 16 KB echo with RTS/CTS) | ✅; ⬜ RS232 end-to-end run (needs wiring) |
 | `+++` escape guard time (S2, S12), `ATO`, `ATH`, `ATZ` hang-up, `F0` (6.2) | `test_hostport`, `test_atcmd` | — | `test_session.py` | ✅ |
 | Test call `AT*TESTCALL`: echo, far end hangs up (NO CARRIER), one call at a time (6.2) | `test_hostport` | — | `test_session.py`, `test_rs232.py` | ✅ |
-| Line-speed emulation `&N`, optional throttling, `CONNECT` text (6.2) | `test_calls`, `test_hostport`, `test_atcmd` (model/explicit speed, both throttle directions, result details) | `test_calls` (NVS) | `test_session.py`, `test_calls.py` | ✅; TCP-refusal bench check pending |
+| Line-speed emulation `&N`, optional throttling, `CONNECT` text (6.2) | `test_calls`, `test_hostport`, `test_atcmd` (model/explicit speed, both throttle directions, result details) | `test_calls` (NVS) | `test_session.py`, `test_calls.py` | ✅; call acceptance passed |
 | Phonebook storage and dialling (6.3) | `test_calls` (64 entries, exact keys, CRC, compaction, save rollback, reserved numbers) | `test_calls` (scratch NVS) | `test_calls.py` (temporary entry and binary call) | ✅ |
-| Outgoing call: Telnet negotiation, 0xFF escaping, raw mode (6.6) | `test_calls` (fragmentation, partial I/O, bounded subnegotiation) | — | `test_calls.py` (local servers, opt-in live BBS) | ✅; TCP-refusal bench check pending |
-| Errors: refused → BUSY, timeout → NO ANSWER, DNS/Wi-Fi → NO DIALTONE, drop → NO CARRIER (6.5) | `test_calls` (cancel, DNS/TCP deadlines, DTR, rollover, Wi-Fi loss) | — | `test_calls.py` | ✅; TCP-refusal bench check pending |
+| Outgoing call: Telnet negotiation, 0xFF escaping, raw mode (6.6) | `test_calls` (fragmentation, partial I/O, bounded subnegotiation) | — | `test_calls.py` (local servers, opt-in live BBS) | ✅; call acceptance passed |
+| Errors: refused → BUSY, timeout → NO ANSWER, DNS/Wi-Fi → NO DIALTONE, drop → NO CARRIER (6.5) | `test_calls` (cancel, DNS/TCP deadlines, DTR, rollover, Wi-Fi loss) | — | `test_calls.py` | ✅; call acceptance passed |
 | Answer mode: port 23, RI, ring, `ATA` / `S0` (6.6) | ⬜ | — | ⬜ | ⬜ |
 | Remote callers can't reach command mode (6.6) | ⬜ | — | ⬜ | ⬜ |
 | PPP (`ATDT666`) and SLIP (`ATDT667`), NAT, hang-up (6.6) | — | ⬜ | ⬜ | ⬜ |

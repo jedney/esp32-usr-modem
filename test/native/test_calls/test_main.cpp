@@ -1,5 +1,6 @@
 #include <unity.h>
 #include <algorithm>
+#include <cerrno>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -293,6 +294,14 @@ void test_tcp_raw_all_bytes_and_partial_socket_writes() {
     TEST_ASSERT_TRUE(bytes == received);
     socket.status = SocketState::kClosed;
     TEST_ASSERT_FALSE(conn.isOpen());
+}
+void test_pending_connect_reset_and_refusal_are_busy_but_other_errors_are_not() {
+    for (int error : {ECONNREFUSED, ECONNRESET}) {
+        TEST_ASSERT_EQUAL(int(SocketState::kRefused), int(connectErrorState(error)));
+    }
+    for (int error : {ETIMEDOUT, ENETUNREACH, ECONNABORTED, EBADF}) {
+        TEST_ASSERT_EQUAL(int(SocketState::kFailed), int(connectErrorState(error)));
+    }
 }
 void test_invalid_reserved_and_missing_entries_never_start_socket_or_sound() {
     Rig r;
@@ -627,6 +636,7 @@ int main() {
     RUN_TEST(test_telnet_fragmented_negotiation_ansi_naws_and_escaped_ff);
     RUN_TEST(test_telnet_refusals_no_loops_and_oversized_subnegotiation);
     RUN_TEST(test_tcp_raw_all_bytes_and_partial_socket_writes);
+    RUN_TEST(test_pending_connect_reset_and_refusal_are_busy_but_other_errors_are_not);
     RUN_TEST(test_invalid_reserved_and_missing_entries_never_start_socket_or_sound);
     RUN_TEST(test_call_resolves_stored_numbers_and_preserves_actual_dialled_digits);
     RUN_TEST(test_call_sequence_pulse_and_buffered_greeting);

@@ -12,6 +12,9 @@ enum class SocketState : uint8_t {
     kRefused,
     kFailed
 };
+// A reset while connect is pending is an active rejection on lwIP. This mapping
+// is not used for established connections, whose reset is a carrier loss.
+SocketState connectErrorState(int error);
 class Socket {
 public:
     virtual ~Socket() = default;

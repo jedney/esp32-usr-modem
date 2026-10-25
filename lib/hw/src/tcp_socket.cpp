@@ -88,7 +88,7 @@ void TcpSocket::connectAddress(uint32_t address) {
     } else if (errno != EINPROGRESS && errno != EWOULDBLOCK) {
         int error = errno;
         close();
-        state_ = error == ECONNREFUSED ? SocketState::kRefused : SocketState::kFailed;
+        state_ = calls::connectErrorState(error);
     }
 }
 void TcpSocket::poll() {
@@ -119,11 +119,12 @@ void TcpSocket::poll() {
     int error = 0;
     socklen_t len = sizeof error;
     if (result < 0 || lwip_getsockopt(fd_, SOL_SOCKET, SO_ERROR, &error, &len) < 0) {
+        int failure = errno;
         close();
-        state_ = SocketState::kFailed;
+        state_ = calls::connectErrorState(failure);
     } else if (error) {
         close();
-        state_ = error == ECONNREFUSED ? SocketState::kRefused : SocketState::kFailed;
+        state_ = calls::connectErrorState(error);
     } else if (result > 0) {
         state_ = SocketState::kOpen;
     }
