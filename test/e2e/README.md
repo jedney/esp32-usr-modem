@@ -21,9 +21,21 @@ or DB25, Unitek adapter plugged straight in). It changes only the PC's speed, fr
 hang-up and a 16 KB echo with RTS/CTS flow control. `test_session.py` needs only the
 console: it makes `AT*TESTCALL` calls and checks `+++`, `ATO`, `ATH` and `AT*BAUD`.
 
-The live-dial tests (later versions) call the Amiga Retro BBS,
-`www.amigaretro.com:23` (170.64.142.64:23), and need Wi-Fi configured on the modem.
-A local test server will cover `BUSY`, `NO ANSWER` and `NO CARRIER`.
+`test_calls.py` (v0.8) uses a PC TCP server on port 32321 and needs the PC LAN
+address reachable from the modem. It checks RAW binary transfer, fragmented Telnet
+negotiation, errors, Wi-Fi loss and stable model reporting. Model persistence needs
+only COM15. The live BBS test is opt-in and calls `www.amigaretro.com:23`.
+
+```powershell
+python -m pytest test/e2e/test_calls.py --console-port COM15 --call-server-ip 10.0.0.208 --live-bbs --tb=short
+```
+
+Windows may require a scoped inbound rule for the actual test Python executable.
+`scripts/allow_call_tests.ps1 -ModemAddress 10.0.0.221` creates the documented
+TCP 32321 rule from that modem only on Domain/Private profiles, when run as
+Administrator after approval. Tests do not alter firewall settings. Remove the rule
+when no longer needed with `Remove-NetFirewallRule -DisplayName 'USR modem local
+call tests TCP 32321'`. Use current LAN addresses, not these example addresses.
 
 `test_wifi.py` (v0.6) needs only the console, plus the Wi-Fi name and password in `.env`
 at the repository root (`USR_MODEM_WIFI_SSID`, `USR_MODEM_WIFI_PASS`; copy

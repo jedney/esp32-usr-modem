@@ -55,12 +55,12 @@ def test_first_bad_command_stops_the_line(console):
 def test_repeat_with_a_slash(console):
     console.command("ATI3")
     received = console.raw(b"A/")
-    assert b"USRobotics Sportster 14400 Fax" in received
+    assert b"Sportster 14.4k Series" in received
     assert received.endswith(b"OK\r\n")
 
 
 def test_identity(console):
-    assert console.command("ATI3") == ["USRobotics Sportster 14400 Fax", "OK"]
+    assert console.command("ATI3") == ["Sportster 14.4k Series", "OK"]
     lines = console.command("ATI7")
     assert "Product type           US/Canada External" in lines
     assert console.command("ATI8")[-1] == "ERROR"
@@ -68,7 +68,7 @@ def test_identity(console):
 
 def test_current_settings_screen(console):
     lines = console.command("ATI4")
-    assert "USRobotics Sportster 14400 Fax Settings..." in lines
+    assert "Sportster 14.4k Series Settings..." in lines
     assert "BAUD=115200  PARITY=N  WORDLEN=8" in lines
     assert any(line.startswith("S00=") for line in lines)
 
@@ -77,6 +77,15 @@ def test_fax_classes_are_refused(console):
     assert console.command("AT+FCLASS=0")[-1] == "OK"
     assert console.command("AT+FCLASS=1")[-1] == "ERROR"
     assert console.command("AT+FCLASS?") == ["0", "OK"]
+
+
+def test_password_separator_visible_without_changing_credentials(console):
+    assert console.command("ATE1")[-1] == "OK"
+    output = console.raw(b"AT*PASS=short\r")  # deliberately invalid; no credential write
+    boundary_correct = output.startswith(b"AT*PASS=*****\r")
+    assert boundary_correct, "masking must start after the visible equals sign"
+    assert output.rstrip().endswith(b"ERROR")
+    assert console.raw(b"A/").rstrip().endswith(b"ERROR")
 
 
 def test_factory_templates(console):

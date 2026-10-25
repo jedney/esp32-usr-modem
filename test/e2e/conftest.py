@@ -55,6 +55,10 @@ except ImportError:  # pragma: no cover
 
 
 def pytest_addoption(parser):
+    parser.addoption("--call-server-ip", default=None, help="PC LAN address reachable from modem")
+    parser.addoption("--call-server-port", default=32321, type=int, help="local call test TCP port")
+    parser.addoption("--live-bbs", action="store_true", help="allow a live outgoing BBS call")
+    parser.addoption("--refusal-probe", action="store_true", help="allow scoped refusal/firewall probe")
     parser.addoption("--console-port", default=None, help="USB console serial port")
     parser.addoption("--rs232-port", default=None, help="RS232 serial port (Unitek adapter)")
     parser.addoption("--rs232-baud", default=38400, type=int, help="RS232 host speed")

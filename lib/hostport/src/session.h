@@ -34,6 +34,17 @@ private:
 
 class Session : public atcmd::Link {
 public:
+    class Dialer {
+    public:
+        virtual ~Dialer() = default;
+        virtual bool start(Session &session, const char *text, bool pulse) = 0;
+    };
+    class BaudControl {
+    public:
+        virtual ~BaudControl() = default;
+        virtual bool online(uint32_t speed) = 0;
+        virtual void command() = 0;
+    };
     Session(atcmd::Modem &modem, atcmd::Sink &out, uint32_t baud, CallSlot &slot);
     Session(const Session &) = delete;
     Session &operator=(const Session &) = delete;
@@ -43,7 +54,12 @@ public:
 
     // Starts a call on `conn` (AT*TESTCALL now, ATD from v0.8): sends CONNECT and goes
     // online. False if this or another port already has a call.
-    bool startCall(Connection &conn);
+    bool startCall(Connection &conn, uint32_t operationalSpeed = 0, uint32_t reportSpeed = 0);
+    void setDialer(Dialer *dialer) { dialer_ = dialer; }
+    void setBaudControl(BaudControl *control) { baudControl_ = control; }
+    bool dial(const char *text, bool pulse) override;
+    uint32_t lineSpeed() const { return lineSpeed_; }
+    uint32_t reportedSpeed() const { return reportSpeed_; }
 
     // Bytes from the computer. Returns how many were taken: online, fewer than `len`
     // when the call can't take more (the caller keeps the rest, so flow control holds
@@ -70,12 +86,21 @@ public:
 private:
     void endCall(bool noCarrier);
     void sendConnect();
+    size_t allowance(unsigned direction) const;
+    void consume(unsigned direction, size_t bytes);
     const modemcfg::Profile &profile() const { return modem_.active(); }
 
     atcmd::Modem &modem_;
     atcmd::Port port_;
     CallSlot &slot_;
     Connection *conn_ = nullptr;
+    Dialer *dialer_ = nullptr;
+    BaudControl *baudControl_ = nullptr;
+    uint32_t lineSpeed_ = 14400;
+    uint32_t reportSpeed_ = 14400;
+    bool throttle_ = false;
+    uint64_t credit_[2] = {};
+    uint32_t creditAt_ = 0;
     Mode mode_ = Mode::kCommand;
     EscapeDetector esc_;
     DtrFilter dtr_;

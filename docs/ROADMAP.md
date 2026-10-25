@@ -36,18 +36,18 @@ use. All seven device acceptance checks have passed.
 
 Notes:
 
-- **v0.8 model update (Jon, 25 Oct):** plan `AT*MODEL=` for Sportster 14.4k, 28.8k,
+- **v0.8 model update (Jon, 25 Oct):** implemented `AT*MODEL=` for Sportster 14.4k, 28.8k,
   33.6k and 56k Series; factory default remains 14.4k. Selection affects ATI identity
   and default reported CONNECT speed only; speed options and features remain.
   Use `AT*MODEL=14400|28800|33600|56000`, saved immediately device-wide, retained
   by `AT&F`/`ATZ`, reset to 14.4k by `AT*FACTORY`. Explicit phonebook/`&N` speed
   wins over the model fallback; changes apply next call and leave current-call
-  CONNECT/ATO reporting stable. Also plan the `AT*PASS=` echo fix: the separator
+  CONNECT/ATO reporting stable. The `AT*PASS=` echo fix is implemented: the separator
   stays visible, its value is masked.
   v0.10's config and v0.11's web interface must offer the model selector and show
   the selected model prominently on the first config page, optionally with ASCII
-  art above the menu. Fixed-14400 identity/speed preparation is implemented; model
-  selection and outgoing calls remain pending. See `docs/v0.8-plan.md`.
+  art above the menu. Model selection and outgoing-call logic are implemented;
+  bench acceptance is in progress. See `docs/v0.8-plan.md` and `test/README.md`.
 - v0.5 needs the RS232 section wired on the bench (MAX3232s, DB9).
 - The pin map is confirmed by Electronics (Q76, schematic rev A, 24 Oct 2026) and applied
   in v0.6. If the board ever changes, `lib/hw/src/pins.h` and the values locked in by

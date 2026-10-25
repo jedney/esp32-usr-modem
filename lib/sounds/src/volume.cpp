@@ -3,6 +3,10 @@
 #include <cmath>
 
 namespace volume {
+float speakerGain(float pot, unsigned level) {
+    const float levels[] = {0.25f, 0.25f, 0.5f, 1.0f};
+    return levelToGain(pot) * levels[level < 4 ? level : 3];
+}
 
 namespace {
 constexpr float kDeadZone = 0.01f;  // of the pot's travel, at each end

@@ -76,5 +76,7 @@ uint32_t lineSpeedForN(unsigned n);
 // Formats a result for profile `p` (V, Q, X, S3, S4) into buf. Returns the length;
 // 0 when Q1 suppresses it.
 size_t formatResult(Result r, const modemcfg::Profile &p, char *buf, size_t cap);
+size_t formatConnect(uint32_t reportedSpeed, uint32_t operationalSpeed, const modemcfg::Profile &p,
+                     char *buf, size_t cap);
 
 }  // namespace atcmd

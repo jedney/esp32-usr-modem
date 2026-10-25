@@ -4,20 +4,89 @@ An ESP32-S3 Wi-Fi "modem" in a 3D-printed replica of a 1990s US Robotics Sportst
 Faxmodem. It has a real DB25 RS232 port, speaks the Hayes AT command set, plays the
 dial, DTMF and handshake sounds, and connects to Telnet BBSes over Wi-Fi.
 
-Status: **v0.8 in progress.** Device identification is **USRobotics Sportster 14400
-Fax**, with factory call speed **14400** (`AT&N8`). The command set and emulated line
-speeds extend through **56000** (`AT&N38`, or `AT&N0` for the highest speed); host
-serial rates remain 300-115200 and the USB console remains 115200. `AT*TESTCALL`
-exercises these speeds now; real outgoing TCP/Telnet calls are the remaining v0.8 work.
+Status: **v0.8 implementation; bench acceptance in progress.** Outgoing TCP/Telnet
+calls, a 64-entry phonebook, selectable Sportster identity, optional throttling and
+call audio are implemented. See `test/README.md` for actual validation and pending
+bench checks. The current bench has console COM15, Unitek COM18, LED and pot; the
+RS232 level shifters/DB9 and amp/speaker are not wired yet.
 
-`AT&F1` loads the new factory profile; `AT&W` saves it. Upgrading keeps existing
-saved profiles, including an explicit `&N0` (which now selects 56000). Wi-Fi and device
-credentials are unaffected by `AT&F1`.
+Factory model and operational call speed are **14.4k**. All emulated line-speed
+options through **56000** remain available (`AT&N38`, or `AT&N0` for highest);
+host serial remains 300-115200 and the USB maintenance console stays at 115200.
+The full requirements are in `docs/project-brief.md`, with later decisions in
+`docs/decisions-log.md` and implementation/acceptance notes in `docs/v0.8-plan.md`.
 
-The full requirements are in `docs/project-brief.md`; later decisions are recorded in
-`docs/decisions-log.md`. The identity is modeled rather than a verified ROM capture:
-`ATI0` is the placeholder `1441`, `ATI1` is `0000`, `ATI3` and `ATI9` show the model
-name, and `ATI7` marks physical ROM/DSP details as emulated or unavailable.
+## Outgoing calls and model selection (v0.8)
+
+| Command | Behaviour |
+|---|---|
+| `AT*MODEL=14400` | Sportster 14.4k Series; factory model; default reported CONNECT 14400 |
+| `AT*MODEL=28800` | Sportster 28.8k Series; default reported CONNECT 28800 |
+| `AT*MODEL=33600` | Sportster 33.6k Series; default reported CONNECT 33600 |
+| `AT*MODEL=56000` | Sportster 56k Series; default reported CONNECT 56000 |
+| `AT*MODEL?` / `AT*MODEL=?` | Current model / list of values |
+| `ATDT1` | Dial the preloaded Amiga Retro BBS entry, stored by hostname |
+| `ATDTbbs.example.com:2323` | Dial a host/port, Telnet by default |
+| `ATDP1` | Same destination, with pulse clicks instead of DTMF |
+| `AT&Z0=1`, then `ATDS0` | Save/dial one of four traditional stored numbers, separate from the phonebook |
+| `ATDL` / `A/` | Redial last destination / repeat last command |
+| `+++`, `ATO`, `ATH` | Guarded escape, resume, hang up |
+| `AT*PHONEBOOK?` | List the 64-entry phonebook |
+| `AT*PHONEBOOK=2,bbs.example.com,2323,RAW,2400` | Save exact numeric key 2, raw TCP, optional speed override 2400 |
+| `AT*PHONEDELETE=2` | Delete entry 2 |
+| `AT*THROTTLE=ON` / `OFF` / `?` | Save/query bidirectional line-speed throttling; factory OFF |
+
+`AT*MODEL` is a project command (the star is required). Model changes save
+immediately device-wide, survive restart and `AT&F`/`ATZ`, and reset to 14.4k with
+`AT*FACTORY`. They affect ATI identification and the fallback CONNECT speed only.
+They do not change operational speed, host baud, handshake selection, flow control,
+compression support, throttling or available commands. A current call, including
+later ATO responses, keeps its reported speed when the model changes.
+
+An explicit phonebook speed overrides `&N`; an explicitly issued `&N` overrides the
+model reporting fallback. New factory profiles use operational `&N8` (14400) with
+no explicit reporting override. `AT&F1` restores that factory profile and clears an
+explicit override; `AT&W` saves the profile. `AT*BAUD` fixes host speed independently.
+With automatic host baud and `&B0`/outgoing `&B2`, the RS232 data rate follows the
+operational call speed, returning to the command rate on escape or hang-up.
+
+Upgrading converts modem NVS layouts 1/2 to layout 3. Existing saved speeds are
+preserved as explicit overrides because their prior intent is unknown. Model and
+throttle settings are outside the templates; `AT*FACTORY` also erases the phonebook.
+Phonebook keys are exact (leading zeroes matter), 1-11 digits; reserved service
+numbers cannot be saved. Host names are up to 63 characters; ports are 1-65535.
+Entry speed 0 or an omitted speed means no entry override. Wi-Fi and credentials
+are unaffected by factory profile commands. Reserved configuration/PPP/SLIP service
+numbers remain unavailable until their roadmap versions.
+
+Telnet negotiates BINARY both ways, ANSI terminal type and 80x24 window size, and
+escapes 0xFF. RAW entries pass bytes unchanged. Queues are bounded and use TCP/serial
+backpressure, including while escaped. S7 bounds DNS/connection setup. Refusal gives
+BUSY, timeout NO ANSWER, DNS/no Wi-Fi NO DIAL TONE, and a dropped connected call
+NO CARRIER, subject to the existing V/Q/X result settings. Network bytes cannot
+execute local AT commands. `&U` rejects operational speeds below its configured floor.
+The default CONNECT text is plain; `&A1` adds ARQ for the reliable channel, `&A2`
+adds modulation, and `&A3` adds NONE for unimplemented modem compression. Numeric,
+quiet and X0 results retain their existing formats.
+
+`ATM0` skips dial/handshake audio delays; `ATM1` plays dial tone, digits and the
+selected handshake until CONNECT. `ATM2` keeps a simulated carrier tone after
+connection. `ATL0`/`ATL1` select low, `ATL2` medium and `ATL3` high within the pot's
+overall level. Every generated/WAV path applies the -7 dB speaker cap last. Call
+audio streams without blocking the maintenance loop; missing/invalid required WAVs
+abort audible calls with NO CARRIER. Upload LittleFS as well as firmware for audio.
+The 1200 recording is CC0; the five other speed files use an approved public-domain
+generic handshake fallback. They are not claimed as authentic recordings of those
+speeds. Originals, attribution and reproducible conversion are in the repository.
+
+Identity presets are modeled rather than complete verified ROM captures. ATI0
+product codes and ATI1 checksum are documented placeholders; ATI3/ATI9 show the
+selected series, and ATI7 marks physical ROM/DSP details as emulated/unavailable.
+See `credits/LICENSES.md` for sources and sound provenance.
+
+The future AT*CONFIG (v0.10) and web (v0.11) menus will include model selection and
+show the selected model prominently on the first page, optionally with ASCII modem
+art above the menu. Those future interfaces are not part of v0.8.
 
 ## Repository layout
 

@@ -17,8 +17,10 @@
 // window, and a confirmed factory reset (lib/devicecfg, hw::EspCrypto/OtaService).
 // Real calls follow in v0.8.
 #include <Arduino.h>
+#include <LittleFS.h>
 
 #include "atcmd.h"
+#include "call_audio.h"
 #include "connection.h"
 #include "device_commands.h"
 #include "device_crypto.h"
@@ -30,9 +32,11 @@
 #include "netcfg.h"
 #include "nvs_store.h"
 #include "ota_service.h"
+#include "outgoing.h"
 #include "panel.h"
 #include "rs232.h"
 #include "session.h"
+#include "tcp_socket.h"
 #include "wifi_radio.h"
 
 #ifndef FW_VERSION
@@ -57,6 +61,11 @@ public:
 hw::NvsStore store;
 hw::NvsStore netStore("net", "cfg");
 hw::NvsStore deviceStore("device", "cfg");
+hw::NvsStore bookStore("phonebook", "cfg");
+calls::Phonebook phonebook(bookStore);
+hw::TcpSocket tcpSocket;
+hw::CallAudio callAudio;
+calls::Outgoing *outgoing = nullptr;
 hw::EspCrypto crypto;
 devicecfg::Device device(deviceStore, crypto);
 hw::OtaService ota(device);
@@ -70,7 +79,7 @@ hostport::Panel panel;
 // Set up in setup(), once the AT* table below exists.
 atcmd::Modem *modem = nullptr;
 hostport::Session *console = nullptr;
-modemcfg::Store *resetStores[] = {&store, &netStore};
+modemcfg::Store *resetStores[] = {&store, &netStore, &bookStore};
 bool restarting = false;
 uint32_t restartAt = 0;
 
@@ -127,6 +136,11 @@ bool modemIdle() {
     return !callSlot.busy();
 }
 
+bool networkUp() {
+    return net.up();
+}
+uint32_t msNow();
+
 // --- AT* commands -----------------------------------------------------------------------
 
 atcmd::Reply cmdVer(atcmd::Port &port, const char *args) {
@@ -177,6 +191,13 @@ atcmd::Reply cmdDialTest(atcmd::Port &port, const char *args) {
 }
 
 atcmd::Reply cmdHw(atcmd::Port &port, const char *args) {
+    if (callSlot.busy() && strncmp(args, "LED", 3) != 0 && strcmp(args, "POT?") != 0 &&
+        strcmp(args, "PINS") != 0 && strcmp(args, "INFO") != 0 && strcmp(args, "?") != 0 &&
+        *args != 0 && strncmp(args, "SIG", 3) != 0 && strncmp(args, "LINES", 5) != 0 &&
+        strncmp(args, "LOOP", 4) != 0 && strncmp(args, "BRIDGE", 6) != 0) {
+        port.line("Audio tests are not available during a call.");
+        return atcmd::Reply::kError;
+    }
     port.beginInfo();
     if (isRs232(port)) {
         Rs232Term t(port);
@@ -185,6 +206,13 @@ atcmd::Reply cmdHw(atcmd::Port &port, const char *args) {
         hwconsole::handle(consoleTerm, args);
     }
     return atcmd::Reply::kDone;
+}
+
+atcmd::Reply cmdPhonebook(atcmd::Port &port, const char *args) {
+    return phonebook.command(port, args, false);
+}
+atcmd::Reply cmdPhoneDelete(atcmd::Port &port, const char *args) {
+    return phonebook.command(port, args, true);
 }
 
 // AT*BAUD? shows the RS232 speed setting; AT*BAUD=AUTO detects it from "AT" (default);
@@ -233,6 +261,13 @@ atcmd::Reply cmdTestCall(atcmd::Port &port, const char *args) {
 }
 
 const atcmd::StarCommand kStarCommands[] = {
+    {"MODEL", "AT*MODEL=<14400|28800|33600|56000>", "identity and default CONNECT (? or =?)",
+     atcmd::cmdModel, false},
+    {"THROTTLE", "AT*THROTTLE=<ON|OFF>", "limit data to operational line speed (default OFF)",
+     atcmd::cmdThrottle, false},
+    {"PHONEBOOK", "AT*PHONEBOOK[?]|=<number>,<host>,<port>,<TELNET|RAW>[,<speed>]",
+     "list/save 64 phonebook entries", cmdPhonebook, false},
+    {"PHONEDELETE", "AT*PHONEDELETE=<number>", "delete a phonebook entry", cmdPhoneDelete, false},
     {"HELP", "AT*HELP", "this list", cmdHelp, false},
     {"?", "AT*?", "same as AT*HELP", cmdHelp, false},
     {"VER", "AT*VER", "firmware version", cmdVer, false},
@@ -427,8 +462,16 @@ void setup() {
     devicecfg::attachCommands(deviceCommands);
     modem = new atcmd::Modem(store, kStarCommands, sizeof kStarCommands / sizeof kStarCommands[0]);
     modemcfg::LoadResult loaded = modem->begin();
+    LittleFS.begin(false);  // never format away sounds on a mount failure
+    if (!phonebook.begin()) {
+        Serial.print("Phonebook unavailable/damaged; factory entry used.\r\n");
+    }
     console = new hostport::Session(*modem, consoleSink, kConsoleBaud, callSlot);
     rs232::begin(*modem, callSlot);
+    outgoing =
+        new calls::Outgoing(*modem, phonebook, callSlot, tcpSocket, callAudio, msNow, networkUp);
+    console->setDialer(outgoing);
+    rs232::session().setDialer(outgoing);
     hwconsole::setPortControl(hwconsole::PortControl{modemIdle, rs232::suspend, rs232::resume});
     netcfg::LoadResult netLoaded = net.begin(millis());
     netcfg::attachCommands(net, msNow);
@@ -461,6 +504,7 @@ void loop() {
     pollConsole(now);
     rs232::poll(now);
     net.tick(now);
+    outgoing->poll();
     netcfg::pollCommands();  // a finished AT*WIFIJOIN or AT*WIFISCAN
     deviceCommands.poll();
     // The command may have opened a window after this loop's timestamp was sampled.

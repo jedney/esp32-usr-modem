@@ -1,0 +1,41 @@
+#pragma once
+#include "connection.h"
+#include "telnet.h"
+
+namespace calls {
+enum class SocketState : uint8_t {
+    kClosed,
+    kResolving,
+    kPending,
+    kOpen,
+    kDnsError,
+    kRefused,
+    kFailed
+};
+class Socket {
+public:
+    virtual ~Socket() = default;
+    virtual void begin(const char *host, uint16_t port) = 0;
+    virtual void poll() = 0;
+    virtual SocketState state() const = 0;
+    virtual size_t write(const uint8_t *data, size_t len) = 0;
+    virtual size_t read(uint8_t *data, size_t len) = 0;
+    virtual void close() = 0;
+};
+class TcpConnection : public hostport::Connection {
+public:
+    explicit TcpConnection(Socket &socket) : socket_(socket) {}
+    void begin(bool raw);
+    size_t space() const override;
+    size_t write(const uint8_t *data, size_t len) override;
+    size_t read(uint8_t *buf, size_t cap) override;
+    bool isOpen() const override;
+    void close() override;
+    void poll(uint32_t nowMs) override;
+
+private:
+    Socket &socket_;
+    Telnet telnet_;
+    bool raw_ = false;
+};
+}  // namespace calls

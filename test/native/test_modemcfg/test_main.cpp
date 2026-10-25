@@ -3,6 +3,7 @@
 #include <unity.h>
 
 #include <cstring>
+#include <initializer_list>
 
 #include "modemcfg.h"
 
@@ -308,7 +309,7 @@ void test_extended_speed_profiles_survive_restart_and_keep_old_auto() {
     TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kOk), static_cast<int>(loadNvram(store, &out)));
     TEST_ASSERT_TRUE(n.tmpl[0] == out.tmpl[0]);
     TEST_ASSERT_TRUE(n.tmpl[1] == out.tmpl[1]);
-    TEST_ASSERT_EQUAL_UINT8(2, kLayoutVersion);  // the serialized fields have not changed
+    TEST_ASSERT_EQUAL_UINT8(3, kLayoutVersion);  // explicit speed and device model metadata
     n.tmpl[0].v[kAmpN] = 39;
     uint8_t blob[kBlobSize];
     serialize(n, blob);
@@ -319,8 +320,41 @@ void test_extended_speed_profiles_survive_restart_and_keep_old_auto() {
     assertLoadFails(blob, sizeof blob, LoadResult::kBadValue);
 }
 
+void test_layout_2_migration_preserves_speeds_and_validates_new_metadata() {
+    Nvram n = factoryNvram();
+    n.tmpl[0].v[kAmpN] = 0;
+    n.tmpl[1].v[kAmpN] = 8;
+    uint8_t current[kBlobSize];
+    serialize(n, current);
+    uint8_t old[kBlobSizeV2];
+    memcpy(old, current, sizeof old);
+    old[4] = 2;
+    uint32_t crc = crc32(old, sizeof old - 4);
+    for (unsigned i = 0; i < 4; ++i) {
+        old[sizeof old - 4 + i] = crc >> (8 * i);
+    }
+    Nvram out;
+    TEST_ASSERT_EQUAL(int(LoadResult::kMigrated), int(deserialize(old, sizeof old, &out)));
+    TEST_ASSERT_TRUE(out.tmpl[0].lineExplicit && out.tmpl[1].lineExplicit);
+    TEST_ASSERT_EQUAL(0, out.tmpl[0].get(kAmpN));
+    TEST_ASSERT_EQUAL(8, out.tmpl[1].get(kAmpN));
+    TEST_ASSERT_EQUAL_UINT32(14400, out.model);
+    TEST_ASSERT_FALSE(out.throttle);
+    for (size_t index : {kBlobSizeV2 - 4, kBlobSize - 9, kBlobSize - 5}) {
+        serialize(n, current);
+        current[index] = 255;
+        crc = crc32(current, sizeof current - 4);
+        for (unsigned i = 0; i < 4; ++i) {
+            current[sizeof current - 4 + i] = crc >> (8 * i);
+        }
+        TEST_ASSERT_EQUAL(int(LoadResult::kBadValue),
+                          int(deserialize(current, sizeof current, &out)));
+    }
+}
+
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_layout_2_migration_preserves_speeds_and_validates_new_metadata);
     RUN_TEST(test_factory_f1_has_the_decided_defaults);
     RUN_TEST(test_factory_s_registers);
     RUN_TEST(test_factory_f0_and_f2_differ_only_in_flow_control_and_results);

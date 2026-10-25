@@ -63,7 +63,7 @@ void copyTrimmed(char *dst, size_t cap, const char *src) {
     if (n >= cap) {
         n = cap - 1;
     }
-    memcpy(dst, src, n);
+    memmove(dst, src, n);
     dst[n] = '\0';
 }
 
@@ -129,6 +129,33 @@ void Modem::reset(unsigned z) {
     } else {
         active_ = modemcfg::factoryProfile(z - modemcfg::kTemplates - 1);
     }
+}
+
+void Modem::setLastDialed(const char *text) {
+    copyTrimmed(lastDialed_, sizeof lastDialed_, text);
+}
+
+bool Modem::setModel(uint32_t speed) {
+    if (!modemcfg::validModel(speed)) {
+        return false;
+    }
+    uint32_t before = nvram_.model;
+    nvram_.model = speed;
+    if (modemcfg::saveNvram(store_, nvram_)) {
+        return true;
+    }
+    nvram_.model = before;
+    return false;
+}
+
+bool Modem::setThrottle(bool enabled) {
+    bool before = nvram_.throttle;
+    nvram_.throttle = enabled;
+    if (modemcfg::saveNvram(store_, nvram_)) {
+        return true;
+    }
+    nvram_.throttle = before;
+    return false;
 }
 
 const StarCommand *Modem::findStar(const char *text, const char **args) const {
@@ -210,6 +237,43 @@ void Port::echo(const char *s, size_t len) {
 
 // --- Port: line input -----------------------------------------------------------------------
 
+Reply cmdModel(Port &port, const char *args) {
+    if (strcmp(args, "=?") == 0) {
+        port.beginInfo();
+        port.line("14400,28800,33600,56000");
+        return Reply::kOk;
+    }
+    if (*args == '\0' || strcmp(args, "?") == 0) {
+        port.beginInfo();
+        port.printf("%u (%s)", static_cast<unsigned>(port.modem().model()),
+                    modemcfg::modelName(port.modem().model()));
+        port.newline();
+        return Reply::kOk;
+    }
+    if (*args++ != '=') {
+        return Reply::kError;
+    }
+    unsigned speed = 0;
+    if (!isDigit(*args) || !number(args, 56000, &speed) || *args != '\0') {
+        return Reply::kError;
+    }
+    return port.modem().setModel(speed) ? Reply::kOk : Reply::kError;
+}
+
+Reply cmdThrottle(Port &port, const char *args) {
+    if (*args == '\0' || strcmp(args, "?") == 0) {
+        port.beginInfo();
+        port.line(port.modem().throttle() ? "ON" : "OFF");
+        return Reply::kOk;
+    }
+    bool on = strlen(args) == 3 && startsWith(args, "=ON");
+    bool off = strlen(args) == 4 && startsWith(args, "=OFF");
+    if (!on && !off) {
+        return Reply::kError;
+    }
+    return port.modem().setThrottle(on) ? Reply::kOk : Reply::kError;
+}
+
 void Port::feed(char c) {
     if (modem_.commandsStopped()) {
         return;
@@ -242,6 +306,7 @@ void Port::feed(char c) {
                 len_ = 0;
                 overflow_ = false;
                 privateLine_ = false;
+                privateStart_ = 0;
                 return;
             }
             if (c == 'A' || c == 'a') {
@@ -295,7 +360,7 @@ void Port::feed(char c) {
                 }
                 return;  // LF and other control characters are ignored
             }
-            if (privateLine_) {
+            if (privateLine_ && !(len_ == privateStart_ && c == '=')) {
                 echo("*", 1);
             } else {
                 echo(&c, 1);
@@ -308,7 +373,10 @@ void Port::feed(char c) {
                 const char *star = strchr(line_, '*');
                 if (star != nullptr) {
                     const StarCommand *command = modem_.findStar(star + 1, nullptr);
-                    privateLine_ = privateLine_ || (command != nullptr && command->sensitive);
+                    if (!privateLine_ && command != nullptr && command->sensitive) {
+                        privateLine_ = true;
+                        privateStart_ = len_;
+                    }
                 }
             } else {
                 overflow_ = true;
@@ -357,8 +425,9 @@ bool Port::cancelPrompt() {
     return true;
 }
 
-void Port::wait(CancelHandler cancel, void *ctx) {
+void Port::wait(CancelHandler cancel, void *ctx, Result cancelResult) {
     cancelFn_ = cancel;
+    cancelResult_ = cancelResult;
     ctx_ = ctx;
     state_ = State::kWait;
 }
@@ -450,7 +519,7 @@ void Port::feedWait(char c) {
     if (cancel != nullptr) {
         cancel(ctx);
     }
-    result(Result::kError);
+    result(cancelResult_);
 }
 
 // --- Port: command execution ------------------------------------------------------------
@@ -500,6 +569,30 @@ bool Port::runCommand(const char *&p, bool *stop) {
     unsigned n = 0;
 
     switch (c) {
+        case 'D': {
+            bool pulse = a.get(modemcfg::kTone) == 0;
+            if (upper(*p) == 'T' || upper(*p) == 'P') {
+                pulse = upper(*p++) == 'P';
+            }
+            const char *digits = p;
+            if (upper(*p) == 'L' && p[1] == '\0') {
+                digits = modem_.lastDialed();
+            }
+            if (upper(*p) == 'S') {
+                ++p;
+                if (!number(p, modemcfg::kPhoneSlots - 1, &n) || *p != '\0') {
+                    return false;
+                }
+                digits = modem_.nvram().phone[n];
+            }
+            if (link_ == nullptr || !link_->dial(digits, pulse)) {
+                return false;
+            }
+            modem_.setLastDialed(digits);
+            resultSent_ = true;
+            *stop = true;
+            return true;
+        }
         case 'B':
         case 'E':
         case 'F':
@@ -686,6 +779,9 @@ bool Port::runAmpersand(const char *&p, bool *stop) {
                 return false;
             }
             a.v[s] = static_cast<uint8_t>(n);
+            if (s == modemcfg::kAmpN) {
+                a.lineExplicit = true;
+            }
             return true;
         }
     }

@@ -92,6 +92,7 @@ Reply cmdLater(Port &port, const char *) {
 }
 
 const StarCommand kStar[] = {
+    {"MODEL", "AT*MODEL=<14400|28800|33600|56000>", "model", atcmd::cmdModel, false},
     {"VER", "AT*VER", "firmware version", cmdVer, false},
     {"HELP", "AT*HELP", "this list", cmdHelp, false},
     {"?", "AT*?", "this list", cmdHelp, false},
@@ -188,7 +189,7 @@ void test_quiet_still_shows_information() {
     MemStore st;
     Rig r(st);
     r.type("ATQ1\r");
-    CONTAINS(r.type("ATI3\r"), "USRobotics Sportster 14400 Fax");
+    CONTAINS(r.type("ATI3\r"), "Sportster 14.4k Series");
 }
 
 void test_backspace_and_delete() {
@@ -215,7 +216,7 @@ void test_repeat_last_line_with_a_slash() {
     Rig r(st);
     r.type("ATI3\r");
     std::string out = r.type("A/");  // no Enter
-    CONTAINS(out, "USRobotics Sportster 14400 Fax");
+    CONTAINS(out, "Sportster 14.4k Series");
     ENDS_WITH(out, "OK\r\n");
     ENDS_WITH(r.type("a/"), "OK\r\n");
 }
@@ -632,11 +633,11 @@ void test_fclass() {
 void test_ati_identity_lines() {
     MemStore st;
     Rig r(st);
-    TEST_ASSERT_EQUAL_STRING("ATI3\r\r\nUSRobotics Sportster 14400 Fax\r\n\r\nOK\r\n",
+    TEST_ASSERT_EQUAL_STRING("ATI3\r\r\nSportster 14.4k Series\r\n\r\nOK\r\n",
                              r.type("ATI3\r").c_str());
     TEST_ASSERT_EQUAL_STRING("ATI0\r\r\n1441\r\n\r\nOK\r\n", r.type("ATI0\r").c_str());
     TEST_ASSERT_EQUAL_STRING("ATI2\r\r\nOK\r\n\r\nOK\r\n", r.type("ATI2\r").c_str());
-    CONTAINS(r.type("ATI9\r"), "USRobotics Sportster 14400 Fax");
+    CONTAINS(r.type("ATI9\r"), "Sportster 14.4k Series");
     ENDS_WITH(r.type("ATI8\r"), "ERROR\r\n");
     ENDS_WITH(r.type("ATI10\r"), "ERROR\r\n");
 }
@@ -660,7 +661,7 @@ void test_ati4_current_settings_layout() {
         "ATI4\r"
         "\r\n"
         "\r\n"
-        "USRobotics Sportster 14400 Fax Settings...\r\n"
+        "Sportster 14.4k Series Settings...\r\n"
         "\r\n"
         "B0  E1  F1  L2  M1  Q0  V1  X4  Y0\r\n"
         "BAUD=115200  PARITY=N  WORDLEN=8\r\n"
@@ -687,7 +688,7 @@ void test_ati5_stored_settings_layout() {
     r.type("AT&Z0=170064142064\r");
     std::string out = r.type("ATI5\r");
     CONTAINS(out,
-             "\r\nUSRobotics Sportster 14400 Fax NVRAM Settings...\r\n\r\nTemplate Y0\r\n\r\n"
+             "\r\nSportster 14.4k Series NVRAM Settings...\r\n\r\nTemplate Y0\r\n\r\n"
              "DIAL=TONE  B0  E1  F1  L2  M1  Q0  V1  X4\r\n"
              "BAUD=38400  PARITY=N  WORDLEN=8\r\n\r\n"
              "&A0  &B1  &C1  &D2  &G0  &H1  &I0  &K1  &M4  &N8\r\n");
@@ -701,7 +702,7 @@ void test_ati6_and_ati7_layout() {
     MemStore st;
     Rig r(st);
     std::string i6 = r.type("ATI6\r");
-    CONTAINS(i6, "\r\n\r\nUSRobotics Sportster 14400 Fax Link Diagnostics...\r\n\r\n");
+    CONTAINS(i6, "\r\n\r\nSportster 14.4k Series Link Diagnostics...\r\n\r\n");
     CONTAINS(i6, "Chars sent                    0      Chars Received                0\r\n");
     CONTAINS(i6, "Chars lost                    0\r\n");
     CONTAINS(i6, "Speed                  0/0\r\n");
@@ -715,15 +716,15 @@ void test_several_inquiries_on_one_line() {
     MemStore st;
     Rig r(st);
     std::string out = r.type("ATI3I7\r");
-    CONTAINS(out, "14400 Fax\r\n\r\nConfiguration Profile...");
+    CONTAINS(out, "14.4k Series\r\n\r\nConfiguration Profile...");
 }
 
 void test_ampersand_v_shows_current_and_stored() {
     MemStore st;
     Rig r(st);
     std::string out = r.type("AT&V\r");
-    CONTAINS(out, "Fax Settings...");
-    CONTAINS(out, "Fax NVRAM Settings...");
+    CONTAINS(out, "Series Settings...");
+    CONTAINS(out, "Series NVRAM Settings...");
     ENDS_WITH(out, "\r\nOK\r\n");
     ENDS_WITH(r.type("AT&V1\r"), "ERROR\r\n");
 }
@@ -732,8 +733,7 @@ void test_numeric_mode_has_no_leading_blank_line() {
     MemStore st;
     Rig r(st);
     r.type("ATV0\r");
-    TEST_ASSERT_EQUAL_STRING("ATI3\rUSRobotics Sportster 14400 Fax\r\n0\r",
-                             r.type("ATI3\r").c_str());
+    TEST_ASSERT_EQUAL_STRING("ATI3\rSportster 14.4k Series\r\n0\r", r.type("ATI3\r").c_str());
 }
 
 // --- AT* commands ---------------------------------------------------------------------------
@@ -892,8 +892,67 @@ void test_secret_handler_can_wait_for_a_late_result() {
     TEST_ASSERT_EQUAL_STRING("\r\nERROR\r\n", r.out.s.c_str());
 }
 
+void test_model_commands_persist_outside_templates() {
+    MemStore st;
+    Rig r(st);
+    for (unsigned speed : {14400u, 28800u, 33600u, 56000u}) {
+        char cmd[40];
+        snprintf(cmd, sizeof cmd, "AT*MODEL=%u\r", speed);
+        ENDS_WITH(r.type(cmd), "OK\r\n");
+        TEST_ASSERT_EQUAL_UINT32(speed, r.modem.model());
+        CONTAINS(r.type("ATI3\r"), modemcfg::modelName(speed));
+        CONTAINS(r.type("ATI4\r"), modemcfg::modelName(speed));
+        CONTAINS(r.type("ATI5\r"), modemcfg::modelName(speed));
+        CONTAINS(r.type("ATI9\r"), modemcfg::modelName(speed));
+        Rig restarted(st);
+        TEST_ASSERT_EQUAL_UINT32(speed, restarted.modem.model());
+    }
+    r.type("AT&F1\r");
+    TEST_ASSERT_EQUAL_UINT32(56000, r.modem.model());
+    r.type("ATZ\r");
+    TEST_ASSERT_EQUAL_UINT32(56000, r.modem.model());
+    for (const char *invalid :
+         {"ATMODEL=14400\r", "AT*MODEL=1\r", "AT*MODEL=56001\r", "AT*MODEL=14400x\r"}) {
+        ENDS_WITH(r.type(invalid), "ERROR\r\n");
+        TEST_ASSERT_EQUAL_UINT32(56000, r.modem.model());
+    }
+    CONTAINS(r.type("AT*MODEL=?\r"), "14400,28800,33600,56000");
+    CONTAINS(r.type("AT*MODEL?\r"), "56000 (Sportster 56k Series)");
+    TEST_ASSERT_FALSE(r.modem.active().lineExplicit);
+    r.type("AT&N8&W\r");
+    TEST_ASSERT_TRUE(r.modem.active().lineExplicit);
+    Rig again(st);
+    TEST_ASSERT_TRUE(again.modem.active().lineExplicit);
+    st.erase();
+    Rig factory(st);
+    TEST_ASSERT_EQUAL_UINT32(14400, factory.modem.model());
+}
+
+void test_connect_detail_uses_operational_speed_and_respects_result_modes() {
+    auto profile = modemcfg::factoryProfile(1);
+    char result[96];
+    profile.v[modemcfg::kAmpA] = 3;
+    atcmd::formatConnect(56000, 14400, profile, result, sizeof result);
+    TEST_ASSERT_EQUAL_STRING("\r\nCONNECT 56000/ARQ/V32/NONE\r\n", result);
+    profile.v[modemcfg::kAmpM] = 0;
+    atcmd::formatConnect(14400, 300, profile, result, sizeof result);
+    TEST_ASSERT_EQUAL_STRING("\r\nCONNECT 14400/V21/NONE\r\n", result);
+    profile.v[modemcfg::kV] = 0;
+    atcmd::formatConnect(56000, 14400, profile, result, sizeof result);
+    TEST_ASSERT_EQUAL_STRING("232\r", result);
+    profile.v[modemcfg::kV] = 1;
+    profile.v[modemcfg::kX] = 0;
+    atcmd::formatConnect(56000, 14400, profile, result, sizeof result);
+    TEST_ASSERT_EQUAL_STRING("\r\nCONNECT\r\n", result);
+    profile.v[modemcfg::kQ] = 1;
+    TEST_ASSERT_EQUAL(0, atcmd::formatConnect(56000, 14400, profile, result, sizeof result));
+    TEST_ASSERT_EQUAL_STRING("", result);
+}
+
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_connect_detail_uses_operational_speed_and_respects_result_modes);
+    RUN_TEST(test_model_commands_persist_outside_templates);
     RUN_TEST(test_secret_prompt_echoes_stars);
     RUN_TEST(test_secret_prompt_with_echo_off_shows_nothing);
     RUN_TEST(test_secret_prompt_cancel_and_overflow);

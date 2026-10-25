@@ -128,7 +128,24 @@ const uint8_t kSRegsStored[] = {0,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 
 
 bool operator==(const Profile &a, const Profile &b) {
     return memcmp(a.v, b.v, sizeof a.v) == 0 && memcmp(a.s, b.s, sizeof a.s) == 0 &&
-           a.baud == b.baud;
+           a.baud == b.baud && a.lineExplicit == b.lineExplicit;
+}
+
+bool validModel(uint32_t speed) {
+    return speed == 14400 || speed == 28800 || speed == 33600 || speed == 56000;
+}
+
+const char *modelName(uint32_t speed) {
+    switch (speed) {
+        case 28800:
+            return "Sportster 28.8k Series";
+        case 33600:
+            return "Sportster 33.6k Series";
+        case 56000:
+            return "Sportster 56k Series";
+        default:
+            return "Sportster 14.4k Series";
+    }
 }
 
 Profile factoryProfile(unsigned n) {
@@ -222,6 +239,12 @@ void serialize(const Nvram &n, uint8_t *out) {
     }
     putU32(p, n.hostBaud);
     p += 4;
+    for (const Profile &t : n.tmpl) {
+        *p++ = t.lineExplicit ? 1 : 0;
+    }
+    putU32(p, n.model);
+    p += 4;
+    *p++ = n.throttle ? 1 : 0;
     putU32(p, crc32(out, static_cast<size_t>(p - out)));
 }
 
@@ -237,10 +260,10 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
         return LoadResult::kBadMagic;
     }
     const uint8_t version = in[4];
-    if (version != 1 && version != kLayoutVersion) {
+    if (version != 1 && version != 2 && version != kLayoutVersion) {
         return LoadResult::kBadVersion;
     }
-    const size_t size = version == 1 ? kBlobSizeV1 : kBlobSize;
+    const size_t size = version == 1 ? kBlobSizeV1 : version == 2 ? kBlobSizeV2 : kBlobSize;
     if (len != size) {
         return LoadResult::kBadSize;
     }
@@ -254,6 +277,7 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
         return LoadResult::kBadValue;
     }
     for (Profile &t : n.tmpl) {
+        t.lineExplicit = version < 3;  // preserve old saved speed; its provenance is unknown
         memcpy(t.v, p, kSettingCount);
         p += kSettingCount;
         memcpy(t.s, p, kSRegCount);
@@ -282,11 +306,26 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
         return LoadResult::kMigrated;
     }
     n.hostBaud = getU32(p);
+    p += 4;
     if (n.hostBaud != 0 && !isHostRate(n.hostBaud)) {
         return LoadResult::kBadValue;
     }
+    if (version == 3) {
+        for (Profile &t : n.tmpl) {
+            if (*p > 1) {
+                return LoadResult::kBadValue;
+            }
+            t.lineExplicit = *p++ != 0;
+        }
+        n.model = getU32(p);
+        p += 4;
+        if (!validModel(n.model) || *p > 1) {
+            return LoadResult::kBadValue;
+        }
+        n.throttle = *p != 0;
+    }
     *out = n;
-    return LoadResult::kOk;
+    return version < 3 ? LoadResult::kMigrated : LoadResult::kOk;
 }
 
 const char *loadResultText(LoadResult r) {

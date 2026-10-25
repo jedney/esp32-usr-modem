@@ -122,6 +122,8 @@ def test_pass_masks_inline_input_and_refuses_repeat(managed_device):
     output = console.raw(("AT*PASS=" + replacement + "\r").encode())
     absent = replacement.encode() not in output
     assert absent, "inline password leaked"
+    boundary_correct = output.startswith(b"AT*PASS=" + b"*" * len(replacement) + b"\r")
+    assert boundary_correct, "password masking must start after the visible equals sign"
     assert output.rstrip().endswith(b"OK")
     repeat = console.raw(b"A/")
     assert repeat.rstrip().endswith(b"ERROR")

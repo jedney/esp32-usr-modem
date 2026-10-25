@@ -170,6 +170,41 @@ bool audioReady() {
     return i2sReady;
 }
 
+bool audioStreamBegin() {
+    if (!i2sBegin()) {
+        return false;
+    }
+    i2s_zero_dma_buffer(kI2sPort);
+    ampWrite(ampModeSetting != AmpMode::kOff);
+    return true;
+}
+
+size_t audioStreamWrite(const int16_t *samples, size_t count, float userGain) {
+    if (!i2sReady) {
+        return 0;
+    }
+    if (count > kBlockFrames) {
+        count = kBlockFrames;
+    }
+    int16_t stereo[kBlockFrames * 2];
+    float gain = volume::outputGain(userGain);  // cap last, including WAV playback
+    for (size_t i = 0; i < count; ++i) {
+        stereo[i * 2] = stereo[i * 2 + 1] = volume::scale(samples[i], gain);
+    }
+    size_t bytes = 0;
+    i2s_write(kI2sPort, stereo, count * sizeof(int16_t) * 2, &bytes, 0);
+    return bytes / (sizeof(int16_t) * 2);
+}
+
+void audioStreamEnd() {
+    if (i2sReady) {
+        i2s_zero_dma_buffer(kI2sPort);
+    }
+    if (ampModeSetting != AmpMode::kOn) {
+        ampWrite(false);
+    }
+}
+
 bool audioPlay(tones::Source &src, GainFn gain, StopFn stop) {
     if (!i2sBegin()) {
         return false;
@@ -319,6 +354,9 @@ void hostEnd() {
     if (!hostOn) {
         return;
     }
+    // Release flow-control state before tearing down this idle port, including
+    // when the computer is absent or holds RTS off.
+    uart_set_hw_flow_ctrl(UART_NUM_1, UART_HW_FLOWCTRL_DISABLE, 100);
     Serial1.end();
     hostOn = false;
     // Back to plain GPIO, deasserted (HIGH).
@@ -329,6 +367,10 @@ void hostEnd() {
 
 bool hostActive() {
     return hostOn;
+}
+
+bool hostDrain(uint32_t timeoutMs) {
+    return !hostOn || uart_wait_tx_done(UART_NUM_1, pdMS_TO_TICKS(timeoutMs)) == ESP_OK;
 }
 
 void hostSetBaud(uint32_t baud) {

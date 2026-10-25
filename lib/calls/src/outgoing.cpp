@@ -1,0 +1,208 @@
+#include "outgoing.h"
+#include <cstring>
+
+namespace calls {
+bool Outgoing::start(hostport::Session &session, const char *text, bool pulse) {
+    dialstring::Result r = dialstring::classify(text);
+    Entry target;
+    if (r.kind == dialstring::Kind::Phonebook) {
+        const Entry *entry = book_.find(r.number);
+        if (!entry) {
+            return false;
+        }
+        target = *entry;
+    } else if (r.kind == dialstring::Kind::Host || r.kind == dialstring::Kind::IpAddress) {
+        strcpy(target.host, r.host);
+        target.port = r.port;
+    } else {
+        return false;
+    }  // future reserved-number services are not TCP destinations
+    if (slot_.busy()) {
+        session.port().result(atcmd::Result::kBusy);
+        return true;
+    }
+    if (!network_()) {
+        session.port().result(atcmd::Result::kNoDialTone);
+        return true;
+    }
+    if (!slot_.claim(&session)) {
+        return false;
+    }
+    target_ = target;
+    session_ = &session;
+    profile_ = modem_.active();
+    pulse_ = pulse;
+    dtrWasOn_ = session.dtrOn();
+    unsigned n = profile_.get(modemcfg::kAmpN);
+    lineSpeed_ = target_.speed ? target_.speed
+                 : n           ? atcmd::lineSpeedForN(n)
+                               : modemcfg::kMaxLineSpeed;
+    unsigned floor = profile_.get(modemcfg::kAmpU);
+    if (floor && lineSpeed_ < atcmd::lineSpeedForN(floor)) {
+        finish(atcmd::Result::kNoCarrier);
+        return true;
+    }
+    reportSpeed_ = target_.speed || profile_.lineExplicit ? lineSpeed_ : modem_.model();
+    // Dial the number the user entered, never the digits in a hostname expansion.
+    size_t count = 0;
+    for (const char *p = text; *p && count < sizeof digits_ - 1; ++p) {
+        if (*p >= '0' && *p <= '9') {
+            digits_[count++] = *p;
+        }
+    }
+    digits_[count] = 0;
+    session.port().wait(cancelWait, this, atcmd::Result::kNoCarrier);
+    if (profile_.get(modemcfg::kM) == 0 || profile_.get(modemcfg::kM) == 3) {
+        connect(clock_());
+    } else {
+        stage_ = CallStage::kDial;
+        if (!play(SoundStage::kDial)) {
+            finish(atcmd::Result::kNoCarrier);
+        }
+    }
+    return true;
+}
+bool Outgoing::play(SoundStage stage) {
+    return sound_.start(stage, digits_, pulse_, lineSpeed_, profile_);
+}
+void Outgoing::connect(uint32_t now) {
+    stage_ = CallStage::kConnecting;
+    since_ = now;
+    socket_.begin(target_.host, target_.port);
+    connection_.begin(target_.raw);
+}
+void Outgoing::connected() {
+    session_->port().finish(atcmd::Reply::kDone);
+    if (!session_->startCall(connection_, lineSpeed_, reportSpeed_)) {
+        finish(atcmd::Result::kNoCarrier);
+        return;
+    }
+    stage_ = CallStage::kOnline;
+    sound_.stop();
+    if (modem_.active().get(modemcfg::kM) == 2) {
+        play(SoundStage::kCarrier);
+    }
+}
+void Outgoing::cancel() {
+    sound_.stop();
+    connection_.close();
+    if (session_) {
+        slot_.release(session_);
+    }
+    session_ = nullptr;
+    stage_ = CallStage::kIdle;
+}
+void Outgoing::finish(atcmd::Result result) {
+    if (session_) {
+        session_->port().finish(atcmd::Reply::kDone);
+        if (session_->callUp()) {
+            session_->hangUp();
+        }
+        session_->port().result(result);
+    }
+    cancel();
+}
+void Outgoing::poll() {
+    // A command can start a call after the main loop sampled its timestamp.
+    // Read the clock here so unsigned deadline arithmetic cannot see the past.
+    const uint32_t now = clock_();
+    if (stage_ == CallStage::kIdle) {
+        return;
+    }
+    sound_.poll(now, modem_.active());
+    if (sound_.failed()) {
+        finish(atcmd::Result::kNoCarrier);
+        return;
+    }
+    if (stage_ == CallStage::kOnline) {
+        if (!network_()) {
+            connection_.close();
+        }
+        if (!session_->callUp()) {
+            cancel();
+            return;
+        }
+        if (modem_.active().get(modemcfg::kM) == 2) {
+            if (!sound_.running()) {
+                play(SoundStage::kCarrier);
+            }
+        } else {
+            sound_.stop();
+        }
+        return;
+    }
+    if (!network_()) {
+        finish(atcmd::Result::kNoDialTone);
+        return;
+    }
+    bool dtr = session_->dtrOn();
+    if (dtrWasOn_ && !dtr && profile_.get(modemcfg::kAmpD) >= 2) {
+        finish(atcmd::Result::kNoCarrier);
+        return;
+    }
+    dtrWasOn_ = dtr;
+    bool silent = modem_.active().get(modemcfg::kM) == 0;
+    if (silent) {
+        sound_.stop();
+    }
+    if (stage_ == CallStage::kDial && !sound_.running()) {
+        stage_ = CallStage::kDigits;
+        if (!silent && !play(SoundStage::kDigits)) {
+            finish(atcmd::Result::kNoCarrier);
+            return;
+        }
+    }
+    if (stage_ == CallStage::kDigits && !sound_.running()) {
+        connect(now);
+    }
+    if (stage_ == CallStage::kBusy) {
+        if (!sound_.running()) {
+            finish(atcmd::Result::kBusy);
+        }
+        return;
+    }
+    if (stage_ != CallStage::kConnecting && stage_ != CallStage::kHandshake) {
+        return;
+    }
+    connection_.poll(now);
+    SocketState state = socket_.state();
+    if (state == SocketState::kDnsError) {
+        finish(atcmd::Result::kNoDialTone);
+        return;
+    }
+    if (state == SocketState::kRefused) {
+        stage_ = CallStage::kBusy;
+        if (silent || !play(SoundStage::kBusy)) {
+            finish(atcmd::Result::kBusy);
+        }
+        return;
+    }
+    if (state == SocketState::kFailed) {
+        finish(atcmd::Result::kNoAnswer);
+        return;
+    }
+    if (state == SocketState::kClosed) {
+        finish(atcmd::Result::kNoCarrier);
+        return;
+    }
+    if (now - since_ >= uint32_t(profile_.s[7]) * 1000) {
+        finish(state == SocketState::kResolving ? atcmd::Result::kNoDialTone
+                                                : atcmd::Result::kNoAnswer);
+        return;
+    }
+    if (stage_ == CallStage::kConnecting && state == SocketState::kOpen) {
+        if (silent) {
+            connected();
+            return;
+        }
+        stage_ = CallStage::kHandshake;
+        if (!play(SoundStage::kHandshake)) {
+            finish(atcmd::Result::kNoCarrier);
+            return;
+        }
+    }
+    if (stage_ == CallStage::kHandshake && !sound_.running()) {
+        connected();
+    }
+}
+}  // namespace calls

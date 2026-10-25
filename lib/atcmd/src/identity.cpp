@@ -1,4 +1,4 @@
-// ATI0-ATI7, ATI9 and the settings screens: Sportster 14400 identity (Jon, v0.8).
+// ATI0-ATI7, ATI9 and settings screens: selectable Sportster series (Jon, v0.8).
 // Commands and selectable speeds retain the later USR capabilities through 56000.
 //
 // Sources (credits/LICENSES.md):
@@ -7,7 +7,7 @@
 //     https://fido7.ru.modem.narkive.com/YzTdiljZ/sportster-33600
 //   - What each inquiry shows: USR Sportster technical reference (techref_uk.pdf) and
 //     the Sportster user guide.
-//   - No verified 14400 ROM capture was found: ATI0/ATI1 are emulator placeholders,
+//   - No verified complete ROM captures for the four series: ATI0/ATI1 are placeholders,
 //     ATI3 has no invented ROM revision, and ATI7 labels hardware details as emulated.
 //     ATI9 returns the model name, without claiming a manufacturer's PnP identifier.
 //
@@ -26,10 +26,22 @@ using modemcfg::Setting;
 
 namespace {
 
-const char kProductCode[] = "1441";  // ATI0 (emulator placeholder, see above)
-const char kRomChecksum[] = "0000";  // ATI1 (no physical ROM)
-const char kProductId[] = "USRobotics Sportster 14400 Fax";
-const char kName[] = "USRobotics Sportster 14400 Fax";
+const char *identity(Port &port) {
+    return modemcfg::modelName(port.modem().model());
+}
+const char *productCode(Port &port) {
+    switch (port.modem().model()) {
+        case 28800:
+            return "2881";
+        case 33600:
+            return "3361";
+        case 56000:
+            return "5601";
+        default:
+            return "1441";
+    }
+}
+const char kRomChecksum[] = "0000";  // emulator placeholder; no physical ROM
 
 void settingsLine(Port &port, const Profile &p, const Setting *list, size_t count,
                   const char *before, const char *after) {
@@ -114,7 +126,7 @@ void field(Port &port, const char *label, const char *value) {
 void showDiagnostics(Port &port) {  // ATI6, with no call since power-on
     port.beginInfo();
     port.newline();
-    port.printf("%s Link Diagnostics...", kName);
+    port.printf("%s Link Diagnostics...", identity(port));
     port.newline();
     port.newline();
     counters(port, "Chars sent", "Chars Received");
@@ -140,7 +152,11 @@ void showConfiguration(Port &port) {  // ATI7
     port.line("Configuration Profile...");
     port.newline();
     field(port, "Product type", "US/Canada External");
-    field(port, "Options", "V32bis");
+    field(port, "Options",
+          port.modem().model() == 14400   ? "V32bis"
+          : port.modem().model() == 28800 ? "V34"
+          : port.modem().model() == 33600 ? "V34+"
+                                          : "V90");
     field(port, "Fax Options", "NONE");
     field(port, "Clock Freq", "Emulated");
     field(port, "Eprom", "Emulated");
@@ -159,7 +175,7 @@ void showCurrent(Port &port) {
     const Profile &p = port.modem().active();
     port.beginInfo();
     port.newline();
-    port.printf("%s Settings...", kName);
+    port.printf("%s Settings...", identity(port));
     port.newline();
     port.newline();
     static const Setting kLetters[] = {modemcfg::kB, modemcfg::kE, modemcfg::kF, modemcfg::kL,
@@ -183,7 +199,7 @@ void showCurrent(Port &port) {
 void showStored(Port &port) {
     const modemcfg::Nvram &n = port.modem().nvram();
     port.beginInfo();
-    port.printf("%s NVRAM Settings...", kName);
+    port.printf("%s NVRAM Settings...", identity(port));
     port.newline();
     static const Setting kLetters[] = {modemcfg::kB, modemcfg::kE, modemcfg::kF, modemcfg::kL,
                                        modemcfg::kM, modemcfg::kQ, modemcfg::kV, modemcfg::kX};
@@ -215,7 +231,7 @@ bool showInfo(Port &port, unsigned n) {
     switch (n) {
         case 0:
             port.beginInfo();
-            port.line(kProductCode);
+            port.line(productCode(port));
             return true;
         case 1:
             port.beginInfo();
@@ -227,7 +243,7 @@ bool showInfo(Port &port, unsigned n) {
             return true;
         case 3:
             port.beginInfo();
-            port.line(kProductId);
+            port.line(identity(port));
             return true;
         case 4:
             showCurrent(port);
@@ -243,7 +259,7 @@ bool showInfo(Port &port, unsigned n) {
             return true;
         case 9:  // model inquiry; no unverified manufacturer PnP ID
             port.beginInfo();
-            port.line(kProductId);
+            port.line(identity(port));
             return true;
         default:
             return false;

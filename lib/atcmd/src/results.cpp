@@ -201,4 +201,29 @@ size_t formatResult(Result r, const modemcfg::Profile &p, char *buf, size_t cap)
     return static_cast<size_t>(n) < cap ? static_cast<size_t>(n) : cap - 1;
 }
 
+size_t formatConnect(uint32_t reportedSpeed, uint32_t operationalSpeed, const modemcfg::Profile &p,
+                     char *buf, size_t cap) {
+    size_t n = formatResult(connectFor(reportedSpeed), p, buf, cap);
+    unsigned detail = p.get(modemcfg::kAmpA);
+    if (n < 2 || p.get(modemcfg::kV) == 0 || p.get(modemcfg::kX) == 0 || !detail) {
+        return n;
+    }
+    // TCP supplies the reliable channel; no modem compression or LAPM frames are
+    // implemented. Keep the default plain, and do not claim V.42bis compression.
+    const char *reliable = operationalSpeed >= 1200 && p.get(modemcfg::kAmpM) >= 4 ? "/ARQ" : "";
+    const char *modulation = operationalSpeed > 33600   ? "/V90"
+                             : operationalSpeed > 14400 ? "/V34"
+                             : operationalSpeed > 2400  ? "/V32"
+                             : operationalSpeed > 300   ? "/V22"
+                                                        : "/V21";
+    int written =
+        snprintf(buf + n - 2, cap - (n - 2), "%s%s%s%c%c", reliable, detail >= 2 ? modulation : "",
+                 detail >= 3 ? "/NONE" : "", static_cast<char>(p.s[3]), static_cast<char>(p.s[4]));
+    if (written < 0) {
+        return 0;
+    }
+    size_t total = n - 2 + static_cast<size_t>(written);
+    return total < cap ? total : cap - 1;
+}
+
 }  // namespace atcmd

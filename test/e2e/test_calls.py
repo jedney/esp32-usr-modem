@@ -1,0 +1,279 @@
+"""v0.8 calls through a local PC server; no RS232 wiring needed.
+
+Set --call-server-ip to the PC address reachable from the modem. These tests do
+not change firewall settings. --live-bbs additionally checks ATDT1 against the BBS.
+"""
+import contextlib
+import socket
+import threading
+import time
+
+import pytest
+
+SERVER_PORT = 32321
+
+
+def _hangup(console):
+    console.raw(b"x", wait=0.1)  # cancel a pending dial, if any
+    time.sleep(1.1)
+    console.raw(b"+++", wait=1.3)
+    console.raw(b"ATH\r", wait=0.2)
+    console.raw(b"ATZ\r", wait=0.2)
+    console.raw(b"ATE1Q0V1X4\r", wait=0.2)
+
+
+@pytest.fixture
+def call_console(console):
+    _hangup(console)
+    before_model = console.command("AT*MODEL?")[0].split()[0]
+    before_throttle = console.command("AT*THROTTLE?")[0]
+    assert console.command("AT*MODEL=14400")[-1] == "OK"
+    assert console.command("AT*THROTTLE=OFF")[-1] == "OK"
+    assert console.command("AT&F1M0S7=5", timeout=8)[-1] == "OK"
+    try:
+        yield console
+    finally:
+        _hangup(console)
+        console.command("AT*MODEL=" + before_model)
+        console.command("AT*THROTTLE=" + before_throttle)
+        console.command("ATZ")
+
+
+@pytest.fixture
+def server_ip(request):
+    global SERVER_PORT
+    SERVER_PORT = request.config.getoption("--call-server-port")
+    address = request.config.getoption("--call-server-ip")
+    if not address:
+        pytest.skip("local call server needs --call-server-ip (PC LAN address)")
+    return address
+
+
+@contextlib.contextmanager
+def server(handler):
+    listener = socket.socket()
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(("0.0.0.0", SERVER_PORT))
+    listener.listen(1)
+    listener.settimeout(0.2)
+    errors = []
+    stopped = threading.Event()
+
+    def run():
+        try:
+            while not stopped.is_set():
+                try:
+                    connection, _ = listener.accept()
+                    break
+                except socket.timeout:
+                    continue
+            else:
+                return
+            with connection:
+                connection.settimeout(5)
+                handler(connection)
+        except (OSError, AssertionError) as exc:
+            if not stopped.is_set():
+                errors.append(type(exc).__name__)
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    try:
+        yield listener.getsockname()[1]
+    finally:
+        stopped.set()
+        listener.close()
+        thread.join(timeout=6)
+        assert not errors, "local call server failed (traffic omitted)"
+
+
+def echo(connection):
+    while True:
+        data = connection.recv(2048)
+        if not data:
+            return
+        connection.sendall(data)
+
+
+def dial(console, host, port, speed="14400"):
+    lines = console.command(f"ATDT{host}:{port}", timeout=8,
+                            until=("CONNECT " + speed, "ERROR", "BUSY", "NO ANSWER", "NO DIAL TONE", "NO CARRIER"))
+    assert lines[-1] == "CONNECT " + speed
+
+
+def escape(console):
+    time.sleep(1.1)
+    received = console.raw(b"+++", wait=1.4)
+    escaped = received.endswith(b"OK\r\n")
+    del received
+    assert escaped, "escape failed (traffic omitted)"
+
+
+def test_raw_call_all_bytes_and_remote_drop(call_console, server_ip):
+    console = call_console
+    # Save/restore a temporary exact phonebook key, including leading zeros.
+    key = "99999999999"
+    before = [line for line in console.command("AT*PHONEBOOK?") if line.startswith(key + ",")]
+    try:
+        with server(echo) as port:
+            assert console.command(f"AT*PHONEBOOK={key},{server_ip},{port},RAW")[-1] == "OK"
+            assert console.command("ATDT" + key, timeout=8, until=("CONNECT 14400", "ERROR", "NO ANSWER"))[-1] == "CONNECT 14400"
+            data = bytes(range(256)) * 8
+            received = console.raw(data, wait=1.0)
+            matched = received == data
+            del received
+            assert matched, "binary echo mismatch (traffic omitted)"
+            escape(console)
+            assert console.command("ATH")[-1] == "OK"
+    finally:
+        _hangup(console)
+        console.command("AT*PHONEDELETE=" + key)
+        if before:
+            console.command("AT*PHONEBOOK=" + before[0])
+
+
+def test_telnet_negotiation_ansi_naws_binary_and_ff(call_console, server_ip):
+    console = call_console
+    payload = b"A\xffB\x00C"
+    got = bytearray()
+    def telnet_peer(connection):
+        request = bytes([255,253,0,255,251,0,255,253,24,255,253,31,255,250,24,1,255,240])
+        # Deliberately split IAC and subnegotiation across TCP writes.
+        for byte in request:
+            connection.sendall(bytes([byte]))
+            time.sleep(0.003)
+        deadline = time.monotonic() + 4
+        expected_type = b"\xff\xfa\x18\x00ANSI\xff\xf0"
+        expected_size = b"\xff\xfa\x1f\x00P\x00\x18\xff\xf0"
+        while time.monotonic() < deadline and (expected_type not in got or expected_size not in got):
+            got.extend(connection.recv(256))
+        assert expected_type in got and expected_size in got
+        expected = payload.replace(b"\xff", b"\xff\xff")
+        # Host data can arrive alongside the initial negotiation replies.
+        received = bytearray(got)
+        while expected not in received:
+            data = connection.recv(256)
+            assert data, "peer closed before the synthetic payload"
+            received.extend(data)
+        connection.sendall(expected + b"done")
+        time.sleep(0.5)
+    with server(telnet_peer) as port:
+        dial(console, server_ip, port)
+        received = console.raw(payload, wait=1.0)
+        matched = payload in received
+        del received
+        assert matched, "Telnet echo mismatch (traffic omitted)"
+        time.sleep(0.6)
+        assert console.command("AT")[-1] == "OK"
+
+
+def test_connection_refused_and_dns_failure(call_console, server_ip, request):
+    if not request.config.getoption("--refusal-probe"):
+        pytest.skip("Windows refusal probe needs the temporary rule in scripts/test_refusal.ps1")
+    console = call_console
+    with socket.socket() as unused:
+        option = socket.SO_EXCLUSIVEADDRUSE if hasattr(socket, "SO_EXCLUSIVEADDRUSE") else socket.SO_REUSEADDR
+        unused.setsockopt(socket.SOL_SOCKET, option, 1)
+        unused.bind(("0.0.0.0", SERVER_PORT))
+        lines = console.command(f"ATDT{server_ip}:{SERVER_PORT}", timeout=8,
+                                until=("BUSY", "ERROR", "NO ANSWER"))
+        assert lines[-1] == "BUSY"
+    lines = console.command("ATDTmissing-v08.invalid:23", timeout=8,
+                            until=("NO DIAL TONE", "NO ANSWER", "ERROR"))
+    assert lines[-1] == "NO DIAL TONE"
+
+
+def test_connection_deadline_and_any_key_cancel(call_console, server_ip):
+    console = call_console
+    assert console.command("ATS7=0")[-1] == "OK"
+    with server(echo) as port:
+        lines = console.command(f"ATDT{server_ip}:{port}", timeout=5,
+                                until=("NO ANSWER", "ERROR", "NO CARRIER"))
+        assert lines[-1] == "NO ANSWER"
+    assert console.command("ATM1S6=5S7=5")[-1] == "OK"
+    console.ser.reset_input_buffer()
+    console.ser.write(b"ATDT1\r")
+    time.sleep(0.1)
+    result = console.raw(b"x", wait=0.5)
+    cancelled = b"NO CARRIER" in result
+    del result  # do not expose a possible reboot banner in assertion output
+    assert cancelled
+    assert console.command("AT")[-1] == "OK"
+
+
+def test_wifi_loss_hangs_up_online_call(call_console, server_ip):
+    from test_wifi import _wait_connected
+    console = call_console
+    try:
+        with server(echo) as port:
+            dial(console, server_ip, port)
+            escape(console)
+            result = console.raw(b"AT*WIFI=OFF\r", wait=1.0)
+            disconnected = b"NO CARRIER" in result
+            del result
+            assert disconnected
+            assert console.command("ATDT1", until=("NO DIAL TONE", "ERROR"))[-1] == "NO DIAL TONE"
+    finally:
+        console.command("AT*WIFI=ON")
+        _wait_connected(console)
+
+
+def test_model_changes_during_call_keep_ato_speed(call_console, server_ip):
+    console = call_console
+    assert console.command("AT*MODEL=56000")[-1] == "OK"
+    with server(echo) as port:
+        dial(console, server_ip, port, "56000")
+        escape(console)
+        assert console.command("AT*MODEL=28800")[-1] == "OK"
+        assert console.command("ATO", until=("CONNECT 56000", "ERROR"))[-1] == "CONNECT 56000"
+        escape(console)
+        assert console.command("ATH")[-1] == "OK"
+    with server(echo) as port:
+        dial(console, server_ip, port, "28800")
+        escape(console)
+        console.command("ATH")
+
+
+def test_streamed_handshake_completes_before_connect(call_console, server_ip):
+    console = call_console
+    assert console.command("AT&F1M1L2S6=1S7=30")[-1] == "OK"
+
+    def patient_echo(connection):
+        connection.settimeout(35)
+        echo(connection)
+
+    with server(patient_echo) as port:
+        started = time.monotonic()
+        result = console.command(f"ATDT{server_ip}:{port}", timeout=35,
+                                 until=("CONNECT 14400", "CONNECT 28800", "CONNECT 33600", "CONNECT 56000", "NO CARRIER", "NO ANSWER", "ERROR"))
+        assert result[-1] == "CONNECT 14400"
+        assert time.monotonic() - started >= 16, "CONNECT preceded the handshake playback"
+        received = console.raw(b"streamed", wait=0.5)
+        matched = b"streamed" in received
+        del received
+        assert matched, "streamed call echo mismatch (traffic omitted)"
+        escape(console)
+        assert console.command("ATH")[-1] == "OK"
+
+
+def test_model_saved_across_restart_and_factory_profile_retains_it(call_console):
+    console = call_console
+    assert console.command("AT*MODEL=33600")[-1] == "OK"
+    console.restart()
+    assert console.command("AT*MODEL?")[0].startswith("33600 ")
+    assert console.command("AT&F1")[-1] == "OK"
+    assert console.command("AT*MODEL?")[0].startswith("33600 ")
+    assert console.command("ATI3")[0] == "Sportster 33.6k Series"
+
+
+def test_live_amiga_retro_bbs(call_console, request):
+    if not request.config.getoption("--live-bbs"):
+        pytest.skip("live BBS needs --live-bbs")
+    console = call_console
+    assert console.command("AT*MODEL=14400")[-1] == "OK"
+    assert console.command("ATDT1", timeout=65,
+                           until=("CONNECT 14400", "BUSY", "NO ANSWER", "NO DIAL TONE", "NO CARRIER", "ERROR"))[-1] == "CONNECT 14400"
+    greeting = console.raw(b"\r", wait=3)
+    assert greeting, "BBS sent no data"
+    escape(console)
+    console.command("ATH")

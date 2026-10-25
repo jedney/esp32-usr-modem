@@ -92,19 +92,19 @@ public:
 
 const atcmd::StarCommand table[] = {DEVICECFG_STAR_COMMANDS};
 struct Rig {
-    Memory auth, modemStore, netStore;
+    Memory auth, modemStore, netStore, bookStore;
     FakeCrypto crypto;
     Device device;
     FakeControl control;
-    modemcfg::Store *stores[2];
+    modemcfg::Store *stores[3];
     Commands commands;
     atcmd::Modem modem;
     Output output, otherOutput;
     atcmd::Port port, other;
     Rig()
         : device(auth, crypto),
-          stores{&modemStore, &netStore},
-          commands(device, control, stores, 2),
+          stores{&modemStore, &netStore, &bookStore},
+          commands(device, control, stores, 3),
           modem(modemStore, table, sizeof table / sizeof table[0]),
           port(modem, output, 115200),
           other(modem, otherOutput, 38400) {
@@ -403,12 +403,14 @@ void test_factory_erases_all_project_stores_and_blocks_commands_until_reboot() {
     Rig r;
     r.modemStore.bytes.assign(100, 42);
     r.netStore.bytes.assign(100, 43);
+    r.bookStore.bytes.assign(100, 44);
     r.type("AT*FACTORY\r");
     TEST_ASSERT_TRUE(has(r.type("Y\rAT&W\r"), "Restarting"));
     TEST_ASSERT_TRUE(r.control.reboot);
     TEST_ASSERT_TRUE(r.auth.bytes.empty());
     TEST_ASSERT_TRUE(r.modemStore.bytes.empty());
     TEST_ASSERT_TRUE(r.netStore.bytes.empty());
+    TEST_ASSERT_TRUE(r.bookStore.bytes.empty());
     TEST_ASSERT_TRUE(r.modem.commandsStopped());
     r.port.execute("&W");  // direct command users must also respect the pending reboot
     TEST_ASSERT_TRUE(r.modemStore.bytes.empty());
@@ -421,8 +423,9 @@ void test_factory_erases_all_project_stores_and_blocks_commands_until_reboot() {
 void test_factory_interruption_is_retried_after_restart() {
     Rig r;
     r.netStore.bytes.assign(20, 1);
-    r.netStore.failErase = true;
-    TEST_ASSERT_FALSE(r.device.factoryReset(r.stores, 2));
+    r.bookStore.bytes.assign(50, 2);
+    r.bookStore.failErase = true;
+    TEST_ASSERT_FALSE(r.device.factoryReset(r.stores, 3));
     TEST_ASSERT_TRUE(r.device.needsReset());
     TEST_ASSERT_FALSE(r.device.ready());
     Device again(r.auth, r.crypto);
@@ -430,17 +433,18 @@ void test_factory_interruption_is_retried_after_restart() {
     TEST_ASSERT_TRUE(again.needsReset());
     TEST_ASSERT_FALSE(again.wantsListener(0, true, true));
     TEST_ASSERT_FALSE(again.change("NewPassword!"));
-    r.netStore.failErase = false;
-    TEST_ASSERT_TRUE(again.factoryReset(r.stores, 2));
+    r.bookStore.failErase = false;
+    TEST_ASSERT_TRUE(again.factoryReset(r.stores, 3));
     TEST_ASSERT_TRUE(r.auth.bytes.empty());
     TEST_ASSERT_TRUE(r.netStore.bytes.empty());
+    TEST_ASSERT_TRUE(r.bookStore.bytes.empty());
 }
 
 void test_factory_marker_failure_does_not_erase_anything() {
     Rig r;
     r.netStore.bytes.assign(20, 1);
     r.auth.failSave = true;
-    TEST_ASSERT_FALSE(r.device.factoryReset(r.stores, 2));
+    TEST_ASSERT_FALSE(r.device.factoryReset(r.stores, 3));
     TEST_ASSERT_EQUAL(20, r.netStore.bytes.size());
     TEST_ASSERT_TRUE(r.device.ready());
 }
@@ -448,12 +452,12 @@ void test_factory_marker_failure_does_not_erase_anything() {
 void test_factory_last_erase_failure_keeps_recovery_marker() {
     Rig r;
     r.auth.failErase = true;
-    TEST_ASSERT_FALSE(r.device.factoryReset(r.stores, 2));
+    TEST_ASSERT_FALSE(r.device.factoryReset(r.stores, 3));
     Device again(r.auth, r.crypto);
     TEST_ASSERT_TRUE(again.begin());
     TEST_ASSERT_TRUE(again.needsReset());
     r.auth.failErase = false;
-    TEST_ASSERT_TRUE(again.factoryReset(r.stores, 2));
+    TEST_ASSERT_TRUE(again.factoryReset(r.stores, 3));
 }
 
 void test_modem_factory_templates_and_reset_keep_device_credentials() {
@@ -474,8 +478,28 @@ void test_help_includes_every_device_command_without_credentials() {
     TEST_ASSERT_FALSE(has(r.output.text, r.device.otaHash()));
 }
 
+void test_password_separator_and_only_value_masked() {
+    Rig r;
+    std::string text = r.type("AT*PASS=abc=defg\r");
+    TEST_ASSERT_TRUE(text.find("AT*PASS=********\r") == 0);
+    TEST_ASSERT_FALSE(has(text, "abc=defg"));
+    TEST_ASSERT_TRUE(has(r.type("A/"), "ERROR"));
+    text = r.type("at*pass=abcdefgh\x7fZ\r");
+    TEST_ASSERT_TRUE(text.find("at*pass=********\b \b*\r") == 0);
+    TEST_ASSERT_TRUE(text.find("at*pass=") == 0);
+    TEST_ASSERT_FALSE(has(text, "abcdefgh"));
+    r.type("ATE0\r");
+    text = r.type("AT*PASS=abcdefgh\r");
+    TEST_ASSERT_EQUAL_STRING("\r\nDevice password changed.\r\n\r\nOK\r\n", text.c_str());
+    r.type("ATE1\r");
+    text = r.type("AT*PASS=\b=abcdefgh\r");
+    TEST_ASSERT_TRUE(text.find("AT*PASS=\b \b=********\r") == 0);
+    TEST_ASSERT_FALSE(has(text, "abcdefgh"));
+}
+
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_password_separator_and_only_value_masked);
     RUN_TEST(test_first_boot_is_random_twelve_and_saved_for_display);
     RUN_TEST(test_first_use_erases_plaintext_but_keeps_both_hashes);
     RUN_TEST(test_password_validation_preserves_spaces_and_punctuation);
