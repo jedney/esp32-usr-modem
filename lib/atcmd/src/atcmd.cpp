@@ -93,6 +93,7 @@ bool Modem::writeTemplate(unsigned n, uint32_t baud) {
         return false;
     }
     nvram_.tmpl[n] = active_;
+    nvram_.tmpl[n].s[1] = 0;
     nvram_.tmpl[n].baud = baud;  // as on the Sportster, the template keeps the port speed
     return modemcfg::saveNvram(store_, nvram_);
 }
@@ -129,6 +130,7 @@ void Modem::reset(unsigned z) {
     } else {
         active_ = modemcfg::factoryProfile(z - modemcfg::kTemplates - 1);
     }
+    active_.s[1] = 0;
 }
 
 void Modem::setLastDialed(const char *text) {
@@ -145,6 +147,16 @@ bool Modem::setModel(uint32_t speed) {
         return true;
     }
     nvram_.model = before;
+    return false;
+}
+
+bool Modem::setAnswerConsole(bool enabled) {
+    bool before = nvram_.answerConsole;
+    nvram_.answerConsole = enabled;
+    if (modemcfg::saveNvram(store_, nvram_)) {
+        return true;
+    }
+    nvram_.answerConsole = before;
     return false;
 }
 
@@ -222,6 +234,10 @@ void Port::beginInfo() {
 }
 
 void Port::result(Result r) {
+    if (modem_.active().get(modemcfg::kQ) == 2 && link_ && link_->answering() &&
+        r == Result::kNoCarrier) {
+        return;
+    }
     char buf[32];
     size_t n = formatResult(r, modem_.active(), buf, sizeof buf);
     if (n > 0) {
@@ -425,9 +441,10 @@ bool Port::cancelPrompt() {
     return true;
 }
 
-void Port::wait(CancelHandler cancel, void *ctx, Result cancelResult) {
+void Port::wait(CancelHandler cancel, void *ctx, Result cancelResult, bool answerCall) {
     cancelFn_ = cancel;
     cancelResult_ = cancelResult;
+    answerWait_ = answerCall;
     ctx_ = ctx;
     state_ = State::kWait;
 }
@@ -514,12 +531,15 @@ void Port::feedWait(char c) {
     }
     CancelHandler cancel = cancelFn_;
     void *ctx = ctx_;
+    const bool quiet = answerWait_ && modem_.active().get(modemcfg::kQ) == 2;
     cancelFn_ = nullptr;
     state_ = State::kIdle;
     if (cancel != nullptr) {
         cancel(ctx);
     }
-    result(cancelResult_);
+    if (!quiet) {
+        result(cancelResult_);
+    }
 }
 
 // --- Port: command execution ------------------------------------------------------------
@@ -569,6 +589,13 @@ bool Port::runCommand(const char *&p, bool *stop) {
     unsigned n = 0;
 
     switch (c) {
+        case 'A':
+            if (link_ == nullptr || !link_->answer()) {
+                return false;
+            }
+            resultSent_ = true;
+            *stop = true;
+            return true;
         case 'D': {
             bool pulse = a.get(modemcfg::kTone) == 0;
             if (upper(*p) == 'T' || upper(*p) == 'P') {
@@ -619,7 +646,7 @@ bool Port::runCommand(const char *&p, bool *stop) {
             if (!number(p, 1, &n)) {
                 return false;
             }
-            if (n == 0 && callUp()) {
+            if (n == 0 && link_ != nullptr) {
                 link_->hangUp();
             }
             return true;
@@ -639,7 +666,7 @@ bool Port::runCommand(const char *&p, bool *stop) {
             if (!number(p, 5, &n)) {
                 return false;
             }
-            if (callUp()) {
+            if (link_ != nullptr) {
                 link_->hangUp();  // the Sportster hangs up on Z
             }
             modem_.reset(n);

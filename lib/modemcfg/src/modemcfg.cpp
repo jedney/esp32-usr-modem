@@ -245,6 +245,7 @@ void serialize(const Nvram &n, uint8_t *out) {
     putU32(p, n.model);
     p += 4;
     *p++ = n.throttle ? 1 : 0;
+    *p++ = n.answerConsole ? 1 : 0;
     putU32(p, crc32(out, static_cast<size_t>(p - out)));
 }
 
@@ -260,10 +261,13 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
         return LoadResult::kBadMagic;
     }
     const uint8_t version = in[4];
-    if (version != 1 && version != 2 && version != kLayoutVersion) {
+    if (version < 1 || version > kLayoutVersion) {
         return LoadResult::kBadVersion;
     }
-    const size_t size = version == 1 ? kBlobSizeV1 : version == 2 ? kBlobSizeV2 : kBlobSize;
+    const size_t size = version == 1   ? kBlobSizeV1
+                        : version == 2 ? kBlobSizeV2
+                        : version == 3 ? kBlobSizeV3
+                                       : kBlobSize;
     if (len != size) {
         return LoadResult::kBadSize;
     }
@@ -281,6 +285,7 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
         memcpy(t.v, p, kSettingCount);
         p += kSettingCount;
         memcpy(t.s, p, kSRegCount);
+        t.s[1] = 0;  // S1 is a live ring counter, never restored from a profile
         p += kSRegCount;
         t.baud = getU32(p);
         p += 4;
@@ -310,7 +315,7 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
     if (n.hostBaud != 0 && !isHostRate(n.hostBaud)) {
         return LoadResult::kBadValue;
     }
-    if (version == 3) {
+    if (version >= 3) {
         for (Profile &t : n.tmpl) {
             if (*p > 1) {
                 return LoadResult::kBadValue;
@@ -322,10 +327,16 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
         if (!validModel(n.model) || *p > 1) {
             return LoadResult::kBadValue;
         }
-        n.throttle = *p != 0;
+        n.throttle = *p++ != 0;
+    }
+    if (version >= 4) {
+        if (*p > 1) {
+            return LoadResult::kBadValue;
+        }
+        n.answerConsole = *p != 0;
     }
     *out = n;
-    return version < 3 ? LoadResult::kMigrated : LoadResult::kOk;
+    return version < kLayoutVersion ? LoadResult::kMigrated : LoadResult::kOk;
 }
 
 const char *loadResultText(LoadResult r) {

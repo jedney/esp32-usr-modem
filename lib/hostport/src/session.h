@@ -26,6 +26,7 @@ class CallSlot {
 public:
     bool busy() const { return owner_ != nullptr; }
     bool claim(const void *who);
+    bool transfer(const void *from, const void *to);
     void release(const void *who);
 
 private:
@@ -34,6 +35,12 @@ private:
 
 class Session : public atcmd::Link {
 public:
+    class Answerer {
+    public:
+        virtual ~Answerer() = default;
+        virtual bool answer(Session &session) = 0;
+        virtual void cancel(Session &session) = 0;
+    };
     class Dialer {
     public:
         virtual ~Dialer() = default;
@@ -54,7 +61,11 @@ public:
 
     // Starts a call on `conn` (AT*TESTCALL now, ATD from v0.8): sends CONNECT and goes
     // online. False if this or another port already has a call.
-    bool startCall(Connection &conn, uint32_t operationalSpeed = 0, uint32_t reportSpeed = 0);
+    bool startCall(Connection &conn, uint32_t operationalSpeed = 0, uint32_t reportSpeed = 0,
+                   const void *reservation = nullptr, bool answered = false);
+    void setAnswerer(Answerer *answerer) { answerer_ = answerer; }
+    bool answer() override;
+    bool answering() const override { return answered_; }
     void setDialer(Dialer *dialer) { dialer_ = dialer; }
     void setBaudControl(BaudControl *control) { baudControl_ = control; }
     bool dial(const char *text, bool pulse) override;
@@ -95,6 +106,8 @@ private:
     CallSlot &slot_;
     Connection *conn_ = nullptr;
     Dialer *dialer_ = nullptr;
+    Answerer *answerer_ = nullptr;
+    bool answered_ = false;
     BaudControl *baudControl_ = nullptr;
     uint32_t lineSpeed_ = 14400;
     uint32_t reportSpeed_ = 14400;

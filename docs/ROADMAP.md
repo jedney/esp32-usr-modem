@@ -20,6 +20,13 @@ the device password, wrong/old passwords are refused, and `AT*FACTORY` generates
 password. The initial password disappears from the boot banner after authenticated
 use. All seven device acceptance checks have passed.
 
+Done in software: **v0.9** answer mode (bench 25 Oct). A PC Telnet client calls port
+23; manual ATA and S0 auto-answer work through COM15, including binary data and
+remote-caller isolation while locally escaped. `AT*ANSWERPORT=RS232|CONSOLE`
+selects the saved auto-answer destination, default RS232. Native, on-board and
+incoming-call acceptance pass; external RI/DCD/DTR, full-panel observation and ring
+audio listening await wiring. See `docs/v0.9-plan.md` and `test/README.md`.
+
 | Version | Feature | Brief | Done when |
 |---|---|---|---|
 | v0.4 | **Settings store and AT command parser** (console first): command-line parsing (several commands per line, `A/` repeat), S-registers, `E Q V X`, `&F &W &V &Z`, `Z`, `ATI0`–`ATI7` (authentic Sportster text), `+FCLASS`, result codes (verbose/numeric/quiet), `AT*` commands in one table, `AT*HELP`. Stored in NVS, logic in `lib/` | 6.2, 6.5, 6.6, 6.7 | Parser and settings unit-tested on the PC; `AT&V` shows the saved profile after a restart |
@@ -36,6 +43,8 @@ use. All seven device acceptance checks have passed.
 
 Notes:
 
+- v0.10's configuration and v0.11's web interface must expose the shared
+  `AT*ANSWERPORT` receiver setting alongside S0; the factory destination is RS232.
 - **v0.8 model update (Jon, 25 Oct):** implemented `AT*MODEL=` for Sportster 14.4k, 28.8k,
   33.6k and 56k Series; factory default remains 14.4k. Selection affects ATI identity
   and default reported CONNECT speed only; speed options and features remain.

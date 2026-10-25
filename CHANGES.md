@@ -14,6 +14,29 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [0.9] - 2026-10-25
+
+### Added
+
+- Incoming Telnet calls on port 23, manual ATA, S0 auto-answer, UK double ringing,
+  RI and AA indication, with one shared incoming/outgoing call slot.
+- Saved AT*ANSWERPORT=RS232|CONSOLE selection (default RS232), query/list and help.
+- Incoming-call native, on-board and PC Telnet acceptance tests, including remote
+  command/escape isolation, binary transfer, buffering and listener recovery.
+
+### Changed
+
+- Modem NVS layout 4 preserves layouts 1-3 and defaults their answer port to RS232.
+  Live S1 ring counts are cleared when saving/restoring profiles.
+
+### Fixed
+
+- ATH and ATZ can reject a pending incoming call before carrier is established.
+- Q2 suppresses incoming-call CONNECT/carrier-loss results while outgoing results
+  keep their existing behavior.
+- Simultaneous socket and Wi-Fi loss emits one NO CARRIER result; answered-call
+  hang-up restores the host command speed once.
+
 ## [0.8] - 2026-10-25
 
 ### Added

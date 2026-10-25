@@ -15,7 +15,8 @@
 // boot banner waits up to 8 s for the network; later changes are printed on the console.
 // v0.7: device credentials, password-authenticated OTA with an optional ten-minute
 // window, and a confirmed factory reset (lib/devicecfg, hw::EspCrypto/OtaService).
-// Real calls follow in v0.8.
+// v0.8 adds outgoing TCP/Telnet calls and streaming audio. v0.9 adds port-23
+// incoming calls, ATA/S0 and a saved RS232/console auto-answer destination.
 #include <Arduino.h>
 #include <LittleFS.h>
 
@@ -27,6 +28,7 @@
 #include "dialstring.h"
 #include "hw.h"
 #include "hwconsole.h"
+#include "incoming.h"
 #include "modemcfg.h"
 #include "net_commands.h"
 #include "netcfg.h"
@@ -36,6 +38,7 @@
 #include "panel.h"
 #include "rs232.h"
 #include "session.h"
+#include "tcp_listener.h"
 #include "tcp_socket.h"
 #include "wifi_radio.h"
 
@@ -66,6 +69,11 @@ calls::Phonebook phonebook(bookStore);
 hw::TcpSocket tcpSocket;
 hw::CallAudio callAudio;
 calls::Outgoing *outgoing = nullptr;
+hw::TcpSocket incomingSocket;
+hw::TcpListener incomingListener(incomingSocket);
+calls::Incoming *incoming = nullptr;
+uint32_t incomingIp = 0;
+bool answerListenFailed = false;
 hw::EspCrypto crypto;
 devicecfg::Device device(deviceStore, crypto);
 hw::OtaService ota(device);
@@ -215,6 +223,10 @@ atcmd::Reply cmdPhoneDelete(atcmd::Port &port, const char *args) {
     return phonebook.command(port, args, true);
 }
 
+atcmd::Reply cmdAnswerPort(atcmd::Port &port, const char *args) {
+    return incoming->command(port, args);
+}
+
 // AT*BAUD? shows the RS232 speed setting; AT*BAUD=AUTO detects it from "AT" (default);
 // AT*BAUD=<300-115200> keeps the port at that speed. Saved at once.
 atcmd::Reply cmdBaud(atcmd::Port &port, const char *args) {
@@ -261,6 +273,8 @@ atcmd::Reply cmdTestCall(atcmd::Port &port, const char *args) {
 }
 
 const atcmd::StarCommand kStarCommands[] = {
+    {"ANSWERPORT", "AT*ANSWERPORT=<RS232|CONSOLE>", "auto-answer destination (? or =?), saved",
+     cmdAnswerPort, false},
     {"MODEL", "AT*MODEL=<14400|28800|33600|56000>", "identity and default CONNECT (? or =?)",
      atcmd::cmdModel, false},
     {"THROTTLE", "AT*THROTTLE=<ON|OFF>", "limit data to operational line speed (default OFF)",
@@ -429,6 +443,7 @@ void pollLeds(uint32_t now) {
     const modemcfg::Profile &p = modem->active();
     hostport::PanelInput in = {};
     in.autoAnswer = p.s[0] >= 1;
+    in.ringing = incoming && incoming->ringing();
     in.cd = (!rs232::suspended() && rs232::session().dcd()) || console->callUp();
     in.tr = rs232::dtrOn() || p.get(modemcfg::kAmpD) == 0;
     in.cs = hw::ctsOutAsserted();
@@ -472,6 +487,10 @@ void setup() {
         new calls::Outgoing(*modem, phonebook, callSlot, tcpSocket, callAudio, msNow, networkUp);
     console->setDialer(outgoing);
     rs232::session().setDialer(outgoing);
+    incoming = new calls::Incoming(*modem, callSlot, incomingListener, incomingSocket, callAudio,
+                                   *console, rs232::session(), msNow, networkUp);
+    console->setAnswerer(incoming);
+    rs232::session().setAnswerer(incoming);
     hwconsole::setPortControl(hwconsole::PortControl{modemIdle, rs232::suspend, rs232::resume});
     netcfg::LoadResult netLoaded = net.begin(millis());
     netcfg::attachCommands(net, msNow);
@@ -501,6 +520,25 @@ void loop() {
         return;  // no late Wi-Fi join or command may save settings after the wipe
     }
     const uint32_t now = millis();
+    // Finish a prior incoming call before a local command can start another one
+    // using the shared audio service. Listen only when other resources are ready.
+    uint32_t ip = net.up() ? net.link().ip : 0;
+    if (ip != incomingIp) {
+        incoming->stop();
+        incomingIp = ip;
+    }
+    incoming->poll(!rs232::suspended() && net.joinResult() != netcfg::JoinResult::kRunning &&
+                   net.scanState() != netcfg::ScanState::kRunning);
+    if (net.up() && !incoming->listening() && !answerListenFailed &&
+        console->mode() == hostport::Mode::kCommand && console->port().lineEmpty()) {
+        Serial.print("Answer listener unavailable; retrying port 23.\r\n");
+        answerListenFailed = true;
+    } else if (incoming->listening() || !net.up()) {
+        answerListenFailed = false;
+    }
+    if (!rs232::suspended()) {
+        hw::lineSet(hwtest::OutSignal::kRI, incoming->ri());
+    }
     pollConsole(now);
     rs232::poll(now);
     net.tick(now);

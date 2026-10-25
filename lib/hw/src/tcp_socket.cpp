@@ -8,6 +8,22 @@
 
 namespace hw {
 using calls::SocketState;
+bool TcpSocket::adopt(int fd) {
+    close();
+    if (fd < 0) {
+        return false;
+    }
+    fd_ = fd;
+    int flags = fcntl(fd_, F_GETFL, 0);
+    if (flags < 0 || fcntl(fd_, F_SETFL, flags | O_NONBLOCK) < 0) {
+        close();
+        return false;
+    }
+    int yes = 1;
+    lwip_setsockopt(fd_, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof yes);
+    state_ = SocketState::kOpen;
+    return true;
+}
 struct TcpSocket::Request {
     TcpSocket *owner;
     uint32_t generation;
@@ -92,6 +108,14 @@ void TcpSocket::connectAddress(uint32_t address) {
     }
 }
 void TcpSocket::poll() {
+    if (state_ == SocketState::kOpen) {
+        uint8_t byte;
+        int n = lwip_recv(fd_, &byte, 1, MSG_PEEK | MSG_DONTWAIT);
+        if (n == 0 || (n < 0 && errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR)) {
+            close();
+        }
+        return;
+    }
     if (state_ != SocketState::kPending && state_ != SocketState::kResolving) {
         return;
     }
