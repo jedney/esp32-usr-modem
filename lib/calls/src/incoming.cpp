@@ -1,0 +1,203 @@
+#include "incoming.h"
+#include <cctype>
+#include <cstring>
+
+namespace calls {
+namespace {
+bool word(const char *text, const char *expected) {
+    while (*expected && std::toupper(static_cast<unsigned char>(*text)) == *expected) {
+        ++text;
+        ++expected;
+    }
+    while (*text == ' ') {
+        ++text;
+    }
+    return *text == 0 && *expected == 0;
+}
+}  // namespace
+
+bool Incoming::eligible(hostport::Session &session) const {
+    return session.mode() == hostport::Mode::kCommand && session.port().lineEmpty() &&
+           (modem_.active().get(modemcfg::kAmpD) == 0 || session.dtrOn());
+}
+void Incoming::ringResult(hostport::Session &session) {
+    if (session.mode() == hostport::Mode::kCommand && session.port().lineEmpty() &&
+        modem_.active().get(modemcfg::kQ) != 2) {
+        session.port().result(atcmd::Result::kRing);
+    }
+}
+void Incoming::ring(uint32_t now) {
+    ringAt_ = now;
+    if (rings_ < 255) {
+        ++rings_;
+    }
+    // The Sportster documents S1 counting when S0 is enabled. Manual rings are
+    // counted internally too, so changing S0 during a pending call is deterministic.
+    modem_.active().s[1] = modem_.active().s[0] ? rings_ : 0;
+    ringResult(console_);
+    ringResult(host_);
+    hostport::Session &target = modem_.answerConsole() ? console_ : host_;
+    if (modem_.active().s[0] && rings_ >= modem_.active().s[0] && eligible(target)) {
+        answer(target);
+    }
+}
+bool Incoming::ri() const {
+    uint32_t elapsed = (clock_() - ringAt_) % 3000;
+    return ringing() && (elapsed < 400 || (elapsed >= 600 && elapsed < 1000));
+}
+void Incoming::cancelWait(void *self) {
+    static_cast<Incoming *>(self)->clear(false);
+}
+void Incoming::clear(bool notify) {
+    if (stage_ == IncomingStage::kIdle) {
+        return;
+    }
+    hostport::Session *session = session_;
+    const bool online = stage_ == IncomingStage::kOnline;
+    const bool hadCarrier = session && session->callUp();
+    stage_ = IncomingStage::kIdle;
+    session_ = nullptr;
+    sound_.stop();
+    connection_.close();
+    slot_.release(this);
+    rings_ = 0;
+    modem_.active().s[1] = 0;
+    if (session) {
+        session->port().finish(atcmd::Reply::kDone);
+        if (online && session->callUp()) {
+            session->hangUp();
+        }
+        if (notify && (!online || hadCarrier) && modem_.active().get(modemcfg::kQ) != 2) {
+            session->port().result(atcmd::Result::kNoCarrier);
+        }
+    }
+}
+void Incoming::stop() {
+    clear(true);
+    listener_.stop();
+    listening_ = false;
+    retried_ = false;
+}
+void Incoming::cancel(hostport::Session &session) {
+    if (ringing() || session_ == &session) {
+        clear(false);
+    }
+}
+bool Incoming::answer(hostport::Session &session) {
+    if (!ringing() || !eligible(session)) {
+        return false;
+    }
+    session_ = &session;
+    sound_.stop();
+    const modemcfg::Profile &p = modem_.active();
+    unsigned n = p.get(modemcfg::kAmpN);
+    lineSpeed_ = n ? atcmd::lineSpeedForN(n) : modemcfg::kMaxLineSpeed;
+    reportSpeed_ = p.lineExplicit ? lineSpeed_ : modem_.model();
+    stage_ = IncomingStage::kHandshake;
+    session.port().wait(cancelWait, this, atcmd::Result::kNoCarrier, true);
+    if (p.get(modemcfg::kAmpU) && lineSpeed_ < atcmd::lineSpeedForN(p.get(modemcfg::kAmpU))) {
+        clear(true);
+    } else if (p.get(modemcfg::kM) == 0 || p.get(modemcfg::kM) == 3) {
+        connected();
+    } else if (!sound_.start(SoundStage::kHandshake, "", false, lineSpeed_, p)) {
+        clear(true);
+    }
+    return true;
+}
+void Incoming::connected() {
+    session_->port().finish(atcmd::Reply::kDone);
+    if (!session_->startCall(connection_, lineSpeed_, reportSpeed_, this, true)) {
+        clear(true);
+        return;
+    }
+    stage_ = IncomingStage::kOnline;
+    sound_.stop();
+    if (modem_.active().get(modemcfg::kM) == 2) {
+        sound_.start(SoundStage::kCarrier, "", false, lineSpeed_, modem_.active());
+    }
+}
+void Incoming::poll(bool available) {
+    const uint32_t now = clock_();
+    if (!network_() || !available || modem_.commandsStopped()) {
+        stop();
+        return;
+    }
+    if (!listening_ && (!retried_ || now - retryAt_ >= 5000)) {
+        retryAt_ = now;
+        retried_ = true;
+        listening_ = listener_.begin(23);
+    }
+    if (stage_ == IncomingStage::kIdle) {
+        if (!listening_) {
+            return;
+        }
+        if (slot_.busy()) {
+            listener_.reject();
+        } else if (listener_.accept()) {
+            if (!slot_.claim(this)) {
+                socket_.close();
+                return;
+            }
+            connection_.begin(false);
+            stage_ = IncomingStage::kRinging;
+            rings_ = 0;
+            ring(now);
+            if (ringing() && modem_.active().get(modemcfg::kM) != 0) {
+                // Audio failure must not prevent ATA or make the ring clock stall.
+                sound_.start(SoundStage::kRing, "", false, 0, modem_.active());
+            }
+        }
+    } else {
+        if (listening_) {
+            listener_.reject();
+        }
+        sound_.poll(now, modem_.active());
+        if (stage_ == IncomingStage::kOnline) {
+            if (!session_->callUp()) {
+                clear(false);
+            } else if (socket_.state() != SocketState::kOpen) {
+                clear(true);
+            }
+            return;  // local Session polls this connection, including while escaped
+        }
+        connection_.poll(now);
+        if (socket_.state() != SocketState::kOpen) {
+            clear(true);
+        } else if (ringing()) {
+            if (modem_.active().get(modemcfg::kM) == 0) {
+                sound_.stop();
+            }
+            if (now - ringAt_ >= 3000) {
+                ring(now);  // no catch-up burst after a delayed poll
+            }
+        } else if (session_ && modem_.active().get(modemcfg::kAmpD) != 0 && !session_->dtrOn()) {
+            clear(true);
+        } else if (sound_.failed()) {
+            clear(true);
+        } else if (!sound_.running()) {
+            connected();
+        }
+    }
+}
+atcmd::Reply Incoming::command(atcmd::Port &port, const char *args) {
+    while (*args == ' ') {
+        ++args;
+    }
+    if (word(args, "=?")) {
+        port.beginInfo();
+        port.line("RS232,CONSOLE");
+    } else if (word(args, "?") || *args == 0) {
+        port.beginInfo();
+        port.line(modem_.answerConsole() ? "CONSOLE" : "RS232");
+    } else {
+        if (*args++ != '=' || slot_.busy()) {
+            return atcmd::Reply::kError;
+        }
+        bool console = word(args, "CONSOLE");
+        if ((!console && !word(args, "RS232")) || !modem_.setAnswerConsole(console)) {
+            return atcmd::Reply::kError;
+        }
+    }
+    return atcmd::Reply::kOk;
+}
+}  // namespace calls

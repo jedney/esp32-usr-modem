@@ -19,16 +19,27 @@ void CallSlot::release(const void *who) {
     }
 }
 
+bool CallSlot::transfer(const void *from, const void *to) {
+    if (owner_ != from || to == nullptr) {
+        return false;
+    }
+    owner_ = to;
+    return true;
+}
+
 Session::Session(atcmd::Modem &modem, atcmd::Sink &out, uint32_t baud, CallSlot &slot)
     : modem_(modem), port_(modem, out, baud), slot_(slot) {
     port_.setLink(this);
 }
 
-bool Session::startCall(Connection &conn, uint32_t operationalSpeed, uint32_t reportSpeed) {
-    if (conn_ != nullptr || !slot_.claim(this)) {
+bool Session::startCall(Connection &conn, uint32_t operationalSpeed, uint32_t reportSpeed,
+                        const void *reservation, bool answered) {
+    if (conn_ != nullptr ||
+        !(reservation ? slot_.transfer(reservation, this) : slot_.claim(this))) {
         return false;
     }
     conn_ = &conn;
+    answered_ = answered;
     const unsigned n = profile().get(modemcfg::kAmpN);
     lineSpeed_ = operationalSpeed ? operationalSpeed
                                   : (n == 0 ? modemcfg::kMaxLineSpeed : atcmd::lineSpeedForN(n));
@@ -50,6 +61,9 @@ bool Session::startCall(Connection &conn, uint32_t operationalSpeed, uint32_t re
 }
 
 void Session::sendConnect() {
+    if (answered_ && profile().get(modemcfg::kQ) == 2) {
+        return;
+    }
     char result[96];
     size_t n = atcmd::formatConnect(reportSpeed_, lineSpeed_, profile(), result, sizeof result);
     port_.write(result, n);
@@ -81,6 +95,13 @@ void Session::resumeOnline() {
 
 void Session::hangUp() {
     endCall(false);  // ATH0 / ATZ: the parser sends OK
+    if (answerer_) {
+        answerer_->cancel(*this);
+    }
+}
+
+bool Session::answer() {
+    return answerer_ != nullptr && answerer_->answer(*this);
 }
 
 void Session::endCall(bool noCarrier) {
@@ -98,6 +119,7 @@ void Session::endCall(bool noCarrier) {
     if (noCarrier) {
         port_.result(atcmd::Result::kNoCarrier);
     }
+    answered_ = false;
 }
 
 size_t Session::fromHost(const uint8_t *data, size_t len, uint32_t nowMs) {

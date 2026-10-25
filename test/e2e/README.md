@@ -21,6 +21,18 @@ or DB25, Unitek adapter plugged straight in). It changes only the PC's speed, fr
 hang-up and a 16 KB echo with RTS/CTS flow control. `test_session.py` needs only the
 console: it makes `AT*TESTCALL` calls and checks `+++`, `ATO`, `ATH` and `AT*BAUD`.
 
+`test_answer.py` (v0.9) connects from the PC to the modem on port 23. It discovers the
+current address from `AT*WIFI?`, temporarily selects CONSOLE for auto-answer, and
+restores the receiver, model and changed active profile settings after each test.
+It covers manual answer, exact S0 thresholds, Telnet/binary data, remote-command
+isolation while the local side is escaped, extra-caller rejection, Wi-Fi recovery
+and answer-port persistence. No PC listener or inbound firewall change is needed.
+COM18 is not used until its RS232 electronics are wired.
+
+```powershell
+python -m pytest test/e2e/test_answer.py --console-port COM15 --tb=short
+```
+
 `test_calls.py` (v0.8) uses a PC TCP server on port 32321 and needs the PC LAN
 address reachable from the modem. It checks RAW binary transfer, fragmented Telnet
 negotiation, errors, Wi-Fi loss and stable model reporting. Model persistence needs

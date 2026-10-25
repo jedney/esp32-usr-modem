@@ -309,7 +309,7 @@ void test_extended_speed_profiles_survive_restart_and_keep_old_auto() {
     TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kOk), static_cast<int>(loadNvram(store, &out)));
     TEST_ASSERT_TRUE(n.tmpl[0] == out.tmpl[0]);
     TEST_ASSERT_TRUE(n.tmpl[1] == out.tmpl[1]);
-    TEST_ASSERT_EQUAL_UINT8(3, kLayoutVersion);  // explicit speed and device model metadata
+    TEST_ASSERT_EQUAL_UINT8(4, kLayoutVersion);  // adds the auto-answer destination
     n.tmpl[0].v[kAmpN] = 39;
     uint8_t blob[kBlobSize];
     serialize(n, blob);
@@ -352,8 +352,40 @@ void test_layout_2_migration_preserves_speeds_and_validates_new_metadata() {
     }
 }
 
+void test_layout_3_migration_preserves_model_and_defaults_answerport() {
+    Nvram n = factoryNvram();
+    n.model = 56000;
+    n.throttle = true;
+    n.answerConsole = true;
+    n.tmpl[0].lineExplicit = true;
+    n.tmpl[0].s[0] = 3;
+    uint8_t current[kBlobSize];
+    serialize(n, current);
+    uint8_t old[kBlobSizeV3];
+    memcpy(old, current, sizeof old);
+    old[4] = 3;
+    uint32_t crc = crc32(old, sizeof old - 4);
+    for (unsigned i = 0; i < 4; ++i)
+        old[sizeof old - 4 + i] = crc >> (8 * i);
+    Nvram out;
+    TEST_ASSERT_EQUAL(int(LoadResult::kMigrated), int(deserialize(old, sizeof old, &out)));
+    TEST_ASSERT_EQUAL_UINT32(56000, out.model);
+    TEST_ASSERT_TRUE(out.throttle);
+    TEST_ASSERT_TRUE(out.tmpl[0].lineExplicit);
+    TEST_ASSERT_EQUAL(3, out.tmpl[0].s[0]);
+    TEST_ASSERT_FALSE(out.answerConsole);
+    TEST_ASSERT_EQUAL(int(LoadResult::kOk), int(deserialize(current, sizeof current, &out)));
+    TEST_ASSERT_TRUE(out.answerConsole);
+    current[kBlobSize - 5] = 2;
+    crc = crc32(current, sizeof current - 4);
+    for (unsigned i = 0; i < 4; ++i)
+        current[sizeof current - 4 + i] = crc >> (8 * i);
+    assertLoadFails(current, sizeof current, LoadResult::kBadValue);
+}
+
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_layout_3_migration_preserves_model_and_defaults_answerport);
     RUN_TEST(test_layout_2_migration_preserves_speeds_and_validates_new_metadata);
     RUN_TEST(test_factory_f1_has_the_decided_defaults);
     RUN_TEST(test_factory_s_registers);

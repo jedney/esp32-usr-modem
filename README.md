@@ -4,7 +4,7 @@ An ESP32-S3 Wi-Fi "modem" in a 3D-printed replica of a 1990s US Robotics Sportst
 Faxmodem. It has a real DB25 RS232 port, speaks the Hayes AT command set, plays the
 dial, DTMF and handshake sounds, and connects to Telnet BBSes over Wi-Fi.
 
-Status: **v0.8 software acceptance passed; external hardware checks pending.** Outgoing TCP/Telnet
+Status: **v0.9 incoming-call acceptance passed; external hardware checks pending.** Outgoing TCP/Telnet
 calls, a 64-entry phonebook, selectable Sportster identity, optional throttling and
 call audio are implemented. See `test/README.md` for actual validation and pending
 bench checks. The current bench has console COM15, Unitek COM18, LED and pot; the
@@ -14,7 +14,49 @@ Factory model and operational call speed are **14.4k**. All emulated line-speed
 options through **56000** remain available (`AT&N38`, or `AT&N0` for highest);
 host serial remains 300-115200 and the USB maintenance console stays at 115200.
 The full requirements are in `docs/project-brief.md`, with later decisions in
-`docs/decisions-log.md` and implementation/acceptance notes in `docs/v0.8-plan.md`.
+`docs/decisions-log.md` and implementation/acceptance notes in `docs/v0.8-plan.md`
+and `docs/v0.9-plan.md`.
+
+## Incoming calls (v0.9)
+
+The modem listens on TCP port **23** while Wi-Fi is connected. A PC Telnet client
+can call `<modem-address>:23`; the caller needs no password. Only one incoming or
+outgoing call is allowed, including a call still ringing. Additional callers close
+without taking over the first call.
+
+| Command | Behaviour |
+|---|---|
+| `ATA` | Answer the pending caller on the local port issuing the command |
+| `ATS0=0` | Manual answer only (default) |
+| `ATS0=3` | Auto-answer on the third logical ring |
+| `ATS1?` | Live ring count when S0 is enabled; cleared after the call |
+| `AT*ANSWERPORT=RS232` | Auto-answer to the host RS232 port (factory default) |
+| `AT*ANSWERPORT=CONSOLE` | Auto-answer to the maintenance console; useful on the bench |
+| `AT*ANSWERPORT?` / `AT*ANSWERPORT=?` | Current destination / available choices |
+| `ATH` / `ATZ` | Reject a ringing call or hang up a connected local call |
+
+`AT*ANSWERPORT` saves immediately, survives restart, `AT&F` and `ATZ`, and returns
+to RS232 with `AT*FACTORY`. It cannot change during a call. S0 remains a normal
+profile setting (`AT&W` to save); S1 is runtime state and is not stored. Auto-answer
+requires the selected terminal to be ready under `&D`; it never falls back to the
+other port or interrupts a partial command/password prompt.
+
+One logical ring is the UK double ring: 400+450 Hz, 400 ms on, 200 ms off, 400 ms on,
+2000 ms off. It produces one RING result; RI follows the two on portions even with
+ATM0. AA flashes while ringing and otherwise follows S0. DCD follows actual carrier
+under `&C`. ATM0 mutes the sounds and skips handshake delay after answering. Pot,
+ATL and the final speaker cap also apply to ring audio.
+
+The remote side is always Telnet data. Remote `+++`, AT commands, configuration
+numbers and Telnet control messages cannot enter the modem's local command mode.
+When the local terminal escapes, incoming data waits in bounded queues until ATO
+or hang-up. Incoming calls use the existing model, speed, flow control and throttle
+settings; Q2 suppresses answer-call results. Wi-Fi loss closes the call and the
+listener reopens after reconnect.
+
+On the current bench use **COM15 at 115200** and select CONSOLE explicitly for
+auto-answer tests. COM18 is the unwired Unitek adapter; physical control-signal,
+full-panel and speaker checks await the electronics.
 
 ## Outgoing calls and model selection (v0.8)
 
@@ -52,7 +94,7 @@ operational call speed, returning to the command rate on escape or hang-up.
 Draining the host output is bounded at two seconds; a host holding RTS off cannot
 freeze the console during a speed transition.
 
-Upgrading converts modem NVS layouts 1/2 to layout 3. Existing saved speeds are
+Upgrading converts modem NVS layouts 1-3 to layout 4. Existing saved speeds in layouts 1/2 are
 preserved as explicit overrides because their prior intent is unknown. Model and
 throttle settings are outside the templates; `AT*FACTORY` also erases the phonebook.
 Phonebook keys are exact (leading zeroes matter), 1-11 digits; reserved service

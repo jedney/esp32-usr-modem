@@ -10,6 +10,9 @@ bool CallAudio::start(calls::SoundStage stage, const char *digits, bool pulse, u
     failed_ = false;
     using calls::SoundStage;
     switch (stage) {
+        case SoundStage::kRing:
+            source_.reset(new (std::nothrow) tones::ToneSource(tones::kUkRingTone, 0));
+            break;
         case SoundStage::kDial:
             if (profile.s[6] == 0) {
                 return true;

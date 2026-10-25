@@ -4,7 +4,7 @@
 #include "tcp_connection.h"
 
 namespace calls {
-enum class SoundStage : uint8_t { kDial, kDigits, kHandshake, kBusy, kCarrier };
+enum class SoundStage : uint8_t { kDial, kDigits, kHandshake, kBusy, kCarrier, kRing };
 class CallSound {
 public:
     virtual ~CallSound() = default;

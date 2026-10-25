@@ -41,6 +41,8 @@ public:
     virtual bool callUp() const = 0;  // a call is connected (ATI4 shows OFF HOOK)
     virtual void resumeOnline() = 0;  // ATO with a call up: send CONNECT, back to the call
     virtual void hangUp() = 0;        // ATH0 or ATZ with a call up
+    virtual bool answer() { return false; }
+    virtual bool answering() const { return false; }
     virtual bool dial(const char *text, bool pulse) {
         (void)text;
         (void)pulse;
@@ -103,6 +105,8 @@ public:
     bool setModel(uint32_t speed);
     bool setThrottle(bool enabled);
     bool throttle() const { return nvram_.throttle; }
+    bool answerConsole() const { return nvram_.answerConsole; }
+    bool setAnswerConsole(bool enabled);
 
     const StarCommand *starTable() const { return star_; }
     size_t starCount() const { return starCount_; }
@@ -152,7 +156,8 @@ public:
     bool cancelPrompt();  // timeout: wipe the pending input and send ERROR
     // The final result comes later, through finish(). Meanwhile typing is not a command;
     // any key (not LF) cancels: `cancel` is called and ERROR sent.
-    void wait(CancelHandler cancel, void *ctx, Result cancelResult = Result::kError);
+    void wait(CancelHandler cancel, void *ctx, Result cancelResult = Result::kError,
+              bool answerCall = false);  // Q2 also suppresses answer-handshake cancellation
     // Sends the result of a wait (nothing for kDone). False if the port isn't waiting
     // (the wait was cancelled).
     bool finish(Reply r);
@@ -198,6 +203,7 @@ private:
     SecretHandler secretFn_ = nullptr;
     CancelHandler cancelFn_ = nullptr;
     Result cancelResult_ = Result::kError;
+    bool answerWait_ = false;
     void *ctx_ = nullptr;
     char secret_[kSecretMax + 1] = {};
     size_t secretLen_ = 0;
