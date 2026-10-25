@@ -47,7 +47,9 @@ Notes:
   v0.10's config and v0.11's web interface must offer the model selector and show
   the selected model prominently on the first config page, optionally with ASCII
   art above the menu. Model selection and outgoing-call logic are implemented;
-  bench acceptance is in progress. See `docs/v0.8-plan.md` and `test/README.md`.
+  software validation passes (262 native, 29 on-board, 77 serial checks, CI). The
+  real TCP-refusal probe awaits a Windows Administrator retry; external RS232 and
+  listening await wiring. See `docs/v0.8-plan.md` and `test/README.md`.
 - v0.5 needs the RS232 section wired on the bench (MAX3232s, DB9).
 - The pin map is confirmed by Electronics (Q76, schematic rev A, 24 Oct 2026) and applied
   in v0.6. If the board ever changes, `lib/hw/src/pins.h` and the values locked in by

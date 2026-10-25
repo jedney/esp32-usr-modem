@@ -37,6 +37,18 @@ Administrator after approval. Tests do not alter firewall settings. Remove the r
 when no longer needed with `Remove-NetFirewallRule -DisplayName 'USR modem local
 call tests TCP 32321'`. Use current LAN addresses, not these example addresses.
 
+The real TCP-refusal check is separately opt-in (`--refusal-probe`). After approving
+its temporary rule, run this in an Administrator PowerShell:
+
+```powershell
+./scripts/test_refusal.ps1 -ModemAddress 10.0.0.221 -ServerAddress 10.0.0.208 -ConsolePort COM15
+```
+
+The helper allows only TCP 32321 from the modem on Domain/Private for the refusal/DNS
+checks, then removes that temporary rule in `finally`. It records secret-safe pytest
+output in `.pio/v08-refusal.log`. DNS failure also runs independently in the normal
+suite. Do not pass `--refusal-probe` without the required local firewall setup.
+
 `test_wifi.py` (v0.6) needs only the console, plus the Wi-Fi name and password in `.env`
 at the repository root (`USR_MODEM_WIFI_SSID`, `USR_MODEM_WIFI_PASS`; copy
 `.env.example`). Without them it is skipped. It joins that network through the masked

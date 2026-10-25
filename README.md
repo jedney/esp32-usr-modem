@@ -49,6 +49,8 @@ no explicit reporting override. `AT&F1` restores that factory profile and clears
 explicit override; `AT&W` saves the profile. `AT*BAUD` fixes host speed independently.
 With automatic host baud and `&B0`/outgoing `&B2`, the RS232 data rate follows the
 operational call speed, returning to the command rate on escape or hang-up.
+Draining the host output is bounded at two seconds; a host holding RTS off cannot
+freeze the console during a speed transition.
 
 Upgrading converts modem NVS layouts 1/2 to layout 3. Existing saved speeds are
 preserved as explicit overrides because their prior intent is unknown. Model and

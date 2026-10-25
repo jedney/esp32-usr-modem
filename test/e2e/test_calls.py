@@ -167,7 +167,7 @@ def test_telnet_negotiation_ansi_naws_binary_and_ff(call_console, server_ip):
         assert console.command("AT")[-1] == "OK"
 
 
-def test_connection_refused_and_dns_failure(call_console, server_ip, request):
+def test_connection_refused(call_console, server_ip, request):
     if not request.config.getoption("--refusal-probe"):
         pytest.skip("Windows refusal probe needs the temporary rule in scripts/test_refusal.ps1")
     console = call_console
@@ -178,6 +178,8 @@ def test_connection_refused_and_dns_failure(call_console, server_ip, request):
         lines = console.command(f"ATDT{server_ip}:{SERVER_PORT}", timeout=8,
                                 until=("BUSY", "ERROR", "NO ANSWER"))
         assert lines[-1] == "BUSY"
+def test_dns_failure(call_console):
+    console = call_console
     lines = console.command("ATDTmissing-v08.invalid:23", timeout=8,
                             until=("NO DIAL TONE", "NO ANSWER", "ERROR"))
     assert lines[-1] == "NO DIAL TONE"

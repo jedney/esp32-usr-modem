@@ -24,7 +24,7 @@ $testResult = 1
 try {
     Push-Location (Split-Path -Parent $PSScriptRoot)
     try {
-        & $pythonProgram -u -m pytest test/e2e/test_calls.py -k connection_refused_and_dns_failure `
+        & $pythonProgram -u -m pytest test/e2e/test_calls.py -k 'connection_refused or dns_failure' `
             --console-port $ConsolePort --call-server-ip $ServerAddress --refusal-probe -v --tb=short `
             > .pio/v08-refusal.log 2>&1
         $testResult = $LASTEXITCODE
