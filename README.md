@@ -341,7 +341,7 @@ automatically in ANSI/CP437, or with R in plain mode.
 
 Screens cover status, phonebook, all current modem settings with help, Wi-Fi/clock,
 updates, About/credits, command reference, sounds, logs and hardware tests. Client
-Tests are marked unavailable until v0.13. Settings say whether they save immediately
+Tests are marked unavailable until v0.12. Settings say whether they save immediately
 or require a profile save (`&W`). Model, S0 and the auto-answer receiver are exposed.
 The line, loopback, bridge and held-output tests are unavailable on RS232 because
 they would take over that session's port. USB hardware tests still require idle RS232.

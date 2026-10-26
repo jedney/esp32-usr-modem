@@ -21,7 +21,7 @@ const Action kActions[] = {
     {S::Main, "Updates and reset", "", "OTA, password and confirmed reset", S::Updates},
     {S::Main, "Export configuration", "*EXPORT", "Restore commands; no passwords", S::Main},
     {S::Main, "Hardware tests", "", "Local electronics tests", S::Hardware},
-    {S::Main, "Client Tests (v0.13)", "", "Unavailable until v0.13", S::Main},
+    {S::Main, "Client Tests (v0.12)", "", "Unavailable until v0.12", S::Main},
     {S::Settings, "Current and stored profiles", "*SETTING?", "Active and stored settings",
      S::Settings},
     {S::Settings, "Edit profile / registers", "", "All supported modem fields", S::Profile},

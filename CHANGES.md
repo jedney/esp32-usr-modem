@@ -34,6 +34,7 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 - Browser network changes commit after connection and revert on failure within
   60 seconds, independently of the browser socket. Configuration buffers use PSRAM
   where available. Serial command and menu behavior remains covered by regression.
+- The Client Tests placeholder follows the reordered v0.12 roadmap milestone.
 
 ### Fixed
 
