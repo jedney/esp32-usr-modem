@@ -3,6 +3,11 @@
 
 namespace calls {
 bool Outgoing::start(hostport::Session &session, const char *text, bool pulse) {
+    // ATH followed by ATD can arrive in one serial burst, before poll() observes
+    // the old Session closing. Finish that lifecycle before replacing its target.
+    if (stage_ == CallStage::kOnline && session_ && !session_->callUp()) {
+        cancel();
+    }
     dialstring::Result r = dialstring::classify(text);
     Entry target;
     if (r.kind == dialstring::Kind::Phonebook) {
@@ -21,8 +26,13 @@ bool Outgoing::start(hostport::Session &session, const char *text, bool pulse) {
         session.port().result(atcmd::Result::kBusy);
         return true;
     }
+    if (observer_) {
+        observer_->started(false, target);
+        observed_ = true;
+    }
     if (!network_()) {
         session.port().result(atcmd::Result::kNoDialTone);
+        endObservation(atcmd::Result::kNoDialTone);
         return true;
     }
     if (!slot_.claim(&session)) {
@@ -78,12 +88,18 @@ void Outgoing::connected() {
         return;
     }
     stage_ = CallStage::kOnline;
+    if (observer_) {
+        observer_->connected(*session_);
+    }
     sound_.stop();
     if (modem_.active().get(modemcfg::kM) == 2) {
         play(SoundStage::kCarrier);
     }
 }
 void Outgoing::cancel() {
+    if (session_) {
+        endObservation(atcmd::Result::kNoCarrier);
+    }
     sound_.stop();
     connection_.close();
     if (session_) {
@@ -93,6 +109,7 @@ void Outgoing::cancel() {
     stage_ = CallStage::kIdle;
 }
 void Outgoing::finish(atcmd::Result result) {
+    endObservation(result);
     if (session_) {
         session_->port().finish(atcmd::Reply::kDone);
         if (session_->callUp()) {

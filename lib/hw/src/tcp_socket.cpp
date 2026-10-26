@@ -14,6 +14,11 @@ bool TcpSocket::adopt(int fd) {
         return false;
     }
     fd_ = fd;
+    sockaddr_in peer = {};
+    socklen_t len = sizeof peer;
+    if (lwip_getpeername(fd_, reinterpret_cast<sockaddr *>(&peer), &len) == 0) {
+        ip4addr_ntoa_r(reinterpret_cast<const ip4_addr_t *>(&peer.sin_addr), peer_, sizeof peer_);
+    }
     int flags = fcntl(fd_, F_GETFL, 0);
     if (flags < 0 || fcntl(fd_, F_SETFL, flags | O_NONBLOCK) < 0) {
         close();

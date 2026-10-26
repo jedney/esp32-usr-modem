@@ -15,12 +15,14 @@ public:
     size_t read(uint8_t *data, size_t len) override;
     void close() override;
     bool adopt(int fd);  // takes ownership, including on failure
+    const char *peer() const override { return peer_; }
 
 private:
     struct Request;
     static void resolved(const char *name, const ip_addr_t *address, void *context);
     void connectAddress(uint32_t address);
     int fd_ = -1;
+    char peer_[16] = {};
     uint16_t port_ = 0;
     calls::SocketState state_ = calls::SocketState::kClosed;
     std::atomic<uint32_t> generation_{0}, address_{0};

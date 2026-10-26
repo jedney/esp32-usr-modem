@@ -38,6 +38,7 @@ public:
     bool ri() const;
     bool listening() const { return listening_; }
     IncomingStage stage() const { return stage_; }
+    void setObserver(Observer *observer) { observer_ = observer; }
     atcmd::Reply command(atcmd::Port &port, const char *args);
 
 private:
@@ -63,5 +64,6 @@ private:
     bool retried_ = false;
     uint8_t rings_ = 0;
     uint32_t lineSpeed_ = 14400, reportSpeed_ = 14400;
+    Observer *observer_ = nullptr;
 };
 }  // namespace calls

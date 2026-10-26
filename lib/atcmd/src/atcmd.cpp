@@ -197,11 +197,11 @@ const StarCommand *Modem::findStar(const char *text, const char **args) const {
 Port::Port(Modem &modem, Sink &out, uint32_t baud) : modem_(modem), out_(out), baud_(baud) {}
 
 void Port::write(const char *data, size_t len) {
-    out_.write(data, len);
+    (redirected_ ? *redirected_ : out_).write(data, len);
 }
 
 void Port::print(const char *text) {
-    out_.write(text, strlen(text));
+    write(text, strlen(text));
 }
 
 void Port::printf(const char *fmt, ...) {
@@ -211,15 +211,18 @@ void Port::printf(const char *fmt, ...) {
     int n = vsnprintf(buf, sizeof buf, fmt, ap);
     va_end(ap);
     if (n > 0) {
-        out_.write(buf,
-                   static_cast<size_t>(n) < sizeof buf ? static_cast<size_t>(n) : sizeof buf - 1);
+        write(buf, static_cast<size_t>(n) < sizeof buf ? static_cast<size_t>(n) : sizeof buf - 1);
     }
 }
 
 void Port::newline() {
+    if (readable_) {
+        write("\r\n", 2);
+        return;
+    }
     const Profile &p = modem_.active();
     const char crlf[2] = {static_cast<char>(p.s[3]), static_cast<char>(p.s[4])};
-    out_.write(crlf, 2);
+    write(crlf, 2);
 }
 
 void Port::line(const char *text) {
@@ -234,6 +237,17 @@ void Port::beginInfo() {
 }
 
 void Port::result(Result r) {
+    if (readable_) {
+        Profile display = modem_.active();
+        display.v[modemcfg::kQ] = 0;
+        display.v[modemcfg::kV] = 1;
+        display.s[3] = 13;
+        display.s[4] = 10;
+        char text[32];
+        size_t n = formatResult(r, display, text, sizeof text);
+        write(text, n);
+        return;
+    }
     if (modem_.active().get(modemcfg::kQ) == 2 && link_ && link_->answering() &&
         r == Result::kNoCarrier) {
         return;
@@ -241,13 +255,13 @@ void Port::result(Result r) {
     char buf[32];
     size_t n = formatResult(r, modem_.active(), buf, sizeof buf);
     if (n > 0) {
-        out_.write(buf, n);
+        write(buf, n);
     }
 }
 
 void Port::echo(const char *s, size_t len) {
-    if (modem_.active().get(modemcfg::kE) != 0) {
-        out_.write(s, len);
+    if (readable_ || modem_.active().get(modemcfg::kE) != 0) {
+        write(s, len);
     }
 }
 

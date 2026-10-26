@@ -73,6 +73,8 @@ struct StarCommand {
     StarHandler fn;
     bool prefix;     // true: matches any command starting with `name` (e.g. "HW" for AT*HWLED)
     bool sensitive;  // mask arguments, wipe input, refuse A/ (passwords/destructive commands)
+    constexpr StarCommand()
+        : name(""), usage(""), help(""), fn(nullptr), prefix(false), sensitive(false) {}
     constexpr StarCommand(const char *n, const char *u, const char *h, StarHandler f, bool p,
                           bool s = false)
         : name(n), usage(u), help(h), fn(f), prefix(p), sensitive(s) {}
@@ -139,6 +141,10 @@ public:
 
     // --- Output, for AT* handlers ---------------------------------------------------------
     void write(const char *data, size_t len);
+    void redirect(Sink *sink, bool readable = false) {
+        redirected_ = sink;
+        readable_ = sink && readable;
+    }
     void print(const char *text);
     void printf(const char *fmt, ...) __attribute__((format(printf, 2, 3)));
     void newline();               // S3 S4
@@ -186,6 +192,8 @@ private:
 
     Modem &modem_;
     Sink &out_;
+    Sink *redirected_ = nullptr;
+    bool readable_ = false;
     uint32_t baud_;
     Link *link_ = nullptr;
     bool resultSent_ = false;  // a command (ATO) sent the line's final result itself

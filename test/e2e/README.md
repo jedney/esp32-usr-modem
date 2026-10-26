@@ -89,3 +89,16 @@ and the first successful authenticated upload removes the first-boot password. T
 Do not enable pytest `--showlocals`: test locals hold credentials. Failure messages
 omit boot banners and upload output. COM18 is the current Unitek port; pass it only
 after the MAX3232/DB9 section is wired.
+
+### Configuration terminal (v0.10)
+
+`python -m pytest test/e2e/test_config.py --console-port COM15` exercises direct
+ANSI/CP437/plain entry, reserved dialing, escape/ATO, help/hardware screens, incoming
+caller rejection, command/export coverage and cancelled restart confirmation. It
+restores the modified active settings and style. It neither rotates credentials nor
+executes the exported script on a live modem. Firmware must already be v0.10.
+
+Pass `--rs232-port COM18` only after confirming the MAX3232/RS232 path is wired. The
+RS232 case verifies unavailable takeover tests and restores its previous style. Real
+PC/Amiga rendering, lowest baud, hardware observation and audio listening are manual
+acceptance; automated console success does not establish those results.

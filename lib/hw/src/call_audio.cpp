@@ -4,6 +4,55 @@
 #include "volume.h"
 
 namespace hw {
+bool CallAudio::preview(const char *name, const modemcfg::Profile &profile) {
+    stop();
+    if (!strcmp(name, "DTMF") || !strcmp(name, "PULSE")) {
+        return start(calls::SoundStage::kDigits, "1234567890*#", !strcmp(name, "PULSE"), 14400,
+                     profile);
+    }
+    if (!strcmp(name, "SWEEP")) {
+        source_.reset(new (std::nothrow) tones::SweepSource(200, 4000, 4000));
+    } else if (!strcmp(name, "DIAL") || !strcmp(name, "BUSY") || !strcmp(name, "RING")) {
+        const auto &spec = !strcmp(name, "DIAL")   ? tones::kUkDialTone
+                           : !strcmp(name, "BUSY") ? tones::kUkBusyTone
+                                                   : tones::kUkRingTone;
+        source_.reset(new (std::nothrow) tones::ToneSource(spec, 3000));
+    } else {
+        char path[100];
+        uint32_t speed;
+        if (hwtest::parseUint(name, 300, 56000, &speed) && calls::validSpeed(speed)) {
+            snprintf(path, sizeof path, "/sounds/handshake-%u.wav",
+                     unsigned(sounds::handshakeSpeed(speed)));
+        } else {
+            if (strncmp(name, "/sounds/", 8) || strstr(name, "..") || strchr(name, '\\') ||
+                strlen(name) >= sizeof path) {
+                return false;
+            }
+            strcpy(path, name);
+        }
+        if (!reader_.open(path)) {
+            return false;
+        }
+        auto *wav = new (std::nothrow) sounds::WavSource(reader_);
+        if (!wav) {
+            reader_.close();
+            return false;
+        }
+        source_.reset(wav);
+        wav_ = wav;
+        if (!wav->begin()) {
+            stop();
+            return false;
+        }
+    }
+    if (!source_ || !audioStreamBegin()) {
+        stop();
+        return false;
+    }
+    active_ = true;
+    since_ = millis();
+    return true;
+}
 bool CallAudio::start(calls::SoundStage stage, const char *digits, bool pulse, uint32_t speed,
                       const modemcfg::Profile &profile) {
     stop();

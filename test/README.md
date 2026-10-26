@@ -95,10 +95,28 @@ Status: ✅ tests written, ⬜ planned. Section numbers refer to the project bri
 | OTA: password required, always/demand policy, 10-minute window, reconnect/idle gating (6.6) | `test_devicecfg` (fake clock, rollover); `test/scripts/test_ota_upload.py` (host secrecy and env precedence) | `test_device` (policy NVS) | `test_device.py` (listener opens/closes, reboot, wrong/old vs correct/new password) | ✅ |
 | Settings kept across a restart, factory templates `&F0`–`&F2`, damaged saved settings → factory, v0.4 settings converted (6.7) | `test_modemcfg`, `test_atcmd` | `test_board` (NVS) | `test_settings.py` (restart), `test_session.py` (`AT*BAUD` restart) | ✅ |
 | `AT*FACTORY`: Y/N, timeout, all project namespaces, interrupted reset recovery (6.7) | `test_devicecfg` (failures and restart recovery) | `test_device` (scratch NVS wipe and fresh credential) | `test_device.py` (`--factory-reset`, restores Wi-Fi) | ✅ |
-| Configuration screen and `AT*` parity, `AT*HELP` (6.8) | `test_atcmd` (`AT*HELP` lists the whole `AT*` table); ⬜ menu model | — | `test_settings.py` | ⬜ menu (v0.10) |
-| Wi-Fi password never displayed or exported (6.6, 6.8) | `test_netcfg` (every command, `ATI`, `AT&V`, the prompt) | — | `test_wifi.py` (banner and every show command) | ✅; ⬜ config export (v0.10) |
+| Configuration screen and `AT*` parity, `AT*HELP` (6.8) | `test_atcmd`, `test_config`, `test_config_services` | `test_config` | `test_config.py` | Software/COM15 pass; real Amiga pending |
+| Wi-Fi password never displayed or exported (6.6, 6.8) | `test_netcfg`, `test_config_services` (secret-free replay) | Existing adapter coverage | `test_wifi.py`, `test_config.py` | Software/COM15 pass |
 | `ATI0`–`ATI7` Sportster identity, `+FCLASS` fax handling (6.6) | `test_atcmd` | — | `test_settings.py` | ✅ |
-| Call log, NTP clock (6.8) | ⬜ | ⬜ | ⬜ | ⬜ |
+| Call log, NTP clock (6.8) | `test_config`, `test_config_services`, `test_netcfg` | `test_config` (files/backup), `test_wifi` (clock) | `test_config.py`, incoming/outgoing regression | Software/on-board/COM15 pass |
 | Web page status bar: LED decode, clock in the modem's time zone, call label, remote host/IP, uptime, Wi-Fi bars, reconnect back-off, 80 × 25 font fit (6.11) | `web/test/status.test.mjs` | — | demo-mode check in a browser | ✅ |
 | Web server: Digest login, session token, Host check, CSRF, WebSocket messages per `web/PROTOCOL.md`, browser firmware upload (6.11) | ⬜ | ⬜ | ⬜ | ⬜ |
 | Client Tests: display, screen size, X/Y/ZMODEM, keyboard, cable check (6.13) | ⬜ | — | ⬜ with `lrzsz` | ⬜ |
+
+## v0.10 configuration coverage (26 Oct 2026)
+
+| Feature | Native | On-board | End-to-end / acceptance |
+|---|---|---|---|
+| Shared menu/AT* inventory and profile help | `test_config` (production registry) | Firmware compile | `test_config.py`; real Amiga pending |
+| ANSI, CP437, plain, paging, bounded output, sanitized text | `test_config` | Firmware compile | `test_config.py`; PC terminal observation pending |
+| Local slot ownership, dial 123, escape/ATO, DTR, cancellation | `test_config`, `test_config_services`, existing host/call suites | Firmware compile | `test_config.py`; COM15 passes |
+| Password masking including F0, secret-free export replay | `test_config`, `test_config_services` | Firmware compile | `test_config.py`; no ordinary credential rotation |
+| Structured logs, fallback/wrap, persistent last-50 history | `test_config`, `test_config_services` | `test_config` (PSRAM and scratch files; pass) | `test_config.py`, incoming/outgoing regressions recorded below |
+| Sound preview and DNS/ping adapter | Shared cancellation/lifecycle tests; existing audio logic | `test_config` (streaming preview and DNS; pass) | Console diagnostics pass; listening pending |
+| Hardware menu availability / Q79 | `test_config` (RS232 actions blocked), existing `test_hwtest` | Existing hardware programs compile | `test_config.py`; COM18 path requires wiring |
+| Credits generated from licensing record | `test/scripts/test_generate_credits.py` | Included in firmware | About command acceptance pending |
+
+All 312 native and 43 on-board checks pass; four host-script tests pass. Normal
+v0.10 firmware is restored on COM15 through the upload gate. Configuration serial
+acceptance: nine pass, one skip (48.75 s). The ESP32/LED/pot-only bench is confirmed;
+COM18, real PC/Amiga rendering and physical signal/listening acceptance remain open.

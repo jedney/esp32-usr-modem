@@ -182,6 +182,17 @@ bool Phonebook::remove(const char *number) {
     }
     return false;
 }
+bool Phonebook::clear() {
+    memcpy(blob_, "USRP\1", 5);
+    put32(blob_ + 5, modemcfg::crc32(blob_, 5));
+    if (!store_.save(blob_, 9)) {
+        return false;
+    }
+    for (auto &e : entries_) {
+        e = Entry{};
+    }
+    return true;
+}
 atcmd::Reply Phonebook::command(atcmd::Port &port, const char *args, bool deleting) {
     using atcmd::Reply;
     if (!deleting && (*args == 0 || strcmp(args, "?") == 0)) {

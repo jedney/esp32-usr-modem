@@ -32,20 +32,29 @@ Session::Session(atcmd::Modem &modem, atcmd::Sink &out, uint32_t baud, CallSlot 
     port_.setLink(this);
 }
 
+bool Session::startLocal(Connection &connection) {
+    if (conn_ || local_ || slot_.busy() || !slot_.claim(this)) {
+        return false;
+    }
+    local_ = &connection;
+    return true;
+}
+
 bool Session::startCall(Connection &conn, uint32_t operationalSpeed, uint32_t reportSpeed,
                         const void *reservation, bool answered) {
-    if (conn_ != nullptr ||
+    if (conn_ != nullptr || local_ != nullptr ||
         !(reservation ? slot_.transfer(reservation, this) : slot_.claim(this))) {
         return false;
     }
     conn_ = &conn;
+    payloadSent_ = payloadReceived_ = 0;
     answered_ = answered;
     const unsigned n = profile().get(modemcfg::kAmpN);
     lineSpeed_ = operationalSpeed ? operationalSpeed
                                   : (n == 0 ? modemcfg::kMaxLineSpeed : atcmd::lineSpeedForN(n));
     reportSpeed_ =
         reportSpeed ? reportSpeed : (profile().lineExplicit ? lineSpeed_ : modem_.model());
-    throttle_ = modem_.throttle();
+    throttle_ = modem_.throttle() && !conn.localService();
     credit_[0] = credit_[1] = 0;
     creditAt_ = now_;
     sendConnect();
@@ -105,6 +114,10 @@ bool Session::answer() {
 }
 
 void Session::endCall(bool noCarrier) {
+    if (local_) {
+        local_->close();
+        local_ = nullptr;
+    }
     if (conn_ != nullptr) {
         conn_->close();
         conn_ = nullptr;
@@ -126,6 +139,10 @@ size_t Session::fromHost(const uint8_t *data, size_t len, uint32_t nowMs) {
     now_ = nowMs;
     size_t used = 0;
     while (used < len) {
+        if (local_) {
+            used += local_->write(data + used, len - used);
+            break;
+        }
         if (mode_ != Mode::kOnline) {
             port_.feed(static_cast<char>(data[used++]));  // may start or resume a call
             continue;
@@ -140,11 +157,14 @@ size_t Session::fromHost(const uint8_t *data, size_t len, uint32_t nowMs) {
                 continue;
             }
         }
-        const bool localEcho = p.get(modemcfg::kF) == 0;
+        const bool localEcho = !conn_->localService() && p.get(modemcfg::kF) == 0;
         if (allowance(0) == 0 || conn_->space() == 0 || (localEcho && echoLen_ >= sizeof echo_)) {
             break;  // the call is full: leave the rest with the caller
         }
         conn_->write(&b, 1);
+        if (payloadSent_ != UINT32_MAX) {
+            ++payloadSent_;
+        }
         consume(0, 1);
         if (localEcho) {
             echo_[echoLen_++] = b;
@@ -156,6 +176,9 @@ size_t Session::fromHost(const uint8_t *data, size_t len, uint32_t nowMs) {
 }
 
 size_t Session::hostSpace() const {
+    if (local_) {
+        return local_->space();
+    }
     if (mode_ != Mode::kOnline) {
         return 256;  // the parser takes everything
     }
@@ -163,7 +186,7 @@ size_t Session::hostSpace() const {
     if (n > allowance(0)) {
         n = allowance(0);
     }
-    if (profile().get(modemcfg::kF) == 0) {
+    if (!conn_->localService() && profile().get(modemcfg::kF) == 0) {
         size_t echoSpace = sizeof echo_ - echoLen_;
         n = n < echoSpace ? n : echoSpace;
     }
@@ -171,6 +194,9 @@ size_t Session::hostSpace() const {
 }
 
 size_t Session::toHost(uint8_t *buf, size_t cap) {
+    if (local_) {
+        return local_->read(buf, cap);
+    }
     if (mode_ != Mode::kOnline || xoff_ || conn_ == nullptr) {
         return 0;
     }
@@ -185,7 +211,10 @@ size_t Session::toHost(uint8_t *buf, size_t cap) {
         echo_[i - n] = echo_[i];
     }
     echoLen_ -= n;
-    n += conn_->read(buf + n, cap - n);
+    size_t received = conn_->read(buf + n, cap - n);
+    payloadReceived_ =
+        received > UINT32_MAX - payloadReceived_ ? UINT32_MAX : payloadReceived_ + received;
+    n += received;
     consume(1, n);
     return n;
 }
@@ -213,11 +242,17 @@ void Session::tick(uint32_t nowMs, bool dtr) {
     }
     if (dtr_.update(dtr, nowMs, p)) {  // DTR went off
         const DtrAction a = dtrAction(p);
-        if (a != DtrAction::kNone && callUp()) {
+        if (a != DtrAction::kNone && (callUp() || local_)) {
             endCall(true);
         }
         if (a == DtrAction::kReset) {
             modem_.reset(0);
+        }
+    }
+    if (local_) {
+        local_->poll(nowMs);
+        if (!local_->isOpen()) {
+            endCall(false);
         }
     }
     if (conn_ != nullptr) {
@@ -227,6 +262,7 @@ void Session::tick(uint32_t nowMs, bool dtr) {
         }
     }
     if (mode_ == Mode::kOnline && esc_.poll(nowMs, p)) {
+        conn_->escaped();
         mode_ = Mode::kOnlineCommand;
         if (baudControl_) {
             baudControl_->command();

@@ -8,6 +8,7 @@ Reads VERSION (e.g. "0.1") and the git commit, and defines:
 import pathlib
 import re
 import subprocess
+import runpy
 
 Import("env")  # noqa: F821  (provided by PlatformIO/SCons)
 
@@ -24,6 +25,7 @@ def _git(root, *args):
 
 
 root = pathlib.Path(env.subst("$PROJECT_DIR"))  # noqa: F821
+runpy.run_path(str(root / "scripts/generate_credits.py"), run_name="__main__")
 version = (root / "VERSION").read_text(encoding="utf-8").strip()
 if not VERSION_RE.match(version):
     raise SystemExit(f"VERSION must look like 0.1 or 1.0, found {version!r}")

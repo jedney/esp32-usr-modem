@@ -14,6 +14,34 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [0.10] - 2026-10-26
+
+### Added
+
+- Local BBS-style configuration through `AT*CONFIG` and reserved dial `ATDT123`,
+  with ANSI/ASCII, CP437 and plain screens, paging, setting help and AT* parity.
+- Status, phonebook, profiles, Wi-Fi/clock, update, sound and hardware-test screens;
+  generated About credits and a command reference. Both local menus reserve the
+  call slot; remote callers remain data-only.
+- A 256 KiB PSRAM structured debug ring with bounded reads, persistent last-50-call
+  history, reset/crash summary, cancellable DNS/ping and capped sound previews.
+- Password-free configuration export with replay support for profiles, phonebook,
+  network/device settings and final serial/response formatting.
+- Native configuration/service tests, scratch on-board checks and serial acceptance
+  tests. External RS232, real PC/Amiga observation and listening acceptance remain open.
+
+### Changed
+
+- Move the production AT* registry into shared, host-testable configuration data.
+- Keep direct local menus separate from network carrier state and use UART input
+  while a local menu owns the RS232 port. Retain existing settings layouts 1-4.
+- Keep call history in CRC-checked LittleFS files with a previous valid backup,
+  avoiding competition with a full phonebook in the small NVS partition.
+
+### Fixed
+
+- Prevent `F0` data echo from revealing password input in dialed configuration.
+
 ## [0.9] - 2026-10-25
 
 ### Added

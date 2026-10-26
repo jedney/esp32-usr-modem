@@ -52,6 +52,9 @@ void Incoming::clear(bool notify) {
     if (stage_ == IncomingStage::kIdle) {
         return;
     }
+    if (observer_) {
+        observer_->ended(atcmd::Result::kNoCarrier);
+    }
     hostport::Session *session = session_;
     const bool online = stage_ == IncomingStage::kOnline;
     const bool hadCarrier = session && session->callUp();
@@ -111,6 +114,9 @@ void Incoming::connected() {
         return;
     }
     stage_ = IncomingStage::kOnline;
+    if (observer_) {
+        observer_->connected(*session_);
+    }
     sound_.stop();
     if (modem_.active().get(modemcfg::kM) == 2) {
         sound_.start(SoundStage::kCarrier, "", false, lineSpeed_, modem_.active());
@@ -139,6 +145,11 @@ void Incoming::poll(bool available) {
                 return;
             }
             connection_.begin(false);
+            if (observer_) {
+                Entry peer;
+                strncpy(peer.host, socket_.peer(), sizeof peer.host - 1);
+                observer_->started(true, peer);
+            }
             stage_ = IncomingStage::kRinging;
             rings_ = 0;
             ring(now);

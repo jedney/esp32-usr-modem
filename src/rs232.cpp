@@ -233,7 +233,7 @@ void poll(uint32_t nowMs) {
         flowKnown = true;
     }
 
-    const bool wantCapture = detecting() && sess->mode() != Mode::kOnline;
+    const bool wantCapture = detecting() && sess->mode() != Mode::kOnline && !sess->localOpen();
     if (wantCapture && !hw::captureActive()) {
         hw::captureBegin();
     } else if (!wantCapture && hw::captureActive()) {
@@ -241,7 +241,7 @@ void poll(uint32_t nowMs) {
         flushUart();  // the UART's copy of the command that went online
     }
 
-    if (sess->mode() == Mode::kOnline) {
+    if (sess->mode() == Mode::kOnline || sess->localOpen()) {
         readOnlineInput(nowMs);
     } else {
         readCommandInput(nowMs);
