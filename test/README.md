@@ -26,6 +26,7 @@ Upload the firmware again afterwards (**Modem: upload over USB (tests first)**).
 | v0.7 | 2026-10-25 | Console COM15, Wi-Fi at 10.0.0.221 on the PC's network, LED and pot; Unitek COM18, RS232/audio unwired | `test_board` 5/5, `test_device` 5/5, internal `test_rs232` 8/8, `test_wifi` 6/6 | Regression: 63 passed, 27 skipped. Device acceptance: 7/7 verified; the previously blocked factory/OTA case passed after reconnecting. Authenticated uploads work by IP and mDNS, wrong/old passwords fail, first-use password display stops, and Wi-Fi plus the saved credential are restored. Every upload attempt first passed 234 native checks |
 | v0.8 | 2026-10-25 | COM15, LED/pot, Wi-Fi; COM18 adapter only, RS232/audio unwired | Board 5, device 5, Wi-Fi 6, internal RS232 9, calls 4: all 29 pass | Console 68 passed / 27 skipped; ten call checks passed including true refusal, live BBS, streaming audio and DNS; external RS232 and listening await wiring |
 | v0.9 | 2026-10-25 | COM15, LED/pot, Wi-Fi; COM18 adapter only, RS232/audio unwired | All seven suites pass: 39 checks, including four new answer tests and six hardware-driver checks | Console regression 70 passed / 35 skipped; nine local outgoing checks pass (external BBS opt-in skipped); all ten final incoming checks pass. External signals, full panel and audio listening remain pending |
+| v0.10 | 2026-10-26 | COM15, ESP32/LED/pot and Wi-Fi; COM18 unwired | All eight suites pass: 43 checks, including PSRAM/history recovery/probe/audio | Configuration 9 passed / 1 skipped; existing console/local-call regression 87 passed / 28 skipped. Normal firmware restored, 23 call records retained after restarts; real PC/Amiga observation and external signals/listening remain open |
 
 ## Feature matrix
 
@@ -114,7 +115,7 @@ Status: ✅ tests written, ⬜ planned. Section numbers refer to the project bri
 | Structured logs, fallback/wrap, persistent last-50 history | `test_config`, `test_config_services` | `test_config` (PSRAM and scratch files; pass) | `test_config.py`, incoming/outgoing regressions recorded below |
 | Sound preview and DNS/ping adapter | Shared cancellation/lifecycle tests; existing audio logic | `test_config` (streaming preview and DNS; pass) | Console diagnostics pass; listening pending |
 | Hardware menu availability / Q79 | `test_config` (RS232 actions blocked), existing `test_hwtest` | Existing hardware programs compile | `test_config.py`; COM18 path requires wiring |
-| Credits generated from licensing record | `test/scripts/test_generate_credits.py` | Included in firmware | About command acceptance pending |
+| Credits generated from licensing record | `test/scripts/test_generate_credits.py` | Included in firmware | About command passes |
 
 All 312 native and 43 on-board checks pass; four host-script tests pass. Normal
 v0.10 firmware is restored on COM15 through the upload gate. Configuration serial
