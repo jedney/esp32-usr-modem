@@ -31,6 +31,10 @@ atcmd::Reply Commands::pass(atcmd::Port &port, const char *args) {
     if (*args != '\0') {
         return atcmd::Reply::kError;
     }
+    if (port.browser()) {
+        port.line("Enter a new password with AT*PASS=<text>; browser passwords are write-only.");
+        return atcmd::Reply::kError;
+    }
     char password[kGeneratedLength + 1] = {};
     bool ok = device_.generate(password) && device_.change(password);
     if (ok) {

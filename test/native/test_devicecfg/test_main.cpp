@@ -497,8 +497,22 @@ void test_password_separator_and_only_value_masked() {
     TEST_ASSERT_FALSE(has(text, "abcdefgh"));
 }
 
+void test_browser_password_generation_cannot_disclose_plaintext() {
+    Rig r;
+    r.port.setBrowser(true);
+    std::string hash = r.device.otaHash();
+    auto text = r.type("AT*PASS\r");
+    TEST_ASSERT_FALSE(has(text, "Device password:"));
+    TEST_ASSERT_TRUE(has(text, "ERROR"));
+    TEST_ASSERT_EQUAL_STRING(hash.c_str(), r.device.otaHash());
+    text = r.type("AT*PASS=WriteOnlyExample\r");
+    TEST_ASSERT_FALSE(has(text, "WriteOnlyExample"));
+    TEST_ASSERT_TRUE(has(text, "OK"));
+    TEST_ASSERT_EQUAL_STRING("", r.device.bootPassword());
+}
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_browser_password_generation_cannot_disclose_plaintext);
     RUN_TEST(test_password_separator_and_only_value_masked);
     RUN_TEST(test_first_boot_is_random_twelve_and_saved_for_display);
     RUN_TEST(test_first_use_erases_plaintext_but_keeps_both_hashes);

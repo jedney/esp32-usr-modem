@@ -26,6 +26,8 @@ def web_files(root: pathlib.Path) -> dict:
         "app.js": src / "app.js",
         "status.js": src / "status.js",
         "demo.js": src / "demo.js",
+        "upload.js": src / "upload.js",
+        "link.js": src / "link.js",
         "xterm.mjs": vendor / "xterm.mjs",
         "xterm.css": vendor / "xterm.css",
         "ibm-plex-mono-400.woff2": vendor / "ibm-plex-mono-400.woff2",
@@ -54,6 +56,10 @@ def build(root: pathlib.Path, out_dir: pathlib.Path) -> int:
         (out_dir / f"{name}.gz").write_bytes(packed)
         total += len(packed)
     print(f"Web interface: {len(files)} files, {total / 1024:.0f} KB gzipped -> {out_dir}")
+    version = (root / "VERSION").read_text(encoding="utf-8").strip()
+    (out_dir.parent / "image-id.txt").write_text(
+        f"USRMODEM/1/LITTLEFS/{version}\n", encoding="ascii", newline="\n"
+    )
     return total
 
 

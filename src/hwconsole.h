@@ -13,6 +13,8 @@ public:
     virtual void write(const char *data, size_t len) = 0;
     virtual int read() = 0;  // next key, or -1
     virtual bool isRs232() const = 0;
+    virtual bool connected() const { return true; }
+    virtual void service() {}
     void print(const char *s);
     void printf(const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 };
@@ -30,6 +32,7 @@ void setPortControl(const PortControl &pc);
 // `rest` is the command after "AT*HW", e.g. "LED=CD" for "AT*HWLED=CD".
 // Prints the result and the final OK / ERROR.
 void handle(Term &term, const char *rest);
+void restoreBrowserResources();
 
 // One line per command, for AT*HELP.
 void printHelp(Term &term);

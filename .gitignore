@@ -19,6 +19,7 @@ Thumbs.db
 
 # Generated web interface files (scripts/build_web.py, scripts/make_preview.py)
 data/www/
+data/image-id.txt
 web/preview.html
 web/node_modules/
 

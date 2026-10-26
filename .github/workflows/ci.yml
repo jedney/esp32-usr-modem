@@ -100,7 +100,9 @@ jobs:
       - run: pio run -e s3
       - name: LittleFS image (web files)
         run: pio run -e s3 -t buildfs
-      - name: Firmware size
+      - name: Validate image identities and manifest
+        run: python scripts/image_manifest.py .pio/build/s3
+      - name: Firmware size report
         run: pio run -e s3 -t size | tail -5
       - uses: actions/upload-artifact@v7
         with:
@@ -110,6 +112,7 @@ jobs:
             .pio/build/s3/bootloader.bin
             .pio/build/s3/partitions.bin
             .pio/build/s3/littlefs.bin
+            .pio/build/s3/image-manifest.json
             .pio/build/s3/firmware.elf
           retention-days: 30
       # Last: the test programs are built in the same folder and replace firmware.bin

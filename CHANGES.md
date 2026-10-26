@@ -14,6 +14,35 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [0.11] - 2026-10-26
+
+### Added
+
+- Authenticated HTTP and WebSocket configuration using the existing xterm page and
+  shared terminal, with read-only browser status while a call or another menu owns
+  the modem. Live panel LEDs, Wi-Fi, clock and call status follow the real hardware.
+- Digest login using the existing device hash, single-use 30-second socket tickets,
+  Host/Origin checks, CSRF-protected uploads and bounded browser queues. `AT*WEB`
+  controls the saved listener setting; browser passwords remain write-only.
+- Browser hardware tests, live line controls and RS232 bridge, with disconnect
+  cleanup. Firmware and LittleFS image uploads verify project/version identity and
+  SHA-256; filesystem images are staged before replacing the single partition.
+- Image identity/manifest build checks and native, on-board, script and web tests.
+
+### Changed
+
+- Browser network changes commit after connection and revert on failure within
+  60 seconds, independently of the browser socket. Configuration buffers use PSRAM
+  where available. Serial command and menu behavior remains covered by regression.
+- The Client Tests placeholder follows the reordered v0.12 roadmap milestone.
+
+### Fixed
+
+- Detect silent browser sockets after restart and reconnect after image uploads;
+  restore the real panel LEDs when leaving browser hardware tests.
+- Wired 300-baud acceptance now budgets for the full ATI4 profile response instead
+  of timing out based only on the short command length.
+
 ## [0.10] - 2026-10-26
 
 ### Added

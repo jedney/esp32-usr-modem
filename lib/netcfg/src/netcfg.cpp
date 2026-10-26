@@ -75,7 +75,18 @@ LoadResult Net::begin(uint32_t nowMs) {
 }
 
 bool Net::store() {
+    if (browserGuard_) {
+        return true;  // commit only after the candidate network connects
+    }
     return save(store_, s_);
+}
+
+void Net::guardBrowserChange(uint32_t nowMs) {
+    if (!browserGuard_) {
+        browserPrevious_ = s_;
+        browserAt_ = nowMs;
+        browserGuard_ = true;
+    }
 }
 
 void Net::attempt(uint32_t nowMs) {
@@ -115,6 +126,20 @@ bool Net::takeNotice(char *buf, size_t cap) {
 void Net::tick(uint32_t nowMs) {
     now_ = nowMs;
     link_ = radio_.link();
+    if (browserGuard_ && join_ != JoinResult::kRunning) {
+        bool connected = link_.state == LinkState::kUp && join_ != JoinResult::kFailed;
+        bool failed = nowMs - browserAt_ >= 60000 || join_ == JoinResult::kFailed;
+        if (connected || failed) {
+            bool committed = connected && save(store_, s_);
+            if (!committed) {
+                s_ = browserPrevious_;
+                tz::resolve(s_.tz, &zone_, nullptr, 0);
+                attempt(nowMs);
+            }
+            wipe(browserPrevious_.pass, sizeof browserPrevious_.pass);
+            browserGuard_ = false;
+        }
+    }
 
     if (!clockNoticed_ && radio_.lastSync() != 0) {
         clockNoticed_ = true;
@@ -380,7 +405,7 @@ bool Net::setTz(const char *zone) {
 
 // --- AT*WIFIJOIN ----------------------------------------------------------------------------
 
-bool Net::join(const char *ssid, const char *pass, uint32_t nowMs) {
+bool Net::join(const char *ssid, const char *pass, uint32_t nowMs, uint32_t timeoutMs) {
     if (join_ == JoinResult::kRunning || scan_ == ScanState::kRunning || !validSsid(ssid) ||
         !validPassword(pass)) {
         return false;
@@ -394,6 +419,7 @@ bool Net::join(const char *ssid, const char *pass, uint32_t nowMs) {
     join_ = JoinResult::kRunning;
     joinReason_ = Reason::kNone;
     joinAt_ = nowMs;
+    joinTimeout_ = timeoutMs;
     joinTryAt_ = nowMs;
     trying_ = false;
     wasUp_ = false;
@@ -404,9 +430,21 @@ bool Net::join(const char *ssid, const char *pass, uint32_t nowMs) {
 
 void Net::pollJoin(uint32_t nowMs) {
     if (link_.state == LinkState::kUp) {
+        Settings previous = s_;
         s_ = candidate_;
         wipe(candidate_.pass, sizeof candidate_.pass);
-        store();
+        if (!(browserGuard_ ? save(store_, s_) : store())) {
+            s_ = previous;
+            wipe(previous.pass, sizeof previous.pass);
+            join_ = JoinResult::kFailed;
+            restoreAfterJoin();
+            return;
+        }
+        wipe(previous.pass, sizeof previous.pass);
+        if (browserGuard_) {
+            browserGuard_ = false;
+            wipe(browserPrevious_.pass, sizeof browserPrevious_.pass);
+        }
         join_ = JoinResult::kJoined;
         wasUp_ = true;
         trying_ = false;
@@ -420,7 +458,7 @@ void Net::pollJoin(uint32_t nowMs) {
         joinReason_ = link_.reason == Reason::kNone ? Reason::kOther : link_.reason;
         // A wrong password won't come right. Anything else may be a missed beacon: try
         // again while there is time.
-        if (joinReason_ == Reason::kWrongPassword || due(nowMs, joinAt_ + kJoinTimeoutMs / 2)) {
+        if (joinReason_ == Reason::kWrongPassword || due(nowMs, joinAt_ + joinTimeout_ / 2)) {
             join_ = JoinResult::kFailed;
             restoreAfterJoin();
         } else if (due(nowMs, joinTryAt_ + 2000)) {
@@ -429,7 +467,7 @@ void Net::pollJoin(uint32_t nowMs) {
         }
         return;
     }
-    if (due(nowMs, joinAt_ + kJoinTimeoutMs)) {
+    if (due(nowMs, joinAt_ + joinTimeout_)) {
         joinReason_ = Reason::kNoAnswer;
         join_ = JoinResult::kFailed;
         restoreAfterJoin();
@@ -437,6 +475,11 @@ void Net::pollJoin(uint32_t nowMs) {
 }
 
 void Net::restoreAfterJoin() {
+    if (browserGuard_) {
+        s_ = browserPrevious_;
+        browserGuard_ = false;
+        wipe(browserPrevious_.pass, sizeof browserPrevious_.pass);
+    }
     wipe(candidate_.pass, sizeof candidate_.pass);
     wasUp_ = false;
     if (s_.enabled && s_.hasNetwork()) {

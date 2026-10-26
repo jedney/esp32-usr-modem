@@ -49,13 +49,20 @@ bool ledHold = false;    // AT*HWLED keeps the LEDs until AT*HWLED=AUTO
 Term &out() {
     return *term;
 }
+void testDelay(uint32_t ms) {
+    uint32_t start = millis();
+    do {
+        term->service();
+        ::delay(ms < 5 ? ms : 5);
+    } while (millis() - start < ms);
+}
 
 // Throws away what's left of the command line (terminals send CR LF) so a test that stops
 // "on any key" doesn't stop at once. On the RS232 port, keys arrive in bursts after the
 // line has been idle for 32 ms, so wait a little longer there.
 void drainInput() {
-    delay(term->isRs232() ? 60 : 30);
-    while (term->read() >= 0) {
+    testDelay(term->isRs232() ? 60 : 30);
+    while (term->connected() && term->read() >= 0) {
     }
 }
 
@@ -109,7 +116,10 @@ void givePort() {
 int waitKey() {
     int c;
     while ((c = readKey()) < 0) {
-        delay(5);
+        testDelay(5);
+    }
+    if (!term->connected()) {
+        return 'Q';
     }
     drainInput();
     return toupper(c);
@@ -266,7 +276,7 @@ void ledChase() {
     ledHold = true;
     for (uint32_t step = 0; !keyPressed(); ++step) {
         hw::ledsSet(hwtest::chaseMask(step));
-        delay(120);
+        testDelay(120);
     }
     hw::ledsSet(0);
     ledHold = false;  // back to the modem's own LED states
@@ -285,7 +295,7 @@ void ledWalk() {
                 ledHold = false;
                 return;
             }
-            delay(10);
+            testDelay(10);
         }
     }
 }
@@ -448,7 +458,7 @@ bool runPot(bool withTone) {
         hw::audioPlay(src, potGain, potStop);
     } else {
         while (!potStop()) {
-            delay(10);
+            testDelay(10);
         }
     }
     float lo = volume::potLevel(potMinSeen, hw::kPotMax);
@@ -482,14 +492,14 @@ void runLines() {
             OutSignal s = c == 'D' ? OutSignal::kDCD : c == 'R' ? OutSignal::kRI : OutSignal::kCTS;
             hw::lineSet(s, !hw::lineIsAsserted(s));
             last = 0;
-        } else if (c == 'Q' || c == kEsc || c == '\r' || c == '\n') {
+        } else if (c == 'Q' || c == kEsc || c == kCtrlX || c == '\r' || c == '\n') {
             break;
         }
         if (millis() - last >= 100) {
             last = millis();
             printLines();
         }
-        delay(5);
+        testDelay(5);
     }
     for (int i = 0; i < 3; ++i) {
         hw::lineSet(static_cast<OutSignal>(i), false);
@@ -533,7 +543,7 @@ LoopResult loopbackAt(uint32_t baud) {
     hw::linesBegin();
     hw::uartBegin(baud);
     HardwareSerial &u = hw::uart();
-    delay(20);
+    testDelay(20);
     while (u.available() > 0) {
         u.read();
     }
@@ -547,7 +557,7 @@ LoopResult loopbackAt(uint32_t baud) {
     while (r.received < count && millis() - start < timeoutMs) {
         int b = u.read();
         if (b < 0) {
-            delay(1);
+            testDelay(1);
             continue;
         }
         if (static_cast<uint8_t>(b) != hwtest::loopbackByte(r.received)) {
@@ -561,10 +571,10 @@ LoopResult loopbackAt(uint32_t baud) {
 
     auto follows = [](OutSignal out, bool (*in)()) {
         hw::lineSet(out, true);
-        delay(5);
+        testDelay(5);
         bool on = in();
         hw::lineSet(out, false);
-        delay(5);
+        testDelay(5);
         bool off = !in();
         return on && off;
     };
@@ -639,7 +649,7 @@ void runBridge(uint32_t baud) {
             out().printf("\r\n[DTR %s, RTS %s]\r\n", yesNo(dtr), yesNo(rts));
         }
         if (c < 0) {
-            delay(1);
+            testDelay(1);
         }
     }
     hw::uartEnd();
@@ -669,6 +679,9 @@ Step askYesNo(const char *question) {
     out().printf("%s (Y/N/S): ", question);
     for (;;) {
         int c = waitKey();
+        if (!term->connected()) {
+            return Step::kSkip;
+        }
         if (c == 'Y' || c == 'N' || c == 'S') {
             out().printf("%c\r\n", c);
             return c == 'Y' ? Step::kPass : c == 'N' ? Step::kFail : Step::kSkip;
@@ -967,4 +980,11 @@ void handle(Term &t, const char *rest) {
     good ? ok() : error();
 }
 
+void restoreBrowserResources() {
+    sigHeld = false;
+    givePort();
+    ledHold = false;
+    hw::ampSetMode(hw::AmpMode::kAuto);
+    hw::ledsSet(0);
+}
 }  // namespace hwconsole

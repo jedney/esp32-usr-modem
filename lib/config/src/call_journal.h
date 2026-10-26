@@ -15,6 +15,8 @@ public:
     const CallRecord &current() const { return record_; }
     uint32_t duration() const { return session_ ? (clock_() - connectedAt_) / 1000 : 0; }
     hostport::Session *session() const { return session_; }
+    int64_t connectedUtc() const { return connectedUtc_; }
+    uint16_t port() const { return port_; }
 
 private:
     History &history_;
@@ -24,6 +26,8 @@ private:
     CallRecord record_;
     hostport::Session *session_ = nullptr;
     uint32_t connectedAt_ = 0;
+    int64_t connectedUtc_ = 0;
+    uint16_t port_ = 23;
     bool active_ = false;
 };
 }  // namespace config

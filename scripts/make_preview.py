@@ -41,10 +41,14 @@ def main(out: pathlib.Path) -> None:
         "usr-xterm": strip_source_map((VENDOR / "xterm.mjs").read_text(encoding="utf-8")),
         "usr-status": (SRC / "status.js").read_text(encoding="utf-8"),
         "usr-demo": (SRC / "demo.js").read_text(encoding="utf-8"),
+        "usr-upload": (SRC / "upload.js").read_text(encoding="utf-8"),
+        "usr-link": (SRC / "link.js").read_text(encoding="utf-8").replace("'./status.js'", "'usr-status'"),
     }
     app = (SRC / "app.js").read_text(encoding="utf-8")
     app = app.replace("'./xterm.mjs'", "'usr-xterm'").replace("'./status.js'", "'usr-status'")
     app = app.replace("'./demo.js'", "'usr-demo'")
+    app = app.replace("'./upload.js'", "'usr-upload'")
+    app = app.replace("'./link.js'", "'usr-link'")
     import_map = {"imports": {k: data_url("text/javascript", v.encode()) for k, v in modules.items()}}
 
     # The modem's Content-Security-Policy forbids inline scripts; the preview needs them.

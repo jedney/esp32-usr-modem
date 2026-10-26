@@ -30,6 +30,38 @@ Upload the firmware again afterwards (**Modem: upload over USB (tests first)**).
 
 ## Feature matrix
 
+v0.11 bench (26 Oct): all hardware wired on COM15/COM18. All 328 native, 18 browser
+unit and six script checks pass. The two new web on-board checks pass and all nine
+programs compile. Wired RS232 baseline 21/21; full regression 128 pass / six skip /
+two exclusions. Web security/menu/bridge/incoming signals, firmware HTTP installation
+and approved USB/browser filesystem installation pass. Final browser suite: 16
+pass, one opt-in installation skip. Chrome reconnects after upload with zero page
+errors. See `docs/v0.11-plan.md`
+for the detailed final web run and remaining manual acceptance.
+
+v0.11 adds Digest/Host/Origin/CSRF policy, socket tickets, a shared browser menu,
+read-only busy views, real status and browser hardware/update adapters. Portable
+coverage is in `test_web`, plus network rollback and browser-secret regressions in
+`test_netcfg`/`test_devicecfg`. `embedded/test_web` checks the real hash/RNG adapter
+and UTF-8 output. `test/e2e/test_web.py --web-tests` uses the existing device
+credential in memory for HTTP/WebSocket and wired COM18 signal tests. Browser
+hash/image tests are in `web/test/upload.test.mjs`; build identity checks are in
+`test/scripts/test_image_manifest.py`. All hardware is now wired (Jon, 26 Oct).
+
+| v0.11 feature | Native / host | On-board / real-device acceptance |
+|---|---|---|
+| Request trust | Duplicate/smuggled headers, Host/Origin, Digest parsing/replay/expiry, bounded single-use tickets | MD5/RNG adapter; real Digest login, invalid Host/Origin and ticket reuse |
+| Browser menu | Existing action parity, secret disclosure refusal, CP437-to-UTF-8, bounded queues | Shared menu, second browser/serial isolation, quit/disconnect cleanup |
+| Network rollback | Delayed commit, 60-second IP rollback, retained old credentials | Real socket-loss/network acceptance is recorded in v0.11 plan |
+| Upload | Numeric versions, image identity/header/size, independent SHA-256 vectors, build manifest checks | Invalid CSRF rejection; actual app/filesystem installation remains explicit acceptance |
+| Browser hardware | Shared command policy and Q79 restrictions | COM18 DTR/RTS and DCD/RI/CTS; bridge; loopback requires a physical plug |
+
+Run `python -m pytest test/e2e/test_web.py --console-port COM15 --rs232-port COM18
+--web-tests --web-host usr-modem.local`. The password comes from the existing
+`USR_MODEM_OTA_PASSWORD` environment/ignored `.env`; do not put it in command arguments.
+Only one process may own either COM port. On fitted hardware, the old bare-board
+`embedded/test_rs232` GPIO-driving tests must skip; wired end-to-end tests cover it.
+
 v0.9 adds incoming Telnet on port 23, UK ringing/RI/AA, ATA/S0 and a saved
 `AT*ANSWERPORT` receiver (RS232 by default). Native: **290 checks pass**, including
 26 incoming-call tests and migration from modem NVS layout 3. All **39 on-board
@@ -101,7 +133,7 @@ Status: ✅ tests written, ⬜ planned. Section numbers refer to the project bri
 | `ATI0`–`ATI7` Sportster identity, `+FCLASS` fax handling (6.6) | `test_atcmd` | — | `test_settings.py` | ✅ |
 | Call log, NTP clock (6.8) | `test_config`, `test_config_services`, `test_netcfg` | `test_config` (files/backup), `test_wifi` (clock) | `test_config.py`, incoming/outgoing regression | Software/on-board/COM15 pass |
 | Web page status bar: LED decode, clock in the modem's time zone, call label, remote host/IP, uptime, Wi-Fi bars, reconnect back-off, 80 × 25 font fit (6.11) | `web/test/status.test.mjs` | — | demo-mode check in a browser | ✅ |
-| Web server: Digest login, session token, Host check, CSRF, WebSocket messages per `web/PROTOCOL.md`, browser firmware upload (6.11) | ⬜ | ⬜ | ⬜ | ⬜ |
+| Web server: Digest login, session token, Host check, CSRF, WebSocket messages per `web/PROTOCOL.md`, browser firmware upload (6.11) | `test_web`, browser upload/link tests, image manifest | `test_web` (hash/RNG/UTF-8) | `test_web.py`, real Chrome app/filesystem upload and reconnect | Software/wired browser pass; manual hardware gaps above |
 | Client Tests: display, screen size, X/Y/ZMODEM, keyboard, cable check (6.13) | ⬜ | — | ⬜ with `lrzsz` | ⬜ |
 
 ## v0.10 configuration coverage (26 Oct 2026)

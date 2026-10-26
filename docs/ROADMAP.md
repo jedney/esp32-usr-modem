@@ -10,9 +10,9 @@ Wi-Fi and clock (joins Jon's Wi-Fi, `ping usr-modem.local` works, password absen
 every output; checked on the bench 24 Oct). The pin map is confirmed (Q76) and applied
 in v0.6.
 
-Built, check outstanding: **v0.5** RS232 host port and LED driver. Unit, on-board and
-console end-to-end tests pass; the RS232 end-to-end tests (`test/e2e/test_rs232.py`)
-wait for the MAX3232s and DB9 to be wired.
+Done: **v0.5** RS232 host port and LED driver. The newly wired baseline passes all
+21 RS232 end-to-end checks (`test/e2e/test_rs232.py`), including 300-115200 baud,
+on 26 Oct through COM15/COM18. Physical panel/listening observations stay separate.
 
 Done: **v0.7** device password, authenticated OTA and factory reset (bench 25 Oct).
 After reconnecting the modem to the PC's network at 10.0.0.221, OTA uploads work with
@@ -24,14 +24,30 @@ Done in software: **v0.9** answer mode (bench 25 Oct). A PC Telnet client calls 
 23; manual ATA and S0 auto-answer work through COM15, including binary data and
 remote-caller isolation while locally escaped. `AT*ANSWERPORT=RS232|CONSOLE`
 selects the saved auto-answer destination, default RS232. Native, on-board and
-incoming-call acceptance pass; external RI/DCD/DTR, full-panel observation and ring
-audio listening await wiring. See `docs/v0.9-plan.md` and `test/README.md`.
+incoming-call acceptance pass; the hardware is now wired. COM18 RI/DCD/DTR and
+incoming payload are verified in v0.11. Full-panel observation and ring listening
+remain separate physical checks.
+See `docs/v0.9-plan.md` and `test/README.md`.
 
 Implemented, acceptance outstanding: **v0.10** configuration terminal. Both local
 entry paths, three terminal styles, shared AT* actions, logging/history, diagnostics
 and export are implemented. All 312 native and 43 on-board checks pass, as do nine
-COM15 configuration cases. External RS232 and real Amiga acceptance remain open. Either
+COM15 configuration cases. External RS232 is verified in the v0.11 regression;
+real Amiga acceptance remains open. Either
 local menu reserves the call slot (Jon, 26 Oct). See `docs/v0.10-plan.md`.
+
+Implemented, acceptance in progress: **v0.11** web interface firmware. See
+`docs/v0.11-plan.md` for authenticated
+HTTP/WebSocket transport, the shared browser menu, hardware tests, image uploads
+and the now-wired COM15/COM18 acceptance sequence. Jon confirmed one active menu
+across console, RS232 and browser, with read-only browser status while busy (26 Oct).
+328 native, 18 browser-unit and six script checks pass; the two new on-board checks
+pass and all nine test programs compile. Real Chrome Digest login/status, all 16
+backend/wired browser checks and firmware-only HTTP installation pass. Jon approved
+filesystem replacement with no further backup; USB and browser installation succeed.
+The full regression passes 128 checks (six skips, two exclusions), with additional
+browser acceptance recorded in the plan. A heartbeat covers half-open sockets after
+reset. Loopback-plug, physical listening/panel and real Amiga checks remain open.
 
 | Version | Feature | Brief | Done when |
 |---|---|---|---|
@@ -43,8 +59,8 @@ local menu reserves the call slot (Jon, 26 Oct). See `docs/v0.10-plan.md`.
 | v0.9 | **Answer mode**: listen on port 23, RI + UK ring, `ATA`, `S0` auto-answer, AA LED, remote-caller isolation | 6.6 | A Telnet client on the PC can "call" the modem; it can't reach command mode |
 | v0.10 | **Configuration screen**: menu data model in `lib/` with ANSI, CP437 and plain renderers; `ATDT123` / `AT*CONFIG`; status, phonebook, settings with help, command reference, About (from `credits/LICENSES.md`), sounds, debug log (PSRAM ring buffer, `AT*LOG`), call log, Wi-Fi tools, updates, config export, Hardware tests screen (all tests on the USB console; on an RS232 session the line, loopback and bridge tests are listed as unavailable, Q79); `AT*` parity unit test | 6.8, 6.14 | Every menu item has an `AT*` command (unit test) and works on the Amiga and a PC terminal |
 | v0.11 | **Web interface firmware**: HTTP server, Digest login, Host check, CSRF, `/api/session` + WebSocket per `web/PROTOCOL.md`, config screen in the browser (including the Hardware tests screen: all tests, with line/loopback/bridge only while the modem is idle, bridge traffic shown in the browser terminal, on-screen DCD/RI/CTS toggles, Q79), live LEDs/status, browser firmware/LittleFS upload | 6.11, 6.14 | The v0.2 page works against the real modem with login |
-| v0.12 | **Internet dial-up**: PPP on `ATDT666` and SLIP on `ATDT667` (port from Zimodem), NAT, clean hang-up | 6.6 | Windows 9x or Amiga TCP stack browses the web through the modem |
-| v0.13 | **Client Tests**: display tests, screen size, keyboard, terminal ID, echo/line endings, flow control, cable check, bell, X/Y/ZMODEM up/downloads (port from Zimodem), save results as client settings | 6.13 | Tested against a PC terminal (with `lrzsz`) and the Amiga |
+| v0.12 | **Client Tests**: display tests, screen size, keyboard, terminal ID, echo/line endings, flow control, cable check, bell, X/Y/ZMODEM up/downloads (port from Zimodem), save results as client settings | 6.13 | Tested against a PC terminal (with `lrzsz`) and the Amiga |
+| v0.13 | **Internet dial-up**: PPP on `ATDT666` and SLIP on `ATDT667` (port from Zimodem), NAT, clean hang-up | 6.6 | Windows 9x or Amiga TCP stack browses the web through the modem |
 | v1.0 | **Production**: final build in the case (pin map already confirmed by Electronics, Q76, and applied in v0.6), all on-board and end-to-end tests pass, README and About complete | all | Jon's sign-off |
 
 Notes:
@@ -65,7 +81,8 @@ Notes:
   software validation passes (263 native, 29 on-board, 78 serial checks). All
   outgoing-call results, including TCP refusal, are verified. External RS232 and
   listening await wiring. See `docs/v0.8-plan.md` and `test/README.md`.
-- v0.5 needs the RS232 section wired on the bench (MAX3232s, DB9).
+- The RS232 section and all other hardware are now wired (Jon, 26 Oct); outstanding
+  v0.5/v0.8/v0.9/v0.10 physical checks can be run through COM15 and COM18.
 - The pin map is confirmed by Electronics (Q76, schematic rev A, 24 Oct 2026) and applied
   in v0.6. If the board ever changes, `lib/hw/src/pins.h` and the values locked in by
   `test/native/test_pins` change together.

@@ -1,5 +1,12 @@
 # End-to-end tests
 
+v0.11 web acceptance: add `--web-tests --web-host usr-modem.local` with
+`--console-port COM15 --rs232-port COM18`. HTTP Digest uses the existing
+`USR_MODEM_OTA_PASSWORD` in memory. The normal web suite does not upload images,
+rotate credentials or erase history. It tests authentication, socket tickets,
+single-menu ownership, read-only views, CSRF rejection and physical line controls.
+Full filesystem acceptance needs explicit approval because replacement erases history.
+
 These drive a real modem through its serial ports and check the responses.
 
 ```powershell

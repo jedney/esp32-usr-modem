@@ -10,6 +10,8 @@
 
 import { Terminal } from './xterm.mjs';
 import * as S from './status.js';
+import {inspectImage, compareVersions} from './upload.js';
+import {createModemLink} from './link.js';
 
 const COLS = 80;
 const ROWS = 25;
@@ -47,6 +49,7 @@ const state = {
     clock: { epoch: 0, tzo: 0, at: 0 },
     wifi: null,
     cell: null, // measured { w, h } per px of font size
+    csrf: null, version: null, edit: false, upload: false,
 };
 
 // ---------------------------------------------------------------- status bar
@@ -121,7 +124,19 @@ function handleMessage(msg) {
     }
     switch (msg.t) {
         case 'hello':
+            state.csrf = msg.csrf;
+            state.version = msg.ver;
             document.title = `${msg.name || 'USR Modem'} v${msg.ver || '?'}`;
+            break;
+        case 'access':
+            state.edit = msg.edit === true;
+            $('upload').disabled = !state.edit || state.upload;
+            $('enter').disabled = state.edit;
+            $('operation').textContent = state.edit ? 'Configuration active' : 'Read-only live status';
+            break;
+        case 'hardware':
+            $('line-controls').hidden = !msg.active || msg.mode !== 'lines';
+            $('stop-test').hidden = !msg.active;
             break;
         case 'led':
             showLeds(msg.m);
@@ -178,52 +193,47 @@ function fitTerminal() {
 // ---------------------------------------------------------------- transport
 
 let send = () => {};
+let reconnectModem = () => {};
 
 function connectModem() {
-    let attempt = 0;
-    const open = async () => {
-        setLink('connecting');
-        try {
-            // The page itself is behind Digest authentication; this returns a short-lived
-            // token for the WebSocket, which can't carry Digest credentials.
-            const reply = await fetch('api/session', { cache: 'no-store' });
-            if (!reply.ok) {
-                throw new Error(`session ${reply.status}`);
-            }
-            const { token } = await reply.json();
-            const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
-            const ws = new WebSocket(`${scheme}://${location.host}/ws?token=${encodeURIComponent(token)}`);
+    const link = createModemLink({
+        session: async () => {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 5000);
+            try {
+                const reply = await fetch('api/session', {cache: 'no-store', signal: controller.signal});
+                if (!reply.ok) throw new Error('Login unavailable');
+                return (await reply.json()).token;
+            } finally { clearTimeout(timer); }
+        },
+        socket: token => {
+            const ws = new WebSocket(`ws://${location.host}/ws?token=${encodeURIComponent(token)}`);
             ws.binaryType = 'arraybuffer';
-            ws.onopen = () => {
-                attempt = 0;
-                setLink('online');
-                send = (bytes) => ws.readyState === WebSocket.OPEN && ws.send(bytes);
-                term.focus();
-            };
-            ws.onmessage = (ev) => {
-                if (typeof ev.data === 'string') {
-                    handleMessage(S.parseMessage(ev.data));
-                } else {
-                    term.write(new Uint8Array(ev.data));
-                }
-            };
-            ws.onclose = () => {
-                send = () => {};
-                retry();
-            };
-        } catch {
-            retry();
-        }
-    };
-    const retry = () => {
-        setLink('offline');
-        setTimeout(open, S.reconnectDelay(attempt++));
-    };
-    open();
+            return ws;
+        },
+        receive: data => {
+            if (typeof data === 'string') handleMessage(S.parseMessage(data));
+            else term.write(new Uint8Array(data));
+        },
+        status: status => { setLink(status); if (status === 'online') term.focus(); },
+        disconnect: () => {
+            state.csrf = null;
+            state.edit = false;
+            $('upload').disabled = true;
+            $('line-controls').hidden = true;
+            $('stop-test').hidden = true;
+        },
+    });
+    send = bytes => !state.upload && link.send(bytes);
+    reconnectModem = () => link.reconnect();
+    setInterval(() => link.poll(state.upload), 5000);
+    link.start();
 }
 
 async function startDemo() {
     setLink('demo');
+    $('enter').disabled = true;
+    $('operation').textContent = 'Demo — D calls, H hangs up';
     const { startDemoModem } = await import('./demo.js');
     const modem = startDemoModem({
         message: handleMessage,
@@ -236,6 +246,50 @@ async function startDemo() {
 // ---------------------------------------------------------------- start
 
 async function main() {
+    $('enter').onclick = () => send(encoder.encode('e\r'));
+    $('dcd').onclick = () => send(encoder.encode('d'));
+    $('ri').onclick = () => send(encoder.encode('r'));
+    $('cts').onclick = () => send(encoder.encode('c'));
+    $('stop-test').onclick = () => send(new Uint8Array([0x18]));
+    $('upload').onclick = () => $('image').click();
+    $('image').onchange = async () => {
+        const file = $('image').files[0];
+        if (!file || !state.edit || !state.csrf || state.upload) return;
+        const output = $('operation');
+        try {
+            if (file.size > 0x7e0000) throw new Error('Image too large');
+            output.textContent = 'Checking image…';
+            const bytes = new Uint8Array(await file.arrayBuffer());
+            const image = inspectImage(bytes);
+            const downgrade = compareVersions(image.version, state.version) < 0;
+            let prompt = `Install ${image.target} v${image.version}? The modem will reboot.`;
+            if (downgrade) prompt += '\nThis is a downgrade.';
+            if (image.target === 'littlefs') prompt += '\nThis replaces sounds, web files and call history. Keep USB available for recovery.';
+            if (!window.confirm(prompt)) { output.textContent = 'Upload cancelled'; return; }
+            // Refresh expired Digest credentials with a small request before
+            // streaming a large body. This does not replace the current socket.
+            const login = await fetch('api/session', {cache: 'no-store'});
+            if (!login.ok) throw new Error('Login expired; reconnect before uploading');
+            state.upload = true;
+            $('upload').disabled = true;
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `/api/update?target=${image.target}&version=${image.version}`);
+            xhr.timeout = 190000;
+            xhr.setRequestHeader('Content-Type','application/octet-stream');
+            xhr.setRequestHeader('X-CSRF-Token',state.csrf);
+            xhr.setRequestHeader('X-Image-SHA256',image.sha256);
+            if (downgrade) xhr.setRequestHeader('X-Confirm-Downgrade',image.sha256);
+            if (image.target === 'littlefs') xhr.setRequestHeader('X-Confirm-Filesystem',image.sha256);
+            xhr.upload.onprogress = ev => {
+                output.textContent = ev.lengthComputable ? `Sending ${Math.round(100*ev.loaded/ev.total)}% — wait for verification` : 'Sending image…';
+            };
+            const done = () => { state.upload = false; $('upload').disabled = !state.edit; };
+            xhr.onload = () => { output.textContent = xhr.responseText; done(); if (xhr.status === 200) reconnectModem(); };
+            xhr.onerror = xhr.ontimeout = () => { output.textContent = 'Upload connection lost. Check the console before retrying.'; done(); };
+            xhr.send(bytes);
+        } catch (error) { output.textContent = error.message; state.upload = false; }
+        finally { $('image').value = ''; }
+    };
     buildLeds();
     showLeds(0);
     try {

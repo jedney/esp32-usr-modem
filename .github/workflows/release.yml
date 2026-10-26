@@ -55,6 +55,7 @@ jobs:
           (cd web && npm test)
           pio run -e s3
           pio run -e s3 -t buildfs
+          python scripts/image_manifest.py .pio/build/s3
 
       - if: steps.version.outputs.exists == 'false'
         name: Tag and publish release
@@ -73,6 +74,7 @@ jobs:
           cp .pio/build/s3/bootloader.bin "dist/usr-modem-v$VERSION-bootloader.bin"
           cp .pio/build/s3/partitions.bin "dist/usr-modem-v$VERSION-partitions.bin"
           cp .pio/build/s3/littlefs.bin   "dist/usr-modem-v$VERSION-littlefs.bin"
+          cp .pio/build/s3/image-manifest.json "dist/usr-modem-v$VERSION-image-manifest.json"
           gh release create "v$VERSION" dist/* \
             --target "$GITHUB_SHA" \
             --title "v$VERSION" \
