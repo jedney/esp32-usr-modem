@@ -120,3 +120,9 @@ All 312 native and 43 on-board checks pass; four host-script tests pass. Normal
 v0.10 firmware is restored on COM15 through the upload gate. Configuration serial
 acceptance: nine pass, one skip (48.75 s). The ESP32/LED/pot-only bench is confirmed;
 COM18, real PC/Amiga rendering and physical signal/listening acceptance remain open.
+
+Final existing console/incoming/local-outgoing regression: 87 passed, 28 skipped
+(385.08 s), with local PC server 10.0.0.208. Together with configuration acceptance:
+96 passed, 29 skipped. Final COM15 queries confirm normal v0.10 firmware and 23
+retained call-history records after regression restarts. No temporary firewall
+change, external BBS call, credential rotation or filesystem upload was used.
