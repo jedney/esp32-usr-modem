@@ -1,0 +1,270 @@
+#include <cctype>
+#include <cstdio>
+#include <cstring>
+#include "config.h"
+#include "credits_generated.h"
+
+#ifndef FW_VERSION
+#define FW_VERSION "test"
+#endif
+#ifndef FW_COMMIT
+#define FW_COMMIT "test"
+#endif
+namespace config {
+namespace {
+Commands *attached = nullptr;
+bool query(const char *s) {
+    return !*s || !strcmp(s, "?");
+}
+void profileExport(atcmd::Port &p, const modemcfg::Profile &a) {
+    // Keep response formatting stable until the final restore commands.
+    for (unsigned i = 0; i < modemcfg::kSettingCount; ++i) {
+        if (i == modemcfg::kQ || i == modemcfg::kV || i == modemcfg::kTone) {
+            continue;
+        }
+        p.printf("AT*SETTING=%s%u\r\n",
+                 modemcfg::settingInfo(static_cast<modemcfg::Setting>(i)).name, a.v[i]);
+    }
+    p.printf("AT*SETTING=%c\r\n", a.v[modemcfg::kTone] ? 'T' : 'P');
+    for (unsigned i = 0; i < modemcfg::kSRegCount; ++i) {
+        if (i == 1 || i == 3 || i == 4) {
+            continue;
+        }
+        p.printf("AT*SETTING=S%u=%u\r\n", i, a.s[i]);
+    }
+    p.printf("AT*EXPLICIT=%u\r\n", a.lineExplicit);
+}
+bool safe(const char *s) {
+    for (; *s; ++s) {
+        if (static_cast<unsigned char>(*s) < 32 || *s > 126) {
+            return false;
+        }
+    }
+    return true;
+}
+}  // namespace
+void Commands::attach(Commands &commands) {
+    attached = &commands;
+}
+atcmd::Reply Commands::dispatch(atcmd::Port &p, const char *name, const char *args) {
+    return attached ? attached->command(p, name, args) : atcmd::Reply::kError;
+}
+atcmd::Reply Commands::command(atcmd::Port &p, const char *name, const char *args) {
+    using atcmd::Reply;
+    if (!strcmp(name, "SETTING")) {
+        if (query(args)) {
+            atcmd::showCurrent(p);
+            atcmd::showStored(p);
+            return Reply::kOk;
+        }
+        if (*args++ != '=' || !*args || strlen(args) > atcmd::kLineMax) {
+            return Reply::kError;
+        }
+        // Only modem/profile commands are accepted by this wrapper. Network,
+        // password, call and destructive handlers retain their own entry points.
+        const char *allowed = "BEFLMQVXPTSYZ&";
+        if (!strchr(allowed, *args) || (*args == '&' && !strchr("ABCDGHIKMNPRSTUYWZF", args[1]))) {
+            return Reply::kError;
+        }
+        for (const char *c = args; *c; ++c) {
+            if (!(isalnum(static_cast<unsigned char>(*c)) || strchr("&=?.:,-_ /", *c))) {
+                return Reply::kError;
+            }
+        }
+        if (!strcmp(args, "T0") || !strcmp(args, "T1")) {
+            p.execute(args[1] == '1' ? "T" : "P");
+        } else {
+            p.execute(args);
+        }
+        return Reply::kDone;
+    }
+    if (!strcmp(name, "EXPLICIT")) {
+        if (!strcmp(args, "=0") || !strcmp(args, "=1")) {
+            p.modem().active().lineExplicit = args[1] == '1';
+            return Reply::kOk;
+        }
+        return Reply::kError;
+    }
+    if (!strcmp(name, "RESTOREEND")) {
+        unsigned baud, q, v, cr, lf;
+        char tail;
+        if (sscanf(args, "=%u,%u,%u,%u,%u%c", &baud, &q, &v, &cr, &lf, &tail) != 5 ||
+            (baud && !modemcfg::isHostRate(baud)) || q > 2 || v > 1 || cr > 255 || lf > 255 ||
+            !p.modem().setHostBaud(baud)) {
+            return Reply::kError;
+        }
+        p.result(atcmd::Result::kOk);  // acknowledge at the old framing and speed
+        p.modem().active().v[modemcfg::kQ] = q;
+        p.modem().active().v[modemcfg::kV] = v;
+        p.modem().active().s[3] = cr;
+        p.modem().active().s[4] = lf;
+        hardware_.command(p, "APPLYBAUD", "");
+        return Reply::kDone;
+    }
+    if (!strcmp(name, "PROFILE")) {
+        unsigned slot = 0, baud = 0;
+        char tail = 0;
+        if (sscanf(args, "=%u,%u%c", &slot, &baud, &tail) != 2 || slot > 1 ||
+            !modemcfg::isHostRate(baud)) {
+            return Reply::kError;
+        }
+        return p.modem().writeTemplate(slot, baud) ? Reply::kOk : Reply::kError;
+    }
+    if (!strcmp(name, "PROFILECTL")) {
+        unsigned t, cr, lf, quiet, verbal;
+        char tail;
+        if (sscanf(args, "=%u,%u,%u,%u,%u%c", &t, &cr, &lf, &quiet, &verbal, &tail) != 5 || t > 1 ||
+            cr > 255 || lf > 255 || quiet > 2 || verbal > 1) {
+            return Reply::kError;
+        }
+        auto active = p.modem().active();
+        p.modem().active() = p.modem().nvram().tmpl[t];
+        auto &a = p.modem().active();
+        a.s[3] = cr;
+        a.s[4] = lf;
+        a.v[modemcfg::kQ] = quiet;
+        a.v[modemcfg::kV] = verbal;
+        bool ok = p.modem().writeTemplate(t, a.baud);
+        p.modem().active() = active;
+        return ok ? Reply::kOk : Reply::kError;
+    }
+    if (!strcmp(name, "BOOKCLEAR")) {
+        return !*args && book_.clear() ? Reply::kOk : Reply::kError;
+    }
+    if (!strcmp(name, "DIAL")) {
+        if (*args != '=' || !args[1] || !p.link()) {
+            return Reply::kError;
+        }
+        return p.link()->dial(args + 1, false) ? Reply::kDone : Reply::kError;
+    }
+    if (!strcmp(name, "REFERENCE")) {
+        if (!query(args)) {
+            return Reply::kError;
+        }
+        p.line("AT / A/ repeat; D/DT/DP dial; DS0-3 stored dial; ATA answer; ATH hang up");
+        p.line("+++ guarded escape; ATO resume; ATI0-7,9 inquiry; +FCLASS=0 modem");
+        p.line("B E F L M Q V X; P/T dial mode; S0-S63=value or ? (S1 live ring count)");
+        p.line("&F0-2 factory active; &W0-1 save; Y0-4 power-on; Z0-5 reset; &V profiles");
+        p.line("&Z0-3=number saved dial; &A &B &C &D &G &H &I &K &M &N &P &R &S &T &U &Y");
+        atcmd::showStarHelp(p);
+        return Reply::kOk;
+    }
+    if (!strcmp(name, "ABOUT")) {
+        if (!query(args)) {
+            return Reply::kError;
+        }
+        p.printf("USR Modem Emulator v%s (%s)\r\n", FW_VERSION, FW_COMMIT);
+        p.line("USRobotics command behavior; replica project by Jon Edney.");
+        for (const char *credit : kCredits) {
+            p.line(credit);
+        }
+        return Reply::kOk;
+    }
+    if (!strcmp(name, "EXPORT")) {
+        return query(args) ? exportConfig(p) : Reply::kError;
+    }
+    if (!strcmp(name, "LOG")) {
+        if (!strcmp(args, "=CLEAR")) {
+            log_.clear();
+            return Reply::kOk;
+        }
+        if (args[0] == '=' && args[1] >= '0' && args[1] <= '2' && !args[2]) {
+            log_.level = args[1] - '0';
+            return Reply::kOk;
+        }
+        unsigned offset = log_.size() > 8192 ? log_.size() - 8192 : 0, count = 8192;
+        if (!query(args)) {
+            char tail;
+            if (sscanf(args, "=%u,%u%c", &offset, &count, &tail) != 2 || count > 8192 ||
+                offset > log_.size()) {
+                return Reply::kError;
+            }
+        }
+        p.printf("Log level %u, capacity %u bytes%s\r\n", log_.level, unsigned(log_.capacity()),
+                 log_.capacity() < 256 * 1024 ? " (reduced capacity)" : " PSRAM");
+        p.printf("Bytes %u-%u of %u; AT*LOG=offset,count reads up to 8192 bytes.\r\n", offset,
+                 unsigned(offset + count < log_.size() ? offset + count : log_.size()),
+                 unsigned(log_.size()));
+        for (size_t i = offset; i < log_.size() && i < size_t(offset) + count; ++i) {
+            char c = log_.at(i);
+            p.write(&c, 1);
+        }
+        return Reply::kOk;
+    }
+    if (!strcmp(name, "CALLLOG")) {
+        if (!query(args)) {
+            return Reply::kError;
+        }
+        p.printf("Call history: %u/50 (configured time zone, result, seconds, TX/RX payload)\r\n",
+                 unsigned(history_.size()));
+        for (size_t i = 0; i < history_.size(); ++i) {
+            const auto &r = history_.at(i);
+            char stamp[48] = "time unavailable";
+            if (r.utc > 0) {
+                netcfg::tz::formatLocal(net_.zone(), r.utc, stamp, sizeof stamp);
+            }
+            p.printf("%s %s %s %s result=%u %lus TX=%lu RX=%lu\r\n", stamp,
+                     r.incoming ? "IN" : "OUT", r.number, r.host, r.result,
+                     static_cast<unsigned long>(r.duration), static_cast<unsigned long>(r.sent),
+                     static_cast<unsigned long>(r.received));
+        }
+        return Reply::kOk;
+    }
+    return hardware_.command(p, name, args);
+}
+atcmd::Reply Commands::exportConfig(atcmd::Port &p) {
+    const auto &m = p.modem();
+    // This is deliberately an explicit allowlist. No password storage or generic
+    // NVS/debug dump is consulted. Network credentials must be entered separately.
+    p.print("ATQ0V1S3=13S4=10\r\n");
+    for (unsigned t = 0; t < 2; ++t) {
+        profileExport(p, m.nvram().tmpl[t]);
+        p.printf("AT*PROFILE=%u,%lu\r\n", t, static_cast<unsigned long>(m.nvram().tmpl[t].baud));
+    }
+    for (unsigned i = 0; i < modemcfg::kPhoneSlots; ++i) {
+        if (safe(m.nvram().phone[i])) {
+            p.printf("AT&Z%u=%s\r\n", i, m.nvram().phone[i]);
+        } else {
+            p.print("; Stored number omitted: unsupported control characters.\r\n");
+        }
+    }
+    // Delete existing phonebook contents before restoring the source entries.
+    // Only source numbers are known: restore onto factory/empty configuration.
+    p.print("AT*BOOKCLEAR\r\n");
+    for (size_t i = 0; i < calls::kPhonebookCount; ++i) {
+        const auto &e = book_.at(i);
+        if (*e.number && safe(e.host)) {
+            p.printf("AT*PHONEBOOK=%s,%s,%u,%s,%lu\r\n", e.number, e.host, e.port,
+                     e.raw ? "RAW" : "TELNET", static_cast<unsigned long>(e.speed));
+        }
+    }
+    p.printf("AT*MODEL=%lu\r\nAT*THROTTLE=%s\r\nAT*ANSWERPORT=%s\r\n",
+             static_cast<unsigned long>(m.model()), m.throttle() ? "ON" : "OFF",
+             m.answerConsole() ? "CONSOLE" : "RS232");
+    const auto &s = net_.settings();
+    p.printf("AT*HOSTNAME=%s\r\nAT*NTP=%s\r\nAT*TZ=%s\r\n", s.host, s.ntp, s.tz);
+    if (s.dhcp) {
+        p.print("AT*WIFIIP=DHCP\r\n");
+    } else {
+        char ip[16], mask[16], gw[16], dns[16];
+        netcfg::formatIp(s.ip, ip, sizeof ip);
+        netcfg::formatIp(s.mask, mask, sizeof mask);
+        netcfg::formatIp(s.gateway, gw, sizeof gw);
+        netcfg::formatIp(s.dns, dns, sizeof dns);
+        p.printf("AT*WIFIIP=%s,%s,%s,%s\r\n", ip, mask, gw, dns);
+    }
+    p.printf("AT*WIFI=%s\r\nAT*OTA=%s\r\nATY%u\r\n", s.enabled ? "ON" : "OFF",
+             device_.policy() == devicecfg::Policy::kAlways ? "ALWAYS" : "DEMAND", m.nvram().y);
+    profileExport(p, m.active());
+    // Control bytes/quiet settings are last so the whole script remains executable.
+    for (unsigned t = 0; t < 2; ++t) {
+        const auto &a = m.nvram().tmpl[t];
+        p.printf("AT*PROFILECTL=%u,%u,%u,%u,%u\r\n", t, a.s[3], a.s[4], a.v[modemcfg::kQ],
+                 a.v[modemcfg::kV]);
+    }
+    p.printf("AT*RESTOREEND=%lu,%u,%u,%u,%u\r\n", static_cast<unsigned long>(m.hostBaud()),
+             m.active().v[modemcfg::kQ], m.active().v[modemcfg::kV], m.active().s[3],
+             m.active().s[4]);
+    return atcmd::Reply::kOk;
+}
+}  // namespace config

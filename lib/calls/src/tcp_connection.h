@@ -24,6 +24,7 @@ public:
     virtual size_t write(const uint8_t *data, size_t len) = 0;
     virtual size_t read(uint8_t *data, size_t len) = 0;
     virtual void close() = 0;
+    virtual const char *peer() const { return "unknown"; }
 };
 class TcpConnection : public hostport::Connection {
 public:

@@ -27,6 +27,12 @@ selects the saved auto-answer destination, default RS232. Native, on-board and
 incoming-call acceptance pass; external RI/DCD/DTR, full-panel observation and ring
 audio listening await wiring. See `docs/v0.9-plan.md` and `test/README.md`.
 
+Implemented, acceptance outstanding: **v0.10** configuration terminal. Both local
+entry paths, three terminal styles, shared AT* actions, logging/history, diagnostics
+and export are implemented. All 312 native and 43 on-board checks pass, as do nine
+COM15 configuration cases. External RS232 and real Amiga acceptance remain open. Either
+local menu reserves the call slot (Jon, 26 Oct). See `docs/v0.10-plan.md`.
+
 | Version | Feature | Brief | Done when |
 |---|---|---|---|
 | v0.4 | **Settings store and AT command parser** (console first): command-line parsing (several commands per line, `A/` repeat), S-registers, `E Q V X`, `&F &W &V &Z`, `Z`, `ATI0`–`ATI7` (authentic Sportster text), `+FCLASS`, result codes (verbose/numeric/quiet), `AT*` commands in one table, `AT*HELP`. Stored in NVS, logic in `lib/` | 6.2, 6.5, 6.6, 6.7 | Parser and settings unit-tested on the PC; `AT&V` shows the saved profile after a restart |

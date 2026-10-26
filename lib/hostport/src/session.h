@@ -58,6 +58,10 @@ public:
 
     atcmd::Port &port() { return port_; }
     Mode mode() const { return mode_; }
+    bool localOpen() const { return local_ != nullptr; }
+    uint32_t payloadSent() const { return payloadSent_; }
+    uint32_t payloadReceived() const { return payloadReceived_; }
+    bool startLocal(Connection &connection);
 
     // Starts a call on `conn` (AT*TESTCALL now, ATD from v0.8): sends CONNECT and goes
     // online. False if this or another port already has a call.
@@ -105,6 +109,7 @@ private:
     atcmd::Port port_;
     CallSlot &slot_;
     Connection *conn_ = nullptr;
+    Connection *local_ = nullptr;
     Dialer *dialer_ = nullptr;
     Answerer *answerer_ = nullptr;
     bool answered_ = false;
@@ -120,6 +125,7 @@ private:
     bool dtrKnown_ = false;
     bool xoff_ = false;
     uint32_t now_ = 0;
+    uint32_t payloadSent_ = 0, payloadReceived_ = 0;
     uint8_t echo_[256] = {};  // F0: online data echoed back to the computer
     size_t echoLen_ = 0;
 };

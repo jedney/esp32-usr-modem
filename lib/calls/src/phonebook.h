@@ -22,6 +22,7 @@ public:
     const Entry &at(size_t index) const { return entries_[index]; }
     bool put(const Entry &entry);
     bool remove(const char *number);
+    bool clear();
     atcmd::Reply command(atcmd::Port &port, const char *args, bool remove);
 
 private:

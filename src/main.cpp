@@ -20,22 +20,31 @@
 #include <Arduino.h>
 #include <LittleFS.h>
 
+#include <Preferences.h>
+#include <esp_core_dump.h>
+#include <lwip/inet.h>
 #include "atcmd.h"
 #include "call_audio.h"
+#include "call_journal.h"
+#include "config.h"
+#include "config_dialer.h"
 #include "connection.h"
 #include "device_commands.h"
 #include "device_crypto.h"
 #include "dialstring.h"
+#include "file_store.h"
 #include "hw.h"
 #include "hwconsole.h"
 #include "incoming.h"
 #include "modemcfg.h"
 #include "net_commands.h"
+#include "net_probe.h"
 #include "netcfg.h"
 #include "nvs_store.h"
 #include "ota_service.h"
 #include "outgoing.h"
 #include "panel.h"
+#include "registry.h"
 #include "rs232.h"
 #include "session.h"
 #include "tcp_listener.h"
@@ -87,7 +96,21 @@ hostport::Panel panel;
 // Set up in setup(), once the AT* table below exists.
 atcmd::Modem *modem = nullptr;
 hostport::Session *console = nullptr;
-modemcfg::Store *resetStores[] = {&store, &netStore, &bookStore};
+config::Terminal *consoleMenu = nullptr, *hostMenu = nullptr;
+config::Dialer *configDialer = nullptr;
+hw::FileStore historyStore("/call-history.bin", "/call-history.tmp", "/call-history.bak");
+hw::NvsStore resetStore("diagnostics", "reset");
+config::History history(historyStore);
+config::Log debugLog;
+uint32_t msNow();
+int64_t utcNow() {
+    return net.utcNow();
+}
+config::CallJournal journal(history, debugLog, msNow, utcNow);
+char fallbackLog[4096];
+uint8_t ledMask = 0xFF;
+atcmd::Port *hardwareOwner = nullptr;
+modemcfg::Store *resetStores[] = {&store, &netStore, &bookStore, &historyStore, &resetStore};
 bool restarting = false;
 uint32_t restartAt = 0;
 
@@ -115,6 +138,12 @@ hostport::Session &sessionOf(atcmd::Port &port) {
 bool isRs232(atcmd::Port &port) {
     return &port == &rs232::session().port();
 }
+config::Terminal &menuOf(atcmd::Port &port) {
+    return isRs232(port) ? *hostMenu : *consoleMenu;
+}
+bool ownsMenu(atcmd::Port &port) {
+    return consoleMenu && hostMenu && menuOf(port).isOpen();
+}
 
 // --- Hardware tests on the port they were typed on ------------------------------------------
 
@@ -141,7 +170,10 @@ private:
 ConsoleTerm consoleTerm;
 
 bool modemIdle() {
-    return !callSlot.busy();
+    return !callSlot.busy() ||
+           (hardwareOwner && ownsMenu(*hardwareOwner) && !isRs232(*hardwareOwner) &&
+            rs232::session().mode() == hostport::Mode::kCommand && !rs232::session().localOpen() &&
+            rs232::session().port().lineEmpty());
 }
 
 bool networkUp() {
@@ -199,19 +231,31 @@ atcmd::Reply cmdDialTest(atcmd::Port &port, const char *args) {
 }
 
 atcmd::Reply cmdHw(atcmd::Port &port, const char *args) {
-    if (callSlot.busy() && strncmp(args, "LED", 3) != 0 && strcmp(args, "POT?") != 0 &&
-        strcmp(args, "PINS") != 0 && strcmp(args, "INFO") != 0 && strcmp(args, "?") != 0 &&
-        *args != 0 && strncmp(args, "SIG", 3) != 0 && strncmp(args, "LINES", 5) != 0 &&
-        strncmp(args, "LOOP", 4) != 0 && strncmp(args, "BRIDGE", 6) != 0) {
+    if (callSlot.busy() && !ownsMenu(port) && strncmp(args, "LED", 3) != 0 &&
+        strcmp(args, "POT?") != 0 && strcmp(args, "PINS") != 0 && strcmp(args, "INFO") != 0 &&
+        strcmp(args, "?") != 0 && *args != 0 && strncmp(args, "SIG", 3) != 0 &&
+        strncmp(args, "LINES", 5) != 0 && strncmp(args, "LOOP", 4) != 0 &&
+        strncmp(args, "BRIDGE", 6) != 0) {
         port.line("Audio tests are not available during a call.");
         return atcmd::Reply::kError;
     }
+    // Interactive tests already service their own Term. They must write prompts
+    // to the initiating UART immediately rather than into a paged response.
+    bool capture = ownsMenu(port) && menuOf(port).capturing();
+    if (capture) {
+        port.redirect(nullptr);
+    }
+    hardwareOwner = &port;
     port.beginInfo();
     if (isRs232(port)) {
         Rs232Term t(port);
         hwconsole::handle(t, args);  // prints its own OK / ERROR
     } else {
         hwconsole::handle(consoleTerm, args);
+    }
+    hardwareOwner = nullptr;
+    if (capture) {
+        port.redirect(&menuOf(port), true);
     }
     return atcmd::Reply::kDone;
 }
@@ -224,6 +268,12 @@ atcmd::Reply cmdPhoneDelete(atcmd::Port &port, const char *args) {
 }
 
 atcmd::Reply cmdAnswerPort(atcmd::Port &port, const char *args) {
+    if (ownsMenu(port) && *args == '=') {
+        if (!strcmp(args, "=RS232") || !strcmp(args, "=CONSOLE")) {
+            return modem->setAnswerConsole(!strcmp(args, "=CONSOLE")) ? atcmd::Reply::kOk
+                                                                      : atcmd::Reply::kError;
+        }
+    }
     return incoming->command(port, args);
 }
 
@@ -272,28 +322,220 @@ atcmd::Reply cmdTestCall(atcmd::Port &port, const char *args) {
     return atcmd::Reply::kDone;
 }
 
-const atcmd::StarCommand kStarCommands[] = {
-    {"ANSWERPORT", "AT*ANSWERPORT=<RS232|CONSOLE>", "auto-answer destination (? or =?), saved",
-     cmdAnswerPort, false},
-    {"MODEL", "AT*MODEL=<14400|28800|33600|56000>", "identity and default CONNECT (? or =?)",
-     atcmd::cmdModel, false},
-    {"THROTTLE", "AT*THROTTLE=<ON|OFF>", "limit data to operational line speed (default OFF)",
-     atcmd::cmdThrottle, false},
-    {"PHONEBOOK", "AT*PHONEBOOK[?]|=<number>,<host>,<port>,<TELNET|RAW>[,<speed>]",
-     "list/save 64 phonebook entries", cmdPhonebook, false},
-    {"PHONEDELETE", "AT*PHONEDELETE=<number>", "delete a phonebook entry", cmdPhoneDelete, false},
-    {"HELP", "AT*HELP", "this list", cmdHelp, false},
-    {"?", "AT*?", "same as AT*HELP", cmdHelp, false},
-    {"VER", "AT*VER", "firmware version", cmdVer, false},
-    {"BAUD", "AT*BAUD=<AUTO|300-115200>", "RS232 speed: from \"AT\" (AUTO) or fixed", cmdBaud,
-     false},
-    {"TESTCALL", "AT*TESTCALL[=<seconds>]", "test call to a built-in echo (+++ returns)",
-     cmdTestCall, false},
-    {"DIALTEST", "AT*DIALTEST <dial string>", "show how a number is dialled", cmdDialTest, false},
-    NETCFG_STAR_COMMANDS,
-    DEVICECFG_STAR_COMMANDS,
-    {"HW", "AT*HW...", "hardware tests (AT*HW? lists them)", cmdHw, true},
+const config::Registry registry(config::Hooks{cmdAnswerPort, cmdPhonebook, cmdPhoneDelete, cmdHelp,
+                                              cmdVer, cmdBaud, cmdTestCall, cmdDialTest, cmdHw});
+
+class ConfigHardware : public config::Hardware {
+public:
+    atcmd::Reply command(atcmd::Port &port, const char *name, const char *args) override {
+        using atcmd::Reply;
+        if (!strcmp(name, "APPLYBAUD")) {
+            rs232::applyHostBaud();
+            return Reply::kDone;
+        }
+        if (!strcmp(name, "CONFIG")) {
+            if (*args || callSlot.busy() || port.busy()) {
+                return Reply::kError;
+            }
+            auto &menu = menuOf(port);
+            if (!menu.open()) {
+                return Reply::kError;
+            }
+            if (!sessionOf(port).startLocal(menu)) {
+                menu.close();
+                return Reply::kError;
+            }
+            debugLog.event(millis(), config::Event::Menu);
+            return Reply::kDone;
+        }
+        if (!strcmp(name, "STYLE")) {
+            if (!*args || !strcmp(args, "?")) {
+                auto style = menuOf(port).style();
+                port.line(style == config::Style::Plain   ? "PLAIN"
+                          : style == config::Style::Cp437 ? "CP437"
+                                                          : "ANSI");
+                return Reply::kOk;
+            }
+            return *args == '=' && menuOf(port).setStyle(args + 1) ? Reply::kOk : Reply::kError;
+        }
+        if (!strcmp(name, "STATUS")) {
+            if (*args && strcmp(args, "?")) {
+                return Reply::kError;
+            }
+            debugLog.event(millis(), config::Event::StatusRead);
+            port.printf("%s\r\nPanel AA CD RD SD TR CS ARQ: ", modemcfg::modelName(modem->model()));
+            for (unsigned i = 0; i < 7; ++i) {
+                port.printf("%u ", (ledMask >> i) & 1);
+            }
+            port.newline();
+            port.printf("Console: 115200; RS232: %lu; S0=%u; auto-answer=%s\r\n",
+                        static_cast<unsigned long>(rs232::baud()), modem->active().s[0],
+                        modem->answerConsole() ? "CONSOLE" : "RS232");
+            port.printf("Outgoing stage=%u; incoming stage=%u; configuration=%s\r\n",
+                        unsigned(outgoing->stage()), unsigned(incoming->stage()),
+                        consoleMenu->isOpen() ? "CONSOLE"
+                        : hostMenu->isOpen()  ? "RS232"
+                                              : "off");
+            if (journal.active()) {
+                const auto &r = journal.current();
+                auto *session = journal.session();
+                port.printf("Call %s %s %s duration %lus, speed %lu TX=%lu RX=%lu\r\n",
+                            r.incoming ? "incoming" : "outgoing", r.raw ? "RAW" : "TELNET", r.host,
+                            static_cast<unsigned long>(journal.duration()),
+                            session ? static_cast<unsigned long>(session->reportedSpeed()) : 0,
+                            session ? static_cast<unsigned long>(session->payloadSent()) : 0,
+                            session ? static_cast<unsigned long>(session->payloadReceived()) : 0);
+            }
+            char ip[16];
+            netcfg::formatIp(net.link().ip, ip, sizeof ip);
+            port.printf("Wi-Fi: %s, %s, %d dBm, IP %s\r\n", net.stateText(), net.settings().ssid,
+                        net.link().rssi, ip);
+            port.printf("Flow &H%u &R%u; DTR &D%u; DCD &C%u; serial &B%u\r\n",
+                        modem->active().get(modemcfg::kAmpH), modem->active().get(modemcfg::kAmpR),
+                        modem->active().get(modemcfg::kAmpD), modem->active().get(modemcfg::kAmpC),
+                        modem->active().get(modemcfg::kAmpB));
+            return Reply::kOk;
+        }
+        if (!strcmp(name, "SOUNDS")) {
+            if (*args && strcmp(args, "?")) {
+                return Reply::kError;
+            }
+            port.line("Generated: DIAL BUSY RING DTMF PULSE SWEEP");
+            File dir = LittleFS.open("/sounds");
+            File file = dir.openNextFile();
+            while (file) {
+                if (!file.isDirectory()) {
+                    port.printf("/sounds/%s (%u bytes)\r\n", file.name(), unsigned(file.size()));
+                }
+                file = dir.openNextFile();
+            }
+            port.line(
+                "1200 recording: CC0 guitarguy1985; other speeds: generic public-domain fallback.");
+            return Reply::kOk;
+        }
+        if (!strcmp(name, "PLAY")) {
+            if (*args != '=' || pending_ || (callSlot.busy() && !ownsMenu(port)) ||
+                !callAudio.preview(args + 1, modem->active())) {
+                return Reply::kError;
+            }
+            pending_ = &port;
+            operation_ = Operation::Sound;
+            started_ = millis();
+            debugLog.event(millis(), config::Event::SoundPreview);
+            port.line("Playing; any key cancels.");
+            port.wait(cancel, this);
+            return Reply::kPending;
+        }
+        if (!strcmp(name, "DNS") || !strcmp(name, "PING")) {
+            if (*args != '=' || pending_ || !net.up() || !netcfg::validServer(args + 1) ||
+                !probe_.start(args + 1, !strcmp(name, "PING"), millis())) {
+                return Reply::kError;
+            }
+            pending_ = &port;
+            operation_ = Operation::Probe;
+            debugLog.event(millis(), config::Event::NetworkProbe);
+            port.line("Network test; any key cancels.");
+            port.wait(cancel, this);
+            return Reply::kPending;
+        }
+        if (!strcmp(name, "RESTART")) {
+            if (*args || pending_ || !deviceControl.idle()) {
+                return Reply::kError;
+            }
+            pending_ = &port;
+            operation_ = Operation::Restart;
+            started_ = millis();
+            port.askConfirmation("Restart modem? Y/N (Enter): ", confirm, this);
+            return Reply::kPending;
+        }
+        if (!strcmp(name, "RESETINFO")) {
+            if (*args && strcmp(args, "?")) {
+                return Reply::kError;
+            }
+            uint8_t record[4] = {};
+            size_t n = resetStore.load(record, sizeof record);
+            port.printf("Current reset: %s\r\n",
+                        hwconsole::resetReasonName(int(esp_reset_reason())));
+            if (n == 3 && record[0] == 1) {
+                port.printf("Previous reset: %s\r\n", hwconsole::resetReasonName(record[2]));
+            }
+#if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH && CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF
+            esp_core_dump_summary_t summary = {};
+            if (esp_core_dump_get_summary(&summary) == ESP_OK) {
+                port.printf("Crash record: PC=0x%08lx, cause=%lu, backtrace depth=%lu\r\n",
+                            static_cast<unsigned long>(summary.exc_pc),
+                            static_cast<unsigned long>(summary.ex_info.exc_cause),
+                            static_cast<unsigned long>(summary.exc_bt_info.depth));
+            } else {
+                port.line("Crash record: none available.");
+            }
+#else
+            port.line("Crash record: unavailable in this build.");
+#endif
+            return Reply::kOk;
+        }
+        return Reply::kError;
+    }
+    void poll() {
+        probe_.poll(millis(), net.up());
+        if (!pending_) {
+            return;
+        }
+        if (!pending_->busy()) {
+            stop();
+            return;
+        }
+        if (operation_ == Operation::Sound) {
+            callAudio.poll(millis(), modem->active());
+            if (!callAudio.running() || millis() - started_ >= 60000) {
+                bool failed = callAudio.failed();
+                auto *port = pending_;
+                stop();
+                port->finish(failed ? atcmd::Reply::kError : atcmd::Reply::kOk);
+            }
+        } else if (operation_ == Operation::Probe && probe_.done()) {
+            auto *port = pending_;
+            uint32_t address = probe_.address();
+            ip4_addr_t ip;
+            ip.addr = address;
+            port->printf("Address %s; replies %u\r\n", ip4addr_ntoa(&ip), probe_.replies());
+            bool ok = probe_.ok();
+            stop();
+            port->finish(ok ? atcmd::Reply::kOk : atcmd::Reply::kError);
+        } else if (operation_ == Operation::Restart && millis() - started_ >= 30000) {
+            pending_->cancelPrompt();
+            stop();
+        }
+    }
+
+private:
+    enum class Operation { Sound, Probe, Restart } operation_ = Operation::Sound;
+    static void cancel(void *self) { static_cast<ConfigHardware *>(self)->stop(); }
+    void stop() {
+        if (operation_ == Operation::Sound) {
+            callAudio.stop();
+        }
+        if (operation_ == Operation::Probe) {
+            probe_.cancel();
+        }
+        pending_ = nullptr;
+    }
+    static atcmd::Reply confirm(atcmd::Port &, const char *text, void *ctx) {
+        auto &self = *static_cast<ConfigHardware *>(ctx);
+        bool ok = (!strcmp(text, "Y") || !strcmp(text, "y")) && millis() - self.started_ < 30000 &&
+                  deviceControl.idle();
+        self.pending_ = nullptr;
+        if (ok) {
+            deviceControl.restart();
+        }
+        return ok ? atcmd::Reply::kOk : atcmd::Reply::kError;
+    }
+    hw::NetProbe probe_;
+    atcmd::Port *pending_ = nullptr;
+    uint32_t started_ = 0;
 };
+ConfigHardware configHardware;
+config::Commands configCommands(debugLog, history, phonebook, net, device, configHardware);
 
 uint32_t msNow() {
     return millis();
@@ -411,7 +653,8 @@ void pollConsole(uint32_t now) {
 // Wi-Fi and clock notices go to the console only, between commands: in command mode,
 // nothing typed, no join or scan waiting. Never to the RS232 port.
 void pollNotices() {
-    if (console->mode() != hostport::Mode::kCommand || !console->port().lineEmpty()) {
+    if (console->localOpen() || console->mode() != hostport::Mode::kCommand ||
+        !console->port().lineEmpty()) {
         return;
     }
     char text[netcfg::Net::kNoticeMax];
@@ -431,8 +674,6 @@ hostport::WifiLed arqLed() {
             return hostport::WifiLed::kOff;
     }
 }
-
-uint8_t ledMask = 0xFF;  // not yet set
 
 void pollLeds(uint32_t now) {
     hw::rgbShow(net.rgb(now));  // on-board LED: not used by the hardware tests
@@ -466,6 +707,7 @@ void setup() {
     // from its interrupt for every chunk it drops (switchable with AT*LOG in v0.10).
     esp_log_level_set("*", ESP_LOG_NONE);
     delay(500);
+    LittleFS.begin(false);  // mount before recovering a reset which erases history
     crypto.begin();
     device.begin();
     if (device.needsReset()) {
@@ -475,21 +717,39 @@ void setup() {
         Serial.print("Pending factory reset could not finish. Retry AT*FACTORY.\r\n");
     }
     devicecfg::attachCommands(deviceCommands);
-    modem = new atcmd::Modem(store, kStarCommands, sizeof kStarCommands / sizeof kStarCommands[0]);
+    modem = new atcmd::Modem(store, registry.data(), registry.size());
     modemcfg::LoadResult loaded = modem->begin();
-    LittleFS.begin(false);  // never format away sounds on a mount failure
     if (!phonebook.begin()) {
         Serial.print("Phonebook unavailable/damaged; factory entry used.\r\n");
     }
     console = new hostport::Session(*modem, consoleSink, kConsoleBaud, callSlot);
     rs232::begin(*modem, callSlot);
+    consoleMenu = new config::Terminal(*console, false);
+    hostMenu = new config::Terminal(rs232::session(), true);
+    char *logStorage = static_cast<char *>(ps_malloc(256 * 1024));
+    debugLog.begin(logStorage ? logStorage : fallbackLog,
+                   logStorage ? 256 * 1024 : sizeof fallbackLog);
+    debugLog.event(millis(), config::Event::Boot);
+    if (!history.begin()) {
+        debugLog.event(millis(), config::Event::StorageError);
+    }
+    uint8_t previous[4] = {}, record[3] = {1, static_cast<uint8_t>(esp_reset_reason()), 0};
+    if (resetStore.load(previous, sizeof previous) == 3 && previous[0] == 1) {
+        record[2] = previous[1];
+    }
+    resetStore.save(record, sizeof record);
+    config::Commands::attach(configCommands);
     outgoing =
         new calls::Outgoing(*modem, phonebook, callSlot, tcpSocket, callAudio, msNow, networkUp);
-    console->setDialer(outgoing);
-    rs232::session().setDialer(outgoing);
+    outgoing->setObserver(&journal);
+    configDialer = new config::Dialer(*console, *consoleMenu, *hostMenu, *outgoing, callSlot,
+                                      callAudio, msNow);
+    console->setDialer(configDialer);
+    rs232::session().setDialer(configDialer);
     incoming = new calls::Incoming(*modem, callSlot, incomingListener, incomingSocket, callAudio,
                                    *console, rs232::session(), msNow, networkUp);
     console->setAnswerer(incoming);
+    incoming->setObserver(&journal);
     rs232::session().setAnswerer(incoming);
     hwconsole::setPortControl(hwconsole::PortControl{modemIdle, rs232::suspend, rs232::resume});
     netcfg::LoadResult netLoaded = net.begin(millis());
@@ -542,7 +802,24 @@ void loop() {
     pollConsole(now);
     rs232::poll(now);
     net.tick(now);
+    static bool wifiWasUp = false;
+    if (wifiWasUp != net.up()) {
+        wifiWasUp = net.up();
+        debugLog.event(millis(), wifiWasUp ? config::Event::WifiUp : config::Event::WifiDown);
+    }
     outgoing->poll();
+    configDialer->poll();
+    configHardware.poll();
+    // Departures are dispatched after Session has closed the local service. No
+    // listener poll occurs between releasing its slot and starting the action.
+    char departure[atcmd::kLineMax + 1];
+    if (consoleMenu->takeDeparture(departure, sizeof departure)) {
+        console->port().execute(departure);
+    }
+    if (hostMenu->takeDeparture(departure, sizeof departure)) {
+        rs232::session().port().execute(departure);
+    }
+    devicecfg::wipe(departure, sizeof departure);
     netcfg::pollCommands();  // a finished AT*WIFIJOIN or AT*WIFISCAN
     deviceCommands.poll();
     // The command may have opened a window after this loop's timestamp was sampled.

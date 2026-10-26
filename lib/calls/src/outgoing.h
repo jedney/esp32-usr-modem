@@ -4,6 +4,13 @@
 #include "tcp_connection.h"
 
 namespace calls {
+class Observer {
+public:
+    virtual ~Observer() = default;
+    virtual void started(bool incoming, const Entry &target) = 0;
+    virtual void connected(hostport::Session &session) = 0;
+    virtual void ended(atcmd::Result result) = 0;
+};
 enum class SoundStage : uint8_t { kDial, kDigits, kHandshake, kBusy, kCarrier, kRing };
 class CallSound {
 public:
@@ -34,6 +41,7 @@ public:
     void poll();
     void cancel();
     CallStage stage() const { return stage_; }
+    void setObserver(Observer *observer) { observer_ = observer; }
 
 private:
     static void cancelWait(void *self) { static_cast<Outgoing *>(self)->cancel(); }
@@ -41,6 +49,12 @@ private:
     void connected();
     void finish(atcmd::Result result);
     bool play(SoundStage stage);
+    void endObservation(atcmd::Result result) {
+        if (observed_ && observer_) {
+            observer_->ended(result);
+        }
+        observed_ = false;
+    }
     atcmd::Modem &modem_;
     Phonebook &book_;
     hostport::CallSlot &slot_;
@@ -56,5 +70,7 @@ private:
     uint32_t lineSpeed_ = 14400, reportSpeed_ = 14400, since_ = 0;
     bool pulse_ = false, dtrWasOn_ = false;
     CallStage stage_ = CallStage::kIdle;
+    Observer *observer_ = nullptr;
+    bool observed_ = false;
 };
 }  // namespace calls

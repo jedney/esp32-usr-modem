@@ -27,6 +27,7 @@ public:
     bool failed() const override { return failed_; }
     void stop() override;
     void poll(uint32_t now, const modemcfg::Profile &profile) override;
+    bool preview(const char *name, const modemcfg::Profile &profile);
 
 private:
     std::unique_ptr<tones::Source> source_;

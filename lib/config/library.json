@@ -1,0 +1,1 @@
+{"name":"config","version":"0.10.0","frameworks":"*","platforms":"*","dependencies":[{"name":"calls"},{"name":"netcfg"},{"name":"devicecfg"}]}

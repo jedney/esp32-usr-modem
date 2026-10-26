@@ -4,9 +4,10 @@ An ESP32-S3 Wi-Fi "modem" in a 3D-printed replica of a 1990s US Robotics Sportst
 Faxmodem. It has a real DB25 RS232 port, speaks the Hayes AT command set, plays the
 dial, DTMF and handshake sounds, and connects to Telnet BBSes over Wi-Fi.
 
-Status: **v0.9 incoming-call acceptance passed; external hardware checks pending.** Outgoing TCP/Telnet
-calls, a 64-entry phonebook, selectable Sportster identity, optional throttling and
-call audio are implemented. See `test/README.md` for actual validation and pending
+Status: **v0.10 configuration and available-bench acceptance passed; external hardware
+and real Amiga checks remain open.** Local configuration, logs/history, export,
+incoming/outgoing TCP/Telnet calls, a 64-entry phonebook, selectable Sportster identity,
+optional throttling and call audio are implemented. See `test/README.md` for validation and pending
 bench checks. The current bench has console COM15, Unitek COM18, LED and pot; the
 RS232 level shifters/DB9 and amp/speaker are not wired yet.
 
@@ -295,6 +296,65 @@ ESP32 build itself does not. For an emergency upload without the tests, set
 `USR_MODEM_SKIP_TESTS=1` first: open PlatformIO's terminal (sidebar → **Quick Access →
 Miscellaneous → PlatformIO Core CLI**), run `$env:USR_MODEM_SKIP_TESTS = "1"`, then
 `pio run -e s3 -t upload` in the same terminal.
+
+## Configuration terminal (v0.10)
+
+Use `AT*CONFIG` for an immediate local menu, or `ATDT123` for dial sounds and
+CONNECT followed by the menu. Either USB console or RS232 menu reserves the modem:
+incoming callers are rejected until exit. A menu cannot interrupt an existing call.
+Remote callers never receive access to configuration or hardware commands.
+
+Choose a number and press Enter. N/P change pages, B returns to the main menu,
+Q quits and Esc cancels an input prompt. Ctrl-C exits from any screen or prompt.
+Long responses pause at `[More]`;
+Enter advances and Q returns. `AT*STYLE=ANSI|CP437|PLAIN` selects this port's style
+for the current boot. The selected model appears at the top. ANSI uses 7-bit art;
+CP437 uses PC line drawing; plain uses no terminal escape sequences. Status refreshes
+automatically in ANSI/CP437, or with R in plain mode.
+
+Screens cover status, phonebook, all current modem settings with help, Wi-Fi/clock,
+updates, About/credits, command reference, sounds, logs and hardware tests. Client
+Tests are marked unavailable until v0.13. Settings say whether they save immediately
+or require a profile save (`&W`). Model, S0 and the auto-answer receiver are exposed.
+The line, loopback, bridge and held-output tests are unavailable on RS232 because
+they would take over that session's port. USB hardware tests still require idle RS232.
+Interactive hardware tests use their existing local prompts and return to the menu.
+
+Every feature action has an `AT*` equivalent, listed by `AT*HELP`/`AT*REFERENCE`.
+Additional commands include:
+
+| Command | Purpose |
+|---|---|
+| `AT*STATUS` | Live panel, call, Wi-Fi and host-serial snapshot |
+| `AT*SETTING?`, `AT*SETTING=<modem command>` | View profiles or edit through existing validation, e.g. `AT*SETTING=S0=2` |
+| `AT*DIAL=<number or host:port>` | Dial through the existing call engine |
+| `AT*ABOUT` | Build and licensing acknowledgements |
+| `AT*SOUNDS`, `AT*PLAY=<name or speed>` | List/preview generated tones and LittleFS WAVs; any key cancels |
+| `AT*LOG`, `AT*LOG=0|1|2`, `AT*LOG=CLEAR` | View, set verbosity or clear the RAM debug ring |
+| `AT*LOG=<offset>,<count>` | Read a stable slice, at most 8192 bytes; default view is the last 8192 |
+| `AT*CALLLOG` | Last 50 calls with timestamps, results, durations and payload counts |
+| `AT*DNS=<host>`, `AT*PING=<host>` | Cancellable DNS/ICMP checks with a ten-second overall bound |
+| `AT*RESETINFO` | Reset reasons and available numeric crash summary |
+| `AT*EXPORT` | Print restore commands, excluding both passwords; join Wi-Fi separately |
+| `AT*RESTART` | Restart after Y/N confirmation; factory reset remains `AT*FACTORY` |
+
+Export replay clears the destination phonebook before restoring the exported one.
+`AT*PROFILE`, `AT*PROFILECTL`, `AT*EXPLICIT` and `AT*RESTOREEND` preserve stored
+profile speeds and response formatting. Replay from ordinary command mode, with no
+call or menu open. The final command acknowledges at the old serial/framing settings
+before applying the saved ones. Supply network/device credentials separately.
+
+Debug logs contain structured events, not AT input, passwords or caller payload.
+The ring uses 256 KiB of PSRAM, with an explicit reduced-capacity fallback. Verbosity
+0 disables events, 1 records lifecycle changes, and 2 also records diagnostic actions.
+Logs do not continuously write flash. Call history uses checksummed LittleFS files
+and a previous valid backup; it survives restarts and firmware-only OTA. Factory reset
+or uploading a replacement filesystem image removes history. Reset diagnostics never
+print raw core-dump memory.
+
+Console is COM15 at 115200; Unitek is COM18. Native/build checks are recorded in
+`docs/v0.10-plan.md`; COM15 configuration and on-board checks pass. External RS232,
+real PC/Amiga terminal observation and listening acceptance remain pending.
 
 ## Web interface
 
