@@ -23,9 +23,33 @@ enum class Op : uint8_t { kNone, kJoin, kScan };
 Op pendingOp = Op::kNone;
 Port *pendingPort = nullptr;
 char joinSsid[kSsidMax + 1] = {};
+Port *confirmationPort = nullptr;
+uint32_t confirmationAt = 0;
+bool confirmationForget = false;
 
 uint32_t now() {
     return clockMs != nullptr ? clockMs() : 0;
+}
+Reply confirmNetworkLoss(Port &port, const char *text, void *) {
+    bool valid = confirmationPort == &port && now() - confirmationAt < 30000 && wordIs(text, "Y");
+    confirmationPort = nullptr;
+    if (!valid) {
+        return Reply::kError;
+    }
+    return (confirmationForget ? net->forget() : net->setEnabled(false)) ? Reply::kOk
+                                                                         : Reply::kError;
+}
+Reply askNetworkLoss(Port &port, bool forget) {
+    if (confirmationPort && confirmationPort->busy()) {
+        return Reply::kError;
+    }
+    confirmationPort = &port;
+    confirmationAt = now();
+    confirmationForget = forget;
+    port.askConfirmation(forget ? "Forget network and disconnect browser? Y/N (Enter): "
+                                : "Turn Wi-Fi off and disconnect browser? Y/N (Enter): ",
+                         confirmNetworkLoss, nullptr);
+    return Reply::kPending;
 }
 
 // The first `n` characters of `s` as the network to join. False if too long.
@@ -147,7 +171,10 @@ Reply beginJoin(Port &port, const char *pass) {
     port.beginInfo();
     port.printf("Joining %s...", joinSsid);
     port.newline();
-    if (!net->join(joinSsid, pass, now())) {
+    if (port.browser()) {
+        net->guardBrowserChange(now());
+    }
+    if (!net->join(joinSsid, pass, now(), port.browser() ? 60000 : Net::kJoinTimeoutMs)) {
         return Reply::kError;
     }
     return startWait(port, Op::kJoin);
@@ -170,9 +197,18 @@ void attachCommands(Net &n, uint32_t (*millisFn)()) {
     clockMs = millisFn;
     pendingOp = Op::kNone;
     pendingPort = nullptr;
+    confirmationPort = nullptr;
 }
 
 void pollCommands() {
+    if (confirmationPort) {
+        if (!confirmationPort->busy()) {
+            confirmationPort = nullptr;
+        } else if (now() - confirmationAt >= 30000) {
+            confirmationPort->cancelPrompt();
+            confirmationPort = nullptr;
+        }
+    }
     if (pendingOp == Op::kNone || pendingPort == nullptr) {
         return;
     }
@@ -217,6 +253,15 @@ void pollCommands() {
     }
 }
 
+void detachCommands(Port &port) {
+    if (pendingPort == &port && pendingOp == Op::kJoin) {
+        // Browser network replacement must finish or roll back after its old
+        // socket disappears. The candidate is owned by Net, not by this Port.
+        pendingPort = nullptr;
+        pendingOp = Op::kNone;
+    }
+}
+
 // --- Commands -------------------------------------------------------------------------------
 
 Reply cmdWifi(Port &port, const char *args) {
@@ -229,6 +274,9 @@ Reply cmdWifi(Port &port, const char *args) {
         return net->setEnabled(true) ? Reply::kOk : Reply::kError;
     }
     if (wordIs(a, "OFF")) {
+        if (port.browser()) {
+            return askNetworkLoss(port, false);
+        }
         return net->setEnabled(false) ? Reply::kOk : Reply::kError;
     }
     return Reply::kError;
@@ -290,9 +338,12 @@ Reply cmdWifiJoin(Port &port, const char *args) {
     return Reply::kPending;
 }
 
-Reply cmdWifiForget(Port &, const char *args) {
+Reply cmdWifiForget(Port &port, const char *args) {
     if (*argStart(args) != '\0') {
         return Reply::kError;
+    }
+    if (port.browser()) {
+        return askNetworkLoss(port, true);
     }
     return net->forget() ? Reply::kOk : Reply::kError;
 }
@@ -316,6 +367,9 @@ Reply cmdWifiIp(Port &port, const char *args) {
     }
     const char *a = argStart(args);
     if (wordIs(a, "DHCP")) {
+        if (port.browser()) {
+            net->guardBrowserChange(now());
+        }
         return net->setDhcp() ? Reply::kOk : Reply::kError;
     }
     uint32_t ip = 0, mask = 0, gw = 0, dns = 0;
@@ -324,6 +378,9 @@ Reply cmdWifiIp(Port &port, const char *args) {
     }
     if (*a != '\0' && (!parseIp(a, &dns, &a) || *a != '\0')) {
         return Reply::kError;
+    }
+    if (port.browser()) {
+        net->guardBrowserChange(now());
     }
     if (!net->setStatic(ip, mask, gw, dns)) {
         port.beginInfo();
@@ -343,6 +400,9 @@ Reply cmdHostname(Port &port, const char *args) {
     }
     char name[atcmd::kLineMax + 1];
     argText(args, name, sizeof name);
+    if (port.browser()) {
+        net->guardBrowserChange(now());
+    }
     return net->setHost(name) ? Reply::kOk : Reply::kError;
 }
 

@@ -119,7 +119,9 @@ public:
     // --- AT*WIFIJOIN --------------------------------------------------------------------
     // Tries `ssid` with `pass`. The settings change only if it connects (result through
     // joinResult()); on failure the previous network is joined again.
-    bool join(const char *ssid, const char *pass, uint32_t nowMs);
+    bool join(const char *ssid, const char *pass, uint32_t nowMs,
+              uint32_t timeoutMs = kJoinTimeoutMs);
+    void guardBrowserChange(uint32_t nowMs);
     JoinResult joinResult() const { return join_; }
     Reason joinReason() const { return joinReason_; }
     void cancelJoin();
@@ -174,6 +176,10 @@ private:
     Reason joinReason_ = Reason::kNone;
     uint32_t joinAt_ = 0;
     uint32_t joinTryAt_ = 0;
+    uint32_t joinTimeout_ = kJoinTimeoutMs;
+    Settings browserPrevious_ = {};
+    bool browserGuard_ = false;
+    uint32_t browserAt_ = 0;
     // AT*WIFISCAN
     ScanState scan_ = ScanState::kIdle;
     bool scanPaused_ = false;  // the background attempt waits for the scan

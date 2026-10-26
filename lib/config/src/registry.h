@@ -17,6 +17,9 @@ struct Hooks {
 inline atcmd::Reply registryCONFIG(atcmd::Port &p, const char *a) {
     return Commands::dispatch(p, "CONFIG", a);
 }
+inline atcmd::Reply registryWEB(atcmd::Port &p, const char *a) {
+    return Commands::dispatch(p, "WEB", a);
+}
 inline atcmd::Reply registrySTYLE(atcmd::Port &p, const char *a) {
     return Commands::dispatch(p, "STYLE", a);
 }
@@ -106,6 +109,7 @@ public:
             {"HW", "AT*HW...", "hardware tests (AT*HW? lists them)", hooks.cmdHw, true},
 
             {"CONFIG", "AT*CONFIG[?]", "open local configuration", registryCONFIG, false},
+            {"WEB", "AT*WEB[?]|=<ON|OFF>", "web listener; saved immediately", registryWEB, false},
             {"STYLE", "AT*STYLE=<ANSI|CP437|PLAIN>", "terminal style, local session", registrySTYLE,
              false},
             {"STATUS", "AT*STATUS", "status and live panel", registrySTATUS, false},

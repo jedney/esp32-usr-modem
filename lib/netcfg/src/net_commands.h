@@ -22,6 +22,7 @@ void attachCommands(Net &net, uint32_t (*millisFn)());
 
 // Call every loop, after Net::tick(): sends the result of a join or scan that finished.
 void pollCommands();
+void detachCommands(atcmd::Port &port);
 
 atcmd::Reply cmdWifi(atcmd::Port &port, const char *args);
 atcmd::Reply cmdWifiScan(atcmd::Port &port, const char *args);

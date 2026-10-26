@@ -44,7 +44,10 @@ def _at(rs232, baud, text="AT", timeout=None):
     rs232.ser.baudrate = baud
     time.sleep(0.05)
     # 32 ms for the capture to hand over the burst, plus the characters both ways.
-    wait = timeout or (0.3 + 2 * (len(text) + 12) * 10 / baud)
+    # ATI4's full profile is hundreds of characters: at 300 baud its response
+    # takes many seconds, even though the request is only four characters long.
+    response_budget = 768 if text.upper() == "ATI4" else 64
+    wait = timeout or (0.3 + (len(text) + response_budget) * 10 / baud)
     return rs232.command(text, timeout=wait + 1.0)
 
 

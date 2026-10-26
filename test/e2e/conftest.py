@@ -55,6 +55,9 @@ except ImportError:  # pragma: no cover
 
 
 def pytest_addoption(parser):
+    parser.addoption("--web-tests", action="store_true", help="test authenticated web interface")
+    parser.addoption("--browser-upload", action="store_true", help="install tested firmware through HTTP")
+    parser.addoption("--web-host", default="usr-modem.local", help="modem HTTP hostname or IPv4")
     parser.addoption("--call-server-ip", default=None, help="PC LAN address reachable from modem")
     parser.addoption("--call-server-port", default=32321, type=int, help="local call test TCP port")
     parser.addoption("--live-bbs", action="store_true", help="allow a live outgoing BBS call")

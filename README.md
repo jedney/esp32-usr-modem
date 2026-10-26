@@ -4,12 +4,39 @@ An ESP32-S3 Wi-Fi "modem" in a 3D-printed replica of a 1990s US Robotics Sportst
 Faxmodem. It has a real DB25 RS232 port, speaks the Hayes AT command set, plays the
 dial, DTMF and handshake sounds, and connects to Telnet BBSes over Wi-Fi.
 
-Status: **v0.10 configuration and available-bench acceptance passed; external hardware
-and real Amiga checks remain open.** Local configuration, logs/history, export,
+Status: **v0.11 web interface implemented and running on the wired bench; manual
+physical/Amiga acceptance remains open.**
+Authenticated browser configuration, local configuration, logs/history, export,
 incoming/outgoing TCP/Telnet calls, a 64-entry phonebook, selectable Sportster identity,
 optional throttling and call audio are implemented. See `test/README.md` for validation and pending
-bench checks. The current bench has console COM15, Unitek COM18, LED and pot; the
-RS232 level shifters/DB9 and amp/speaker are not wired yet.
+bench checks. All hardware is now wired: console **COM15**, Unitek **COM18**.
+The wired RS232 baseline passes all 21 cases; physical listening and real Amiga
+observations remain separate acceptance items.
+
+## Web configuration (v0.11)
+
+Open `http://usr-modem.local` (or the modem's current IP). Log in as **admin** with
+the same device password used for OTA. Set a replacement locally with `AT*PASS`
+if needed. `AT*WEB=OFF` disables the saved listener; `AT*WEB=ON` re-enables it from
+serial. Every asset and status connection requires login.
+
+One configuration menu across USB console, RS232 and browser reserves the call
+slot. Other browsers show read-only live status; press **E** or **Enter
+configuration** when free. Quit returns to read-only status. The selected model,
+settings, help, phonebook, export, logs and hardware tests use the same menu as
+serial. Browser phonebook dialing sends CONNECT and call data to the RS232 host.
+
+The toolbar uploads a raw project `firmware.bin` or `littlefs.bin`, checking its
+embedded identity and SHA-256. Confirm older versions explicitly. A LittleFS upload
+replaces **sounds, web files and stored call history**; keep USB available because
+the final filesystem copy cannot roll back after power loss. Invalid/staging-full
+images are rejected before the live filesystem is replaced. Recovery uses
+`pio run -e s3 -t uploadfs --upload-port COM15`. Firmware-only updates preserve history.
+Use tested release images; browser uploads cannot run the PC test gate themselves.
+
+Browser network changes have a 60-second rollback guard that survives socket loss.
+Passwords are write-only in the browser. HTTP is the agreed LAN transport; see
+`web/PROTOCOL.md` for authentication, trust boundaries and update details.
 
 Factory model and operational call speed are **14.4k**. All emulated line-speed
 options through **56000** remain available (`AT&N38`, or `AT&N0` for highest);
@@ -55,9 +82,9 @@ or hang-up. Incoming calls use the existing model, speed, flow control and throt
 settings; Q2 suppresses answer-call results. Wi-Fi loss closes the call and the
 listener reopens after reconnect.
 
-On the current bench use **COM15 at 115200** and select CONSOLE explicitly for
-auto-answer tests. COM18 is the unwired Unitek adapter; physical control-signal,
-full-panel and speaker checks await the electronics.
+On the wired bench use **COM15 at 115200** and **COM18** through the Unitek adapter.
+Select the intended auto-answer destination explicitly. Physical control-signal,
+full-panel and speaker observations are recorded separately from automated checks.
 
 ## Outgoing calls and model selection (v0.8)
 

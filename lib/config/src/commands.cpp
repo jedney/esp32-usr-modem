@@ -255,6 +255,7 @@ atcmd::Reply Commands::exportConfig(atcmd::Port &p) {
     }
     p.printf("AT*WIFI=%s\r\nAT*OTA=%s\r\nATY%u\r\n", s.enabled ? "ON" : "OFF",
              device_.policy() == devicecfg::Policy::kAlways ? "ALWAYS" : "DEMAND", m.nvram().y);
+    hardware_.command(p, "WEBEXPORT", "");
     profileExport(p, m.active());
     // Control bytes/quiet settings are last so the whole script remains executable.
     for (unsigned t = 0; t < 2; ++t) {

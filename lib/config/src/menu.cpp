@@ -80,6 +80,7 @@ const Action kActions[] = {
     {S::Updates, "Factory reset", "*FACTORY",
      "Erase ALL settings and passwords; asks Y/N; leaves menu", S::Updates, false, false, false,
      true},
+    {S::Updates, "Web interface", "*WEB=", "ON|OFF; OFF closes browser sessions", S::Updates, true},
     {S::Sounds, "List sounds", "*SOUNDS", "Generated tones and LittleFS recordings", S::Sounds},
     {S::Sounds, "Play", "*PLAY=", "DIAL|BUSY|RING|DTMF|PULSE|SWEEP|1200..56000; key cancels",
      S::Sounds, true},

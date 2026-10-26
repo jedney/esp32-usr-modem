@@ -4,6 +4,8 @@ namespace config {
 void CallJournal::started(bool incoming, const calls::Entry &target) {
     record_ = CallRecord{};
     record_.utc = utc_();
+    connectedUtc_ = 0;
+    port_ = target.port;
     record_.incoming = incoming;
     record_.raw = target.raw;
     memcpy(record_.host, target.host, sizeof record_.host);
@@ -15,6 +17,7 @@ void CallJournal::started(bool incoming, const calls::Entry &target) {
 void CallJournal::connected(hostport::Session &session) {
     session_ = &session;
     connectedAt_ = clock_();
+    connectedUtc_ = utc_();
     log_.event(clock_(), Event::Connected);
 }
 void CallJournal::ended(atcmd::Result result) {
