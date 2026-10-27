@@ -1,4 +1,4 @@
-// The six packaged recordings; intermediate playback rates use the lower entry.
+// The seven packaged recordings; intermediate playback rates use the lower entry.
 #pragma once
 #include <cstddef>
 #include <cstdint>
@@ -12,6 +12,7 @@ struct Asset {
 inline constexpr Asset kAssets[] = {
     {1200, "HS1200.WAV", "/sounds/handshake-1200.wav"},
     {2400, "HS2400.WAV", "/sounds/handshake-2400.wav"},
+    {9600, "HS9600.WAV", "/sounds/handshake-9600.wav"},
     {14400, "HS14400.WAV", "/sounds/handshake-14400.wav"},
     {28800, "HS28800.WAV", "/sounds/handshake-28800.wav"},
     {33600, "HS33600.WAV", "/sounds/handshake-33600.wav"},

@@ -623,9 +623,12 @@ void test_wav_validation_upsampling_and_handshake_mapping() {
     r.bytes.pop_back();
     TEST_ASSERT_FALSE(sounds::inspectWav(r, info));
     TEST_ASSERT_EQUAL_UINT32(1200, sounds::handshakeSpeed(300));
-    TEST_ASSERT_EQUAL_UINT32(2400, sounds::handshakeSpeed(9600));
+    TEST_ASSERT_EQUAL_UINT32(2400, sounds::handshakeSpeed(4800));
+    TEST_ASSERT_EQUAL_UINT32(9600, sounds::handshakeSpeed(9600));
+    TEST_ASSERT_EQUAL_UINT32(9600, sounds::handshakeSpeed(12000));
     TEST_ASSERT_EQUAL_UINT32(14400, sounds::handshakeSpeed(19200));
     TEST_ASSERT_EQUAL_UINT32(33600, sounds::handshakeSpeed(54666));
+    TEST_ASSERT_EQUAL_UINT32(56000, sounds::handshakeSpeed(56000));
 }
 
 int main() {

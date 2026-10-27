@@ -130,3 +130,12 @@ v0.14 is installed through the native-test gate; LittleFS and device credentials
 are retained. The 9600 download name aliases its existing 2400 playback fallback;
 ALL now includes the real 56000 file. Optional resource refactors, SDK migration
 and previously deferred physical/legacy-client acceptance remain separate work.
+
+Implemented, host validation passed: **v0.15 replacement sounds**. Jon supplied
+seven PCM WAVs from Gough Lui's collection, now packaged at their matching
+1200/2400/9600/14400/28800/33600/56000 rates with updated README/About credits.
+9600 playback and downloads use the supplied 9600 file; ALL includes seven sounds.
+385 native and 13 script checks pass, along with formatting, cppcheck, firmware
+and LittleFS builds and image-manifest validation. On-board, wired transfer and
+physical listening acceptance have not been rerun for these replacements.
+No v0.15 images have been installed; the installed v0.14 baseline is unchanged.

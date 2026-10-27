@@ -63,6 +63,6 @@ python test/interop/serial_lrzsz.py --port COM18 --baud 115200 --sounds
 ```
 
 Use the matching host UART speed (AUTO can detect the AT prefix). This downloads
-ALL through both YMODEM and ZMODEM, checks all six WAVs against `data/sounds`, and
+ALL through both YMODEM and ZMODEM, checks all seven WAVs against `data/sounds`, and
 checks aggregate file count/bytes/CRC including the frozen log. It writes only
 under `.pio/client-acceptance`; it does not replace firmware or saved settings.
