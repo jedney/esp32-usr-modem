@@ -1,4 +1,40 @@
 #pragma once
+void test_idle_menus_do_not_repaint_but_input_and_resize_do() {
+    for (const char *style : {"ANSI", "CP437", "PLAIN"}) {
+        Rig r;
+        r.terminal.setStyle(style);
+        r.terminal.open();
+        r.drain();
+        for (uint32_t now = 1000; now <= 12000; now += 1000) {
+            r.terminal.poll(now);
+            auto out = r.drain();
+            // Serial size probes are allowed; they contain no display output.
+            TEST_ASSERT_EQUAL_STRING(strcmp(style, "PLAIN") && now % 5000 == 0 ? "\x1b[18t" : "",
+                                     out.c_str());
+        }
+        r.feed("3\r");
+        TEST_ASSERT_FALSE(r.drain().empty());
+        r.terminal.poll(14000);
+        TEST_ASSERT_TRUE(r.drain().empty());
+        r.terminal.resize(100, 30);
+        TEST_ASSERT_FALSE(r.drain().empty());
+    }
+}
+void test_status_view_keeps_its_explicit_live_refresh() {
+    Rig r;
+    r.terminal.open();
+    r.drain();
+    r.feed("1\r");
+    TEST_ASSERT_FALSE(r.drain().empty());
+    r.terminal.poll(1000);
+    TEST_ASSERT_TRUE(r.drain().empty());
+    r.terminal.poll(2100);
+    TEST_ASSERT_FALSE(r.drain().empty());
+    r.feed("q");
+    r.drain();
+    r.terminal.poll(4200);
+    TEST_ASSERT_TRUE(r.drain().empty());
+}
 void test_serial_reports_and_async_prompts_keep_input_isolated() {
     Rig r;
     TEST_ASSERT_FALSE(r.terminal.setSize("4294967376,25"));
@@ -283,14 +319,14 @@ void test_phonebook_empty_missing_hook_and_changed_entry_confirmation() {
     TEST_ASSERT_TRUE(view.has("Phonebook unavailable"));
     BookServices services;
     r.terminal.services(&services);
-    r.terminal.poll(2100);
+    r.feed("1\r");  // Explicitly refresh the list after an external change.
     view.accept(r.drain());
     TEST_ASSERT_TRUE(view.has("No saved entries"));
     r.feed("4\r");
     view.accept(r.drain());
     TEST_ASSERT_TRUE(view.has("No selected entry"));
     services.add(0);
-    r.terminal.poll(4200);
+    r.feed("1\r");
     r.drain();
     r.feed("4\r");
     r.drain();

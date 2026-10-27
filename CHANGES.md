@@ -14,6 +14,14 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [0.16] - 2026-10-27
+
+### Fixed
+
+- Stop repainting idle configuration menus every two seconds, avoiding flicker
+  and repeated scrolling on consoles. Keep explicit live Status refresh, input,
+  resize and model-change updates.
+
 ## [0.15] - 2026-10-27
 
 ### Changed
