@@ -10,6 +10,7 @@
 
 #include "autobaud.h"
 #include "hw.h"
+#include "input_buffer.h"
 #include "linectl.h"
 
 namespace rs232 {
@@ -50,6 +51,7 @@ autobaud::Run *runs = nullptr;     // in PSRAM
 
 atcmd::Modem *modemPtr = nullptr;
 UartSink sink;
+hostport::InputBuffer input;
 hostport::Session *sess = nullptr;  // made once at boot
 
 uint32_t currentBaud = modemcfg::kFactoryBaud;
@@ -126,7 +128,8 @@ CallBaud callBaud;
 
 void feed(const uint8_t *data, size_t len, uint32_t nowMs) {
     fromComputer += len;
-    sess->fromHost(data, len, nowMs);
+    input.append(data, len);
+    input.poll(*sess, nowMs);
 }
 
 uint32_t startBaud() {
@@ -148,6 +151,9 @@ void startPort() {
 }
 
 void readCommandInput(uint32_t nowMs) {
+    input.poll(*sess, nowMs);
+    if (input.size())
+        return;
     uint8_t buf[512];
     if (detecting()) {
         flushUart();  // the capture has the same bytes, decoded at the right speed
@@ -158,7 +164,7 @@ void readCommandInput(uint32_t nowMs) {
                 setBaud(b.baud);
             }
             feed(buf, b.len, nowMs);
-            if (sess->mode() == Mode::kOnline) {
+            if (sess->mode() == Mode::kOnline || input.size()) {
                 break;  // the rest arrives through the UART
             }
         }
@@ -173,6 +179,9 @@ void readCommandInput(uint32_t nowMs) {
 }
 
 void readOnlineInput(uint32_t nowMs) {
+    input.poll(*sess, nowMs);
+    if (input.size())
+        return;
     HardwareSerial &u = hw::uart();
     uint8_t buf[512];
     size_t room = sess->hostSpace();
@@ -182,7 +191,8 @@ void readOnlineInput(uint32_t nowMs) {
     }
     if (n > 0) {
         fromComputer += n;
-        sess->fromHost(buf, n, nowMs);  // takes them all: n <= room
+        input.append(buf, n);
+        input.poll(*sess, nowMs);
     }
 }
 
@@ -281,6 +291,7 @@ void suspend() {
     if (isSuspended) {
         return;
     }
+    input.clear();
     hw::captureEnd();
     hw::hostEnd();
     hw::lineSet(hwtest::OutSignal::kDCD, false);

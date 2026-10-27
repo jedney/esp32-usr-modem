@@ -393,3 +393,72 @@ def test_internet_wifi_loss_cleans_up_and_allows_redial(ports):
     host.ser.reset_input_buffer()
     dial(host.ser, '667')
     assert 'SLIP ready' in '\n'.join(console.command('AT*INTERNET?'))
+
+
+def test_ppp_renegotiates_after_original_startup_deadline(ports):
+    console, host = ports
+    dial(host.ser, '666')
+    peer = Peer(host.ser)
+    peer.negotiate()
+    started = time.monotonic()
+    while time.monotonic() - started < 31:
+        assert host.ser.cd
+        time.sleep(.25)
+    peer.negotiate()
+    assert host.ser.cd
+    assert 'PPP ready' in '\n'.join(console.command('AT*INTERNET?'))
+
+
+def test_ppp_reply_pressure_preserves_every_serial_request(ports):
+    console, host = ports
+    dial(host.ser, '666')
+    peer = Peer(host.ser)
+    peer.negotiate()
+    ser = host.ser
+    count = 1600
+    encoded = bytearray()
+    for sequence in range(count):
+        body = b'\xff\x03\xc0\x21' + struct.pack('!BBHII', 9, sequence & 255, 12, 0, sequence)
+        body += struct.pack('<H', ppp_crc(body) ^ 65535)
+        encoded.append(126)
+        for byte in body:
+            encoded.extend((125, byte ^ 32) if byte < 32 or byte in (125, 126) else (byte,))
+        encoded.append(126)
+    stop = threading.Event()
+    errors = []
+    def send_with_cts():
+        try:
+            for offset in range(0, len(encoded), 8):
+                while not ser.cts:
+                    if stop.wait(.002):
+                        return
+                if stop.is_set():
+                    return
+                ser.write(encoded[offset:offset+8])
+                ser.flush()
+        except Exception:
+            errors.append(True)
+    ser.rtscts = False
+    ser.rts = False
+    worker = threading.Thread(target=send_with_cts, daemon=True)
+    worker.start()
+    try:
+        deadline = time.monotonic() + 12
+        while ser.cts and time.monotonic() < deadline and worker.is_alive():
+            time.sleep(.02)
+        assert not ser.cts, 'PPP response pressure did not reach UART backpressure'
+        ser.rts = True
+        replies = set()
+        deadline = time.monotonic() + 30
+        while len(replies) < count and time.monotonic() < deadline:
+            protocol, body = peer.receive(timeout=5)
+            if protocol == 0xc021 and len(body) == 12 and body[0] == 10:
+                replies.add(struct.unpack('!I', body[8:12])[0])
+        assert replies == set(range(count)), 'PPP echo requests were lost under serial pressure'
+        assert not errors
+        assert host.ser.cd
+    finally:
+        stop.set()
+        ser.rts = True
+        worker.join(timeout=3)
+        ser.rtscts = True

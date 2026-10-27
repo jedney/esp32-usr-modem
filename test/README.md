@@ -188,3 +188,19 @@ Final existing console/incoming/local-outgoing regression: 87 passed, 28 skipped
 96 passed, 29 skipped. Final COM15 queries confirm normal v0.10 firmware and 23
 retained call-history records after regression restarts. No temporary firewall
 change, external BBS call, credential rotation or filesystem upload was used.
+
+## v0.14 pre-v1 review regressions
+
+| Finding | Native / host | On-board | Wired acceptance |
+|---|---|---|---|
+| R1 serial partial consumption | `test_internet`: bounded InputBuffer retains a PPP chunk tail and verifies every reply after draining | Existing UART/control coverage | `test_internet.py`: 1600 LCP replies across RTS/CTS pressure |
+| R2 stale browser guard tick | `test_netcfg`: older tick and full 60-second window across clock rollover | Firmware build | Existing browser/network regression |
+| R3 prompt ownership | `test_netcfg`: two ports, cancellation, invalid password, timeout, disconnect, blocked scan | Firmware build | `test_wifi.py`: prompt exclusivity in both COM15/COM18 directions without joining a network |
+| R4 sound catalogue | `test_sound_catalog.py`: catalogue matches all packaged PCM files | `test_client`: every source, ALL and 9600 alias read through LittleFS | `serial_lrzsz.py --port COM18 --baud 115200 --sounds`: complete Y/Z sound batches, compare bytes/count/CRC |
+| R5 PPP renegotiation | `test_internet`: late LCP/IPCP renegotiation, successful reconnect, fresh bounded timeout | Existing NAPT lifecycle | `test_internet.py`: renegotiate after 31 seconds |
+| R6 failed saves | `test_netcfg`, `test_atcmd`: no live/radio mutation or later persistence of rejected settings | Existing NVS roundtrips | Existing settings/Wi-Fi regression |
+| R7 invalid NVS reads | `test_devicecfg`: read error cannot generate replacement credentials | `test_device`: real oversized scratch blob, web fails closed, credential record retained | Production namespaces are never corrupted for testing |
+
+Validation results are recorded in `docs/v0.14-validation.md`. Embedded tests
+replace the installed app; restore normal firmware afterwards. LittleFS does not
+need replacement for these fixes.

@@ -118,3 +118,15 @@ Notes:
   `&B0` (serial speed follows the call) takes effect with real calls in v0.8.
 - `AT*TESTCALL` (v0.5) gives a call without a network; later versions can use it to
   test their online features.
+
+Implemented and retested: **v0.14 pre-v1 review fixes**. All seven findings in
+`docs/v1-code-review.md` are addressed; see `docs/v0.14-validation.md`. 385 native,
+22 browser-unit, 18 script/layout (seven subtests), 44 on-board checks and 158
+unique wired E2E checks pass. Nine internal-loopback on-board cases correctly skip
+with receivers fitted; nine E2E skips are optional tests. Independent pppd/kernel
+and wired PPP HTTP/DNS/NAPT checks pass, as do ten standalone transfers and both
+complete Y/ZMODEM ALL sound batches with byte/count/CRC verification. Normal
+v0.14 is installed through the native-test gate; LittleFS and device credentials
+are retained. The 9600 download name aliases its existing 2400 playback fallback;
+ALL now includes the real 56000 file. Optional resource refactors, SDK migration
+and previously deferred physical/legacy-client acceptance remain separate work.

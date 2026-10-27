@@ -30,8 +30,11 @@ def reader(stream, pending):
         pending.put(data)
 
 
-def run_case(ser, protocol, downloading, length=8193):
-    directory = ROOT / '.pio' / 'client-acceptance' / f'{protocol}-' / ('download' if downloading else 'upload')
+def run_case(ser, protocol, downloading, length=8193, selection="TEST"):
+    sounds = selection == "ALL"
+    if sounds and (not downloading or protocol < 3):
+        raise ValueError("Sound batches require Y/ZMODEM download")
+    directory = ROOT / '.pio' / 'client-acceptance' / (f'{protocol}-sounds' if sounds else f'{protocol}-') / ('download' if downloading else 'upload')
     directory.mkdir(parents=True, exist_ok=True)
     expected = bytes(i & 255 for i in range(length))
     if not downloading:
@@ -40,7 +43,7 @@ def run_case(ser, protocol, downloading, length=8193):
     kind = 'XXXYZ'[protocol]
     command = f'AT*{("S" if downloading else "R")}{kind}'
     if downloading:
-        command += '=TEST,' + (variant + ',' if protocol < 3 else '') + str(length)
+        command += '=ALL' if sounds else '=TEST,' + (variant + ',' if protocol < 3 else '') + str(length)
     elif protocol < 3:
         command += '=' + variant
     ser.reset_input_buffer()
@@ -59,7 +62,7 @@ def run_case(ser, protocol, downloading, length=8193):
     worker = threading.Thread(target=reader, args=(proc.stdout, pending), daemon=True)
     worker.start()
     received = bytearray()
-    deadline = time.monotonic() + 150
+    deadline = time.monotonic() + (280 if sounds else 150)
     try:
         while time.monotonic() < deadline:
             while not pending.empty():
@@ -84,7 +87,21 @@ def run_case(ser, protocol, downloading, length=8193):
         assert 'LRZSZ_EXIT=0' in peer_report, f'lrzsz bridge exit {proc.returncode}: ' + peer_report
         match = re.search(rb'Transfer SUCCESS: bytes=(\d+) ms=(\d+) cps=(\d+) retries=(\d+) errors=(\d+) files=(\d+) CRC32=([0-9A-F]+)', received)
         assert match, 'missing transfer statistics'
-        if downloading:
+        if sounds:
+            catalog = (ROOT / 'lib/sounds/src/catalog.h').read_text()
+            assets = re.findall(r'\{\d+, "(HS\d+\.WAV)", "(/sounds/handshake-\d+\.wav)"\}', catalog)
+            assert len(assets) == 6
+            log = (directory / 'USRMODEM.LOG').read_bytes()
+            crc = binascii.crc32(log)
+            total = len(log)
+            for name, path in assets:
+                data = (directory / name).read_bytes()
+                assert data == (ROOT / 'data' / path.lstrip('/')).read_bytes(), 'sound payload mismatch'
+                crc = binascii.crc32(data, crc)
+                total += len(data)
+            assert int(match[1]) == total and int(match[6]) == 7
+            assert int(match[7], 16) == crc, 'batch CRC mismatch'
+        elif downloading:
             target = directory / ('RECEIVED.BIN' if protocol < 3 else 'TEST64K.BIN' if length == 65536 else 'TEST1M.BIN' if length == 1048576 else 'TEST.BIN')
             data = target.read_bytes()
             assert data[:length] == expected, 'download payload mismatch'
@@ -111,11 +128,17 @@ def main():
     parser.add_argument('--port', required=True)
     parser.add_argument('--baud', type=int, default=38400)
     parser.add_argument('--protocol', type=int, choices=range(5))
+    parser.add_argument('--sounds', action='store_true', help='verify both complete ALL sound batches; use 115200 baud')
     args = parser.parse_args()
     with serial.Serial(args.port, args.baud, timeout=.01, rtscts=True, write_timeout=5) as ser:
         ser.write(b'ATE0Q0V1\r')
         time.sleep(.3)
         ser.reset_input_buffer()
+        if args.sounds:
+            for protocol in (3, 4):
+                print(args.port, protocol, 'ALL sounds', run_case(ser, protocol, True, selection='ALL'), flush=True)
+                time.sleep(.2)
+            return
         for protocol in (range(5) if args.protocol is None else [args.protocol]):
             for downloading in (True, False):
                 print(args.port, protocol, 'download' if downloading else 'upload',

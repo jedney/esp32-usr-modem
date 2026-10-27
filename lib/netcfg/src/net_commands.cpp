@@ -19,16 +19,27 @@ Net *net = nullptr;
 uint32_t (*clockMs)() = nullptr;
 
 // The one join or scan waiting for its result (any port).
-enum class Op : uint8_t { kNone, kJoin, kScan };
+enum class Op : uint8_t { kNone, kPassword, kJoin, kScan };
 Op pendingOp = Op::kNone;
 Port *pendingPort = nullptr;
 char joinSsid[kSsidMax + 1] = {};
+uint32_t passwordAt = 0;
 Port *confirmationPort = nullptr;
 uint32_t confirmationAt = 0;
 bool confirmationForget = false;
 
 uint32_t now() {
     return clockMs != nullptr ? clockMs() : 0;
+}
+void releasePassword() {
+    if (pendingOp != Op::kPassword || !pendingPort)
+        return;
+    if (pendingPort->busy() && now() - passwordAt < 120000)
+        return;
+    pendingPort->cancelPrompt();
+    pendingPort = nullptr;
+    pendingOp = Op::kNone;
+    wipe(joinSsid, sizeof joinSsid);
 }
 Reply confirmNetworkLoss(Port &port, const char *text, void *) {
     bool valid = confirmationPort == &port && now() - confirmationAt < 30000 && wordIs(text, "Y");
@@ -174,14 +185,21 @@ Reply beginJoin(Port &port, const char *pass) {
     if (port.browser()) {
         net->guardBrowserChange(now());
     }
-    if (!net->join(joinSsid, pass, now(), port.browser() ? 60000 : Net::kJoinTimeoutMs)) {
+    bool joined = net->join(joinSsid, pass, now(), port.browser() ? 60000 : Net::kJoinTimeoutMs);
+    wipe(joinSsid, sizeof joinSsid);
+    if (!joined) {
         return Reply::kError;
     }
     return startWait(port, Op::kJoin);
 }
 
 Reply onPassword(Port &port, const char *text, void *) {
-    if (!validPassword(text)) {
+    if (pendingOp != Op::kPassword || pendingPort != &port)
+        return Reply::kError;
+    pendingOp = Op::kNone;
+    pendingPort = nullptr;
+    if (now() - passwordAt >= 120000 || !validPassword(text)) {
+        wipe(joinSsid, sizeof joinSsid);
         port.beginInfo();
         port.print("The password must be 8-63 characters (or 64 hex digits)");
         port.newline();
@@ -201,6 +219,9 @@ void attachCommands(Net &n, uint32_t (*millisFn)()) {
 }
 
 void pollCommands() {
+    releasePassword();
+    if (pendingOp == Op::kPassword)
+        return;
     if (confirmationPort) {
         if (!confirmationPort->busy()) {
             confirmationPort = nullptr;
@@ -254,6 +275,10 @@ void pollCommands() {
 }
 
 void detachCommands(Port &port) {
+    if (pendingPort == &port && pendingOp == Op::kPassword) {
+        port.cancelPrompt();
+        releasePassword();
+    }
     if (pendingPort == &port && pendingOp == Op::kJoin) {
         // Browser network replacement must finish or roll back after its old
         // socket disappears. The candidate is owned by Net, not by this Port.
@@ -283,6 +308,7 @@ Reply cmdWifi(Port &port, const char *args) {
 }
 
 Reply cmdWifiScan(Port &port, const char *args) {
+    releasePassword();
     if (*argStart(args) != '\0' || pendingOp != Op::kNone) {
         return Reply::kError;
     }
@@ -296,6 +322,7 @@ Reply cmdWifiScan(Port &port, const char *args) {
 }
 
 Reply cmdWifiJoin(Port &port, const char *args) {
+    releasePassword();
     if (pendingOp != Op::kNone) {
         return Reply::kError;
     }
@@ -334,6 +361,9 @@ Reply cmdWifiJoin(Port &port, const char *args) {
         return beginJoin(port, "");
     }
     port.beginInfo();
+    pendingOp = Op::kPassword;
+    pendingPort = &port;
+    passwordAt = now();
     port.askSecret("Password (Enter for none): ", onPassword, nullptr);
     return Reply::kPending;
 }

@@ -4,7 +4,7 @@ An ESP32-S3 Wi-Fi "modem" in a 3D-printed replica of a 1990s US Robotics Sportst
 Faxmodem. It has a real DB25 RS232 port, speaks the Hayes AT command set, plays the
 dial, DTMF and handshake sounds, and connects to Telnet BBSes over Wi-Fi.
 
-Status: **v0.13 PPP/SLIP Internet dial-up implemented and running on the wired bench;
+Status: **v0.14 pre-production correctness fixes; PPP/SLIP Internet dial-up implemented;
 Windows 9x/Amiga browsing acceptance is deferred because neither client is available.**
 Authenticated browser configuration, local configuration, logs/history, export,
 incoming/outgoing TCP/Telnet calls, a 64-entry phonebook, selectable Sportster identity,
@@ -447,10 +447,11 @@ Factory reset removes both records.
 `AT*SX=TEST,CRC,65536` sends generated 64 KiB data by XMODEM; SUM and 1K select
 the other variants. `AT*SY=ALL` batches the frozen log and six handshake sounds;
 `AT*SZ=LOG` sends `USRMODEM.LOG` by ZMODEM. Other sources are `HS1200.WAV`,
-`HS2400.WAV`, `HS9600.WAV`, `HS14400.WAV`, `HS28800.WAV`, `HS33600.WAV` and
+`HS2400.WAV`, `HS14400.WAV`, `HS28800.WAV`, `HS33600.WAV`, `HS56000.WAV` and
 generated `TEST` (1 byte to 16 MiB). `AT*SY=TEST,1048576` or
 `AT*SZ=TEST,1048576` generates `TEST1M.BIN` without allocating a megabyte buffer.
-ALL requires YMODEM or ZMODEM.
+ALL requires YMODEM or ZMODEM. `HS9600.WAV` remains an alias of `HS2400.WAV`,
+matching the fallback used for 9600-baud playback.
 
 `AT*RX=SUM`, `AT*RX=CRC`, `AT*RX=1K`, `AT*RY` and `AT*RZ` validate uploads and
 discard their contents. Use protocol cancellation: ordinary Ctrl-C/ESC/`+++`

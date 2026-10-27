@@ -23,6 +23,8 @@ public:
         return n;
     }
     bool save(const uint8_t *d, size_t n) override {
+        if (fail)
+            return false;
         memcpy(data, d, n);
         len = n;
         ++saves;
@@ -35,6 +37,7 @@ public:
     uint8_t data[1024] = {};
     size_t len = 0;
     int saves = 0;
+    bool fail = false;
 };
 
 class StrSink : public Sink {
@@ -949,8 +952,36 @@ void test_connect_detail_uses_operational_speed_and_respects_result_modes() {
     TEST_ASSERT_EQUAL_STRING("", result);
 }
 
+void test_failed_nvram_updates_do_not_leak_into_later_saves() {
+    MemStore store;
+    Modem modem(store, nullptr, 0);
+    modem.begin();
+    TEST_ASSERT_TRUE(modem.writeTemplate(0, 38400));
+    const auto before = modem.nvram();
+    modem.active().v[modemcfg::kE] = 0;
+    store.fail = true;
+    TEST_ASSERT_FALSE(modem.writeTemplate(0, 9600));
+    TEST_ASSERT_TRUE(before.tmpl[0] == modem.nvram().tmpl[0]);
+    TEST_ASSERT_FALSE(modem.setHostBaud(9600));
+    TEST_ASSERT_EQUAL(before.hostBaud, modem.hostBaud());
+    TEST_ASSERT_FALSE(modem.setPowerOn(1));
+    TEST_ASSERT_EQUAL(before.y, modem.nvram().y);
+    TEST_ASSERT_FALSE(modem.setPhone(0, "test.example"));
+    TEST_ASSERT_EQUAL_STRING(before.phone[0], modem.nvram().phone[0]);
+    store.fail = false;
+    TEST_ASSERT_TRUE(modem.setModel(56000));
+    modemcfg::Nvram restored;
+    TEST_ASSERT_EQUAL(modemcfg::LoadResult::kOk, modemcfg::loadNvram(store, &restored));
+    TEST_ASSERT_TRUE(before.tmpl[0] == restored.tmpl[0]);
+    TEST_ASSERT_EQUAL(before.hostBaud, restored.hostBaud);
+    TEST_ASSERT_EQUAL(before.y, restored.y);
+    TEST_ASSERT_EQUAL_STRING(before.phone[0], restored.phone[0]);
+}
+
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_failed_nvram_updates_do_not_leak_into_later_saves);
+
     RUN_TEST(test_connect_detail_uses_operational_speed_and_respects_result_modes);
     RUN_TEST(test_model_commands_persist_outside_templates);
     RUN_TEST(test_secret_prompt_echoes_stars);

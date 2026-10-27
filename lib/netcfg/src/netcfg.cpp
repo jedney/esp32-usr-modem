@@ -82,6 +82,7 @@ bool Net::store() {
 }
 
 void Net::guardBrowserChange(uint32_t nowMs) {
+    now_ = nowMs;
     if (!browserGuard_) {
         browserPrevious_ = s_;
         browserAt_ = nowMs;
@@ -124,6 +125,8 @@ bool Net::takeNotice(char *buf, size_t cap) {
 // --- Main loop ------------------------------------------------------------------------------
 
 void Net::tick(uint32_t nowMs) {
+    if (static_cast<int32_t>(nowMs - now_) < 0)
+        return;
     now_ = nowMs;
     link_ = radio_.link();
     if (browserGuard_ && join_ != JoinResult::kRunning) {
@@ -308,99 +311,120 @@ Arq Net::arq() const {
 
 // --- Changes --------------------------------------------------------------------------------
 
+bool Net::apply(const Settings &next, bool cancel) {
+    if ((cancel || !browserGuard_) && !save(store_, next))
+        return false;
+    if (cancel) {
+        browserGuard_ = false;
+        wipe(browserPrevious_.pass, sizeof browserPrevious_.pass);
+        join_ = JoinResult::kNone;
+        wipe(candidate_.pass, sizeof candidate_.pass);
+    }
+    s_ = next;
+    return true;
+}
+
 bool Net::setEnabled(bool on) {
-    cancelJoin();
-    s_.enabled = on;
-    bool ok = store();
+    Settings next = s_;
+    next.enabled = on;
+    bool ok = apply(next, true);
+    wipe(next.pass, sizeof next.pass);
+    if (!ok)
+        return false;
     if (on && s_.hasNetwork()) {
-        if (!up()) {
+        if (!up())
             attempt(now_);
-        }
     } else if (!on) {
         radio_.off();
         link_.state = LinkState::kOff;
-        trying_ = false;
-        wasUp_ = false;
+        trying_ = wasUp_ = false;
     }
-    return ok;
+    return true;
 }
 
 bool Net::forget() {
-    cancelJoin();
-    wipe(s_.ssid, sizeof s_.ssid);
-    wipe(s_.pass, sizeof s_.pass);
-    bool ok = store();
+    Settings next = s_;
+    wipe(next.ssid, sizeof next.ssid);
+    wipe(next.pass, sizeof next.pass);
+    if (!apply(next, true))
+        return false;
     if (s_.enabled) {
         radio_.leave();
         link_.state = LinkState::kDown;
     }
-    trying_ = false;
-    wasUp_ = false;
+    trying_ = wasUp_ = false;
     lastFail_ = Reason::kNone;
-    return ok;
+    return true;
 }
 
 void Net::reconnect() {
-    if (s_.enabled && s_.hasNetwork()) {
+    if (s_.enabled && s_.hasNetwork())
         attempt(now_);
-    }
 }
 
 bool Net::setDhcp() {
-    s_.dhcp = true;
-    bool ok = store();
-    reconnect();
+    Settings next = s_;
+    next.dhcp = true;
+    bool ok = apply(next);
+    wipe(next.pass, sizeof next.pass);
+    if (ok)
+        reconnect();
     return ok;
 }
 
 bool Net::setStatic(uint32_t ip, uint32_t mask, uint32_t gateway, uint32_t dns) {
-    if (!validStatic(ip, mask, gateway)) {
+    if (!validStatic(ip, mask, gateway))
         return false;
-    }
-    s_.dhcp = false;
-    s_.ip = ip;
-    s_.mask = mask;
-    s_.gateway = gateway;
-    s_.dns = dns != 0 ? dns : gateway;
-    bool ok = store();
-    reconnect();
+    Settings next = s_;
+    next.dhcp = false;
+    next.ip = ip;
+    next.mask = mask;
+    next.gateway = gateway;
+    next.dns = dns != 0 ? dns : gateway;
+    bool ok = apply(next);
+    wipe(next.pass, sizeof next.pass);
+    if (ok)
+        reconnect();
     return ok;
 }
 
 bool Net::setHost(const char *name) {
     char host[kHostMax + 1];
-    if (!normalizeHost(name, host, sizeof host)) {
+    if (!normalizeHost(name, host, sizeof host))
         return false;
-    }
-    copy(s_.host, sizeof s_.host, host);
-    bool ok = store();
-    if (up()) {
+    Settings next = s_;
+    copy(next.host, sizeof next.host, host);
+    bool ok = apply(next);
+    wipe(next.pass, sizeof next.pass);
+    if (ok && up())
         radio_.startServices(s_);
-    }
     return ok;
 }
 
 bool Net::setNtp(const char *server) {
-    if (!validServer(server)) {
+    if (!validServer(server))
         return false;
-    }
-    copy(s_.ntp, sizeof s_.ntp, server);
-    bool ok = store();
-    if (up()) {
+    Settings next = s_;
+    copy(next.ntp, sizeof next.ntp, server);
+    bool ok = apply(next);
+    wipe(next.pass, sizeof next.pass);
+    if (ok && up())
         radio_.startServices(s_);
-    }
     return ok;
 }
 
 bool Net::setTz(const char *zone) {
     tz::Rule rule;
     char name[kTzMax + 1];
-    if (strlen(zone) > kTzMax || !tz::resolve(zone, &rule, name, sizeof name)) {
+    if (strlen(zone) > kTzMax || !tz::resolve(zone, &rule, name, sizeof name))
         return false;
-    }
-    copy(s_.tz, sizeof s_.tz, name);
-    zone_ = rule;
-    return store();
+    Settings next = s_;
+    copy(next.tz, sizeof next.tz, name);
+    bool ok = apply(next);
+    wipe(next.pass, sizeof next.pass);
+    if (ok)
+        zone_ = rule;
+    return ok;
 }
 
 // --- AT*WIFIJOIN ----------------------------------------------------------------------------

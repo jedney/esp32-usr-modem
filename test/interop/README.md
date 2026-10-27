@@ -55,3 +55,14 @@ are g++, Python, iproute2 and ppp, with kernel PPP support and `/dev/ppp`.
 
 Real Windows 9x/Amiga stack/browser acceptance remains deferred by Jon because
 neither client is available. Automated modern-stack results do not close it.
+
+Complete packaged-sound batch regression (v0.14):
+
+```powershell
+python test/interop/serial_lrzsz.py --port COM18 --baud 115200 --sounds
+```
+
+Use the matching host UART speed (AUTO can detect the AT prefix). This downloads
+ALL through both YMODEM and ZMODEM, checks all six WAVs against `data/sounds`, and
+checks aggregate file count/bytes/CRC including the frozen log. It writes only
+under `.pio/client-acceptance`; it does not replace firmware or saved settings.

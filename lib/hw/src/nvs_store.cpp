@@ -2,20 +2,23 @@
 #include "nvs_store.h"
 
 #include <Preferences.h>
+#include <cstring>
 
 namespace hw {
 
 size_t NvsStore::load(uint8_t *buf, size_t cap) {
     Preferences prefs;
+    memset(buf, 0, cap);
     if (!prefs.begin(ns_, false)) {
-        return 0;
+        return modemcfg::kLoadError;
     }
-    size_t len = prefs.isKey(key_) ? prefs.getBytesLength(key_) : 0;
-    if (len > cap) {
-        len = cap;  // too big to be ours; the caller reports it as damaged
-    }
-    if (len > 0) {
-        len = prefs.getBytes(key_, buf, len);
+    size_t len = 0;
+    if (prefs.isKey(key_)) {
+        len = prefs.getBytesLength(key_);
+        if (!len || len > cap || prefs.getBytes(key_, buf, cap) != len) {
+            memset(buf, 0, cap);
+            len = modemcfg::kLoadError;
+        }
     }
     prefs.end();
     return len;

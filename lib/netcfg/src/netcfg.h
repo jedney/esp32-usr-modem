@@ -148,6 +148,7 @@ private:
     static constexpr size_t kRawMax = 32;  // scan entries read from the radio
 
     bool store();
+    bool apply(const Settings &next, bool cancel = false);
     void attempt(uint32_t nowMs);
     void reconnect();
     void pollJoin(uint32_t nowMs);
