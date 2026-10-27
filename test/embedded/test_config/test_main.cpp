@@ -9,6 +9,43 @@
 #include "net_probe.h"
 void setUp() {}
 void tearDown() {}
+void test_idle_menu_has_no_periodic_display_output() {
+    class Store : public modemcfg::Store {
+    public:
+        size_t load(uint8_t *, size_t) override { return 0; }
+        bool save(const uint8_t *, size_t) override { return true; }
+        bool erase() override { return true; }
+    } store;
+    class Sink : public atcmd::Sink {
+    public:
+        void write(const char *, size_t) override {}
+    } sink;
+    atcmd::Modem modem(store, nullptr, 0);
+    modem.begin();
+    hostport::CallSlot slot;
+    hostport::Session session(modem, sink, 115200, slot);
+    auto *terminal = new config::Terminal(session, false);
+    uint8_t bytes[256];
+    for (const char *style : {"ANSI", "CP437", "PLAIN"}) {
+        TEST_ASSERT_TRUE(terminal->setStyle(style));
+        TEST_ASSERT_TRUE(terminal->open());
+        while (terminal->read(bytes, sizeof bytes)) {
+        }
+        // Under five seconds: no serial geometry probe is due.
+        terminal->poll(2100);
+        TEST_ASSERT_EQUAL(0, terminal->read(bytes, sizeof bytes));
+        terminal->poll(4200);
+        TEST_ASSERT_EQUAL(0, terminal->read(bytes, sizeof bytes));
+        const uint8_t down[] = {27, '[', 'B'};
+        for (uint8_t c : down)
+            terminal->write(&c, 1);
+        TEST_ASSERT_GREATER_THAN(0, terminal->read(bytes, sizeof bytes));
+        while (terminal->read(bytes, sizeof bytes)) {
+        }
+        terminal->close();
+    }
+    delete terminal;
+}
 void test_psram_log_capacity_and_wrap() {
     char *memory = static_cast<char *>(ps_malloc(256 * 1024));
     TEST_ASSERT_NOT_NULL(memory);
@@ -80,6 +117,7 @@ void setup() {
     delay(2000);
     WiFi.mode(WIFI_STA);
     UNITY_BEGIN();
+    RUN_TEST(test_idle_menu_has_no_periodic_display_output);
     RUN_TEST(test_psram_log_capacity_and_wrap);
     RUN_TEST(test_atomic_history_files_reload_and_capacity);
     RUN_TEST(test_numeric_dns_probe_and_cancel_without_network_peer);

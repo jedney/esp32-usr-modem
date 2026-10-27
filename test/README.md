@@ -204,3 +204,18 @@ change, external BBS call, credential rotation or filesystem upload was used.
 Validation results are recorded in `docs/v0.14-validation.md`. Embedded tests
 replace the installed app; restore normal firmware afterwards. LittleFS does not
 need replacement for these fixes.
+
+## v0.16 idle menu regression
+
+`test_config` checks that ANSI, CP437 and plain menus produce no idle display
+output across repeated timer intervals, while input, resize, model changes and
+the explicit live Status view still update. Serial size probes remain enabled.
+Phonebook changes from outside the menu appear on the next input/list refresh.
+`embedded/test_config` checks the same idle behavior on the ESP32; the three
+`test_config.py::test_idle_menu_does_not_repaint` cases check real serial output
+over six seconds. Hardware acceptance requires installing the new firmware.
+
+Local validation: all **387 native checks pass**, including 28 configuration
+checks; firmware and embedded configuration test builds, cppcheck and formatting
+pass. All 13 configuration E2E cases collect successfully. No firmware upload or
+hardware execution was performed for this change.
