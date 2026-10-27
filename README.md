@@ -4,11 +4,12 @@ An ESP32-S3 Wi-Fi "modem" in a 3D-printed replica of a 1990s US Robotics Sportst
 Faxmodem. It has a real DB25 RS232 port, speaks the Hayes AT command set, plays the
 dial, DTMF and handshake sounds, and connects to Telnet BBSes over Wi-Fi.
 
-Status: **v0.11 web interface implemented and running on the wired bench; manual
-physical/Amiga acceptance remains open.**
+Status: **v0.13 PPP/SLIP Internet dial-up implemented and running on the wired bench;
+Windows 9x/Amiga browsing acceptance is deferred because neither client is available.**
 Authenticated browser configuration, local configuration, logs/history, export,
 incoming/outgoing TCP/Telnet calls, a 64-entry phonebook, selectable Sportster identity,
-optional throttling and call audio are implemented. See `test/README.md` for validation and pending
+Client Tests/transfers, Internet NAPT, optional throttling and call audio are implemented.
+See `test/README.md` for validation and pending
 bench checks. All hardware is now wired: console **COM15**, Unitek **COM18**.
 The wired RS232 baseline passes all 21 cases; physical listening and real Amiga
 observations remain separate acceptance items.
@@ -213,7 +214,7 @@ art above the menu. Those future interfaces are not part of v0.8.
    the firmware is written (`SUCCESS`). If it stops at "Connecting…", hold **BOOT**, press
    and release **RST**, release **BOOT**, and run the task again.
 4. **Run Task → Modem: upload sounds and web files (LittleFS).** This writes the files
-   partition (only the web page for now).
+   partition (web files and handshake sounds).
 5. **Run Task → Modem: USB console (115200).** Press **RST** on the board to see the
    banner with the version, flash and PSRAM size. Type `AT*VER`, `AT*HELP`, `AT*HWINFO`.
    Press **Ctrl+C** in the console terminal before the next upload (only one program can
@@ -369,7 +370,7 @@ model explicitly displays Unknown. Footer fields come from device state.
 
 Screens cover status, phonebook, all current modem settings with help, Wi-Fi/clock,
 updates, About/credits, command reference, sounds, logs and hardware tests. Client
-Tests are marked unavailable until v0.12. Settings say whether they save immediately
+Tests run on serial and are listed read-only in the browser. Settings say whether they save immediately
 or require a profile save (`&W`). Model, S0 and the auto-answer receiver are exposed.
 The line, loopback, bridge and held-output tests are unavailable on RS232 because
 they would take over that session's port. USB hardware tests still require idle RS232.
@@ -408,7 +409,7 @@ or uploading a replacement filesystem image removes history. Reset diagnostics n
 print raw core-dump memory.
 
 Console is COM15 at 115200; Unitek is COM18, with all components wired.
-Current v0.12 validation is recorded in `docs/v0.12-plan.md`; the older
+Current v0.13 validation is recorded in `docs/v0.13-plan.md`; the older
 `docs/v0.10-plan.md` records its original bench scope. Real Amiga and physical
 listening/panel observations remain separate acceptance checks.
 
@@ -459,6 +460,49 @@ final-block padding because it carries no original length. See the
 [independent/wired test instructions](test/interop/README.md). Close PuTTY before
 another program opens COM18.
 
+## Internet dial-up (v0.13)
+
+Dial `ATDT666` for PPP or `ATDT667` for SLIP; Zimodem aliases `5517546` and
+`5517545` also work. The attached computer needs a TCP/IP stack. PPP accepts any
+login and negotiates IPv4 addressing/DNS; SLIP needs static client configuration.
+The default private network is `10.64.64.0/30`: modem/peer `10.64.64.1`, computer
+`10.64.64.2`. Set the computer's default route through the modem. Traffic uses
+Wi-Fi NAPT; the computer does not share the modem's Wi-Fi address.
+
+Use fixed serial speed (`&B1`), 8N1 and hardware RTS/CTS (`&H1&R2`). A typical
+initialization is `AT&B1&H1&R2&I0&D2&C1F1M0`. `ATM0` connects immediately;
+other speaker settings retain the dial/handshake sequence and volume cap.
+Configure unauthenticated PPP or PAP; compression/encryption is not required.
+
+`AT*INTERNET?` reports setup/state, effective DNS, packet counters and last reason.
+`AT*INTERNET=IP,10.64.64.1,10.64.64.2` saves a private /30 address pair, and
+`AT*INTERNET=DNS,AUTO` uses Wi-Fi DNS (`DNS,1.1.1.1` selects a fixed server).
+Changes require an idle call and cannot overlap Wi-Fi. Export/factory reset include
+these settings; modem `&F`/`Z` retain them. Wi-Fi and Clock menu D/E/F provides
+Internet status, settings and dialing; browser dialing targets the RS232 port.
+
+PPP LCP termination or RS232 DTR drop with `&D2` hangs up without restarting.
+`AT*INTERNET=HANGUP` on the other local serial port ends PPP or SLIP. Binary calls
+do not interpret `+++`, software flow characters or command-looking payloads.
+Console PPP/SLIP is supported; its USB control lines remain ESP reset/boot lines,
+so use COM18 for local management when COM15 carries packets. Wi-Fi loss/address
+change ends the call; redial after reconnection.
+
+The bounded serial interface supports unfragmented IPv4 through a 1500-byte MTU;
+IPv6, CSLIP, packet compression and fragmented datagrams are unsupported. Use a
+client TCP MTU/MSS suitable for that link. Translated TCP/UDP ports occupy
+32768-49151, separate from the modem's own ephemeral socket ports. Firmware
+`AT*PING` is unavailable during Internet calls to avoid shared ICMP-identifier
+ambiguity; client ping and local HTTP/DNS/NTP remain available.
+Internet call byte totals include serial framing; packet counters count IP packets
+submitted or returned through the network adapter.
+
+The firmware now builds Arduino 2.0.17 and pinned IDF 4.4.7 together from source
+to enable NAT; the first build downloads additional tools/sources. SDK defaults
+and dependency checksums are tracked; no installed SDK files are patched. See
+`docs/v0.13-plan.md` and `test/interop/README.md` for verification. Real Windows
+9x/Amiga browsing acceptance is deferred because neither client is available.
+
 ## Web interface
 
 The modem serves a page with an adaptive terminal (starting at 80 × 25) and a status
@@ -471,13 +515,13 @@ clock. Source is in `web/`; see `web/PROTOCOL.md`.
   Every CI run also attaches the preview as a downloadable artifact. All preview
   values are explicitly synthetic; production output comes from the shared C++ UI.
 - **On the modem:** the page files are gzipped into `data/www/` and uploaded with the
-  LittleFS image (**Modem: upload sounds and web files (LittleFS)**). The firmware side
-  of the web server comes in a later version.
+  LittleFS image (**Modem: upload sounds and web files (LittleFS)**). The modem serves
+  the authenticated page and shared terminal directly.
 - **Tests:** **Modem: web interface tests** (`cd web && npm test`) needs Node.js 20 or later.
 
 ## Versioning
 
-- `VERSION` holds the current version (`0.7`). It is built into the firmware together
+- `VERSION` holds the current version (`0.13`). It is built into the firmware together
   with the git commit, and shown in the boot banner and by `AT*VER`.
 - **+0.1** for small enhancements and bug fixes. After 0.9 comes 0.10.
 - **+1.0** for a major feature or a hardware change. **v1.0** is the first production

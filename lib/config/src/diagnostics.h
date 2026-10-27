@@ -1,6 +1,7 @@
 // Local diagnostics. Only structured, credential-free events enter this buffer.
 #pragma once
 #include "modemcfg.h"
+#include "phonebook.h"
 
 namespace config {
 enum class Event : uint8_t {
@@ -37,6 +38,7 @@ struct CallRecord {
     uint16_t result = 0;
     bool incoming = false;
     bool raw = false;
+    calls::Kind kind = calls::Kind::Telnet;
     char host[64] = {}, number[12] = {};
 };
 class History {

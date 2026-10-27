@@ -257,6 +257,7 @@ atcmd::Reply Commands::exportConfig(atcmd::Port &p) {
              device_.policy() == devicecfg::Policy::kAlways ? "ALWAYS" : "DEMAND", m.nvram().y);
     hardware_.command(p, "WEBEXPORT", "");
     hardware_.command(p, "CLIENTEXPORT", "");
+    hardware_.command(p, "INTERNETEXPORT", "");
     profileExport(p, m.active());
     // Control bytes/quiet settings are last so the whole script remains executable.
     for (unsigned t = 0; t < 2; ++t) {

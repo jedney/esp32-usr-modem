@@ -63,6 +63,16 @@ reset. Loopback-plug, physical listening/panel and real Amiga checks remain open
 | v0.13 | **Internet dial-up**: PPP on `ATDT666` and SLIP on `ATDT667` (port from Zimodem), NAT, clean hang-up | 6.6 | Windows 9x or Amiga TCP stack browses the web through the modem |
 | v1.0 | **Production**: final build in the case (pin map already confirmed by Electronics, Q76, and applied in v0.6), all on-board and end-to-end tests pass, README and About complete | all | Jon's sign-off |
 
+Implemented, available-bench acceptance passed: **v0.13 Internet dial-up**. See
+`docs/v0.13-plan.md` for the source-built Arduino 2.0.17/IDF 4.4.7 NAPT stack,
+PPP/SLIP and aliases, settings and clean hang-up. 376 native and three new on-board
+checks pass; all 11 embedded programs compile. New Internet acceptance passes 11
+cases (two opt-in UDP echo skips); full regression is 155 passed/nine skipped.
+Independent pppd 2.4.9 verifies 64 KiB HTTP plus two concurrent 8 KiB flows, DNS,
+actual Wi-Fi NAT and LCP hang-up; local authenticated HTTP remains available.
+Normal v0.13 is installed, retaining LittleFS. Jon defers Windows 9x/Amiga browsing
+acceptance because neither client is available (27 Oct); that criterion remains open.
+
 Implemented, automated bench acceptance passed: **v0.12 Client Tests**, including the existing device-password variable
 rename and Sportster terminal/browser UI in one release commit (Jon, 27 Oct).
 See `docs/v0.12-plan.md`. Save one client profile per port (console and RS232).

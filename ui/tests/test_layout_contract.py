@@ -26,11 +26,11 @@ class HandoffContract(unittest.TestCase):
     def test_inventory(self):
         items=menu['main_menu']
         self.assertEqual(len(items),13)
-        self.assertEqual(sum(len(m['items']) for m in items),72)
+        self.assertEqual(sum(len(m['items']) for m in items),75)
         self.assertEqual([m['key'] for m in items],list('123456789ABCD'))
         self.assertEqual(len(set(m['id'] for m in items)),13)
-        self.assertEqual(len(set(i['id'] for m in items for i in m['items'])),72)
-        self.assertEqual([len(m['items']) for m in items],[0,4,13,2,4,0,12,7,0,15,0,0,15])
+        self.assertEqual(len(set(i['id'] for m in items for i in m['items'])),75)
+        self.assertEqual([len(m['items']) for m in items],[0,4,13,2,4,0,15,7,0,15,0,0,15])
     def test_disabled_version(self):
         m=menu['main_menu'][-1]
         self.assertEqual(m['label'],'Client Tests')

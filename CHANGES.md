@@ -14,6 +14,28 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [0.13] - 2026-10-27
+
+### Added
+
+- PPP (`666`, `5517546`) and SLIP (`667`, `5517545`) Internet dial-up with a
+  private /30 network and IPv4 NAPT through Wi-Fi.
+- Saved Internet addressing/DNS, AT*INTERNET status and local management hang-up,
+  shared menu actions, PPP/SLIP browser status and call-history kinds.
+- Portable protocol, settings and lifecycle tests, on-board adapter checks and
+  binary COM15/COM18 network acceptance.
+
+### Changed
+
+- Build Arduino 2.0.17 with pinned ESP-IDF 4.4.7 from source, enabling forwarding
+  and NAPT while retaining 16 MB flash, octal PSRAM, 240 MHz and the OTA partitions.
+- Fetch matching LittleFS sources at immutable revisions with SHA-256 verification.
+
+### Fixed
+
+- Binary calls suppress F0 online echo as well as software flow and Hayes escapes.
+- Internet hang-up restores command mode and releases network resources without reset.
+
 ## [0.12] - 2026-10-27
 
 ### Added

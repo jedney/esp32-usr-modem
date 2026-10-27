@@ -242,6 +242,21 @@
           "id": "wifi-clock.ping",
           "label": "Ping",
           "key": "C"
+        },
+        {
+          "id": "wifi-clock.internet-status",
+          "label": "Internet dial-up status",
+          "key": "D"
+        },
+        {
+          "id": "wifi-clock.internet-settings",
+          "label": "Internet addresses / DNS",
+          "key": "E"
+        },
+        {
+          "id": "wifi-clock.internet-dial",
+          "label": "Dial Internet PPP / SLIP",
+          "key": "F"
         }
       ]
     },

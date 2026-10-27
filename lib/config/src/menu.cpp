@@ -45,7 +45,8 @@ bool confirmation(const Action &a, bool browser, const char *command) {
         return !strcmp(a.command, "*WIFIJOIN=") || !strcmp(a.command, "*WIFI=") ||
                !strcmp(a.command, "*WIFIFORGET") || !strcmp(a.command, "*WIFIIP=") ||
                !strcmp(a.command, "*HOSTNAME=") || !strcmp(a.command, "*TZ=") ||
-               !strcmp(a.command, "*NTP=");
+               !strcmp(a.command, "*NTP=") || !strcmp(a.command, "*INTERNET=") ||
+               !strcmp(a.command, "*DIAL=");
     return false;
 }
 uint32_t entryHash(const calls::Entry &e) {
