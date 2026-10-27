@@ -257,7 +257,7 @@ def test_browser_hardware_line_toggles_restore_on_disconnect(web, manual_rs232):
     rs232 = manual_rs232
     with web.ws() as peer:
         peer.collect(0.4)
-        for keys in (b"A\r", b"C\r"):
+        for keys in (b"B\r", b"C\r"):
             peer.send(keys)
             text, _ = peer.collect(0.4)
         require(b"Live RS232" in text, "Browser line test did not start")
@@ -284,7 +284,7 @@ def test_upload_rejects_missing_csrf_before_writing(web):
 def test_browser_bridge_to_com18_both_directions(web, rs232):
     with web.ws() as peer:
         peer.collect(0.4)
-        for keys in (b"A\r", b"E\r"):
+        for keys in (b"B\r", b"E\r"):
             peer.send(keys)
             text, _ = peer.collect(0.4)
         require(b"Bridge:" in text, "Browser bridge did not start")
@@ -391,7 +391,7 @@ def test_browser_forget_requires_confirmation_and_cancel_keeps_network(web):
 def test_browser_guided_stop_returns_control_without_starting_leds(web, console):
     with web.ws() as peer:
         peer.collect(0.4)
-        for keys in (b"A\r", b"1\r"):
+        for keys in (b"B\r", b"1\r"):
             peer.send(keys)
             text, _ = peer.collect(0.3)
         require(b"Enter = start" in text, "Guided test did not reach its first prompt")

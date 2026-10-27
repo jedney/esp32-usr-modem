@@ -29,6 +29,8 @@ def call_console(console):
     _hangup(console)
     before_model = console.command("AT*MODEL?")[0].split()[0]
     before_throttle = console.command("AT*THROTTLE?")[0]
+    before_ring_delay = console.command("AT*RINGDELAY?")[0]
+    before_connect_delay = console.command("AT*CONNECTDELAY?")[0]
     assert console.command("AT*MODEL=14400")[-1] == "OK"
     assert console.command("AT*THROTTLE=OFF")[-1] == "OK"
     assert console.command("AT&F1M0S7=5", timeout=8)[-1] == "OK"
@@ -38,6 +40,8 @@ def call_console(console):
         _hangup(console)
         console.command("AT*MODEL=" + before_model)
         console.command("AT*THROTTLE=" + before_throttle)
+        console.command("AT*RINGDELAY=" + before_ring_delay)
+        console.command("AT*CONNECTDELAY=" + before_connect_delay)
         console.command("ATZ")
 
 
@@ -300,6 +304,8 @@ def test_model_changes_during_call_keep_ato_speed(call_console, server_ip):
 def test_streamed_handshake_completes_before_connect(call_console, server_ip):
     console = call_console
     assert console.command("AT&F1M1L2S6=1S7=30")[-1] == "OK"
+    assert console.command("AT*RINGDELAY=1500")[-1] == "OK"
+    assert console.command("AT*CONNECTDELAY=1000")[-1] == "OK"
 
     def patient_echo(connection):
         connection.settimeout(35)
@@ -311,12 +317,30 @@ def test_streamed_handshake_completes_before_connect(call_console, server_ip):
                                  until=("CONNECT 14400", "CONNECT 28800", "CONNECT 33600", "CONNECT 56000", "NO CARRIER", "NO ANSWER", "ERROR"))
         assert result[-1] == "CONNECT 14400"
         assert time.monotonic() - started >= 16, "CONNECT preceded the handshake playback"
-        received = console.raw(b"streamed", wait=0.5)
+        connected_at = time.monotonic()
+        console.ser.write(b"streamed")
+        received = b""
+        deadline = connected_at + 4
+        while b"streamed" not in received and time.monotonic() < deadline:
+            received += console.ser.read(console.ser.in_waiting or 1)
         matched = b"streamed" in received
         del received
         assert matched, "streamed call echo mismatch (traffic omitted)"
+        assert time.monotonic() - connected_at >= 0.8, "payload arrived before post-CONNECT delay"
         escape(console)
         assert console.command("ATH")[-1] == "OK"
+
+
+def test_call_delays_saved_across_restart_and_factory_profile_retains_them(call_console):
+    console = call_console
+    assert console.command("AT*RINGDELAY=2345")[-1] == "OK"
+    assert console.command("AT*CONNECTDELAY=678")[-1] == "OK"
+    console.restart()
+    assert console.command("AT*RINGDELAY?")[0] == "2345"
+    assert console.command("AT*CONNECTDELAY?")[0] == "678"
+    assert console.command("AT&F1")[-1] == "OK"
+    assert console.command("AT*RINGDELAY?")[0] == "2345"
+    assert console.command("AT*CONNECTDELAY?")[0] == "678"
 
 
 def test_model_saved_across_restart_and_factory_profile_retains_it(call_console):

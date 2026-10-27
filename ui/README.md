@@ -1,6 +1,6 @@
 # USRobotics Sportster BBS UI — 80×25 Codex handoff
 
-v0.12 integration: D opens Client Tests on serial; the browser lists them without
+v0.12 integration: C opens Client Tests on serial; the browser lists them without
 execution. The catalogue now has 72 nested actions (57 original plus 15 client
 actions). This supersedes the original disabled-placeholder instructions below.
 

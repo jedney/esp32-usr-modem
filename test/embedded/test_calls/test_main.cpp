@@ -18,6 +18,8 @@ void test_model_metadata_in_scratch_nvs() {
     TEST_ASSERT_EQUAL_UINT32(14400, modem.model());
     TEST_ASSERT_TRUE(modem.setModel(56000));
     TEST_ASSERT_TRUE(modem.setThrottle(true));
+    TEST_ASSERT_TRUE(modem.setCallDelay(true, 4321));
+    TEST_ASSERT_TRUE(modem.setCallDelay(false, 567));
     modem.active().lineExplicit = true;
     modem.active().v[modemcfg::kAmpN] = 38;
     TEST_ASSERT_TRUE(modem.writeTemplate(0, 115200));
@@ -25,6 +27,8 @@ void test_model_metadata_in_scratch_nvs() {
     again.begin();
     TEST_ASSERT_EQUAL_UINT32(56000, again.model());
     TEST_ASSERT_TRUE(again.throttle());
+    TEST_ASSERT_EQUAL_UINT32(4321, again.ringDelayMs());
+    TEST_ASSERT_EQUAL_UINT32(567, again.connectDelayMs());
     TEST_ASSERT_TRUE(again.active().lineExplicit);
     TEST_ASSERT_EQUAL(38, again.active().get(modemcfg::kAmpN));
     again.reset(4);

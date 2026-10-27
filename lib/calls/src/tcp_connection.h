@@ -30,6 +30,7 @@ class TcpConnection : public hostport::Connection {
 public:
     explicit TcpConnection(Socket &socket) : socket_(socket) {}
     void begin(bool raw);
+    void holdPayload(uint32_t nowMs, uint32_t durationMs);
     size_t space() const override;
     size_t write(const uint8_t *data, size_t len) override;
     size_t read(uint8_t *buf, size_t cap) override;
@@ -41,5 +42,6 @@ private:
     Socket &socket_;
     Telnet telnet_;
     bool raw_ = false;
+    uint32_t holdSince_ = 0, holdMs_ = 0;
 };
 }  // namespace calls

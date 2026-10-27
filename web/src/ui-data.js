@@ -132,6 +132,16 @@ export default {
           "id": "sounds.play-sound",
           "label": "Play",
           "key": "2"
+        },
+        {
+          "id": "sounds.ring-delay",
+          "label": "Ringing duration",
+          "key": "3"
+        },
+        {
+          "id": "sounds.connect-delay",
+          "label": "Delay after CONNECT",
+          "key": "4"
         }
       ]
     },
@@ -314,8 +324,17 @@ export default {
       "items": []
     },
     {
-      "id": "hardware-tests",
+      "id": "about",
       "key": "A",
+      "label": "About",
+      "group": "Information",
+      "icon": "info",
+      "summary": "Show version, device and project information",
+      "items": []
+    },
+    {
+      "id": "hardware-tests",
+      "key": "B",
       "label": "Hardware Tests",
       "group": "Tools",
       "icon": "chip",
@@ -399,26 +418,8 @@ export default {
       ]
     },
     {
-      "id": "command-reference",
-      "key": "B",
-      "label": "Command Reference",
-      "group": "Information",
-      "icon": "book",
-      "summary": "Browse AT commands and usage examples",
-      "items": []
-    },
-    {
-      "id": "about",
-      "key": "C",
-      "label": "About",
-      "group": "Information",
-      "icon": "info",
-      "summary": "Show version, device and project information",
-      "items": []
-    },
-    {
       "id": "client-tests",
-      "key": "D",
+      "key": "C",
       "label": "Client Tests",
       "group": "Tools",
       "icon": "flask",
@@ -501,6 +502,15 @@ export default {
           "label": "Reset client settings"
         }
       ]
+    },
+    {
+      "id": "command-reference",
+      "key": "D",
+      "label": "Command Reference",
+      "group": "Information",
+      "icon": "book",
+      "summary": "Browse AT commands and usage examples",
+      "items": []
     }
   ],
   "models": [

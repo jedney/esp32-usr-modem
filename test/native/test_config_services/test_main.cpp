@@ -143,6 +143,8 @@ void test_export_replays_nondefault_profiles_and_phonebook_without_secrets() {
     source.run("*MODEL=33600");
     source.run("*THROTTLE=ON");
     source.run("*ANSWERPORT=CONSOLE");
+    source.run("*RINGDELAY=4321");
+    source.run("*CONNECTDELAY=567");
     source.modem.setHostBaud(19200);
     source.modem.active().s[3] = 59;
     source.modem.active().s[4] = 12;
@@ -183,6 +185,8 @@ void test_export_replays_nondefault_profiles_and_phonebook_without_secrets() {
     TEST_ASSERT_EQUAL(33600, restored.modem.model());
     TEST_ASSERT_TRUE(restored.modem.throttle());
     TEST_ASSERT_TRUE(restored.modem.answerConsole());
+    TEST_ASSERT_EQUAL_UINT32(4321, restored.modem.ringDelayMs());
+    TEST_ASSERT_EQUAL_UINT32(567, restored.modem.connectDelayMs());
     TEST_ASSERT_NOT_NULL(restored.phonebook.find("42"));
     TEST_ASSERT_EQUAL(19200, restored.modem.hostBaud());
     TEST_ASSERT_NULL(restored.phonebook.find("1"));

@@ -57,6 +57,8 @@ def test_direct_configuration_styles_and_quit(local, style):
     local.command("AT*STYLE=" + style)
     data = local.raw(b"AT*CONFIG\r")
     require(b"MODEM CONFIGURATION" in data and b"Phonebook" in data, "Missing root menu")
+    positions = [data.find(label) for label in (b"About", b"Hardware Tests", b"Client Tests", b"Command Reference")]
+    require(all(position >= 0 for position in positions) and positions == sorted(positions), "Wrong A-D menu order")
     require(b"CONNECT" not in data, "Direct configuration emitted CONNECT")
     if style == "PLAIN":
         require(b"\x1b" not in data, "Plain mode emitted terminal escapes")
@@ -95,7 +97,7 @@ def test_submenus_help_and_hardware_availability(local):
     require(b"0 disables auto-answer" in data, "Missing setting help")
     send(local, b"\x1b")
     send(local, b"\x1b")
-    data = send(local, b"A\r")
+    data = send(local, b"B\r")
     require(b"Hardware Tests" in data and b"Guided tests" in data, "Missing hardware screen")
     data += read(local, 0.1)
     require(b"RS232 lines" in data and b"Loopback" in data and b"Bridge" in data, "Missing console port tests")
@@ -155,7 +157,7 @@ def test_rs232_hardware_takeover_tests_are_unavailable(rs232):
     rs232.command("AT*STYLE=PLAIN")
     try:
         rs232.raw(b"AT*CONFIG\r")
-        data = send(rs232, b"A\r", 1)
+        data = send(rs232, b"B\r", 1)
         require(b"unavailable: takes over RS232" in data, "RS232 test restriction is absent")
         data = send(rs232, b"C\r", 1)
         require(b"DTR=" not in data, "Unavailable line test took over RS232")

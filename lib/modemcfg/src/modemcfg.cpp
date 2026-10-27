@@ -246,6 +246,10 @@ void serialize(const Nvram &n, uint8_t *out) {
     p += 4;
     *p++ = n.throttle ? 1 : 0;
     *p++ = n.answerConsole ? 1 : 0;
+    putU32(p, n.ringDelayMs);
+    p += 4;
+    putU32(p, n.connectDelayMs);
+    p += 4;
     putU32(p, crc32(out, static_cast<size_t>(p - out)));
 }
 
@@ -267,6 +271,7 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
     const size_t size = version == 1   ? kBlobSizeV1
                         : version == 2 ? kBlobSizeV2
                         : version == 3 ? kBlobSizeV3
+                        : version == 4 ? kBlobSizeV4
                                        : kBlobSize;
     if (len != size) {
         return LoadResult::kBadSize;
@@ -333,7 +338,15 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
         if (*p > 1) {
             return LoadResult::kBadValue;
         }
-        n.answerConsole = *p != 0;
+        n.answerConsole = *p++ != 0;
+    }
+    if (version >= 5) {
+        n.ringDelayMs = getU32(p);
+        p += 4;
+        n.connectDelayMs = getU32(p);
+        if (n.ringDelayMs > kMaxCallDelayMs || n.connectDelayMs > kMaxCallDelayMs) {
+            return LoadResult::kBadValue;
+        }
     }
     *out = n;
     return version < kLayoutVersion ? LoadResult::kMigrated : LoadResult::kOk;
