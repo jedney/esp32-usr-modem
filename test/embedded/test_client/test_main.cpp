@@ -72,7 +72,7 @@ void test_every_packaged_sound_and_all_batch_source_is_readable() {
     }
     source = platform.source("HS9600.WAV", 1);
     TEST_ASSERT_NOT_NULL(source);
-    TEST_ASSERT_EQUAL_STRING("HS2400.WAV", source->name(0));
+    TEST_ASSERT_EQUAL_STRING("HS9600.WAV", source->name(0));
     platform.release();
 }
 void setup() {

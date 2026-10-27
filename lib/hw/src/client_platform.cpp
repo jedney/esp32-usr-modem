@@ -20,8 +20,6 @@ clienttest::Source *ClientPlatform::source(const char *selection, uint32_t gener
             selected_ = kGenerated;
         else if (!strcmp(selection, "USRMODEM.LOG"))
             selected_ = 0;
-        else if (!strcmp(selection, "HS9600.WAV"))
-            selected_ = 2;  // compatibility alias, matching 9600-baud playback
         else
             for (unsigned i = 0; i < sounds::kAssetCount; ++i)
                 if (!strcmp(selection, sounds::kAssets[i].name))

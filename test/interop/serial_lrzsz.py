@@ -90,7 +90,7 @@ def run_case(ser, protocol, downloading, length=8193, selection="TEST"):
         if sounds:
             catalog = (ROOT / 'lib/sounds/src/catalog.h').read_text()
             assets = re.findall(r'\{\d+, "(HS\d+\.WAV)", "(/sounds/handshake-\d+\.wav)"\}', catalog)
-            assert len(assets) == 6
+            assert len(assets) == 7
             log = (directory / 'USRMODEM.LOG').read_bytes()
             crc = binascii.crc32(log)
             total = len(log)
@@ -99,7 +99,7 @@ def run_case(ser, protocol, downloading, length=8193, selection="TEST"):
                 assert data == (ROOT / 'data' / path.lstrip('/')).read_bytes(), 'sound payload mismatch'
                 crc = binascii.crc32(data, crc)
                 total += len(data)
-            assert int(match[1]) == total and int(match[6]) == 7
+            assert int(match[1]) == total and int(match[6]) == len(assets) + 1
             assert int(match[7], 16) == crc, 'batch CRC mismatch'
         elif downloading:
             target = directory / ('RECEIVED.BIN' if protocol < 3 else 'TEST64K.BIN' if length == 65536 else 'TEST1M.BIN' if length == 1048576 else 'TEST.BIN')

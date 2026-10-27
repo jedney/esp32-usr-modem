@@ -9,7 +9,7 @@ is generated from the same list.
 |---|---|---|---|---|---|
 | RetroExternalModem case model (`3d-model/`) | 3D-printed case (modified) | luizpacheco, <https://www.thingiverse.com/thing:7063155> | CC BY-NC | Attribute; non-commercial only; modified versions keep the same terms | In repo |
 | Front label art (`images/USR*.PNG`) | Printed front label | luizpacheco (as above) | CC BY-NC | As above | In repo |
-| `sound/dial-up.wav`, `sound/busy-signal.wav` | Reference sounds | caiot5, RetroExternalModem, <https://github.com/caiot5/retroexternalmodem> | GPL-3.0 | Source must be offered if distributed; GPL applies to the combined work if bundled in firmware | In repo; not yet used in firmware |
+| `sound/dial-up.wav`, `sound/busy-signal.wav` (removed) | Former reference sounds | caiot5, RetroExternalModem, <https://github.com/caiot5/retroexternalmodem> | GPL-3.0 | Preserve applicable notices when redistributing historical copies | Removed 27 Oct 2026; never used in firmware |
 | Zimodem Telnet handler (`handleAsciiIAC`, adapted) | Incremental Telnet parsing in `lib/calls/src/telnet.*` | Bo Zimmerman, <https://github.com/bozimmerman/Zimodem>, revision `a534e5129d88b8b09aa01fe17498d5cd5368569e`, `zimodem/pet2asc.ino` | Apache-2.0 | Original headers kept; changes marked; LICENSE and NOTICE in `credits/zimodem/` | Used in v0.8 |
 | Zimodem PPP/SLIP framing | Portable binary framing in `lib/internet/src/internet.*`; control negotiation and lifecycle rewritten for this project | Bo Zimmerman, same revision, `zimodem/zpppmode.*` and `zslipmode.*` | Apache-2.0 | Attribution/licence retained, modifications marked; existing LICENSE/NOTICE in `credits/zimodem/` | Used in v0.13; shared-IP routing is replaced by private-address NAPT |
 | ESP-IDF 4.4.7 lwIP NAPT | Source-built IPv4 translation and forwarding | Espressif Systems and lwIP contributors; IDF `38eeba213a`, lwIP `a45be9e438f6cf9c54ec150581819c3b95d5af6b` | Apache-2.0 (IDF), BSD-style notices in lwIP | Preserve upstream licences/notices; source remains unchanged in the pinned framework package | Used in v0.13 |
@@ -28,8 +28,9 @@ is generated from the same list.
 | Zimodem ZMODEM (`proto_zmodem`), from Synchronet/SyncTERM | Incremental serial Client Tests framing/CRC in `lib/clienttest/src/transfer.cpp` | Jacques Mattheij (1994), rights transferred to Stephen Hurd (2015); via Bo Zimmerman's Zimodem revision `a534e5129d88b8b09aa01fe17498d5cd5368569e` | Not stated in the file; **accepted by Jon, 23 Oct** | Original notice in `credits/zimodem/zmodem-notice.txt`; adaptation marked in source | Used in v0.12 |
 | lrzsz | Independent test peer, separate executable; no code linked into firmware | Uwe Ohse and contributors, <https://www.ohse.de/uwe/software/lrzsz.html> | GPL | Preserve package licensing when distributing the test tool; not bundled in firmware | Host interoperability tests in v0.12 |
 | USR Sportster 33.6 command behaviour, defaults and `ATI` text (`lib/atcmd`, `lib/modemcfg`) | Authentic modem identity and command set (brief 6.6, Q55) | U.S. Robotics: Sportster technical reference (<https://support.usr.com/support/sportster/sportster-files/techref_uk.pdf>) and Sportster user guide (copy at <https://www.rigacci.org/docs/biblio/online/usr/sportster_guide.txt>); `ATI3`–`ATI7`/`ATI9` output of a Sportster 33600/Fax V2.31 posted in the fido7.ru.modem echo (<https://fido7.ru.modem.narkive.com/YzTdiljZ/sportster-33600>) | Facts and short identification strings, re-implemented (no code copied) | None beyond this note; the About screen should name U.S. Robotics as the source of the command set | Used |
-| `modem1200.wav` (HQ MP3 preview, converted) | 1200-baud handshake asset | guitarguy1985, <https://freesound.org/people/guitarguy1985/sounds/78657/>; source `sound/sources/modem1200-78657.mp3` | CC0 1.0, <https://creativecommons.org/publicdomain/zero/1.0/> | None; attribution and conversion kept for provenance | Used in v0.8: `data/sounds/handshake-1200.wav`, mono 8000 Hz signed 16-bit PCM, FFmpeg resampling and metadata removal |
-| `Dial up modem noises.ogg` | Generic handshake fallback for five missing speed recordings | William Termini, <https://commons.wikimedia.org/wiki/File:Dial_up_modem_noises.ogg>; original in `sound/sources/` | Public-domain dedication by copyright holder | None; source and conversion retained | Used in v0.8 with Jon's approval; not verified as any of the five selected speeds; conversion below |
+| `modem1200.wav` (HQ MP3 preview, converted; removed) | Original 1200-baud handshake asset | guitarguy1985, <https://freesound.org/people/guitarguy1985/sounds/78657/>; former source `sound/sources/modem1200-78657.mp3` | CC0 1.0, <https://creativecommons.org/publicdomain/zero/1.0/> | None; historical attribution retained for provenance | Used in v0.8-v0.14; source and packaged recording replaced 27 Oct 2026 |
+| `Dial up modem noises.ogg` (removed) | Original generic handshake fallback for five missing speed recordings | William Termini, <https://commons.wikimedia.org/wiki/File:Dial_up_modem_noises.ogg>; former source `sound/sources/dial-up-modem-noises.ogg` | Public-domain dedication by copyright holder | None; historical attribution retained for provenance | Used in v0.8-v0.14 with Jon's approval; source and packaged recordings replaced 27 Oct 2026 |
+| `sound/1200bps.wav`, `sound/2400bps.wav`, `sound/9600bps.wav`, `sound/14400bps.wav`, `sound/28800bps.wav`, `sound/33600bps.wav`, `sound/56000bps.wav` | Modem handshake recordings for playback and downloads | Gough Lui, Gough's Tech Zone, "Project: THE DEFINITIVE COLLECTION of V.90/V.92 Modem Sounds" (3 May 2016), <https://goughlui.com/2016/05/03/project-the-definitive-collection-of-v-90v-92-modem-sounds/> | Audio reuse licence not stated on the linked page | Retain attribution and source; redistribution terms remain unspecified | Used in v0.15; supplied by Jon on 27 Oct 2026 as mono 8000 Hz signed 16-bit PCM WAVs |
 
 Concept credits (no code used): Luis Miguel Silva (WiFi2DialUp), Matt Whitted (PodSix
 pimodem), Jim Brain and FozzTexx (tcpser).
@@ -38,21 +39,36 @@ pimodem), Jim Brain and FozzTexx (tcpser).
 
 ### v0.8 handshake assets
 
-The 1200-baud recording is credited in the table above. The five other speed files
-use William Termini's [Dial up modem noises.ogg](https://commons.wikimedia.org/wiki/File:Dial_up_modem_noises.ogg),
+The original 1200-baud recording is credited in the table above. The five other speed files
+used William Termini's [Dial up modem noises.ogg](https://commons.wikimedia.org/wiki/File:Dial_up_modem_noises.ogg),
 released into the public domain by its copyright holder on that page. The original
-is retained as `sound/sources/dial-up-modem-noises.ogg`.
+was retained as `sound/sources/dial-up-modem-noises.ogg` until 27 Oct 2026.
 
-`python scripts/build_handshakes.py` uses FFmpeg to rebuild all six WAVs as mono
-8000 Hz signed 16-bit PCM, without metadata. The five generic fallback files are
+The v0.8-v0.14 `scripts/build_handshakes.py` used FFmpeg to rebuild all six WAVs as
+mono 8000 Hz signed 16-bit PCM, without metadata. The five generic fallback files were
 identical copies of the 9.9-26.8 second segment, removing recorded dialing/ringing
-and final silence. Their filenames select an emulator sound; they are not verified
+and final silence. Their filenames selected an emulator sound; they were not verified
 recordings of 2400, 14400, 28800, 33600 or 56000 negotiated rates. Jon approved this
-explicit fallback on 25 Oct 2026. Original sources make conversion reproducible.
+explicit fallback on 25 Oct 2026. The original sources were removed on 27 Oct 2026;
+this describes the historical conversion and is no longer reproducible from the
+current working tree.
 
-Intermediate operational rates use the nearest lower of the six asset rates;
-300 uses 1200. Model selection does not change this mapping. Genuine freely
-licensed recordings can replace individual fallback files when available.
+### Replacement recordings (27 Oct 2026)
+
+Jon supplied the seven WAVs in `sound/` and identified Gough Lui's collection above
+as their source. Keep that attribution with the replacement assets. The linked
+article does not state an audio reuse licence; no CC0 or public-domain claim is
+made for these recordings. Individual original download names were not supplied.
+
+All seven supplied files are mono 8000 Hz signed 16-bit PCM. The 1200/2400,
+9600/14400 and 28800/33600 pairs are byte-identical. Their filenames describe Jon's
+selected playback assignments, not independently verified negotiated rates.
+`python scripts/build_handshakes.py` validates all seven inputs, then copies them
+unchanged to `data/sounds/handshake-<rate>.wav`. No further conversion or trimming
+is applied. The rates are 1200, 2400, 9600, 14400, 28800, 33600 and 56000.
+Playback and Client Tests downloads share that catalogue; ALL includes all seven.
+Intermediate operational rates use the nearest lower asset rate; 300 uses 1200.
+Model selection does not change this mapping.
 
 ### v0.8 identity and extended speed references
 
@@ -73,6 +89,6 @@ indexes are not in increasing speed order; 38 selects 56000. These are factual
 command mappings reimplemented in this project; no code or manual pages are bundled.
 
 If the repository is ever made public, the mixed licences need a decision first:
-CC BY-NC (case) forbids commercial use, GPL-3.0 (reference sounds) would apply to any
-firmware image that bundles them, and Apache-2.0 (Zimodem) is compatible with GPL-3.0
-but not the reverse.
+CC BY-NC (case) forbids commercial use, the replacement recordings' redistribution
+terms are unspecified, and historical GPL-3.0 reference sounds retain their
+original licensing requirements if redistributed.
