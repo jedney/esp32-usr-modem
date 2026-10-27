@@ -140,7 +140,7 @@ export default {
         },
         {
           "id": "sounds.connect-delay",
-          "label": "Delay after CONNECT",
+          "label": "Delay before CONNECT",
           "key": "4"
         }
       ]

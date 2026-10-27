@@ -241,6 +241,8 @@ class Socket : public calls::Socket {
 public:
     calls::SocketState value = calls::SocketState::kClosed;
     void begin(const char *, uint16_t) override { value = calls::SocketState::kPending; }
+    void resolve(const char *) override { value = calls::SocketState::kResolved; }
+    const char *address() const override { return "192.0.2.1"; }
     void poll() override {}
     calls::SocketState state() const override { return value; }
     size_t write(const uint8_t *, size_t) override { return 0; }

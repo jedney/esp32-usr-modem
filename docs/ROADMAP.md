@@ -151,3 +151,8 @@ formatting, firmware/LittleFS builds and both affected embedded test builds pass
 The 11 outgoing E2E cases collect successfully. No v0.17 installation or hardware
 execution has been performed; listening and actual wire timing remain acceptance
 work after installation.
+
+Implemented, host validation passed: **v0.18 dial fixes**. The connect delay now
+runs after the handshake sound and before CONNECT (v0.17 sent CONNECT first).
+Hostname dials look the name up during the dial tone and play the IP address
+digits as DTMF/pulse, then connect to that address. Hardware acceptance pending.

@@ -1,12 +1,14 @@
 # Test plan
 
-Outgoing call timing: `test_calls` covers ringback and post-CONNECT boundaries,
-both payload directions, custom/zero settings, per-call snapshots, S7 timing,
-cancellation, timer rollover and stale ticks. `test_modemcfg` covers layout-4
+Outgoing call timing: `test_calls` covers ringback and pre-CONNECT delay boundaries
+(CONNECT only after the handshake and delay), custom/zero settings, per-call
+snapshots, S7 timing, remote hang-up, keypress and ATM0 during the delay, and
+timer rollover. Hostname dials: lookup during dial tone, IP digits as DTMF,
+connect to the resolved address, lookup failure/S7 timeout give NO DIAL TONE. `test_modemcfg` covers layout-4
 migration and bounds; `test_config_services` checks export/replay.
 `embedded/test_calls` saves/reloads both delays through scratch NVS.
-`test_calls.py` checks persistence across restart and the actual pause after
-CONNECT; these new hardware cases require installation before they can run.
+`test_calls.py` checks persistence across restart and that CONNECT comes after
+the handshake and pause; these new hardware cases require installation before they can run.
 
 v0.17 combined validation: 393 native, 23 browser-unit, 13 script and five UI
 layout checks pass, together with cppcheck, formatting, firmware/LittleFS and the

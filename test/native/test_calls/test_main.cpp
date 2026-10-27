@@ -69,6 +69,15 @@ public:
         ++begins;
         status = initial;
     }
+    SocketState lookupResult = SocketState::kResolved;
+    std::string looked, resolvedAddress = "203.0.113.47";
+    unsigned resolves = 0;
+    void resolve(const char *h) override {
+        looked = h;
+        ++resolves;
+        status = lookupResult;
+    }
+    const char *address() const override { return resolvedAddress.c_str(); }
     void poll() override {}
     SocketState state() const override { return status; }
     size_t write(const uint8_t *data, size_t n) override {
@@ -349,18 +358,20 @@ void test_call_sequence_pulse_and_buffered_greeting() {
     r.poll();
     TEST_ASSERT_EQUAL(int(CallStage::kHandshake), int(r.call.stage()));
     TEST_ASSERT_FALSE(r.session.callUp());
+    r.output.take();
     r.sound.active = false;
     r.poll();
+    // The connect delay runs after the handshake sound and before CONNECT.
+    TEST_ASSERT_EQUAL(int(CallStage::kConnectDelay), int(r.call.stage()));
+    TEST_ASSERT_FALSE(r.session.callUp());
+    r.poll(249);
+    TEST_ASSERT_FALSE(r.session.callUp());
+    TEST_ASSERT_NULL(strstr(r.output.text.c_str(), "CONNECT"));
+    r.poll(1);
     TEST_ASSERT_TRUE(r.session.callUp());
     TEST_ASSERT_NOT_NULL(strstr(r.output.take().c_str(), "CONNECT"));
     uint8_t greeting[8];
-    TEST_ASSERT_EQUAL(0, r.session.toHost(greeting, sizeof greeting));
     const uint8_t reply[] = {'o', 'k'};
-    TEST_ASSERT_EQUAL(0, r.session.hostSpace());
-    TEST_ASSERT_EQUAL(0, r.session.fromHost(reply, 2, clockMs));
-    r.poll(249);
-    TEST_ASSERT_EQUAL(0, r.session.toHost(greeting, sizeof greeting));
-    r.poll(1);
     TEST_ASSERT_EQUAL(2, r.session.toHost(greeting, sizeof greeting));
     TEST_ASSERT_EQUAL_UINT8_ARRAY("hi", greeting, 2);
     TEST_ASSERT_EQUAL(2, r.session.fromHost(reply, 2, clockMs));
@@ -526,11 +537,12 @@ void test_custom_call_delays_are_snapshotted_and_ringback_does_not_use_s7() {
     TEST_ASSERT_EQUAL(int(CallStage::kHandshake), int(r.call.stage()));
     r.sound.active = false;
     r.poll(0);
+    TEST_ASSERT_FALSE(r.session.callUp());
+    r.poll(16);
+    TEST_ASSERT_FALSE(r.session.callUp());
+    r.poll(1);
     TEST_ASSERT_TRUE(r.session.callUp());
     uint8_t data;
-    r.poll(16);
-    TEST_ASSERT_EQUAL(0, r.session.toHost(&data, 1));
-    r.poll(1);
     TEST_ASSERT_EQUAL(1, r.session.toHost(&data, 1));
     TEST_ASSERT_EQUAL('h', data);
 }
@@ -571,28 +583,113 @@ void test_ringback_snapshot_wrap_and_cancellation_keep_call_slot_safe() {
     }
 }
 
-void test_payload_hold_handles_stale_ticks_rollover_and_new_connections() {
-    for (bool raw : {false, true}) {
-        FakeSocket socket;
-        socket.status = SocketState::kOpen;
-        socket.input = {'h', 'i'};
-        TcpConnection connection(socket);
-        connection.begin(raw);
-        connection.holdPayload(UINT32_MAX - 100, 250);
-        uint8_t data[2];
-        connection.poll(UINT32_MAX - 101);
-        TEST_ASSERT_EQUAL(0, connection.read(data, 2));
-        TEST_ASSERT_EQUAL(0, connection.write(reinterpret_cast<const uint8_t *>("ok"), 2));
-        connection.poll(148);
-        TEST_ASSERT_EQUAL(0, connection.space());
-        connection.poll(149);
-        TEST_ASSERT_EQUAL(2, connection.read(data, 2));
-        TEST_ASSERT_EQUAL_UINT8_ARRAY("hi", data, 2);
-        TEST_ASSERT_EQUAL(2, connection.write(reinterpret_cast<const uint8_t *>("ok"), 2));
-        connection.holdPayload(150, 60000);
-        connection.close();
-        connection.begin(raw);
-        TEST_ASSERT_GREATER_THAN(0, connection.space());
+void test_hostname_dial_plays_resolved_ip_as_digits_and_connects_to_it() {
+    Rig r;
+    r.modem.active().v[modemcfg::kM] = 1;
+    r.socket.lookupResult = SocketState::kResolving;
+    r.send("ATDTbbs.example.com:2323\r");
+    TEST_ASSERT_EQUAL_STRING("bbs.example.com", r.socket.looked.c_str());
+    TEST_ASSERT_EQUAL(int(SoundStage::kDial), int(r.sound.stages.back()));
+    r.sound.active = false;
+    r.poll();
+    // Dial tone done but lookup still running: wait, no digits yet.
+    TEST_ASSERT_EQUAL(int(CallStage::kDial), int(r.call.stage()));
+    TEST_ASSERT_EQUAL(1, r.sound.stages.size());
+    r.socket.status = SocketState::kResolved;
+    r.poll();
+    TEST_ASSERT_EQUAL(int(SoundStage::kDigits), int(r.sound.stages.back()));
+    TEST_ASSERT_EQUAL_STRING("203011347", r.sound.digits.c_str());
+    r.sound.active = false;
+    r.poll();
+    r.poll(1500);
+    TEST_ASSERT_EQUAL(int(CallStage::kConnecting), int(r.call.stage()));
+    TEST_ASSERT_EQUAL_STRING("203.0.113.47", r.socket.host.c_str());
+    TEST_ASSERT_EQUAL(2323, r.socket.port);
+    TEST_ASSERT_EQUAL(1, r.socket.begins);
+    TEST_ASSERT_EQUAL(1, r.socket.resolves);
+}
+
+void test_hostname_lookup_failure_timeout_and_non_hostname_dials() {
+    for (bool timeout : {false, true}) {
+        Rig r;
+        r.modem.active().v[modemcfg::kM] = 1;
+        r.modem.active().s[7] = 2;
+        r.socket.lookupResult = timeout ? SocketState::kResolving : SocketState::kDnsError;
+        r.send("ATDTbbs.example.com\r");
+        r.output.take();
+        r.sound.active = false;
+        r.poll(timeout ? 1999 : 1);
+        if (timeout) {
+            TEST_ASSERT_EQUAL(int(CallStage::kDial), int(r.call.stage()));
+            r.poll(1);
+        }
+        TEST_ASSERT_EQUAL_STRING("\r\nNO DIAL TONE\r\n", r.output.take().c_str());
+        TEST_ASSERT_EQUAL(int(CallStage::kIdle), int(r.call.stage()));
+        TEST_ASSERT_FALSE(r.slot.busy());
+        TEST_ASSERT_EQUAL(0, r.socket.begins);
+    }
+    {
+        // A phonebook number keeps the typed digits and needs no lookup.
+        Rig r;
+        r.modem.active().v[modemcfg::kM] = 1;
+        r.send("ATDT1\r");
+        r.sound.active = false;
+        r.poll();
+        TEST_ASSERT_EQUAL_STRING("1", r.sound.digits.c_str());
+        TEST_ASSERT_EQUAL(0, r.socket.resolves);
+    }
+    {
+        // ATM0 plays no digits, so the connect does the lookup itself.
+        Rig r;
+        r.send("ATDTbbs.example.com\r");
+        TEST_ASSERT_EQUAL(0, r.socket.resolves);
+        TEST_ASSERT_EQUAL_STRING("bbs.example.com", r.socket.host.c_str());
+    }
+}
+
+void test_connect_delay_rollover_hangup_keypress_and_m0() {
+    for (unsigned variant = 0; variant < 4; ++variant) {
+        clockMs = UINT32_MAX - 100;
+        wifi = true;
+        Rig r;
+        r.modem.setCallDelay(true, 0);
+        r.modem.active().v[modemcfg::kM] = 1;
+        r.send("ATDT1\r");
+        r.sound.active = false;
+        r.poll();
+        r.sound.active = false;
+        r.poll();
+        r.socket.status = SocketState::kOpen;
+        r.socket.input = {'h', 'i'};
+        r.poll();
+        TEST_ASSERT_EQUAL(int(CallStage::kHandshake), int(r.call.stage()));
+        r.output.take();
+        r.sound.active = false;
+        r.poll();
+        TEST_ASSERT_EQUAL(int(CallStage::kConnectDelay), int(r.call.stage()));
+        if (variant == 0) {
+            r.poll(249);  // crosses the clock rollover
+            TEST_ASSERT_FALSE(r.session.callUp());
+            r.poll(1);
+            TEST_ASSERT_TRUE(r.session.callUp());
+            TEST_ASSERT_NOT_NULL(strstr(r.output.take().c_str(), "CONNECT"));
+            continue;
+        }
+        if (variant == 1) {
+            r.socket.status = SocketState::kClosed;
+            r.poll();
+        } else if (variant == 2) {
+            r.send("x");
+        } else {
+            r.modem.active().v[modemcfg::kM] = 0;  // ATM0 skips the audio delays
+            r.poll();
+            TEST_ASSERT_TRUE(r.session.callUp());
+            TEST_ASSERT_NOT_NULL(strstr(r.output.take().c_str(), "CONNECT"));
+            continue;
+        }
+        TEST_ASSERT_EQUAL_STRING("\r\nNO CARRIER\r\n", r.output.take().c_str());
+        TEST_ASSERT_EQUAL(int(CallStage::kIdle), int(r.call.stage()));
+        TEST_ASSERT_FALSE(r.slot.busy());
     }
 }
 void test_model_default_explicit_override_and_current_call_snapshot() {
@@ -797,7 +894,9 @@ int main() {
     RUN_TEST(test_zero_call_delays_skip_ringback_and_release_payload_at_connect);
     RUN_TEST(test_custom_call_delays_are_snapshotted_and_ringback_does_not_use_s7);
     RUN_TEST(test_ringback_snapshot_wrap_and_cancellation_keep_call_slot_safe);
-    RUN_TEST(test_payload_hold_handles_stale_ticks_rollover_and_new_connections);
+    RUN_TEST(test_connect_delay_rollover_hangup_keypress_and_m0);
+    RUN_TEST(test_hostname_dial_plays_resolved_ip_as_digits_and_connects_to_it);
+    RUN_TEST(test_hostname_lookup_failure_timeout_and_non_hostname_dials);
     RUN_TEST(test_phonebook_defaults_exact_keys_validation_and_atomic_save);
     RUN_TEST(test_phonebook_capacity_and_corruption);
     RUN_TEST(test_phonebook_command_roundtrip_and_strict_arguments);

@@ -150,9 +150,12 @@ audio streams without blocking the maintenance loop; missing/invalid required WA
 abort audible calls with NO CARRIER. Upload LittleFS as well as firmware for audio.
 
 An audible outgoing TCP call plays dial tone, dialled digits, then generated
-ringing for 1500 ms before starting TCP. After the selected handshake WAV ends,
-CONNECT is sent and payload in both directions waits another 250 ms. Socket
-servicing continues and buffered input is retained during that pause.
+ringing for 1500 ms before starting TCP. When you dial a hostname
+(`ATDTbbs.example.com`), the modem looks it up during the dial tone and plays
+the digits of its IP address (203.0.113.47 dials 203011347), then connects to
+that address. A phonebook number plays the number you typed. After the selected handshake WAV ends,
+the modem waits another 250 ms and then sends CONNECT. Socket servicing continues
+during that pause, and data from the remote end is kept until CONNECT.
 
 Use `AT*RINGDELAY=1500` and `AT*CONNECTDELAY=250` to change these durations in
 milliseconds (0-60000; zero skips the corresponding delay). Query with `?`;
@@ -399,7 +402,7 @@ Additional commands include:
 | `AT*ABOUT` | Build and licensing acknowledgements |
 | `AT*SOUNDS`, `AT*PLAY=<name or speed>` | List/preview generated tones and LittleFS WAVs; any key cancels |
 | `AT*RINGDELAY=<ms>` | Outgoing ringing duration, 0-60000 ms; default 1500; saved immediately |
-| `AT*CONNECTDELAY=<ms>` | Payload pause after handshake and CONNECT, 0-60000 ms; default 250; saved immediately |
+| `AT*CONNECTDELAY=<ms>` | Pause after the handshake sound, before CONNECT, 0-60000 ms; default 250; saved immediately |
 | `AT*LOG`, `AT*LOG=0|1|2`, `AT*LOG=CLEAR` | View, set verbosity or clear the RAM debug ring |
 | `AT*LOG=<offset>,<count>` | Read a stable slice, at most 8192 bytes; default view is the last 8192 |
 | `AT*CALLLOG` | Last 50 calls with timestamps, results, durations and payload counts |

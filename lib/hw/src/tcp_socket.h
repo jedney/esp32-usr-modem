@@ -9,6 +9,8 @@ namespace hw {
 class TcpSocket : public calls::Socket {
 public:
     void begin(const char *host, uint16_t port) override;
+    void resolve(const char *host) override;
+    const char *address() const override { return resolved_; }
     void poll() override;
     calls::SocketState state() const override { return state_; }
     size_t write(const uint8_t *data, size_t len) override;
@@ -20,9 +22,12 @@ public:
 private:
     struct Request;
     static void resolved(const char *name, const ip_addr_t *address, void *context);
+    void lookup(const char *host);
+    void found(uint32_t address);
     void connectAddress(uint32_t address);
     int fd_ = -1;
-    char peer_[16] = {};
+    bool resolveOnly_ = false;
+    char peer_[16] = {}, resolved_[16] = {};
     uint16_t port_ = 0;
     calls::SocketState state_ = calls::SocketState::kClosed;
     std::atomic<uint32_t> generation_{0}, address_{0};
