@@ -1,4 +1,25 @@
 {
+  "wifi-clock.internet-status": {
+    "screen": "Wifi",
+    "command": "*INTERNET?",
+    "help": "PPP 666 / SLIP 667; hang up by DTR or AT*INTERNET=HANGUP on the other port",
+    "target": "Wifi"
+  },
+  "wifi-clock.internet-settings": {
+    "screen": "Wifi",
+    "command": "*INTERNET=",
+    "help": "IP,local,peer (private /30) or DNS,AUTO|ip; saved immediately",
+    "target": "Wifi",
+    "input": true
+  },
+  "wifi-clock.internet-dial": {
+    "screen": "Wifi",
+    "command": "*DIAL=",
+    "help": "666 PPP / 667 SLIP; needs a TCP stack; browser dials on RS232",
+    "target": "Wifi",
+    "input": true,
+    "leave": true
+  },
   "status": {
     "screen": "Main",
     "command": "*STATUS",

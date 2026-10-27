@@ -50,6 +50,13 @@ jobs:
           mkdir -p .pio
           g++ -std=c++17 -Wall -Wextra -Ilib/clienttest/src -Ilib/calls/src test/interop/client_peer.cpp lib/clienttest/src/transfer.cpp -o .pio/client-peer
           python3 test/interop/run_lrzsz.py --peer .pio/client-peer
+      - name: Independent PPP interoperability
+        run: |
+          sudo apt-get install -y ppp
+          sudo modprobe ppp_generic
+          if [ ! -e /dev/ppp ]; then sudo mknod /dev/ppp c 108 0; fi
+          g++ -std=c++17 -Wall -Wextra -Ilib/internet/src -Ilib/calls/src -Ilib/hostport/src -Ilib/modemcfg/src -Ilib/netcfg/src test/interop/internet_peer.cpp lib/internet/src/internet.cpp lib/internet/src/internet_settings.cpp lib/modemcfg/src/modemcfg.cpp lib/netcfg/src/net_settings.cpp lib/netcfg/src/net_tz.cpp -o .pio/internet-peer
+          sudo python3 test/interop/run_pppd.py --peer .pio/internet-peer
 
   lint:
     name: Lint (cppcheck, clang-format)

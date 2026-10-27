@@ -84,6 +84,14 @@ void flushUart() {
 
 class CallBaud : public hostport::Session::BaudControl {
 public:
+    void prepareOnline() override {
+        // UartSink writes CONNECT directly: stop capture and discard the UART
+        // copy of the AT line before the peer can respond with binary bytes.
+        if (hw::captureActive()) {
+            hw::captureEnd();
+            flushUart();
+        }
+    }
     bool online(uint32_t speed) override {
         if (modemPtr->hostBaud() || profile().get(modemcfg::kAmpB) == 1) {
             return true;
@@ -97,12 +105,17 @@ public:
         return true;
     }
     void command() override {
-        if (!following_) {
-            return;
+        if (following_) {
+            hw::hostDrain(2000);
+            setBaud(commandBaud_);
+            following_ = false;
         }
-        hw::hostDrain(2000);
-        setBaud(commandBaud_);
-        following_ = false;
+        // Be ready for a new AT before Session drops DCD. Waiting for the next
+        // poll can lose an immediately redialing host's first character.
+        if (detecting() && !hw::captureActive()) {
+            flushUart();
+            hw::captureBegin();
+        }
     }
 
 private:

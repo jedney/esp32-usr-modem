@@ -1,5 +1,14 @@
 # End-to-end tests
 
+v0.13 adds `test_internet.py`: PPP/SLIP and legacy aliases, console and COM18
+ownership, LCP/DTR hang-up, negotiation timeout, binary NAT round trips, timed
+RTS pauses, UDP DNS, settings/export/reboot and Wi-Fi loss/redial. Run with
+`--console-port COM15 --rs232-port COM18`. Two optional PC UDP echo cases also
+need `--udp-tests --call-server-ip <PC LAN IP>` and pre-existing UDP 32322
+reachability; the suite does not change firewall policy. The default NAT cases
+use the negotiated DNS/router for ICMP and ordinary DNS rather than a new PC port.
+Use `test/interop/serial_pppd.py` for independent kernel TCP/IP HTTP acceptance.
+
 v0.12 adds `test_client.py` for COM15/COM18 diagnostics, confirmed per-port
 settings/reboot retention (original records restored), RTS pauses and cable
 signal restoration. `test/interop/serial_lrzsz.py` tests real X/Y/ZMODEM transfers

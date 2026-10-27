@@ -39,6 +39,8 @@
 #include "hw.h"
 #include "hwconsole.h"
 #include "incoming.h"
+#include "internet_dialer.h"
+#include "internet_network.h"
 #include "modemcfg.h"
 #include "net_commands.h"
 #include "net_probe.h"
@@ -93,6 +95,10 @@ hw::OtaService ota(device);
 hw::NvsStore webStore("web", "cfg");
 hw::NvsStore clientStore("clients", "cfg");
 clienttest::Settings clientSettings(clientStore);
+hw::NvsStore internetStore("internet", "cfg");
+dialup::Settings internetSettings(internetStore);
+hw::InternetNetwork internetNetwork;
+dialup::Dialer *internetDialer = nullptr;
 webinterface::Settings webSettings(webStore);
 hw::WebService webServer(device);
 hw::EspRadio radio;
@@ -137,8 +143,8 @@ config::CallJournal journal(history, debugLog, msNow, utcNow);
 char fallbackLog[4096];
 uint8_t ledMask = 0xFF;
 atcmd::Port *hardwareOwner = nullptr;
-modemcfg::Store *resetStores[] = {&store,      &netStore, &bookStore,  &historyStore,
-                                  &resetStore, &webStore, &clientStore};
+modemcfg::Store *resetStores[] = {&store,      &netStore, &bookStore,   &historyStore,
+                                  &resetStore, &webStore, &clientStore, &internetStore};
 bool restarting = false;
 uint32_t restartAt = 0;
 
@@ -424,6 +430,21 @@ public:
     }
     atcmd::Reply command(atcmd::Port &port, const char *name, const char *args) override {
         using atcmd::Reply;
+        if (!strcmp(name, "INTERNETEXPORT")) {
+            internetDialer->exportSettings(port);
+            return Reply::kDone;
+        }
+        if (!strcmp(name, "INTERNET")) {
+            bool read = !*args || !strcmp(args, "?");
+            bool hangup = !strcmp(args, "=HANGUP");
+            if (!read && !hangup && callSlot.busy() && !ownsMenu(port))
+                return Reply::kError;
+            auto result = internetDialer->command(port, args);
+            if (read)
+                port.printf("Network adapter drops=%lu\r\n",
+                            static_cast<unsigned long>(internetNetwork.drops()));
+            return result;
+        }
         if (!strcmp(name, "CLIENTEXPORT")) {
             for (unsigned i = 0; i < 2; ++i) {
                 const auto &s = clientSettings.get(i);
@@ -530,7 +551,7 @@ public:
                 const auto &r = journal.current();
                 auto *session = journal.session();
                 port.printf("Call %s %s %s duration %lus, speed %lu TX=%lu RX=%lu\r\n",
-                            r.incoming ? "incoming" : "outgoing", r.raw ? "RAW" : "TELNET", r.host,
+                            r.incoming ? "incoming" : "outgoing", calls::kindName(r.kind), r.host,
                             static_cast<unsigned long>(journal.duration()),
                             session ? static_cast<unsigned long>(session->reportedSpeed()) : 0,
                             session ? static_cast<unsigned long>(session->payloadSent()) : 0,
@@ -577,7 +598,8 @@ public:
             return Reply::kPending;
         }
         if (!strcmp(name, "DNS") || !strcmp(name, "PING")) {
-            if (*args != '=' || pending_ || !net.up() || !netcfg::validServer(args + 1) ||
+            if ((!strcmp(name, "PING") && internetDialer->active()) || *args != '=' || pending_ ||
+                !net.up() || !netcfg::validServer(args + 1) ||
                 !probe_.start(args + 1, !strcmp(name, "PING"), millis())) {
                 return Reply::kError;
             }
@@ -902,6 +924,10 @@ void publishWebStatus() {
     const char *state = "idle";
     if ((consoleClient && consoleClient->isOpen()) || (hostClient && hostClient->isOpen())) {
         state = "test";
+    } else if (internetDialer && internetDialer->active()) {
+        state = !internetDialer->connected()                                   ? "dialling"
+                : internetDialer->engine().protocol() == dialup::Protocol::Ppp ? "ppp"
+                                                                               : "slip";
     } else if (journal.active()) {
         state = journal.session()            ? "connected"
                 : journal.current().incoming ? "ringing"
@@ -914,14 +940,29 @@ void publishWebStatus() {
     std::string call = std::string("{\"t\":\"call\",\"state\":\"") + state + '"';
     if (journal.active()) {
         const auto &r = journal.current();
-        call += std::string(",\"mode\":\"") + (r.raw ? "raw" : "telnet") + "\",\"dir\":\"" +
-                (r.incoming ? "in" : "out") +
+        const bool internet = r.kind == calls::Kind::Ppp || r.kind == calls::Kind::Slip;
+        call += std::string(",\"mode\":\"") +
+                (internet ? (r.kind == calls::Kind::Ppp ? "ppp" : "slip")
+                 : r.raw  ? "raw"
+                          : "telnet") +
+                "\",\"dir\":\"" + (r.incoming ? "in" : "out") +
                 "\",\"number\":" + webinterface::jsonString(r.number) +
                 ",\"host\":" + webinterface::jsonString(r.host) + ",\"ip\":" +
-                webinterface::jsonString(r.incoming ? incomingSocket.peer() : tcpSocket.peer()) +
-                ",\"port\":" + std::to_string(journal.port()) +
+                webinterface::jsonString(internet     ? ""
+                                         : r.incoming ? incomingSocket.peer()
+                                                      : tcpSocket.peer()) +
+                (internet ? std::string() : ",\"port\":" + std::to_string(journal.port())) +
                 ",\"since\":" + std::to_string(journal.connectedUtc()) + ",\"speed\":" +
                 std::to_string(journal.session() ? journal.session()->reportedSpeed() : 0);
+        if (internet) {
+            char local[16], peer[16];
+            netcfg::formatIp(internetSettings.get().local, local, sizeof local);
+            netcfg::formatIp(internetSettings.get().peer, peer, sizeof peer);
+            call += std::string(",\"ready\":") +
+                    (internetDialer->engine().ready() ? "true" : "false") +
+                    ",\"local\":" + webinterface::jsonString(local) +
+                    ",\"peer\":" + webinterface::jsonString(peer);
+        }
     }
     webServer.snapshot(3, call + "}");
 }
@@ -1074,6 +1115,7 @@ void setup() {
     device.begin();
     webSettings.begin();
     clientSettings.begin();
+    internetSettings.begin();
     if (device.needsReset()) {
         if (device.factoryReset(resetStores, sizeof resetStores / sizeof resetStores[0])) {
             ESP.restart();
@@ -1132,8 +1174,11 @@ void setup() {
     outgoing->setObserver(&journal);
     configDialer = new config::Dialer(*console, *consoleMenu, *hostMenu, *outgoing, callSlot,
                                       callAudio, msNow);
-    console->setDialer(configDialer);
-    rs232::session().setDialer(configDialer);
+    internetDialer = new dialup::Dialer(*modem, internetSettings, net, callSlot, internetNetwork,
+                                        callAudio, msNow, *configDialer);
+    internetDialer->setObserver(&journal);
+    console->setDialer(internetDialer);
+    rs232::session().setDialer(internetDialer);
     incoming = new calls::Incoming(*modem, callSlot, incomingListener, incomingSocket, callAudio,
                                    *console, rs232::session(), msNow, networkUp);
     console->setAnswerer(incoming);
@@ -1168,6 +1213,8 @@ void loop() {
         return;  // no late Wi-Fi join or command may save settings after the wipe
     }
     const uint32_t now = millis();
+    internetNetwork.poll();
+    internetDialer->poll();
     pollBrowser();
     if (webServer.uploading()) {
         net.tick(now);
@@ -1203,6 +1250,7 @@ void loop() {
     }
     outgoing->poll();
     configDialer->poll();
+    internetDialer->poll();
     configHardware.poll();
     for (unsigned i = 0; i < 2; ++i) {
         auto *service = i ? hostClient : consoleClient;

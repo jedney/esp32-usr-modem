@@ -20,6 +20,9 @@ inline atcmd::Reply registryCONFIG(atcmd::Port &p, const char *a) {
 inline atcmd::Reply registryWEB(atcmd::Port &p, const char *a) {
     return Commands::dispatch(p, "WEB", a);
 }
+inline atcmd::Reply registryINTERNET(atcmd::Port &p, const char *a) {
+    return Commands::dispatch(p, "INTERNET", a);
+}
 inline atcmd::Reply registrySTYLE(atcmd::Port &p, const char *a) {
     return Commands::dispatch(p, "STYLE", a);
 }
@@ -143,6 +146,8 @@ public:
             {"RY", "AT*RY", "YMODEM upload; validate and discard", registryRY, false},
             {"RZ", "AT*RZ", "ZMODEM upload; validate and discard", registryRZ, false},
             {"WEB", "AT*WEB[?]|=<ON|OFF>", "web listener; saved immediately", registryWEB, false},
+            {"INTERNET", "AT*INTERNET[?]|=IP,local,peer|=DNS,AUTO|ip|=HANGUP",
+             "PPP/SLIP settings, status and local hang-up", registryINTERNET, false},
             {"STYLE", "AT*STYLE=<ANSI|CP437|PLAIN>", "terminal style, local session", registrySTYLE,
              false},
             {"SIZE", "AT*SIZE[?]|=<1-132>,<1-50>", "terminal cells, local session", registrySIZE,

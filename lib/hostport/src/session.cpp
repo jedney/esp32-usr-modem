@@ -57,6 +57,8 @@ bool Session::startCall(Connection &conn, uint32_t operationalSpeed, uint32_t re
     throttle_ = modem_.throttle() && !conn.localService();
     credit_[0] = credit_[1] = 0;
     creditAt_ = now_;
+    if (baudControl_)
+        baudControl_->prepareOnline();
     sendConnect();
     mode_ = Mode::kOnline;
     if (baudControl_ && !baudControl_->online(lineSpeed_)) {
@@ -93,6 +95,8 @@ void Session::consume(unsigned direction, size_t bytes) {
 }
 
 void Session::resumeOnline() {
+    if (baudControl_)
+        baudControl_->prepareOnline();
     sendConnect();
     mode_ = Mode::kOnline;
     if (baudControl_ && !baudControl_->online(lineSpeed_)) {
@@ -157,7 +161,8 @@ size_t Session::fromHost(const uint8_t *data, size_t len, uint32_t nowMs) {
                 continue;
             }
         }
-        const bool localEcho = !conn_->localService() && p.get(modemcfg::kF) == 0;
+        const bool localEcho =
+            !conn_->localService() && !conn_->binaryService() && p.get(modemcfg::kF) == 0;
         if (allowance(0) == 0 || conn_->space() == 0 || (localEcho && echoLen_ >= sizeof echo_)) {
             break;  // the call is full: leave the rest with the caller
         }
@@ -187,7 +192,7 @@ size_t Session::hostSpace() const {
     if (n > allowance(0)) {
         n = allowance(0);
     }
-    if (!conn_->localService() && profile().get(modemcfg::kF) == 0) {
+    if (!conn_->localService() && !conn_->binaryService() && profile().get(modemcfg::kF) == 0) {
         size_t echoSpace = sizeof echo_ - echoLen_;
         n = n < echoSpace ? n : echoSpace;
     }

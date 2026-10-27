@@ -1,5 +1,15 @@
 # Test plan
 
+v0.13 validation (27 Oct): **376 native, 22 Node, 12 script and five design
+checks pass**, with three new on-board Internet checks and all 11 embedded
+programs compiling. New wired Internet acceptance passes 11 cases, with two
+opt-in PC UDP echo skips; real UDP DNS and full binary ICMP round trips pass
+for both PPP and SLIP. Independent pppd 2.4.9 verifies 64 KiB HTTP, DNS and LCP
+hang-up through actual Wi-Fi NAT; two concurrent 8 KiB HTTP flows and authenticated
+local HTTP during PPP also pass. The portable-core pppd/kernel test passes.
+Full regression: **155 passed, nine skipped**. Detailed results are recorded in
+`docs/v0.13-plan.md`. Windows 9x/Amiga acceptance is explicitly deferred by Jon.
+
 v0.12 validation (27 Oct): **361 native, 22 Node, nine script and five design
 checks pass**. Three new on-board client checks pass; all ten embedded programs
 compile. Nine wired client cases and ten independent COM18 transfers pass, with
@@ -7,7 +17,8 @@ zero transfer retries/errors and full content/CRC checks. Both lrzsz 0.12.21rc
 and 0.13.1 pass 12 independent portable-core cases. Final browser: 16 pass, one
 opt-in skip. See `docs/v0.12-plan.md` for full regression history and corrections.
 PuTTY automation was blocked by product policy; visual/listening and unavailable
-real-Amiga checks remain manual. Normal v0.12 and matching LittleFS are installed.
+real-Amiga checks remain manual. At that checkpoint normal v0.12 and matching
+LittleFS were installed; v0.13 now retains that filesystem with the new firmware.
 
 Every modem feature has tests. Three levels:
 
@@ -134,7 +145,7 @@ Status: ✅ tests written, ⬜ planned. Section numbers refer to the project bri
 | Errors: refused → BUSY, timeout → NO ANSWER, DNS/Wi-Fi → NO DIALTONE, drop → NO CARRIER (6.5) | `test_calls` (cancel, DNS/TCP deadlines, DTR, rollover, Wi-Fi loss) | — | `test_calls.py` | ✅; call acceptance passed |
 | Answer mode: port 23, RI, ring, `ATA` / `S0`, saved receiver (6.6) | `test_answer`, `test_modemcfg` (migration) | `test_answer` (NVS, real lwIP loopback, RI GPIO, ring I2S/pot) | `test_answer.py` | ✅ software; ⬜ external RI/panel/listening |
 | Remote callers can't reach command mode (6.6) | `test_answer` (handler spies, queued payload, remote guard times, locally escaped) | — | `test_answer.py` (preanswer/online/escaped injection, Telnet controls) | ✅ |
-| PPP (`ATDT666`) and SLIP (`ATDT667`), NAT, hang-up (6.6) | — | ⬜ | ⬜ | ⬜ |
+| PPP (`ATDT666`) and SLIP (`ATDT667`), aliases, private /30, NAPT, hang-up (6.6) | `test_internet` (14), history migration, independent pppd/kernel peer | `test_internet` (board memory, 20 netif/NAPT lifecycles, scratch NVS) | `test_internet.py`; independent `serial_pppd.py` HTTP/DNS | ✅ software/available bench; legacy Windows 9x/Amiga browsing deferred |
 | Tones: UK dial, busy, ring, DTMF, pulse clicks (6.4) | `test_hwtest` (frequency, cadence, timing), `test_answer` (ring clock) | `test_hw`, `test_answer` (I2S) | `test_hwtest.py`, `test_calls.py`, `test_answer.py`; listen with `AT*HWTEST` | ✅ generator/call sequences; ⬜ listening |
 | Handshake WAV playback per speed (6.4) | `test_calls` (header, truncation, resampling, speed mapping) | `test_calls` (all six assets and nonblocking I2S) | `test_calls.py`; listening needs amp/speaker | ✅; generic fallback approved, listening pending wiring |
 | Volume: pot, `ATL`, `ATM`, hard cap (5.3, 6.4) | `test_hwtest` (ATL levels, pot curve and final cap), `test_calls` (ATM sequence) | `test_calls` (ADC/I2S), `test_hw` | `AT*HWPOT=TONE`, `AT*HWTEST` step 3 | ✅; listening pending wiring |

@@ -49,6 +49,7 @@ public:
     class BaudControl {
     public:
         virtual ~BaudControl() = default;
+        virtual void prepareOnline() {}
         virtual bool online(uint32_t speed) = 0;
         virtual void command() = 0;
     };
