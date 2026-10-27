@@ -1098,13 +1098,11 @@ void Terminal::poll(uint32_t now) {
             model_ = current;
             render();
         }
+        // Only the explicit Status view refreshes on a timer. Repainting idle
+        // menus flickers and scrolls terminals without cursor support.
         if (style_ != Style::Plain && focus_ == Focus::Menu && !capturing_ && !drawing_ &&
-            stagePos_ == stageLen_) {
-            if (liveStatus_ && response_ && !more_ && responseLine_ == 0)
-                execute("*STATUS");
-            else if (!response_)
-                render();
-        }
+            stagePos_ == stageLen_ && liveStatus_ && response_ && !more_ && responseLine_ == 0)
+            execute("*STATUS");
     }
 }
 size_t Terminal::write(const uint8_t *data, size_t len) {

@@ -419,6 +419,8 @@ void test_binary_service_has_no_geometry_or_redraw_bytes() {
 }
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_idle_menus_do_not_repaint_but_input_and_resize_do);
+    RUN_TEST(test_status_view_keeps_its_explicit_live_refresh);
     RUN_TEST(test_browser_lists_serial_diagnostics_without_dispatch);
     RUN_TEST(test_client_key_alias_preserves_standard_s5);
     RUN_TEST(test_binary_service_has_no_geometry_or_redraw_bytes);

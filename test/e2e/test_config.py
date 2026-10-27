@@ -66,6 +66,17 @@ def test_direct_configuration_styles_and_quit(local, style):
     require(local.command("AT")[-1] == "OK", "Quit did not restore AT mode")
 
 
+@pytest.mark.parametrize("style", ["ANSI", "CP437", "PLAIN"])
+def test_idle_menu_does_not_repaint(local, style):
+    local.command("AT*STYLE=" + style)
+    data = local.raw(b"AT*CONFIG\r", wait=1)
+    require(b"MODEM CONFIGURATION" in data, "Missing root menu")
+    data = read(local, 6)
+    require(not data.replace(b"\x1b[18t", b""), "Idle menu emitted display output")
+    data = send(local, b"3\r", 1)
+    require(b"Settings" in data, "Menu stopped responding to input")
+
+
 def test_reserved_dial_escape_resume_and_hangup(local):
     data = local.raw(b"ATDT123\r")
     require(data.count(b"CONNECT") == 1 and b"MODEM CONFIGURATION" in data, "Reserved dial did not connect once")
