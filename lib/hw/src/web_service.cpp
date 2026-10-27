@@ -379,6 +379,8 @@ esp_err_t WebService::serve(httpd_req_t *req) {
                                    {"/demo.js", "text/javascript"},
                                    {"/upload.js", "text/javascript"},
                                    {"/link.js", "text/javascript"},
+                                   {"/geometry.js", "text/javascript"},
+                                   {"/ui-data.js", "text/javascript"},
                                    {"/xterm.mjs", "text/javascript"},
                                    {"/xterm.css", "text/css"},
                                    {"/ibm-plex-mono-400.woff2", "font/woff2"},
@@ -464,6 +466,16 @@ esp_err_t WebService::ws(httpd_req_t *req) {
     }
     Lock lock(mutex_);
     auto *c = find(context->id);
+    if (c && !c->fragmented && frame.type == HTTPD_WS_TYPE_TEXT && frame.final) {
+        unsigned columns, rows;
+        if (!webinterface::terminalSize(
+                std::string(reinterpret_cast<const char *>(data), frame.len), columns, rows))
+            return ESP_FAIL;
+        c->columns = columns;
+        c->rows = rows;
+        c->sizeChanged = true;
+        return ESP_OK;
+    }
     if (!c || (c->fragmented ? frame.type != HTTPD_WS_TYPE_CONTINUE
                              : frame.type != HTTPD_WS_TYPE_BINARY)) {
         return ESP_FAIL;
@@ -499,6 +511,9 @@ uint32_t WebService::prepareUpgrade(int fd, const webinterface::HeaderGate &gate
     available->input.clear();
     available->output.clear();
     available->fragmented = available->close = false;
+    available->columns = 80;
+    available->rows = 25;
+    available->sizeChanged = true;
     for (auto &m : available->messages) {
         m.clear();
     }
@@ -511,7 +526,7 @@ uint32_t WebService::prepareUpgrade(int fd, const webinterface::HeaderGate &gate
     available->csrf = csrf;
     available->messages[4] =
         "{\"t\":\"hello\",\"name\":" + webinterface::jsonString(name_.c_str()) +
-        ",\"ver\":\"" FW_VERSION "\",\"csrf\":\"" + csrf + "\"}";
+        ",\"ver\":\"" FW_VERSION "\",\"size\":true,\"csrf\":\"" + csrf + "\"}";
     return available->id;
 }
 uint32_t WebService::clientId(unsigned index) {
@@ -526,6 +541,16 @@ size_t WebService::read(uint32_t id, uint8_t *data, size_t cap) {
     Lock lock(mutex_);
     auto *c = find(id);
     return c ? c->input.pop(data, cap) : 0;
+}
+bool WebService::takeSize(uint32_t id, unsigned &columns, unsigned &rows) {
+    Lock lock(mutex_);
+    auto *c = find(id);
+    if (!c || !c->sizeChanged)
+        return false;
+    columns = c->columns;
+    rows = c->rows;
+    c->sizeChanged = false;
+    return true;
 }
 void WebService::discardInput(uint32_t id) {
     Lock lock(mutex_);

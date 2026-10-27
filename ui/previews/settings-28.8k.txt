@@ -1,0 +1,25 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  USRobotics          Sportster 28.8k Series                                  ║
+║ ──────────────────────────────────────────────────────────────────────────── ║
+║  MAIN  >  SETTINGS                                                           ║
+║  KEY   OPTION                                                                ║
+║  >  [1]   Current and stored profiles                                        ║
+║     [2]   Edit profile / registers                                           ║
+║     [3]   Model                                                              ║
+║     [4]   Auto-answer rings (S0)                                             ║
+║     [5]   Auto-answer destination                                            ║
+║     [6]   Host baud                                                          ║
+║     [7]   Data throttle                                                      ║
+║     [8]   Save active profile                                                ║
+║     [9]   Load stored/factory profile                                        ║
+║     [A]   Load factory profile                                               ║
+║     [B]   Power-on profile                                                   ║
+║     [C]   Stored number                                                      ║
+║     [D]   Terminal style                                                     ║
+║     No further options                                                       ║
+║                                                                              ║
+║  UP/DOWN Select  ENTER Open  ESC Back  Q Back                                ║
+║  F1 Help  F2 Main  |  Model: 28.8k  Link: UNKNOWN                            ║
+║  All actions depend on existing project services.                            ║
+║  Command > █                                                                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝

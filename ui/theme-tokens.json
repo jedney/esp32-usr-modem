@@ -1,0 +1,97 @@
+{
+  "version": 2,
+  "description": "USRobotics Sportster ANSI BBS theme. Four runtime-selected models. Exact accent colours required when truecolour supported.",
+  "active_model_source": "AT*MODEL (existing state/service; argument and output syntax unknown)",
+  "models": [
+    {
+      "id": "sportster-14.4k",
+      "label": "Sportster 14.4k Series",
+      "short_label": "14.4k",
+      "accent": "#6f327f",
+      "nominal_line_rate_bps": 14400
+    },
+    {
+      "id": "sportster-28.8k",
+      "label": "Sportster 28.8k Series",
+      "short_label": "28.8k",
+      "accent": "#448FA1",
+      "nominal_line_rate_bps": 28800
+    },
+    {
+      "id": "sportster-33.6k",
+      "label": "Sportster 33.6k Series",
+      "short_label": "33.6k",
+      "accent": "#349b67",
+      "nominal_line_rate_bps": 33600
+    },
+    {
+      "id": "sportster-56k",
+      "label": "Sportster 56k Series",
+      "short_label": "56k",
+      "accent": "#3F668E",
+      "nominal_line_rate_bps": 56000
+    }
+  ],
+  "colors": {
+    "background": "#030507",
+    "panel_background": "#000000",
+    "logo_red": "#CC2229",
+    "bright_cyan": "#20DDEB",
+    "frame_white": "#D1D5DF",
+    "primary_text": "#D6DAE6",
+    "muted_text": "#8B92A2",
+    "hotkey_green": "#47DB90",
+    "status_green": "#32DE78",
+    "shortcut_blue": "#278BFF",
+    "highlight_cyan": "#24DCEB",
+    "highlight_text": "#001B21",
+    "warning_yellow": "#F0DA63",
+    "error_red": "#F43F4F",
+    "disabled_gray": "#696E7B"
+  },
+  "typography": {
+    "family": "monospace; prefer IBM VGA / CP437-inspired licensed font when available; fallback to ui-monospace, Consolas, monospace",
+    "style": "fixed character-cell widths, mostly single weight; ANSI block decoration for header",
+    "text_case": "use uppercase for section headers and key hints; title case for menu items"
+  },
+  "terminal": {
+    "canonical_compact": {
+      "columns": 80,
+      "rows": 25,
+      "reserved_last_column": false,
+      "requirements": "No auto-wrap or scrolling; every visible row exactly <= 80 display cells; every screen exactly 25 visible rows"
+    },
+    "wide": {
+      "min_columns": 120,
+      "recommended_columns": 132,
+      "recommended_rows": 45,
+      "mode": "two-column framed cards and richer Phonebook split view"
+    },
+    "intermediate": {
+      "columns": "81–119",
+      "mode": "compact or reduced-column layout chosen by measured cells; never use 120-column layout blindly"
+    },
+    "below_80x25": "Use safe clipped/scrollable minimal view with explicit short-terminal notice. Never overflow or promise full fidelity.",
+    "color": "Use ANSI 24-bit RGB when supported, 256/16-colour approximation otherwise; monochrome must remain legible",
+    "glyph": "Use box-drawing and block glyphs if terminal supports single-cell widths, else ASCII +-| fallback",
+    "safe_rightmost_column": "Never print a newline after the final cell if it would cause terminal scrolling; render through existing terminal API."
+  },
+  "roles": {
+    "logo": "logo_red",
+    "model_subtitle": "models[active].accent",
+    "title": "bright_cyan",
+    "frame": "frame_white",
+    "hotkey": "hotkey_green",
+    "function_key": "shortcut_blue",
+    "disabled": "disabled_gray",
+    "selected": "highlight_cyan"
+  },
+  "web_mockup": {
+    "aspect_ratio": "4:3",
+    "reference_pixels": [
+      1448,
+      1086
+    ],
+    "scanlines": "subtle decorative layer only; disable for reduced motion and accessible modes"
+  }
+}

@@ -264,8 +264,8 @@ green; switched off = both off.
 
 Copy `.env.example` to `.env` at the repository root and fill it in. `.env` is
 git-ignored. It holds the Wi-Fi name and password the end-to-end Wi-Fi tests use
-(`USR_MODEM_WIFI_SSID`, `USR_MODEM_WIFI_PASS`) and the OTA password
-(`USR_MODEM_OTA_PASSWORD`). Environment variables of the same names win over the file.
+(`USR_MODEM_WIFI_SSID`, `USR_MODEM_WIFI_PASS`) and the device password (OTA and web)
+(`USR_MODEM_PASSWORD`). Environment variables of the same names win over the file.
 
 ### Debugging
 
@@ -276,13 +276,13 @@ S3's built-in USB-JTAG is used (`debug_tool = esp-builtin`).
 ### Over-the-air uploads
 
 The first boot generates a random 12-character **device password**, shared by OTA and
-the future web login (`admin`). It is printed only on the USB console at each boot
+the web login (`admin`). It is printed only on the USB console at each boot
 until the first authenticated upload or password change. After that only hashes are
 kept. `AT*PASS` replaces it with a random password shown once on the requesting local
 port; `AT*PASS=<text>` sets 8–32 printable characters, including spaces. Arguments are
 masked and cannot be repeated with `A/`.
 
-Put the device password in `.env` (`USR_MODEM_OTA_PASSWORD`, see above), then use
+Put the device password in `.env` (`USR_MODEM_PASSWORD`, see above), then use
 **Modem: upload over Wi-Fi / OTA (tests first)**, or:
 
 ```powershell
@@ -324,20 +324,48 @@ ESP32 build itself does not. For an emergency upload without the tests, set
 Miscellaneous → PlatformIO Core CLI**), run `$env:USR_MODEM_SKIP_TESTS = "1"`, then
 `pio run -e s3 -t upload` in the same terminal.
 
-## Configuration terminal (v0.10)
+## Configuration terminal
 
 Use `AT*CONFIG` for an immediate local menu, or `ATDT123` for dial sounds and
 CONNECT followed by the menu. Either USB console or RS232 menu reserves the modem:
 incoming callers are rejected until exit. A menu cannot interrupt an existing call.
 Remote callers never receive access to configuration or hardware commands.
 
-Choose a number and press Enter. N/P change pages, B returns to the main menu,
-Q quits and Esc cancels an input prompt. Ctrl-C exits from any screen or prompt.
-Long responses pause at `[More]`;
-Enter advances and Q returns. `AT*STYLE=ANSI|CP437|PLAIN` selects this port's style
-for the current boot. The selected model appears at the top. ANSI uses 7-bit art;
-CP437 uses PC line drawing; plain uses no terminal escape sequences. Status refreshes
-automatically in ANSI/CP437, or with R in plain mode.
+Use arrows and Enter, or press a displayed hotkey immediately. Main keys are
+1-9/A-D in the supplied design order; D opens Client Tests. The browser lists
+Client Tests but execution requires the console or RS232 port.
+Esc/Q goes Back in child screens; Q/F10 exits from Main. Ctrl-C exits ordinary
+menus/forms; raw client captures and transfers use the controls documented below.
+F1 opens contextual help. Main F2/F3/F4 opens Status/Phonebook/Settings; child F2
+returns to Main. Forms own their printable input, including Q and menu keys;
+arrows/Home/End, Backspace/Delete, Tab between comma-separated fields and Ctrl-U
+support editing. Enter reviews a change; Y confirms and N/Esc cancels. Existing
+service-owned prompts still require their normal Enter. Trailing Enter after a
+hotkey does not submit a form or dismiss a result.
+
+80x25 is canonical: every main option is visible in two columns, and Settings,
+Wi-Fi and Hardware lists fit without paging. At >=120x45, Main has description
+cards and Phonebook has a list, action cards and selected-entry details. Other
+sizes use compact or smaller paged views, bounded to 132x50. ANSI/CP437 terminals
+are queried for their cell dimensions with `CSI 18 t`; unsupported terminals keep
+80x25. Outside the menu, `AT*SIZE=80,25` overrides this port's dimensions for the
+current boot (`AT*SIZE?` reads them; supported range 1-132 by 1-50).
+
+`AT*STYLE=ANSI|CP437|PLAIN` selects this port's style for the current boot.
+ANSI uses safe ASCII art and approximate ANSI colours; CP437 uses PC line/block
+drawing. The browser converts CP437 to Unicode and uses exact RGB accents.
+Plain emits no cursor/colour escapes and remains a transcript fallback. Status
+refreshes automatically in ANSI/CP437, or with R in plain mode. Export uses a
+separate paged transcript so restore command lines remain complete and copyable.
+
+
+Phonebook shows saved hosts as NAME, keeps number as the selection key, and pages
+nine entries at a time in compact mode. I/Enter opens full details. Keys 1-4 are
+List, Add/edit, Delete and Dial; delete/dial need a selected entry and confirmation.
+Speed is a configured override, not a measured connection rate. Existing contacts
+and storage format are retained; no mock-up contacts are installed. Model titles
+read the live state behind `AT*MODEL=14400|28800|33600|56000`; an unrecognized
+model explicitly displays Unknown. Footer fields come from device state.
 
 Screens cover status, phonebook, all current modem settings with help, Wi-Fi/clock,
 updates, About/credits, command reference, sounds, logs and hardware tests. Client
@@ -379,19 +407,69 @@ and a previous valid backup; it survives restarts and firmware-only OTA. Factory
 or uploading a replacement filesystem image removes history. Reset diagnostics never
 print raw core-dump memory.
 
-Console is COM15 at 115200; Unitek is COM18. Native/build checks are recorded in
-`docs/v0.10-plan.md`; COM15 configuration and on-board checks pass. External RS232,
-real PC/Amiga terminal observation and listening acceptance remain pending.
+Console is COM15 at 115200; Unitek is COM18, with all components wired.
+Current v0.12 validation is recorded in `docs/v0.12-plan.md`; the older
+`docs/v0.10-plan.md` records its original bench scope. Real Amiga and physical
+listening/panel observations remain separate acceptance checks.
+
+### Client Tests (v0.12)
+
+Open D on console COM15 (115200) or host RS232 COM18, or use `AT*TEST <name>`.
+Tests reserve the modem. The browser lists them for reference and cannot execute
+them; remote callers cannot reach them. PuTTY is the selected PC terminal;
+independent transfers use lrzsz. Real-Amiga acceptance remains outstanding.
+
+| Test | Full command |
+|---|---|
+| Display | `AT*TEST ANSI`, `AT*TEST PC`, `AT*TEST PLAIN`, `AT*TEST LATIN1` |
+| Size | `AT*TEST SIZE` (CPR; ruler/manual fallback after one second) |
+| Keys, identity, echo | `AT*TEST KEYS`, `AT*TEST ID`, `AT*TEST ECHO` |
+| Bell, configured UART format | `AT*TEST BELL`, `AT*TEST FORMAT` |
+| Throughput | `AT*TEST TX=5`, `AT*TEST RX=5` (1-30 seconds) |
+| Cable signals | `AT*TEST CABLE` (RS232; automatic restore after six seconds) |
+| Findings | `AT*TEST SUMMARY` |
+| Stage settings | `AT*TEST SET=ANSI,80,25,8` |
+| Confirm/save or defaults | `AT*TEST APPLY`, `AT*TEST RESET` (Y confirms) |
+
+Raw key/ID captures show hexadecimal bytes; Ctrl-] ends them. Display and bell
+checks require observation. Character-table control positions are represented
+safely rather than executed. Console handshake fields are unavailable because
+its lines serve ESP reset/boot. Host DSR is hard-wired asserted.
+
+One saved record belongs to each physical port. Charset, dimensions and Backspace
+(8 or 127) survive reboot; no attached-client identity is inferred. `AT*STYLE`
+and `AT*SIZE` remain local overrides. Measured dimensions can exceed the bounded
+132x50 menu viewport. Latin-1 uses ASCII-safe menu frames. Export annotates both
+records as manual restore commands, each applied/confirmed on its own port.
+Factory reset removes both records.
+
+`AT*SX=TEST,CRC,65536` sends generated 64 KiB data by XMODEM; SUM and 1K select
+the other variants. `AT*SY=ALL` batches the frozen log and six handshake sounds;
+`AT*SZ=LOG` sends `USRMODEM.LOG` by ZMODEM. Other sources are `HS1200.WAV`,
+`HS2400.WAV`, `HS9600.WAV`, `HS14400.WAV`, `HS28800.WAV`, `HS33600.WAV` and
+generated `TEST` (1 byte to 16 MiB). `AT*SY=TEST,1048576` or
+`AT*SZ=TEST,1048576` generates `TEST1M.BIN` without allocating a megabyte buffer.
+ALL requires YMODEM or ZMODEM.
+
+`AT*RX=SUM`, `AT*RX=CRC`, `AT*RX=1K`, `AT*RY` and `AT*RZ` validate uploads and
+discard their contents. Use protocol cancellation: ordinary Ctrl-C/ESC/`+++`
+are payload during transfers. Deadlines restore the modem after stalls. Reports
+include bytes, time/rate, retries/errors and CRC32. XMODEM upload counts include
+final-block padding because it carries no original length. See the
+[independent/wired test instructions](test/interop/README.md). Close PuTTY before
+another program opens COM18.
 
 ## Web interface
 
-The modem serves a page with an 80 × 25 terminal (the configuration screen) and a status
+The modem serves a page with an adaptive terminal (starting at 80 × 25) and a status
 bar with the live front-panel lights, call status, remote host, connection time and modem
 clock. Source is in `web/`; see `web/PROTOCOL.md`.
 
 - **Preview without hardware:** run **Modem: web interface preview (demo)** (or
-  `python scripts/make_preview.py`) and open `web/preview.html`. Press **D** to fake a
-  call, **H** to hang up. Every CI run also attaches the preview as a downloadable artifact.
+  `python scripts/make_preview.py`) and open `web/preview.html`. Phonebook **4**
+  simulates a call after confirmation; **H** ends it. D remains unavailable.
+  Every CI run also attaches the preview as a downloadable artifact. All preview
+  values are explicitly synthetic; production output comes from the shared C++ UI.
 - **On the modem:** the page files are gzipped into `data/www/` and uploaded with the
   LittleFS image (**Modem: upload sounds and web files (LittleFS)**). The firmware side
   of the web server comes in a later version.

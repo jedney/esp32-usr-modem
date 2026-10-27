@@ -6,6 +6,31 @@
 #include "devicecfg.h"
 
 namespace webinterface {
+bool terminalSize(const std::string &message, unsigned &columns, unsigned &rows) {
+    const std::string prefix = "{\"t\":\"size\",\"cols\":";
+    if (message.compare(0, prefix.size(), prefix) != 0 || message.size() > 48)
+        return false;
+    size_t offset = prefix.size();
+    auto number = [&](unsigned &value, unsigned maximum) {
+        value = 0;
+        size_t start = offset;
+        while (offset < message.size() && message[offset] >= '0' && message[offset] <= '9') {
+            value = value * 10 + message[offset++] - '0';
+            if (value > maximum)
+                return false;
+        }
+        return offset > start && (offset - start == 1 || message[start] != '0');
+    };
+    unsigned c, r;
+    if (!number(c, 132) || c < 1 || message.compare(offset, 8, ",\"rows\":") != 0)
+        return false;
+    offset += 8;
+    if (!number(r, 50) || r < 1 || message.substr(offset) != "}")
+        return false;
+    columns = c;
+    rows = r;
+    return true;
+}
 namespace {
 std::string lower(std::string value) {
     for (char &c : value) {

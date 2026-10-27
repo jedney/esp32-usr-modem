@@ -24,16 +24,17 @@ public:
         if (!hw::hostActive()) {
             return;
         }
-        HardwareSerial &u = hw::uart();
         size_t done = 0;
         const uint32_t start = millis();
         while (done < len) {
-            int room = u.availableForWrite();
+            if (millis() - start > 2000)
+                return;
+            int room = hw::hostWriteSpace();
             if (room > 0) {
                 size_t n = len - done < static_cast<size_t>(room) ? len - done : room;
-                u.write(reinterpret_cast<const uint8_t *>(data + done), n);
-                done += n;
-                toComputer += n;
+                size_t written = hw::hostWrite(reinterpret_cast<const uint8_t *>(data + done), n);
+                done += written;
+                toComputer += written;
             } else if (millis() - start > 2000) {
                 return;  // the computer has held RTS off for 2 s: drop the rest
             } else {
@@ -173,8 +174,7 @@ void readOnlineInput(uint32_t nowMs) {
 }
 
 void writeOutput() {
-    HardwareSerial &u = hw::uart();
-    int room = u.availableForWrite();
+    int room = hw::hostWriteSpace();
     if (room <= 0) {
         return;
     }
@@ -182,8 +182,7 @@ void writeOutput() {
     size_t cap = static_cast<size_t>(room) < sizeof buf ? static_cast<size_t>(room) : sizeof buf;
     size_t n = sess->toHost(buf, cap);
     if (n > 0) {
-        u.write(buf, n);
-        sink.toComputer += n;
+        sink.toComputer += hw::hostWrite(buf, n);
     }
 }
 
@@ -247,9 +246,12 @@ void poll(uint32_t nowMs) {
         readCommandInput(nowMs);
     }
 
-    int c = xoff.update(static_cast<size_t>(hw::uart().available()), hw::kHostRxBuffer, p);
+    int c = sess->binaryLocal() || !hw::hostWriteSpace()
+                ? -1
+                : xoff.update(static_cast<size_t>(hw::uart().available()), hw::kHostRxBuffer, p);
     if (c >= 0) {
-        hw::uart().write(static_cast<uint8_t>(c));
+        uint8_t control = c;
+        hw::hostWrite(&control, 1);
     }
     writeOutput();
 

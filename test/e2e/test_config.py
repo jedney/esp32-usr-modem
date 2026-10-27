@@ -56,19 +56,19 @@ def local(console):
 def test_direct_configuration_styles_and_quit(local, style):
     local.command("AT*STYLE=" + style)
     data = local.raw(b"AT*CONFIG\r")
-    require(b"Configuration" in data and b"Phonebook" in data, "Missing root menu")
+    require(b"MODEM CONFIGURATION" in data and b"Phonebook" in data, "Missing root menu")
     require(b"CONNECT" not in data, "Direct configuration emitted CONNECT")
     if style == "PLAIN":
         require(b"\x1b" not in data, "Plain mode emitted terminal escapes")
     elif style == "CP437":
-        require(b"\xda\xc4" in data, "Missing serial CP437 line drawing")
+        require(b"\xc9\xcd" in data, "Missing serial CP437 line drawing")
     send(local, b"q\r")
     require(local.command("AT")[-1] == "OK", "Quit did not restore AT mode")
 
 
 def test_reserved_dial_escape_resume_and_hangup(local):
     data = local.raw(b"ATDT123\r")
-    require(data.count(b"CONNECT") == 1 and b"Configuration" in data, "Reserved dial did not connect once")
+    require(data.count(b"CONNECT") == 1 and b"MODEM CONFIGURATION" in data, "Reserved dial did not connect once")
     time.sleep(1.1)
     send(local, b"+++", 1.2)
     require(b"CONNECT" in local.raw(b"ATO\r"), "ATO did not resume")
@@ -83,10 +83,10 @@ def test_submenus_help_and_hardware_availability(local):
     data = send(local, b"4\r")
     require(b"0 disables auto-answer" in data, "Missing setting help")
     send(local, b"\x1b")
-    send(local, b"b\r")
-    data = send(local, b"12\r")
-    require(b"Hardware tests" in data and b"Guided tests" in data, "Missing hardware screen")
-    data += send(local, b"n\r")
+    send(local, b"\x1b")
+    data = send(local, b"A\r")
+    require(b"Hardware Tests" in data and b"Guided tests" in data, "Missing hardware screen")
+    data += read(local, 0.1)
     require(b"RS232 lines" in data and b"Loopback" in data and b"Bridge" in data, "Missing console port tests")
 
 
@@ -113,7 +113,7 @@ def test_configuration_commands_export_and_credentials(local):
     text = "\n".join(lines)
     require("AT*RESTOREEND=" in text and "AT*PROFILE=" in text, "Export lacks restore commands")
     require("AT*PASS" not in text and "AT*WIFIJOIN" not in text, "Export contains credential commands")
-    for key in ("USR_MODEM_WIFI_PASS", "USR_MODEM_OTA_PASSWORD"):
+    for key in ("USR_MODEM_WIFI_PASS", "USR_MODEM_PASSWORD"):
         secret = os.environ.get(key, "")
         require(not secret or secret not in text, "Export disclosed a credential")
 
@@ -144,10 +144,9 @@ def test_rs232_hardware_takeover_tests_are_unavailable(rs232):
     rs232.command("AT*STYLE=PLAIN")
     try:
         rs232.raw(b"AT*CONFIG\r")
-        send(rs232, b"12\r")
-        data = send(rs232, b"n\r", 1)
+        data = send(rs232, b"A\r", 1)
         require(b"unavailable: takes over RS232" in data, "RS232 test restriction is absent")
-        data = send(rs232, b"1\r", 1)
+        data = send(rs232, b"C\r", 1)
         require(b"DTR=" not in data, "Unavailable line test took over RS232")
     finally:
         send(rs232, b"\x03", 0.3)

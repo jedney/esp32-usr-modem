@@ -14,6 +14,40 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [0.12] - 2026-10-27
+
+### Added
+
+- Serial Client Tests for display/charset, screen size, raw keys, terminal replies,
+  echo/line endings, bell, configured format, timed throughput and RS232 signals.
+- Incremental XMODEM checksum/CRC/1K, YMODEM batch and ZMODEM downloads/uploads,
+  generated throughput files, immutable log snapshots and DOS-safe sound names.
+  Uploads are validated and discarded; transfer statistics include retries and CRC.
+- Confirmed client settings saved independently for console and RS232, with
+  reboot retention, corruption defaults and save rollback.
+- Sportster UI with 13 main options and 72 nested actions, 80x25 compact and wide
+  layouts, four model themes, Phonebook selection, editable forms and safe keys.
+- Adaptive browser geometry and a labelled demo using the shared catalogue;
+  browser Client Tests are listed for reference and execute only on serial.
+- Native, on-board, wired and independent lrzsz transfer checks.
+
+### Changed
+
+- Rename USR_MODEM_OTA_PASSWORD to USR_MODEM_PASSWORD for the shared OTA/web
+  device credential. Update local .env/environment keys; the password is unchanged.
+- Consequential menu changes require confirmation; secret buffers clear on
+  cancellation, timeout, exit and disconnect.
+
+### Fixed
+
+- Binary diagnostics bypass menu key decoding, software flow bytes, guarded
+  escape and unsolicited console notices; every temporary resource is restored.
+- A diagnostic started after the loop timestamp no longer immediately times out.
+- Host output uses nonblocking FIFO writes, keeping the modem responsive and
+  counting RTS pauses while the computer stops receiving.
+- The WebSocket acceptance peer retains partial frames across read timeouts;
+  the missing-CSRF probe uses the current version rather than requesting a downgrade.
+
 ## [0.11] - 2026-10-26
 
 ### Added
@@ -153,8 +187,8 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ### Fixed
 
-- OTA upload passwords stay out of process arguments and PlatformIO/espota debug
-  output. The upload hook reads `.env` or the environment and invokes the installed
+- The device password (OTA and web) stays out of process arguments and PlatformIO/espota
+  debug output. The upload hook reads `.env` or the environment and invokes the installed
   uploader in memory, preserving native tests before every upload.
 - End-to-end timeout failures omit raw boot output and command text that can contain
   credentials.
@@ -183,7 +217,7 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 - Wi-Fi settings are stored on their own (NVS namespace `net`), so `AT&F`, `ATZ` and
   `&W` don't touch them. The ESP-IDF's own copy of the network is switched off.
 - `.env` (git-ignored, see `.env.example`) holds the Wi-Fi details for the end-to-end
-  tests and the OTA password for `s3_ota` uploads.
+  tests and the device password (OTA and web) for `s3_ota` uploads.
 - Tests: 42 unit tests (`test_netcfg`: settings, checks, time zones and NZ daylight
   saving, retry rules, lights, join and scan, every command, and a check that the
   password never appears in any output), 6 for the masked prompt and late results

@@ -23,6 +23,30 @@ inline atcmd::Reply registryWEB(atcmd::Port &p, const char *a) {
 inline atcmd::Reply registrySTYLE(atcmd::Port &p, const char *a) {
     return Commands::dispatch(p, "STYLE", a);
 }
+inline atcmd::Reply registrySIZE(atcmd::Port &p, const char *a) {
+    return Commands::dispatch(p, "SIZE", a);
+}
+inline atcmd::Reply registryTEST(atcmd::Port &p, const char *a) {
+    return Commands::dispatch(p, "TEST", a);
+}
+inline atcmd::Reply registrySX(atcmd::Port &p, const char *a) {
+    return Commands::dispatch(p, "SX", a);
+}
+inline atcmd::Reply registrySY(atcmd::Port &p, const char *a) {
+    return Commands::dispatch(p, "SY", a);
+}
+inline atcmd::Reply registrySZ(atcmd::Port &p, const char *a) {
+    return Commands::dispatch(p, "SZ", a);
+}
+inline atcmd::Reply registryRX(atcmd::Port &p, const char *a) {
+    return Commands::dispatch(p, "RX", a);
+}
+inline atcmd::Reply registryRY(atcmd::Port &p, const char *a) {
+    return Commands::dispatch(p, "RY", a);
+}
+inline atcmd::Reply registryRZ(atcmd::Port &p, const char *a) {
+    return Commands::dispatch(p, "RZ", a);
+}
 inline atcmd::Reply registrySTATUS(atcmd::Port &p, const char *a) {
     return Commands::dispatch(p, "STATUS", a);
 }
@@ -109,8 +133,19 @@ public:
             {"HW", "AT*HW...", "hardware tests (AT*HW? lists them)", hooks.cmdHw, true},
 
             {"CONFIG", "AT*CONFIG[?]", "open local configuration", registryCONFIG, false},
+            {"TEST", "AT*TEST <test|SUMMARY|SET=charset,cols,rows,bs|APPLY|RESET>",
+             "serial client diagnostics; saved per port", registryTEST, false},
+            {"SX", "AT*SX=<source>[,SUM|CRC|1K[,bytes]]", "XMODEM download; TEST/LOG/HSxxxxx.WAV",
+             registrySX, false},
+            {"SY", "AT*SY=<source|ALL>[,bytes]", "YMODEM batch download", registrySY, false},
+            {"SZ", "AT*SZ=<source|ALL>[,bytes]", "ZMODEM download", registrySZ, false},
+            {"RX", "AT*RX[=SUM|CRC|1K]", "XMODEM upload; validate and discard", registryRX, false},
+            {"RY", "AT*RY", "YMODEM upload; validate and discard", registryRY, false},
+            {"RZ", "AT*RZ", "ZMODEM upload; validate and discard", registryRZ, false},
             {"WEB", "AT*WEB[?]|=<ON|OFF>", "web listener; saved immediately", registryWEB, false},
             {"STYLE", "AT*STYLE=<ANSI|CP437|PLAIN>", "terminal style, local session", registrySTYLE,
+             false},
+            {"SIZE", "AT*SIZE[?]|=<1-132>,<1-50>", "terminal cells, local session", registrySIZE,
              false},
             {"STATUS", "AT*STATUS", "status and live panel", registrySTATUS, false},
             {"SETTING", "AT*SETTING[?]|=<modem command>", "active/profile settings; &W saves",

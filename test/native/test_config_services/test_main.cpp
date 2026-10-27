@@ -335,7 +335,7 @@ void test_local_service_f0_never_echoes_password_and_escape_wipes_prompt() {
             r.session.fromHost(&c, 1, clockMs);
         }
     };
-    feed("10\r");
+    feed("8\r");
     drain();
     feed("4\r");
     drain();
@@ -383,8 +383,48 @@ void test_outgoing_history_failure_and_same_burst_redial_are_recorded_once() {
     outgoing.cancel();
     TEST_ASSERT_EQUAL(3, r.history.size());
 }
+void test_menu_export_retains_complete_replayable_lines_across_pages() {
+    Rig r;
+    Terminal menu(r.session, false);
+    menu.setStyle("PLAIN");
+    menu.open();
+    auto drain = [&]() {
+        std::string text;
+        uint8_t byte;
+        while (menu.read(&byte, 1))
+            text += char(byte);
+        return text;
+    };
+    auto feed = [&](const char *keys) {
+        while (*keys) {
+            uint8_t c = *keys++;
+            menu.write(&c, 1);
+        }
+    };
+    drain();
+    feed("9\r");
+    std::string output;
+    for (unsigned i = 0; i < 30; ++i) {
+        auto page = drain();
+        output += page;
+        if (page.find("Enter returns to menu") != std::string::npos)
+            break;
+        TEST_ASSERT_NOT_EQUAL(std::string::npos, page.find("More:"));
+        feed("\r");
+    }
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, output.find("AT*RESTOREEND="));
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, output.find("AT*PROFILE=0,"));
+    TEST_ASSERT_NOT_EQUAL(std::string::npos,
+                          output.find("AT*PHONEBOOK=1,www.amigaretro.com,23,TELNET,0\r\n"));
+    TEST_ASSERT_EQUAL(std::string::npos, output.find("AT*PASS"));
+    TEST_ASSERT_EQUAL(std::string::npos, output.find("AT*WIFIJOIN"));
+    TEST_ASSERT_EQUAL(std::string::npos, output.find('|'));
+    feed("\r");
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, drain().find("Configuration"));
+}
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_menu_export_retains_complete_replayable_lines_across_pages);
     RUN_TEST(test_export_replays_nondefault_profiles_and_phonebook_without_secrets);
     RUN_TEST(test_setting_wrapper_applies_validation_and_tone_choice);
     RUN_TEST(test_log_range_is_bounded_and_verbosity_does_not_capture_raw_text);

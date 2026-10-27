@@ -12,6 +12,7 @@ import { Terminal } from './xterm.mjs';
 import * as S from './status.js';
 import {inspectImage, compareVersions} from './upload.js';
 import {createModemLink} from './link.js';
+import {terminalGeometry, sizeMessage} from './geometry.js';
 
 const COLS = 80;
 const ROWS = 25;
@@ -49,7 +50,7 @@ const state = {
     clock: { epoch: 0, tzo: 0, at: 0 },
     wifi: null,
     cell: null, // measured { w, h } per px of font size
-    csrf: null, version: null, edit: false, upload: false,
+    csrf: null, version: null, edit: false, upload: false, sizeSupported: false,
 };
 
 // ---------------------------------------------------------------- status bar
@@ -127,12 +128,15 @@ function handleMessage(msg) {
             state.csrf = msg.csrf;
             state.version = msg.ver;
             document.title = `${msg.name || 'USR Modem'} v${msg.ver || '?'}`;
+            state.sizeSupported = msg.size === true;
+            requestAnimationFrame(fitTerminal);
             break;
         case 'access':
             state.edit = msg.edit === true;
             $('upload').disabled = !state.edit || state.upload;
             $('enter').disabled = state.edit;
             $('operation').textContent = state.edit ? 'Configuration active' : 'Read-only live status';
+            if (state.edit) requestAnimationFrame(fitTerminal);
             break;
         case 'hardware':
             $('line-controls').hidden = !msg.active || msg.mode !== 'lines';
@@ -173,7 +177,8 @@ const term = new Terminal({
     allowTransparency: false,
 });
 
-// Scale the font so the fixed 80 x 25 screen fills the space above the status bar.
+let sizeTimer = null;
+// Adapt cell geometry at a readable base size, then fit the font to that grid.
 function fitTerminal() {
     const screen = $('screen');
     const style = getComputedStyle(screen);
@@ -182,12 +187,16 @@ function fitTerminal() {
     if (!state.cell) {
         const el = term.element.querySelector('.xterm-screen');
         const size = term.options.fontSize;
-        state.cell = { w: el.offsetWidth / COLS / size, h: el.offsetHeight / ROWS / size };
+        state.cell = { w: el.offsetWidth / term.cols / size, h: el.offsetHeight / term.rows / size };
     }
-    const size = S.fitFontSize(width, height, COLS, ROWS, state.cell.w, state.cell.h);
+    const geometry = state.sizeSupported ? terminalGeometry(width, height, state.cell.w * 16, state.cell.h * 16) : {cols: COLS, rows: ROWS};
+    if (term.cols !== geometry.cols || term.rows !== geometry.rows) term.resize(geometry.cols, geometry.rows);
+    const size = S.fitFontSize(width, height, term.cols, term.rows, state.cell.w, state.cell.h);
     if (size !== term.options.fontSize) {
         term.options.fontSize = size;
     }
+    clearTimeout(sizeTimer);
+    if (state.sizeSupported && state.edit) sizeTimer = setTimeout(() => send(sizeMessage(term.cols, term.rows)), 100);
 }
 
 // ---------------------------------------------------------------- transport
@@ -219,6 +228,8 @@ function connectModem() {
         disconnect: () => {
             state.csrf = null;
             state.edit = false;
+            state.sizeSupported = false;
+            clearTimeout(sizeTimer);
             $('upload').disabled = true;
             $('line-controls').hidden = true;
             $('stop-test').hidden = true;
@@ -233,7 +244,8 @@ function connectModem() {
 async function startDemo() {
     setLink('demo');
     $('enter').disabled = true;
-    $('operation').textContent = 'Demo — D calls, H hangs up';
+    $('operation').textContent = 'DEMO - synthetic values; Phonebook 4 simulates a call';
+    state.edit = true;
     const { startDemoModem } = await import('./demo.js');
     const modem = startDemoModem({
         message: handleMessage,

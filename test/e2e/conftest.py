@@ -67,7 +67,8 @@ def pytest_addoption(parser):
     parser.addoption("--device-tests", action="store_true", help="allow device password changes")
     parser.addoption("--factory-reset", action="store_true", help="allow erasing all modem settings")
     parser.addoption("--ota-upload", action="store_true", help="allow real OTA uploads (tests first)")
-    parser.addoption("--save-ota-password", action="store_true", help="save final OTA password in .env")
+    parser.addoption("--save-password", action="store_true",
+                     help="save final device password (OTA and web) in .env")
 
 
 class Port:

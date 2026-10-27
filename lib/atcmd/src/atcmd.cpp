@@ -311,7 +311,10 @@ void Port::feed(char c) {
     const Profile &p = modem_.active();
     const char cr = static_cast<char>(p.s[3]);
     const bool bsOn = p.s[5] < 128;
-    const bool isBs = (bsOn && c == static_cast<char>(p.s[5])) || c == 0x7F;
+    // A client preference adds an input alias; the standard S5 setting remains
+    // effective, and DEL retains the parser's existing compatibility behavior.
+    const bool isBs = (bsOn && c == static_cast<char>(p.s[5])) || c == 0x7F ||
+                      (clientBackspace_ && static_cast<uint8_t>(c) == clientBackspace_);
 
     switch (state_) {
         case State::kIdle:

@@ -179,6 +179,7 @@ public:
     bool callUp() const { return link_ != nullptr && link_->callUp(); }
     bool browser() const { return browser_; }
     void setBrowser(bool value) { browser_ = value; }
+    void clientBackspace(uint8_t code) { clientBackspace_ = code; }
 
 private:
     enum class State : uint8_t { kIdle, kGotA, kLine, kSecret, kWait };
@@ -197,6 +198,7 @@ private:
     Sink *redirected_ = nullptr;
     bool readable_ = false;
     bool browser_ = false;
+    uint8_t clientBackspace_ = 0;
     uint32_t baud_;
     Link *link_ = nullptr;
     bool resultSent_ = false;  // a command (ATO) sent the line's final result itself

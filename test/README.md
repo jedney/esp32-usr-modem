@@ -1,5 +1,14 @@
 # Test plan
 
+v0.12 validation (27 Oct): **361 native, 22 Node, nine script and five design
+checks pass**. Three new on-board client checks pass; all ten embedded programs
+compile. Nine wired client cases and ten independent COM18 transfers pass, with
+zero transfer retries/errors and full content/CRC checks. Both lrzsz 0.12.21rc
+and 0.13.1 pass 12 independent portable-core cases. Final browser: 16 pass, one
+opt-in skip. See `docs/v0.12-plan.md` for full regression history and corrections.
+PuTTY automation was blocked by product policy; visual/listening and unavailable
+real-Amiga checks remain manual. Normal v0.12 and matching LittleFS are installed.
+
 Every modem feature has tests. Three levels:
 
 | Level | Where it runs | Command | When |
@@ -30,6 +39,15 @@ Upload the firmware again afterwards (**Modem: upload over USB (tests first)**).
 
 ## Feature matrix
 
+Sportster UI working-tree coverage uses the actual terminal byte stream through a
+small ANSI/CP437 emulator, including one-byte reads, SGR, delayed wrap, cursor
+positioning and resize mid-CSI. It covers all requested geometries, tiny safe
+fallbacks, the complete catalogue, four/unknown model themes, Back/focus, password
+safety, service confirmations, export line integrity and Phonebook capacity/pages.
+Generator and static handoff checks are separate contracts; Node tests cover
+browser sizing and the synthetic demo. Device/Amiga/Chrome acceptance of this UI
+has not been run; the earlier release bench results below do not certify it.
+
 v0.11 bench (26 Oct): all hardware wired on COM15/COM18. All 328 native, 18 browser
 unit and six script checks pass. The two new web on-board checks pass and all nine
 programs compile. Wired RS232 baseline 21/21; full regression 128 pass / six skip /
@@ -57,8 +75,8 @@ hash/image tests are in `web/test/upload.test.mjs`; build identity checks are in
 | Browser hardware | Shared command policy and Q79 restrictions | COM18 DTR/RTS and DCD/RI/CTS; bridge; loopback requires a physical plug |
 
 Run `python -m pytest test/e2e/test_web.py --console-port COM15 --rs232-port COM18
---web-tests --web-host usr-modem.local`. The password comes from the existing
-`USR_MODEM_OTA_PASSWORD` environment/ignored `.env`; do not put it in command arguments.
+--web-tests --web-host usr-modem.local`. The device password (OTA and web) comes from
+`USR_MODEM_PASSWORD` in the environment/ignored `.env`; do not put it in command arguments.
 Only one process may own either COM port. On fitted hardware, the old bare-board
 `embedded/test_rs232` GPIO-driving tests must skip; wired end-to-end tests cover it.
 
@@ -134,7 +152,7 @@ Status: ✅ tests written, ⬜ planned. Section numbers refer to the project bri
 | Call log, NTP clock (6.8) | `test_config`, `test_config_services`, `test_netcfg` | `test_config` (files/backup), `test_wifi` (clock) | `test_config.py`, incoming/outgoing regression | Software/on-board/COM15 pass |
 | Web page status bar: LED decode, clock in the modem's time zone, call label, remote host/IP, uptime, Wi-Fi bars, reconnect back-off, 80 × 25 font fit (6.11) | `web/test/status.test.mjs` | — | demo-mode check in a browser | ✅ |
 | Web server: Digest login, session token, Host check, CSRF, WebSocket messages per `web/PROTOCOL.md`, browser firmware upload (6.11) | `test_web`, browser upload/link tests, image manifest | `test_web` (hash/RNG/UTF-8) | `test_web.py`, real Chrome app/filesystem upload and reconnect | Software/wired browser pass; manual hardware gaps above |
-| Client Tests: display, screen size, X/Y/ZMODEM, keyboard, cable check (6.13) | ⬜ | — | ⬜ with `lrzsz` | ⬜ |
+| Client Tests: display, screen size, X/Y/ZMODEM, keyboard, cable check (6.13) | `test_client` | `embedded/test_client` (wired-safe) | `test_client.py`, `test/interop/` with `lrzsz` | PuTTY/physical observations; Amiga deferred |
 
 ## v0.10 configuration coverage (26 Oct 2026)
 

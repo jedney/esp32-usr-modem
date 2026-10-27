@@ -4,6 +4,7 @@
 #include <vector>
 #include "config.h"
 #include "registry.h"
+#include "screen.h"
 using namespace config;
 void setUp() {}
 void tearDown() {}
@@ -37,11 +38,32 @@ public:
     void write(const char *p, size_t n) override { text.append(p, n); }
 };
 unsigned stubCalls = 0;
-atcmd::Reply stub(atcmd::Port &, const char *) {
-    ++stubCalls;
+calls::Phonebook *activeBook = nullptr;
+bool stubAsync = false;
+std::string secretReceived;
+atcmd::Reply receiveSecret(atcmd::Port &, const char *text, void *) {
+    secretReceived = text;
     return atcmd::Reply::kOk;
 }
-Registry registry(Hooks{stub, stub, stub, stub, stub, stub, stub, stub, stub});
+atcmd::Reply stub(atcmd::Port &port, const char *) {
+    ++stubCalls;
+    if (stubAsync) {
+        stubAsync = false;
+        for (unsigned i = 0; i < 30; ++i)
+            port.line("Earlier service output");
+        port.askSecret("Password: ", receiveSecret, nullptr);
+        return atcmd::Reply::kPending;
+    }
+    return atcmd::Reply::kOk;
+}
+atcmd::Reply phonebookCommand(atcmd::Port &port, const char *args) {
+    return activeBook ? activeBook->command(port, args, false) : stub(port, args);
+}
+atcmd::Reply phonebookDelete(atcmd::Port &port, const char *args) {
+    return activeBook ? activeBook->command(port, args, true) : stub(port, args);
+}
+Registry registry(Hooks{stub, phonebookCommand, phonebookDelete, stub, stub, stub, stub, stub,
+                        stub});
 struct Rig {
     Store store;
     Sink sink;
@@ -65,6 +87,30 @@ struct Rig {
             uint8_t c = *s++;
             terminal.write(&c, 1);
         }
+    }
+};
+struct BookServices : UiServices {
+    Store store;
+    calls::Phonebook book{store};
+    BookServices() {
+        book.begin();
+        book.clear();
+        activeBook = &book;
+    }
+    ~BookServices() { activeBook = nullptr; }
+    calls::Phonebook *phonebook() override { return &book; }
+    UiState state() const override {
+        UiState result;
+        strcpy(result.link, "Idle");
+        result.hostBaud = 38400;
+        return result;
+    }
+    void add(unsigned n) {
+        calls::Entry entry;
+        snprintf(entry.number, sizeof entry.number, "%u", n + 200);
+        snprintf(entry.host, sizeof entry.host, "host%02u.example", n);
+        entry.speed = 28800;
+        TEST_ASSERT_TRUE(book.put(entry));
     }
 };
 void test_menu_actions_have_production_at_star_handlers() {
@@ -114,43 +160,54 @@ void test_renderers_and_paging_work_with_one_byte_output() {
     auto out = r.drain();
     TEST_ASSERT_EQUAL(std::string::npos, out.find('\x1b'));
     TEST_ASSERT_NOT_EQUAL(std::string::npos, out.find("14.4"));
-    r.feed("n\r");
-    out = r.drain();
     TEST_ASSERT_NOT_EQUAL(std::string::npos, out.find("Client Tests"));
     r.terminal.close();
     r.terminal.setStyle("CP437");
     r.terminal.open();
     out = r.drain();
-    TEST_ASSERT_NOT_EQUAL(std::string::npos, out.find(char(0xda)));
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, out.find(char(0xc9)));
+    ScreenView screen;
+    screen.accept(out);
+    TEST_ASSERT_EQUAL(0, screen.outside);
+    TEST_ASSERT_EQUAL(0, screen.scrolls);
+    TEST_ASSERT_TRUE(screen.wrap && screen.cursor);
 }
 void test_response_pagination_does_not_leak_next_page() {
     Rig r;
     r.terminal.open();
     r.drain();
     for (unsigned i = 0; i < 60; ++i) {
-        r.terminal.write("row\r\n", 5);
+        char row[24];
+        snprintf(row, sizeof row, "row%02u\n", i);
+        r.terminal.write(row, strlen(row));
     }
-    auto first = r.drain();
-    TEST_ASSERT_NOT_EQUAL(std::string::npos, first.find("More:"));
-    TEST_ASSERT_LESS_THAN(150, first.size());
+    ScreenView first;
+    first.accept(r.drain());
+    TEST_ASSERT_TRUE(first.has("More:"));
+    TEST_ASSERT_FALSE(first.has("row15"));
     TEST_ASSERT_TRUE(r.drain().empty());
     r.feed("\r");
-    TEST_ASSERT_FALSE(r.drain().empty());
+    ScreenView second;
+    second.accept(r.drain());
+    TEST_ASSERT_TRUE(second.has("row15"));
+    TEST_ASSERT_FALSE(second.has("row30"));
 }
 void test_menu_secret_input_is_wiped_and_never_echoed() {
     Rig r;
     r.terminal.open();
     r.drain();
-    r.feed("10\r");
-    r.drain();
-    r.feed("4\r");
-    r.drain();
-    r.feed("SecretCanary123");
+    r.feed("8\r4\rSecretCanary123");
     auto out = r.drain();
     TEST_ASSERT_EQUAL(std::string::npos, out.find("SecretCanary"));
     TEST_ASSERT_NOT_EQUAL(std::string::npos, out.find("***"));
+    r.feed("\r");
+    out = r.drain();
+    TEST_ASSERT_EQUAL(std::string::npos, out.find("SecretCanary"));
     r.feed("\x1b");
-    r.drain();
+    r.terminal.poll(61);
+    out = r.drain();
+    TEST_ASSERT_EQUAL(std::string::npos, out.find("SecretCanary"));
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, out.find("cancelled"));
 }
 void test_ring_wrap_has_only_structured_events_and_can_disable() {
     Log log;
@@ -218,8 +275,11 @@ void test_display_sanitizes_untrusted_escape_sequences() {
     r.terminal.open();
     r.drain();
     r.terminal.write("\x1b[2Jhello", 10);
-    auto text = r.drain();
-    TEST_ASSERT_EQUAL(std::string::npos, text.find('\x1b'));
+    ScreenView view;
+    view.accept(r.drain());
+    TEST_ASSERT_TRUE(view.has("?[2Jhello"));
+    TEST_ASSERT_EQUAL(0, view.outside);
+    TEST_ASSERT_EQUAL(0, view.scrolls);
 }
 void test_direct_menu_dtr_drop_closes_and_releases_reservation() {
     Rig r;
@@ -237,49 +297,119 @@ void test_overlong_output_is_bounded_and_reported() {
     r.drain();
     std::string huge(100000, 'x');
     r.terminal.write(huge.data(), huge.size());
-    size_t count = 0;
-    for (unsigned page = 0; page < 100; ++page) {
+    for (unsigned page = 0; page < 50; ++page) {
         auto out = r.drain(64);
-        count += out.size();
-        if (count > 40000) {
-            TEST_FAIL_MESSAGE("Unbounded output");
-        }
-        if (out.find("More:") == std::string::npos) {
-            break;
-        }
+        TEST_ASSERT_LESS_THAN(10000, out.size());
+        ScreenView view;
+        view.accept(out);
+        TEST_ASSERT_EQUAL(0, view.outside);
+        if (!view.has("More:"))
+            return;
         r.feed("\r");
     }
-    TEST_ASSERT_LESS_THAN(40000, count);
+    TEST_FAIL_MESSAGE("Output exceeded the bounded response buffer");
 }
 void test_rs232_menu_lists_and_blocks_takeover_actions() {
     Rig r(true);
     r.terminal.open();
     r.drain();
-    r.feed("12\r");
-    auto out = r.drain();
-    TEST_ASSERT_NOT_EQUAL(std::string::npos, out.find("unavailable: takes over RS232"));
-    r.feed("n\r");
-    r.drain();
+    r.feed("a\r");
+    ScreenView screen;
+    screen.accept(r.drain());
+    TEST_ASSERT_TRUE(screen.has("RS232 lines"));
+    TEST_ASSERT_TRUE(screen.has("unavailable: takes over RS232"));
     stubCalls = 0;
-    r.feed("1\r");
-    r.drain();
+    r.feed("c\r");
+    screen.accept(r.drain());
+    TEST_ASSERT_TRUE(screen.has("Unavailable: hardware hook"));
     TEST_ASSERT_EQUAL(0, stubCalls);
+    r.feed("\x1b[B");
+    screen.accept(r.drain());
+    TEST_ASSERT_FALSE(screen.has("> [C]"));
 }
 void test_oversized_input_is_rejected_without_dispatching_prefix() {
     Rig r;
     r.terminal.open();
     r.drain();
-    stubCalls = 0;
+    r.feed("3\r3\r");
+    r.drain();
     std::string input(200, '1');
     input += '\r';
     r.feed(input.c_str());
     auto out = r.drain();
     TEST_ASSERT_NOT_EQUAL(std::string::npos, out.find("Input too long"));
-    TEST_ASSERT_EQUAL(0, stubCalls);
+    TEST_ASSERT_EQUAL(14400, r.modem.model());
     TEST_ASSERT_TRUE(r.terminal.isOpen());
+}
+#include "ui_cases.h"
+void test_browser_lists_serial_diagnostics_without_dispatch() {
+    Rig r;
+    r.session.port().setBrowser(true);
+    r.terminal.open();
+    r.drain();
+    stubCalls = 0;
+    r.feed("d1");
+    ScreenView view;
+    view.accept(r.drain());
+    TEST_ASSERT_TRUE(view.has("Serial client test"));
+    TEST_ASSERT_EQUAL(0, stubCalls);
+}
+void test_client_key_alias_preserves_standard_s5() {
+    Rig r;
+    r.modem.active().s[5] = 21;
+    r.session.port().clientBackspace(127);
+    const char *command =
+        "ATEX\x15"
+        "0\r";
+    while (*command)
+        r.session.port().feed(*command++);
+    TEST_ASSERT_EQUAL(0, r.modem.active().get(modemcfg::kE));
+    TEST_ASSERT_TRUE(r.sink.text.find("OK") != std::string::npos);
+}
+void test_binary_service_has_no_geometry_or_redraw_bytes() {
+    class Raw : public hostport::Connection {
+    public:
+        bool active = true;
+        unsigned position = 0;
+        size_t space() const override { return 256; }
+        size_t write(const uint8_t *, size_t len) override { return len; }
+        size_t read(uint8_t *out, size_t cap) override {
+            size_t n = std::min<size_t>(cap, 256 - position);
+            for (size_t i = 0; i < n; ++i)
+                out[i] = position++;
+            return n;
+        }
+        bool isOpen() const override { return active; }
+        void close() override { active = false; }
+        bool binaryService() const override { return true; }
+    } raw;
+    Rig r;
+    r.terminal.open();
+    r.drain();
+    r.terminal.diagnostic(raw);
+    r.terminal.poll(10000);
+    auto bytes = r.drain(1);
+    TEST_ASSERT_EQUAL(256, bytes.size());
+    for (unsigned i = 0; i < 256; ++i)
+        TEST_ASSERT_EQUAL_HEX8(i, uint8_t(bytes[i]));
+    raw.close();
+    r.terminal.poll(10001);
+    TEST_ASSERT_FALSE(r.drain().empty());
 }
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_browser_lists_serial_diagnostics_without_dispatch);
+    RUN_TEST(test_client_key_alias_preserves_standard_s5);
+    RUN_TEST(test_binary_service_has_no_geometry_or_redraw_bytes);
+    RUN_TEST(test_serial_reports_and_async_prompts_keep_input_isolated);
+    RUN_TEST(test_phonebook_capacity_boundaries_and_wide_actions);
+    RUN_TEST(test_geometry_inventory_and_compact_submenus);
+    RUN_TEST(test_four_themes_unknown_live_refresh_and_failed_save);
+    RUN_TEST(test_disabled_navigation_back_stack_and_form_focus);
+    RUN_TEST(test_phonebook_paging_details_selection_and_storage_failure);
+    RUN_TEST(test_phonebook_empty_missing_hook_and_changed_entry_confirmation);
+    RUN_TEST(test_resize_mid_escape_and_secret_confirmation_timeout);
+    RUN_TEST(test_cell_text_has_fixed_width_and_cannot_inject_controls);
     RUN_TEST(test_menu_actions_have_production_at_star_handlers);
     RUN_TEST(test_direct_menu_reserves_without_carrier_and_releases);
     RUN_TEST(test_renderers_and_paging_work_with_one_byte_output);

@@ -18,6 +18,8 @@ public:
     static constexpr size_t kSize = 5 + kPhonebookCount * kRecordSize + 4;
     explicit Phonebook(modemcfg::Store &store) : store_(store) {}
     bool begin();  // false: damaged record; factory entry used, not saved over it
+    bool loaded() const { return loaded_; }
+    bool healthy() const { return healthy_; }
     const Entry *find(const char *number) const;
     const Entry &at(size_t index) const { return entries_[index]; }
     bool put(const Entry &entry);
@@ -31,5 +33,6 @@ private:
     modemcfg::Store &store_;
     Entry entries_[kPhonebookCount] = {};
     uint8_t blob_[kSize + 1] = {};
+    bool loaded_ = false, healthy_ = false;
 };
 }  // namespace calls

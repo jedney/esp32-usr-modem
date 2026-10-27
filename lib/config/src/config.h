@@ -1,5 +1,6 @@
 // Shared local configuration model, commands and terminal. No hardware dependencies.
 #pragma once
+#include "cell_grid.h"
 #include "devicecfg.h"
 #include "diagnostics.h"
 #include "netcfg.h"
@@ -16,7 +17,8 @@ enum class Screen : uint8_t {
     Updates,
     Sounds,
     Debug,
-    Hardware
+    Hardware,
+    Client
 };
 struct Action {
     Screen screen;
@@ -28,12 +30,27 @@ struct Action {
     bool secret = false;
     bool rs232Unavailable = false;
     bool leave = false;
+    const char *id = "";
+    char key = 0;
+    bool available = true;
+    const char *summary = "";
 };
 const Action *actions(size_t &count);
 const char *screenName(Screen screen);
 const char *settingHelp(modemcfg::Setting setting);
 const char *registerHelp(unsigned reg);
 enum class Style : uint8_t { Ansi, Cp437, Plain };
+struct UiState {
+    char link[24] = "Unknown";
+    uint32_t hostBaud = 0;
+    uint32_t reportedRate = 0;
+};
+class UiServices {
+public:
+    virtual ~UiServices() = default;
+    virtual calls::Phonebook *phonebook() = 0;
+    virtual UiState state() const = 0;
+};
 class Hardware {
 public:
     virtual ~Hardware() = default;
@@ -72,9 +89,24 @@ public:
     bool open();
     bool isOpen() const override { return open_; }
     bool localService() const override { return true; }
+    bool binaryService() const override { return diagnostic_ && diagnostic_->binaryService(); }
+    void diagnostic(hostport::Connection &connection) {
+        diagnostic_ = &connection;
+        drawing_ = false;
+        stagePos_ = stageLen_ = 0;
+        if (!connection.binaryService() && style_ != Style::Plain) {
+            const char prefix[] = "\x18\x1b[0m\x1b[?7h\x1b[?25h\x1b[2J\x1b[H";
+            for (char c : prefix)
+                if (c)
+                    staging_[stageLen_++] = c;
+        }
+        dirty_ = false;
+        querySize_ = false;
+    }
+    void backspace(uint8_t code) { backspace_ = code; }
     void escaped() override;
     void close() override;
-    size_t space() const override { return open_ ? 1 : 0; }
+    size_t space() const override { return diagnostic_ ? diagnostic_->space() : open_ ? 1 : 0; }
     size_t write(const uint8_t *data, size_t len) override;
     void write(const char *data, size_t len) override;
     size_t read(uint8_t *data, size_t cap) override;
@@ -83,13 +115,46 @@ public:
     bool setStyle(const char *text);
     bool takeDeparture(char *command, size_t cap);
     bool capturing() const { return capturing_; }
+    void services(UiServices *services) { services_ = services; }
+    bool resize(unsigned columns, unsigned rows);
+    bool setSize(const char *text);
+    unsigned columns() const { return cols_; }
+    unsigned rows() const { return rows_; }
+    void color(Color color) {
+        color_ = color;
+        render();
+    }
+    Color color() const { return color_; }
 
 private:
     void render();
     void line(const char *text);
     void append(const char *text);
     void input(char c);
-    void select();
+    void buildFrame();
+    void drawMenu();
+    void drawPhonebook();
+    void drawForm();
+    void drawResponse();
+    void key(unsigned key);
+    void sequence();
+    void activate(const Action &action);
+    void submit();
+    void dispatchPending();
+    void back();
+    void help();
+    void navigate(int direction);
+    void changeScreen(Screen screen);
+    void feedback(const char *text);
+    void clearInput();
+    void syncPhonebook();
+    const calls::Entry *entry() const;
+    const Action *item(size_t index) const;
+    size_t itemCount() const;
+    size_t visibleItems() const;
+    size_t phonebookPageSize() const;
+    bool enabled(size_t index) const;
+    void profileAction(size_t index);
     void execute(const char *command);
     void clearOutput();
     void finishResponse();
@@ -99,7 +164,7 @@ private:
     bool overflow_ = false, skipLf_ = false, departure_ = false;
     Style style_ = Style::Ansi;
     Screen screen_ = Screen::Main;
-    size_t page_ = 0, length_ = 0, pos_ = 0, pageEnd_ = 0;
+    size_t length_ = 0, pos_ = 0;
     unsigned lines_ = 0;
     unsigned column_ = 0;
     bool liveStatus_ = false;
@@ -111,5 +176,48 @@ private:
     bool inputOverflow_ = false;
     const Action *prompt_ = nullptr;
     char departureCommand_[atcmd::kLineMax + 1] = {};
+    UiServices *services_ = nullptr;
+    CellGrid grid_;
+    unsigned cols_ = 80, rows_ = 25;
+    Color color_ = Color::Ansi16;
+    Style drawStyle_ = Style::Ansi;
+    Color drawColor_ = Color::Ansi16;
+    unsigned drawModelRgb_ = 0;
+    bool dirty_ = false, drawing_ = false, querySize_ = false;
+    bool styled_ = false;
+    unsigned drawRow_ = 0;
+    char staging_[4096] = {};
+    size_t stageLen_ = 0, stagePos_ = 0;
+    enum class Focus : uint8_t { Menu, Form, Confirm, Details, Help };
+    Focus focus_ = Focus::Menu;
+    Focus helpReturn_ = Focus::Menu;
+    struct Location {
+        size_t selected = 0, offset = 0;
+    } locations_[10];
+    Screen stack_[10] = {};
+    unsigned depth_ = 0;
+    hostport::Connection *diagnostic_ = nullptr;
+    uint8_t backspace_ = 8;
+    size_t cursor_ = 0, responseLine_ = 0;
+    size_t helpReturnLine_ = 0;
+    unsigned responseLines_ = 0, drawCursorRow_ = 24, drawCursorCol_ = 13;
+    unsigned escapeLen_ = 0;
+    char escape_[24] = {};
+    bool escapeDiscard_ = false;
+    uint32_t now_ = 0, escapeAt_ = 0, model_ = 0;
+    uint32_t activityAt_ = 0;
+    uint32_t sizeQueriedAt_ = 0;
+    bool exportPrompt_ = false, exportFinished_ = false;
+    bool swallowEnter_ = false, confirmingLeave_ = false;
+    char pending_[atcmd::kLineMax + 1] = {};
+    char notice_[144] = {};
+    char resultTitle_[64] = "Result";
+    Action profileField_{};
+    char profileCommand_[32] = {}, profileHelp_[384] = {};
+    unsigned bookIndices_[calls::kPhonebookCount] = {};
+    size_t bookCount_ = 0;
+    char selectedNumber_[12] = {};
+    char confirmedNumber_[12] = {};
+    uint32_t confirmedEntryHash_ = 0;
 };
 }  // namespace config
