@@ -445,13 +445,13 @@ records as manual restore commands, each applied/confirmed on its own port.
 Factory reset removes both records.
 
 `AT*SX=TEST,CRC,65536` sends generated 64 KiB data by XMODEM; SUM and 1K select
-the other variants. `AT*SY=ALL` batches the frozen log and six handshake sounds;
+the other variants. `AT*SY=ALL` batches the frozen log and seven handshake sounds;
 `AT*SZ=LOG` sends `USRMODEM.LOG` by ZMODEM. Other sources are `HS1200.WAV`,
-`HS2400.WAV`, `HS14400.WAV`, `HS28800.WAV`, `HS33600.WAV`, `HS56000.WAV` and
+`HS2400.WAV`, `HS9600.WAV`, `HS14400.WAV`, `HS28800.WAV`, `HS33600.WAV`, `HS56000.WAV` and
 generated `TEST` (1 byte to 16 MiB). `AT*SY=TEST,1048576` or
 `AT*SZ=TEST,1048576` generates `TEST1M.BIN` without allocating a megabyte buffer.
-ALL requires YMODEM or ZMODEM. `HS9600.WAV` remains an alias of `HS2400.WAV`,
-matching the fallback used for 9600-baud playback.
+ALL requires YMODEM or ZMODEM. `HS9600.WAV` uses its own packaged recording,
+matching 9600-baud playback.
 
 `AT*RX=SUM`, `AT*RX=CRC`, `AT*RX=1K`, `AT*RY` and `AT*RZ` validate uploads and
 discard their contents. Use protocol cancellation: ordinary Ctrl-C/ESC/`+++`
@@ -551,5 +551,6 @@ GitHub Actions runs the unit tests, lint and a full firmware build on every push
 ## Credits
 
 See `credits/LICENSES.md`. In short: case model by luizpacheco (CC BY-NC), firmware
-modules ported from Zimodem by Bo Zimmerman (Apache-2.0), concept and reference sounds
-from RetroExternalModem by caiot5 (GPL-3.0).
+modules ported from Zimodem by Bo Zimmerman (Apache-2.0), concept from
+RetroExternalModem by caiot5, and replacement modem recordings from
+[Gough Lui's modem sound collection](https://goughlui.com/2016/05/03/project-the-definitive-collection-of-v-90v-92-modem-sounds/).

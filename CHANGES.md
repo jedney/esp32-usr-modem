@@ -14,6 +14,16 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [0.15] - 2026-10-27
+
+### Changed
+
+- Replace all packaged handshake recordings with Jon's supplied WAVs from Gough
+  Lui's collection and update README, About and licensing attribution.
+- Add a dedicated 9600 playback/download asset; ALL transfers now include seven
+  handshake files. Package the supplied PCM WAVs unchanged with
+  `scripts/build_handshakes.py`, replacing its removed MP3/OGG source dependencies.
+
 ## [0.14] - 2026-10-27
 
 ### Fixed
