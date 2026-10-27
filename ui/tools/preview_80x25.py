@@ -131,7 +131,7 @@ def main(f):
     f.put(2,15,' ' * 76)
     f.rule(16)
     f.put(3,17,'ARROWS: navigate / switch column    ENTER: select    Q: quit',COLORS['shortcut_blue'])
-    f.put(3,18,'[D] Client Tests - serial client diagnostics',COLORS['disabled_gray'])
+    f.put(3,18,'[C] Client Tests - serial client diagnostics',COLORS['disabled_gray'])
     footer(f,'Reference layout only. Device information is not connected.')
     return f
 

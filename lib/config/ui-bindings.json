@@ -182,6 +182,20 @@
     "target": "Sounds",
     "input": true
   },
+  "sounds.ring-delay": {
+    "screen": "Sounds",
+    "command": "*RINGDELAY=",
+    "help": "0-60000 ms; default 1500; saved immediately; ? queries",
+    "target": "Sounds",
+    "input": true
+  },
+  "sounds.connect-delay": {
+    "screen": "Sounds",
+    "command": "*CONNECTDELAY=",
+    "help": "0-60000 ms; default 250; saved immediately; ? queries",
+    "target": "Sounds",
+    "input": true
+  },
   "debug": {
     "screen": "Main",
     "command": "",

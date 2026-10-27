@@ -109,6 +109,9 @@ public:
     bool throttle() const { return nvram_.throttle; }
     bool answerConsole() const { return nvram_.answerConsole; }
     bool setAnswerConsole(bool enabled);
+    uint32_t ringDelayMs() const { return nvram_.ringDelayMs; }
+    uint32_t connectDelayMs() const { return nvram_.connectDelayMs; }
+    bool setCallDelay(bool ring, uint32_t milliseconds);
 
     const StarCommand *starTable() const { return star_; }
     size_t starCount() const { return starCount_; }
@@ -233,5 +236,7 @@ void showStored(Port &port);   // ATI5
 void showStarHelp(Port &port);
 Reply cmdModel(Port &port, const char *args);
 Reply cmdThrottle(Port &port, const char *args);
+Reply cmdRingDelay(Port &port, const char *args);
+Reply cmdConnectDelay(Port &port, const char *args);
 
 }  // namespace atcmd

@@ -41,6 +41,8 @@ bool Outgoing::start(hostport::Session &session, const char *text, bool pulse) {
     target_ = target;
     session_ = &session;
     profile_ = modem_.active();
+    ringDelayMs_ = modem_.ringDelayMs();
+    connectDelayMs_ = modem_.connectDelayMs();
     pulse_ = pulse;
     dtrWasOn_ = session.dtrOn();
     unsigned n = profile_.get(modemcfg::kAmpN);
@@ -88,6 +90,11 @@ void Outgoing::connected() {
         return;
     }
     stage_ = CallStage::kOnline;
+    // CONNECT is already queued. Keep the socket/negotiation running while both
+    // payload directions remain held; serial callers retain unconsumed input.
+    if (modem_.active().get(modemcfg::kM) != 0) {
+        connection_.holdPayload(clock_(), connectDelayMs_);
+    }
     if (observer_) {
         observer_->connected(*session_);
     }
@@ -170,6 +177,22 @@ void Outgoing::poll() {
         }
     }
     if (stage_ == CallStage::kDigits && !sound_.running()) {
+        if (!silent && ringDelayMs_) {
+            stage_ = CallStage::kRingback;
+            since_ = now;
+            if (!play(SoundStage::kRing)) {
+                finish(atcmd::Result::kNoCarrier);
+                return;
+            }
+        } else {
+            connect(now);
+        }
+    }
+    if (stage_ == CallStage::kRingback) {
+        if (!silent && now - since_ < ringDelayMs_) {
+            return;
+        }
+        sound_.stop();
         connect(now);
     }
     if (stage_ == CallStage::kBusy) {

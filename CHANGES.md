@@ -14,6 +14,22 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [0.17] - 2026-10-27
+
+### Added
+
+- Play 1500 ms of generated ringing after dialled digits and before starting TCP.
+- Hold payload in both directions for 250 ms after handshake playback completes
+  and CONNECT is sent, while continuing network and modem services.
+- Add saved `AT*RINGDELAY` and `AT*CONNECTDELAY` settings (0-60000 ms), Sounds menu
+  controls and configuration export. Migrate existing settings with the new defaults.
+  Zero disables each delay; ATM0 retains immediate connection without audio delays.
+
+### Changed
+
+- Order the main menu shortcuts as A About, B Hardware Tests, C Client Tests,
+  and D Command Reference across serial, browser and preview screens.
+
 ## [0.16] - 2026-10-27
 
 ### Fixed

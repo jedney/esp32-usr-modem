@@ -187,6 +187,20 @@ bool Modem::setThrottle(bool enabled) {
     return false;
 }
 
+bool Modem::setCallDelay(bool ring, uint32_t milliseconds) {
+    if (milliseconds > modemcfg::kMaxCallDelayMs) {
+        return false;
+    }
+    uint32_t &value = ring ? nvram_.ringDelayMs : nvram_.connectDelayMs;
+    const uint32_t before = value;
+    value = milliseconds;
+    if (modemcfg::saveNvram(store_, nvram_)) {
+        return true;
+    }
+    value = before;
+    return false;
+}
+
 const StarCommand *Modem::findStar(const char *text, const char **args) const {
     const StarCommand *best = nullptr;
     size_t bestLen = 0;
@@ -319,6 +333,35 @@ Reply cmdThrottle(Port &port, const char *args) {
         return Reply::kError;
     }
     return port.modem().setThrottle(on) ? Reply::kOk : Reply::kError;
+}
+
+namespace {
+Reply callDelay(Port &port, const char *args, bool ring) {
+    if (!*args || strcmp(args, "?") == 0) {
+        port.beginInfo();
+        port.printf("%lu", static_cast<unsigned long>(ring ? port.modem().ringDelayMs()
+                                                           : port.modem().connectDelayMs()));
+        port.newline();
+        return Reply::kOk;
+    }
+    if (strcmp(args, "=?") == 0) {
+        port.beginInfo();
+        port.line("0-60000 ms");
+        return Reply::kOk;
+    }
+    unsigned value = 0;
+    if (*args++ != '=' || !isDigit(*args) || !number(args, modemcfg::kMaxCallDelayMs, &value) ||
+        *args) {
+        return Reply::kError;
+    }
+    return port.modem().setCallDelay(ring, value) ? Reply::kOk : Reply::kError;
+}
+}  // namespace
+Reply cmdRingDelay(Port &port, const char *args) {
+    return callDelay(port, args, true);
+}
+Reply cmdConnectDelay(Port &port, const char *args) {
+    return callDelay(port, args, false);
 }
 
 void Port::feed(char c) {

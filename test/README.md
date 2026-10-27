@@ -1,5 +1,26 @@
 # Test plan
 
+Outgoing call timing: `test_calls` covers ringback and post-CONNECT boundaries,
+both payload directions, custom/zero settings, per-call snapshots, S7 timing,
+cancellation, timer rollover and stale ticks. `test_modemcfg` covers layout-4
+migration and bounds; `test_config_services` checks export/replay.
+`embedded/test_calls` saves/reloads both delays through scratch NVS.
+`test_calls.py` checks persistence across restart and the actual pause after
+CONNECT; these new hardware cases require installation before they can run.
+
+v0.17 combined validation: 393 native, 23 browser-unit, 13 script and five UI
+layout checks pass, together with cppcheck, formatting, firmware/LittleFS and the
+two affected embedded test builds. All 11 outgoing E2E cases collect. No hardware
+execution or upload was performed for this release.
+
+Main-menu A-D order and shortcuts (About, Hardware Tests, Client Tests, Command
+Reference) are covered by `test_config`, the browser demo tests and the UI layout
+contract. The embedded configuration screen check and serial style cases also
+verify their display order.
+Local validation: 387 native, 23 browser, five layout and two catalogue tests
+pass, along with firmware and embedded configuration builds, cppcheck and
+formatting. Hardware execution remains pending.
+
 v0.13 validation (27 Oct): **376 native, 22 Node, 12 script and five design
 checks pass**, with three new on-board Internet checks and all 11 embedded
 programs compiling. New wired Internet acceptance passes 11 cases, with two

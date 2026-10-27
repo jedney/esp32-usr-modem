@@ -45,7 +45,7 @@ void test_serial_reports_and_async_prompts_keep_input_isolated() {
     r.drain();
     stubAsync = true;
     secretReceived.clear();
-    r.feed("a\r2\r");
+    r.feed("b\r2\r");
     ScreenView view;
     view.accept(r.drain());
     TEST_ASSERT_TRUE(view.has("Password:"));
@@ -132,7 +132,7 @@ void test_geometry_inventory_and_compact_submenus() {
                 if (a[i].screen == Screen::Main)
                     TEST_ASSERT_TRUE_MESSAGE(view.has(a[i].label), a[i].label);
             if (dimensions.second >= 45) {
-                TEST_ASSERT_NOT_EQUAL(std::string::npos, view.row(37).find("Serial terminal"));
+                TEST_ASSERT_NOT_EQUAL(std::string::npos, view.row(33).find("Serial terminal"));
                 TEST_ASSERT_EQUAL(char(205), view.row(38)[dimensions.first / 2 + 3]);
             }
         } else
@@ -144,7 +144,7 @@ void test_geometry_inventory_and_compact_submenus() {
     }
     size_t count;
     auto *a = actions(count);
-    TEST_ASSERT_EQUAL(88, count);
+    TEST_ASSERT_EQUAL(90, count);
     unsigned root = 0;
     for (size_t i = 0; i < count; ++i) {
         TEST_ASSERT_TRUE(*a[i].id);
@@ -155,7 +155,14 @@ void test_geometry_inventory_and_compact_submenus() {
             TEST_ASSERT_NOT_EQUAL(0, strcmp(a[i].id, a[j].id));
     }
     TEST_ASSERT_EQUAL(13, root);
-    for (char key : {'3', '7', 'A', 'D'}) {
+    const char *labels[] = {"About", "Hardware Tests", "Client Tests", "Command Reference"};
+    const char *commands[] = {"*ABOUT", "", "", "*REFERENCE"};
+    for (unsigned i = 0; i < 4; ++i) {
+        TEST_ASSERT_EQUAL('A' + i, a[9 + i].key);
+        TEST_ASSERT_EQUAL_STRING(labels[i], a[9 + i].label);
+        TEST_ASSERT_EQUAL_STRING(commands[i], a[9 + i].command);
+    }
+    for (char key : {'3', '7', 'B', 'C'}) {
         Rig r;
         r.terminal.setStyle("CP437");
         r.terminal.color(Color::Rgb);
@@ -167,7 +174,7 @@ void test_geometry_inventory_and_compact_submenus() {
         view.accept(r.drain());
         Screen screen = key == '3'   ? Screen::Settings
                         : key == '7' ? Screen::Wifi
-                        : key == 'A' ? Screen::Hardware
+                        : key == 'B' ? Screen::Hardware
                                      : Screen::Client;
         for (size_t i = 0; i < count; ++i)
             if (a[i].screen == screen)
@@ -175,7 +182,7 @@ void test_geometry_inventory_and_compact_submenus() {
         TEST_ASSERT_FALSE(view.has("More:"));
         view.snapshot(key == '3'   ? "settings"
                       : key == '7' ? "wifi"
-                      : key == 'A' ? "hardware"
+                      : key == 'B' ? "hardware"
                                    : "client-tests");
     }
 }
@@ -218,18 +225,18 @@ void test_disabled_navigation_back_stack_and_form_focus() {
     r.terminal.open();
     r.drain();
     stubCalls = 0;
-    r.feed("d\r");
+    r.feed("c\r");
     ScreenView view;
     view.accept(r.drain());
     TEST_ASSERT_TRUE(view.has("Client Tests"));
     TEST_ASSERT_EQUAL(0, stubCalls);
     r.feed("q\x1b[A");
     view.accept(r.drain());
-    TEST_ASSERT_TRUE(view.has("> [C] About"));
+    TEST_ASSERT_TRUE(view.has("> [B] Hardware Tests"));
     r.feed("\x1b[B");
     view.accept(r.drain());
-    TEST_ASSERT_TRUE(view.has("> [D] Client Tests"));
-    TEST_ASSERT_TRUE(view.has("> [D]"));
+    TEST_ASSERT_TRUE(view.has("> [C] Client Tests"));
+    TEST_ASSERT_TRUE(view.has("> [C]"));
     r.feed("3\r2\r");
     r.drain();
     r.feed("\x1b");

@@ -514,7 +514,7 @@ void Terminal::drawMenu() {
             grid_.rule(16);
             grid_.text(3, 17, "ARROWS: navigate / switch column   ENTER: select   Q: quit",
                        Ink::Body, cols_ - 5);
-            grid_.text(3, 18, "[D] Client Tests - serial client diagnostics", Ink::Muted,
+            grid_.text(3, 18, "[C] Client Tests - serial client diagnostics", Ink::Muted,
                        cols_ - 5);
         } else {
             grid_.text(3, 8, "   ______________", Ink::Title);
@@ -524,7 +524,7 @@ void Terminal::drawMenu() {
             grid_.text(cols_ - 22, 9, "| USRobotics \\", Ink::Title);
             grid_.text(cols_ - 22, 10, "| \\___________\\", Ink::Frame);
             grid_.text(3, 36, "ARROWS Navigate  ENTER Select  Q Quit", Ink::Body, divider - 4);
-            grid_.text(3, 37, "[D] Client Tests - serial only", Ink::Muted, divider - 4);
+            grid_.text(3, 37, "[C] Client Tests - serial only", Ink::Muted, divider - 4);
         }
         return;
     }

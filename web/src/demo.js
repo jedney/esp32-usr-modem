@@ -60,11 +60,11 @@ export function startDemoModem({message, write}) {
             });
             if (wide) {
                 put(3, 36, 'ARROWS Navigate  ENTER Select  Q Quit', ink.body, divider - 4);
-                put(3, 37, '[D] Client Tests - serial only', ink.disabled, divider - 4);
+                put(3, 37, '[C] Client Tests - serial only', ink.disabled, divider - 4);
             } else {
                 rule(rows - 9);
                 put(3, rows - 8, 'ARROWS Navigate  ENTER Select  Q Quit');
-                put(3, rows - 7, '[D] Client Tests - serial only', ink.disabled);
+                put(3, rows - 7, '[C] Client Tests - serial only', ink.disabled);
             }
         } else if (screen.id === 'phonebook') {
             put(3, 4, 'PHONEBOOK ENTRIES - DEMO fixture', ink.title);
@@ -116,7 +116,7 @@ export function startDemoModem({message, write}) {
     const key = ch => {
         if (ch === '\n' && swallowEnter) return;
         if ((ch === '\r' || ch === '\n') && swallowEnter) { swallowEnter = false; return; }
-        if (ch === 'HELP') { detail = 'DEMO help\nArrows select; Enter opens; menu hotkeys open immediately.\nEsc/Q Back; F2 Main. D lists serial-only Client Tests.\nPhonebook 4 simulates a call after confirmation; H ends it.\nAll device values and contacts in this preview are synthetic.'; redraw(); return; }
+        if (ch === 'HELP') { detail = 'DEMO help\nArrows select; Enter opens; menu hotkeys open immediately.\nEsc/Q Back; F2 Main. C lists serial-only Client Tests.\nPhonebook 4 simulates a call after confirmation; H ends it.\nAll device values and contacts in this preview are synthetic.'; redraw(); return; }
         if (ch === '\x1b' || ch.toUpperCase() === 'Q' || ch === 'EXIT') { back(); return; }
         if (ch === 'MAIN') { screen = null; detail = null; confirm = false; stack.length = 0; selected = 0; redraw(); return; }
         if (confirm) {
