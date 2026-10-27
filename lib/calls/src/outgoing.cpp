@@ -55,7 +55,27 @@ bool Outgoing::start(hostport::Session &session, const char *text, bool pulse) {
         return true;
     }
     reportSpeed_ = target_.speed || profile_.lineExplicit ? lineSpeed_ : modem_.model();
-    // Dial the number the user entered, never the digits in a hostname expansion.
+    // Dial the number the user entered, never the digits in a phonebook expansion.
+    // A hostname has no number, so its digits come from its IP address (see poll).
+    setDigits(r.kind == dialstring::Kind::Host ? "" : text);
+    session.port().wait(cancelWait, this, atcmd::Result::kNoCarrier);
+    if (profile_.get(modemcfg::kM) == 0 || profile_.get(modemcfg::kM) == 3) {
+        connect(clock_());
+    } else {
+        stage_ = CallStage::kDial;
+        if (r.kind == dialstring::Kind::Host) {
+            // Look the name up while the dial tone plays.
+            lookup_ = true;
+            since_ = clock_();
+            socket_.resolve(target_.host);
+        }
+        if (!play(SoundStage::kDial)) {
+            finish(atcmd::Result::kNoCarrier);
+        }
+    }
+    return true;
+}
+void Outgoing::setDigits(const char *text) {
     size_t count = 0;
     for (const char *p = text; *p && count < sizeof digits_ - 1; ++p) {
         if (*p >= '0' && *p <= '9') {
@@ -63,21 +83,29 @@ bool Outgoing::start(hostport::Session &session, const char *text, bool pulse) {
         }
     }
     digits_[count] = 0;
-    session.port().wait(cancelWait, this, atcmd::Result::kNoCarrier);
-    if (profile_.get(modemcfg::kM) == 0 || profile_.get(modemcfg::kM) == 3) {
-        connect(clock_());
-    } else {
-        stage_ = CallStage::kDial;
-        if (!play(SoundStage::kDial)) {
-            finish(atcmd::Result::kNoCarrier);
-        }
+}
+bool Outgoing::lookupDone(uint32_t now) {
+    socket_.poll();
+    SocketState state = socket_.state();
+    if (state == SocketState::kResolved) {
+        // Connect to the address that was dialled, without a second lookup.
+        strncpy(target_.host, socket_.address(), sizeof target_.host - 1);
+        target_.host[sizeof target_.host - 1] = 0;
+        setDigits(target_.host);
+        lookup_ = false;
+        return true;
     }
-    return true;
+    if (state == SocketState::kResolving && now - since_ < uint32_t(profile_.s[7]) * 1000) {
+        return false;
+    }
+    finish(atcmd::Result::kNoDialTone);
+    return false;
 }
 bool Outgoing::play(SoundStage stage) {
     return sound_.start(stage, digits_, pulse_, lineSpeed_, profile_);
 }
 void Outgoing::connect(uint32_t now) {
+    lookup_ = false;  // begin() replaces any unfinished lookup
     stage_ = CallStage::kConnecting;
     since_ = now;
     socket_.begin(target_.host, target_.port);
@@ -90,11 +118,6 @@ void Outgoing::connected() {
         return;
     }
     stage_ = CallStage::kOnline;
-    // CONNECT is already queued. Keep the socket/negotiation running while both
-    // payload directions remain held; serial callers retain unconsumed input.
-    if (modem_.active().get(modemcfg::kM) != 0) {
-        connection_.holdPayload(clock_(), connectDelayMs_);
-    }
     if (observer_) {
         observer_->connected(*session_);
     }
@@ -113,6 +136,7 @@ void Outgoing::cancel() {
         slot_.release(session_);
     }
     session_ = nullptr;
+    lookup_ = false;
     stage_ = CallStage::kIdle;
 }
 void Outgoing::finish(atcmd::Result result) {
@@ -170,6 +194,11 @@ void Outgoing::poll() {
         sound_.stop();
     }
     if (stage_ == CallStage::kDial && !sound_.running()) {
+        // Wait in silence after the dial tone if the lookup has not finished.
+        // With ATM0 the digits are not played, so the connect does its own lookup.
+        if (lookup_ && !silent && !lookupDone(now)) {
+            return;
+        }
         stage_ = CallStage::kDigits;
         if (!silent && !play(SoundStage::kDigits)) {
             finish(atcmd::Result::kNoCarrier);
@@ -201,7 +230,8 @@ void Outgoing::poll() {
         }
         return;
     }
-    if (stage_ != CallStage::kConnecting && stage_ != CallStage::kHandshake) {
+    if (stage_ != CallStage::kConnecting && stage_ != CallStage::kHandshake &&
+        stage_ != CallStage::kConnectDelay) {
         return;
     }
     connection_.poll(now);
@@ -225,7 +255,8 @@ void Outgoing::poll() {
         finish(atcmd::Result::kNoCarrier);
         return;
     }
-    if (now - since_ >= uint32_t(profile_.s[7]) * 1000) {
+    // The pause before CONNECT is a fixed, configured wait, so S7 does not apply to it.
+    if (stage_ != CallStage::kConnectDelay && now - since_ >= uint32_t(profile_.s[7]) * 1000) {
         finish(state == SocketState::kResolving ? atcmd::Result::kNoDialTone
                                                 : atcmd::Result::kNoAnswer);
         return;
@@ -242,6 +273,16 @@ void Outgoing::poll() {
         }
     }
     if (stage_ == CallStage::kHandshake && !sound_.running()) {
+        if (!connectDelayMs_) {
+            connected();
+            return;
+        }
+        // Pause after the handshake sound, before CONNECT. The socket keeps being
+        // serviced; host data waits until the call is up.
+        stage_ = CallStage::kConnectDelay;
+        delaySince_ = now;
+    }
+    if (stage_ == CallStage::kConnectDelay && (silent || now - delaySince_ >= connectDelayMs_)) {
         connected();
     }
 }

@@ -316,7 +316,8 @@ def test_streamed_handshake_completes_before_connect(call_console, server_ip):
         result = console.command(f"ATDT{server_ip}:{port}", timeout=35,
                                  until=("CONNECT 14400", "CONNECT 28800", "CONNECT 33600", "CONNECT 56000", "NO CARRIER", "NO ANSWER", "ERROR"))
         assert result[-1] == "CONNECT 14400"
-        assert time.monotonic() - started >= 16, "CONNECT preceded the handshake playback"
+        # Ringing, handshake and the 1000 ms pause all come before CONNECT.
+        assert time.monotonic() - started >= 17, "CONNECT preceded the handshake and delay"
         connected_at = time.monotonic()
         console.ser.write(b"streamed")
         received = b""
@@ -326,7 +327,6 @@ def test_streamed_handshake_completes_before_connect(call_console, server_ip):
         matched = b"streamed" in received
         del received
         assert matched, "streamed call echo mismatch (traffic omitted)"
-        assert time.monotonic() - connected_at >= 0.8, "payload arrived before post-CONNECT delay"
         escape(console)
         assert console.command("ATH")[-1] == "OK"
 

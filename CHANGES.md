@@ -14,6 +14,19 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [0.18] - 2026-10-27
+
+### Added
+
+- When dialling a hostname, look it up during the dial tone and play the digits of
+  its IP address, then connect to that address. A failed lookup gives NO DIAL TONE.
+
+### Fixed
+
+- Pause for the connect delay after the handshake sound and before sending
+  CONNECT, instead of holding data after CONNECT. The Sounds menu item is now
+  "Delay before CONNECT".
+
 ## [0.17] - 2026-10-27
 
 ### Added

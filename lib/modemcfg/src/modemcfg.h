@@ -115,7 +115,7 @@ struct Nvram {
     bool throttle = false;
     bool answerConsole = false;     // AT*ANSWERPORT, RS232 by default
     uint32_t ringDelayMs = 1500;    // outgoing ringback before TCP connection
-    uint32_t connectDelayMs = 250;  // payload hold after the handshake and CONNECT
+    uint32_t connectDelayMs = 250;  // pause after the handshake, before CONNECT
 };
 
 // As shipped: Y0 = &F1, Y1 = &F2, power-on from Y0, no stored numbers, speed from "AT".
@@ -129,7 +129,7 @@ Profile powerOnProfile(const Nvram &n);
 // before it. Multi-byte values are little-endian.
 //   Layout 1 (v0.4): y, templates, phone numbers.
 //   Layout 2 (v0.5): adds hostBaud after the phone numbers.
-//   Layout 5 (v0.17): appends ringback and post-CONNECT delay milliseconds.
+//   Layout 5 (v0.17): appends ringback and pre-CONNECT delay milliseconds.
 constexpr uint8_t kLayoutVersion = 5;
 constexpr size_t kBlobSizeV1 =
     4 + 1 + 1 + kTemplates * (kSettingCount + kSRegCount + 4) + kPhoneSlots * kPhoneLen + 4;

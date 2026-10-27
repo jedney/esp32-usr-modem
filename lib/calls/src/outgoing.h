@@ -29,6 +29,7 @@ enum class CallStage : uint8_t {
     kRingback,
     kConnecting,
     kHandshake,
+    kConnectDelay,
     kOnline,
     kBusy
 };
@@ -58,6 +59,8 @@ private:
     void connected();
     void finish(atcmd::Result result);
     bool play(SoundStage stage);
+    void setDigits(const char *text);
+    bool lookupDone(uint32_t now);
     void endObservation(atcmd::Result result) {
         if (observed_ && observer_) {
             observer_->ended(result);
@@ -77,8 +80,8 @@ private:
     modemcfg::Profile profile_ = {};
     char digits_[33] = {};
     uint32_t lineSpeed_ = 14400, reportSpeed_ = 14400, since_ = 0;
-    uint32_t ringDelayMs_ = 1500, connectDelayMs_ = 250;
-    bool pulse_ = false, dtrWasOn_ = false;
+    uint32_t ringDelayMs_ = 1500, connectDelayMs_ = 250, delaySince_ = 0;
+    bool pulse_ = false, dtrWasOn_ = false, lookup_ = false;
     CallStage stage_ = CallStage::kIdle;
     Observer *observer_ = nullptr;
     bool observed_ = false;

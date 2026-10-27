@@ -56,6 +56,8 @@ public:
     std::string input, output;
     size_t chunk = 256;
     void begin(const char *, uint16_t) override {}
+    void resolve(const char *) override {}
+    const char *address() const override { return ""; }
     void poll() override {}
     SocketState state() const override { return status; }
     size_t write(const uint8_t *data, size_t n) override {

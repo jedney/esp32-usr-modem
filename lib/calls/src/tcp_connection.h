@@ -6,6 +6,7 @@ namespace calls {
 enum class SocketState : uint8_t {
     kClosed,
     kResolving,
+    kResolved,  // after resolve(): address() holds the IPv4 address; no connection
     kPending,
     kOpen,
     kDnsError,
@@ -19,6 +20,10 @@ class Socket {
 public:
     virtual ~Socket() = default;
     virtual void begin(const char *host, uint16_t port) = 0;
+    // Looks up a name without connecting. state() goes kResolving, then kResolved
+    // (address() gives the dotted IPv4 address) or kDnsError. close() abandons it.
+    virtual void resolve(const char *host) = 0;
+    virtual const char *address() const = 0;
     virtual void poll() = 0;
     virtual SocketState state() const = 0;
     virtual size_t write(const uint8_t *data, size_t len) = 0;
@@ -30,7 +35,6 @@ class TcpConnection : public hostport::Connection {
 public:
     explicit TcpConnection(Socket &socket) : socket_(socket) {}
     void begin(bool raw);
-    void holdPayload(uint32_t nowMs, uint32_t durationMs);
     size_t space() const override;
     size_t write(const uint8_t *data, size_t len) override;
     size_t read(uint8_t *buf, size_t cap) override;
@@ -42,6 +46,5 @@ private:
     Socket &socket_;
     Telnet telnet_;
     bool raw_ = false;
-    uint32_t holdSince_ = 0, holdMs_ = 0;
 };
 }  // namespace calls

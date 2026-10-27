@@ -6,27 +6,16 @@ SocketState connectErrorState(int error) {
                                                         : SocketState::kFailed;
 }
 void TcpConnection::begin(bool raw) {
-    holdMs_ = 0;
     raw_ = raw;
     telnet_.begin();
     if (raw_) {
         telnet_.tx.clear();
     }
 }
-void TcpConnection::holdPayload(uint32_t nowMs, uint32_t durationMs) {
-    holdSince_ = nowMs;
-    holdMs_ = durationMs;
-}
 size_t TcpConnection::space() const {
-    if (holdMs_) {
-        return 0;
-    }
     return raw_ ? telnet_.tx.space() : telnet_.space();
 }
 size_t TcpConnection::write(const uint8_t *data, size_t len) {
-    if (holdMs_) {
-        return 0;
-    }
     if (!raw_) {
         return telnet_.write(data, len);
     }
@@ -37,25 +26,17 @@ size_t TcpConnection::write(const uint8_t *data, size_t len) {
     return n;
 }
 size_t TcpConnection::read(uint8_t *buf, size_t cap) {
-    if (holdMs_) {
-        return 0;
-    }
     return telnet_.rx.read(buf, cap);
 }
 bool TcpConnection::isOpen() const {
     return socket_.state() == SocketState::kOpen || telnet_.rx.size() != 0;
 }
 void TcpConnection::close() {
-    holdMs_ = 0;
     socket_.close();
     telnet_.rx.clear();
     telnet_.tx.clear();
 }
-void TcpConnection::poll(uint32_t nowMs) {
-    const uint32_t elapsed = nowMs - holdSince_;
-    if (holdMs_ && elapsed < UINT32_MAX / 2 && elapsed >= holdMs_) {
-        holdMs_ = 0;
-    }
+void TcpConnection::poll(uint32_t) {
     socket_.poll();
     if (socket_.state() != SocketState::kOpen) {
         return;

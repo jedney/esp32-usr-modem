@@ -54,10 +54,30 @@ void TcpSocket::resolved(const char *name, const ip_addr_t *address, void *conte
 void TcpSocket::begin(const char *host, uint16_t port) {
     close();
     port_ = port;
+    resolveOnly_ = false;
+    lookup(host);
+}
+void TcpSocket::resolve(const char *host) {
+    close();
+    resolveOnly_ = true;
+    lookup(host);
+}
+void TcpSocket::found(uint32_t address) {
+    if (!resolveOnly_) {
+        connectAddress(address);
+        return;
+    }
+    ip4_addr_t ip;
+    ip4_addr_set_u32(&ip, address);
+    ip4addr_ntoa_r(&ip, resolved_, sizeof resolved_);
+    state_ = SocketState::kResolved;
+}
+void TcpSocket::lookup(const char *host) {
+    resolved_[0] = 0;
     state_ = SocketState::kResolving;
     ip_addr_t address;
     if (ipaddr_aton(host, &address) && IP_IS_V4(&address)) {
-        connectAddress(ip4_addr_get_u32(ip_2_ip4(&address)));
+        found(ip4_addr_get_u32(ip_2_ip4(&address)));
         return;
     }
     if (pending_.load() >= 4) {
@@ -78,7 +98,7 @@ void TcpSocket::begin(const char *host, uint16_t port) {
         --pending_;
         delete request;
         if (result == ERR_OK && IP_IS_V4(&address)) {
-            connectAddress(ip4_addr_get_u32(ip_2_ip4(&address)));
+            found(ip4_addr_get_u32(ip_2_ip4(&address)));
         } else {
             state_ = SocketState::kDnsError;
         }
@@ -130,7 +150,7 @@ void TcpSocket::poll() {
         uint32_t address = address_.load();
         portEXIT_CRITICAL(&dnsLock_);
         if (result == 1) {
-            connectAddress(address);
+            found(address);
         } else if (result == 2) {
             state_ = SocketState::kDnsError;
         }
