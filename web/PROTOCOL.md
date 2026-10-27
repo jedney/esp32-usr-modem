@@ -21,8 +21,8 @@ Series and its runtime accent, with Model in Settings. The logo always stays red
 The 80x25 cell grid and generated catalogue come from the supplied `ui/` handoff;
 wide menus add description cards and Phonebook action/details panes.
 The factory model remains 14.4k. Selection affects ATI identity and default CONNECT
-reporting only, not the supported commands, speeds or other features. See
-`docs/v0.8-plan.md` for the confirmed command, persistence and reporting rules.
+reporting only, not the supported commands, speeds or other features (see
+`docs/COMMANDS.md`).
 The selector maps to `AT*MODEL=14400|28800|33600|56000` and saves device-wide
 immediately. A change affects the next call's reporting default; an explicit
 phonebook/`&N` speed wins, and the current call's CONNECT/ATO speed stays stable.
@@ -37,7 +37,7 @@ serves `data/www/<file>.gz` with `Content-Encoding: gzip`.
 Assets are compressed into the existing LittleFS image, including the small
 generated `ui-data.js` catalogue for the explicitly synthetic browser demo.
 
-## HTTP endpoints (v0.11 firmware)
+## HTTP endpoints
 
 | Method and path | Auth | Purpose |
 |---|---|---|
@@ -52,7 +52,10 @@ rebinding). Changes need a CSRF token (sent to the page on the WebSocket).
 The listener defaults on; `AT*WEB[?]` and `AT*WEB=ON|OFF` query/change its saved
 setting. OFF closes sockets and tickets. Serial access can re-enable it.
 All files require Digest (`qop=auth`, MD5 HA1 from the device store); no Basic
-fallback. Nonces expire after 60 seconds and nonce counts must increase. Successful
+fallback. Nonces expire after 60 seconds and nonce counts must increase. A correct
+response with an expired, replaced or replayed nonce gets a new challenge with
+`stale=true`, so the browser retries without asking for the password again. A wrong
+response is answered after a one-second delay to slow down password guessing. Successful
 authentication removes the initial boot password; a storage failure refuses access.
 Password changes invalidate nonces, socket tickets and existing connections.
 
@@ -81,12 +84,18 @@ files are not reachable. Responses set CSP, no-sniff, no-referrer and frame deni
 | `wifi` | `state`: `up`, `connecting`, `down`; `ssid`; `rssi` (dBm); `ip` | On connect, on change, and every 10 s while up |
 | `access` | `edit`: boolean | Interactive ownership changes; false means read-only |
 | `hardware` | `active`: boolean; `mode`: `lines` when applicable | Show/disable line controls and test-stop button |
+| `pong` | None | Reply to the browser's `{"t":"ping"}` text heartbeat |
 
-v0.12 serial Client Tests publish call state `test`. Their browser menu is a
+Serial Client Tests publish call state `test`. Their browser menu is a
 reference listing: execution and transfer handlers reject browser-originated
 requests. Serial tests retain the shared reservation, keeping other browsers
 read-only. Serial protocol bytes never enter WebSocket output.
-| `pong` | None | Reply to the browser's `{"t":"ping"}` text heartbeat |
+
+The browser sends `{"t":"ping"}` every five seconds and reconnects after 15 seconds
+without a frame, covering half-open TCP connections after a power cycle. The
+watchdog pauses during its own upload; success explicitly starts a new connection.
+Old socket callbacks and ticket fetches cannot replace the new session. Heartbeats
+are handled in the transport and never enter terminal input or light RD/SD.
 
 The upgrade also requires a same-modem HTTP Origin. Invalid Origin does not consume
 a ticket. Binary terminal input is authorized by the single-use upgrade capability
@@ -121,12 +130,6 @@ buttons, which send ordinary terminal keys. Disconnect stops an interactive test
 and restores modem control. CP437 output is translated only at the browser boundary.
 
 ## Image upload
-
-The browser sends `{"t":"ping"}` every five seconds and reconnects after 15 seconds
-without a frame, covering half-open TCP connections after a power cycle. The
-watchdog pauses during its own upload; success explicitly starts a new connection.
-Old socket callbacks and ticket fetches cannot replace the new session. Heartbeats
-are handled in the transport and never enter terminal input or light RD/SD.
 
 The toolbar selects a raw project `.bin`. The page reads its embedded
 `USRMODEM/1/FIRMWARE/<major.minor>\n` or `USRMODEM/1/LITTLEFS/<major.minor>\n`
@@ -179,8 +182,9 @@ Example:
 ## Demo mode
 
 Open `index.html?demo` (or the single-file preview from `python scripts/make_preview.py`)
-to run the page against a simulated modem: press **D** to fake a call to phonebook
-entry 1 and **H** to hang up. The demo's menu is a mock-up, not the final screen.
+to run the page against a simulated modem: in the phonebook, **4** (Dial) fakes a call
+after confirmation and **H** hangs up. All demo values are synthetic; the real screen
+comes from the firmware.
 
 ## Tests
 

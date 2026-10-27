@@ -1,24 +1,13 @@
-# USRobotics Sportster BBS UI — 80×25 Codex handoff
+# Sportster configuration screen design
 
-v0.12 integration: C opens Client Tests on serial; the browser lists them without
-execution. The catalogue now has 72 nested actions (57 original plus 15 client
-actions). This supersedes the original disabled-placeholder instructions below.
-
-
-This is **a design and implementation contract**, not a deployable program. The package supports four modem identities, a first-class **80×25 terminal**, and an enhanced wide-terminal rendition inspired by the supplied 28.8k images.
-
-This repository now consumes the contract in `lib/config/src/`. See
-[`docs/sportster-ui-implementation.md`](../docs/sportster-ui-implementation.md)
-for service bindings, keyboard controls, geometry, validation and remaining manual
-acceptance. `scripts/generate_ui.py` builds the firmware catalogue and labelled
-browser DEMO data; the preview PNGs are never used as application screens.
-
-## Quick start in VS Code / Codex
-
-1. Copy the entire `ui/` folder into your application's repository root.
-2. Open the repository in VS Code and start Codex within it.
-3. Tell Codex: **"Implement the task in `ui/CODEX_PROMPT.md`, following `ui/DESIGN_SPEC.md`. Inspect this repository first."**
-4. Inspect actual implementation and run its tests. The reference previews do not replace functional UI tests.
+This folder is the design contract for the configuration screen: four model themes, the
+canonical 80x25 layout and the wider layout for larger terminals. The firmware renders
+it in `lib/config/src/`, and `scripts/generate_ui.py` builds the firmware catalogue and
+the browser demo data from `menu-definition.json`. Main menu keys A-D are About,
+Hardware Tests, Client Tests and Command Reference; Client Tests run on serial only and
+the browser lists them for reference. The preview images are references, never
+application screens. The original implementation notes are in
+[`docs/history/sportster-ui-implementation.md`](../docs/history/sportster-ui-implementation.md).
 
 ## Files
 
@@ -48,13 +37,3 @@ python ui/tools/render_previews.py
 ```
 
 The previews deliberately use `Link: UNKNOWN`, `Profile: --`, and an unbound Phonebook. No real modem has been queried; no fake contacts or serial numbers have been inserted. For an unknown runtime model, the actual implementation should show an explicit unknown-model state instead of treating the 28.8k preview as a default.
-
-## Differences from the previous 28.8k-only handoff
-
-- Four **AT*MODEL-selected** Sportster model themes, with exact colours.
-- **80×25 is canonical**, and **all 13** main options remain visible in compact two-column text layout.
-- Compact child screens have a shorter banner; up to 15 individual submenu actions fit per screen.
-- Phonebook swaps wide split panes for a paged full-width table at 80×25.
-- Client Tests version changed from **v0.13 to v0.12**, per the latest instruction; still unavailable.
-- New measured `.txt`, `.ans` and PNG previews plus reproducible tests.
-- Refined keyboard/navigation, unknown device-state handling, and security guidance.

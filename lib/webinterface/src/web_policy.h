@@ -42,13 +42,24 @@ private:
     size_t remaining_ = 0;
 };
 
+// Result of checking an Authorization header.
+//   kMissing: no usable Digest header (first request, or malformed)
+//   kStale:   correct password, but the nonce expired, was replaced or was replayed;
+//             the next challenge says stale=true so the browser retries silently
+//   kWrong:   wrong password or response (the caller slows the next attempt)
+enum class Check : uint8_t { kOk, kMissing, kStale, kWrong };
+
 class Auth {
 public:
     explicit Auth(Crypto &crypto) : crypto_(crypto) {}
     void reset();
-    std::string challenge(uint32_t now);
-    bool verify(const std::string &header, const std::string &method, const std::string &uri,
+    std::string challenge(uint32_t now, bool stale = false);
+    Check check(const std::string &header, const std::string &method, const std::string &uri,
                 const char *ha1, uint32_t now);
+    bool verify(const std::string &header, const std::string &method, const std::string &uri,
+                const char *ha1, uint32_t now) {
+        return check(header, method, uri, ha1, now) == Check::kOk;
+    }
     bool token(char out[33]);
 
 private:

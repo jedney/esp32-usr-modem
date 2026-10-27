@@ -1,6 +1,7 @@
 #pragma once
 #include <LittleFS.h>
 #include <memory>
+#include "file_store.h"
 #include "outgoing.h"
 #include "wav.h"
 
@@ -8,6 +9,9 @@ namespace hw {
 class FileReader : public sounds::Reader {
 public:
     bool open(const char *path) {
+        if (!fileExists(path)) {
+            return false;
+        }
         file_ = LittleFS.open(path, "r");
         return bool(file_);
     }
@@ -35,6 +39,10 @@ private:
     int16_t samples_[256] = {};
     size_t count_ = 0, sent_ = 0;
     uint32_t since_ = 0;
+    // The pot is read at most every 50 ms: 16 ADC reads each loop cost serial time.
+    float potLevel_ = 0.0f;
+    uint32_t potAt_ = 0;
+    bool potRead_ = false;
     bool active_ = false, draining_ = false, eof_ = false;
     bool failed_ = false;
     sounds::WavSource *wav_ = nullptr;

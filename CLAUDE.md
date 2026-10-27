@@ -15,7 +15,10 @@ Owner: Jon Edney. Windows 11 PC, VS Code + PlatformIO, repo at `C:\repo\esp32-us
 - **`docs/decisions-log.md`**: append every new decision or spec change made while
   coding here (date, what, why). Don't edit `docs/project-brief.md`: its master copy is
   shared with other workstreams, and Jon merges the log back into it.
+- `docs/COMMANDS.md`: the complete command reference. Update it with every command or
+  option change, together with `AT*HELP` and the README.
 - `test/README.md`: feature-to-test matrix. `web/PROTOCOL.md`: web page ↔ firmware protocol.
+- `docs/history/`: plans and validation notes from earlier versions (read-only record).
 - `credits/LICENSES.md`: licensing record. Update it whenever third-party code, a
   library or a sound file is added.
 

@@ -2,7 +2,7 @@
 
 These tests talk to a real modem over serial ports:
   --console-port   the USB maintenance console (UART0, 115200), e.g. COM5
-  --rs232-port     the RS232 port through the Unitek adapter, e.g. COM7 (later versions)
+  --rs232-port     the RS232 port through the Unitek adapter, e.g. COM18
 
 Tests that need a port that was not given are skipped, so the suite is safe to run
 anywhere.

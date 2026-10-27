@@ -154,7 +154,7 @@ bool Service::start(const char *command, const char *args, uint32_t now) {
         complete("OK");
     } else if (!strcmp(args, "CABLE")) {
         if (!port_) {
-            complete("Unavailable on console: host RS232 cable test runs on COM18.");
+            complete("Unavailable on console: run the cable test on the RS232 port.");
         } else {
             text(
                 "DTR/RTS live; DSR always on (hard-wired). DCD/RI/CTS toggle every 1 s.\r\n"

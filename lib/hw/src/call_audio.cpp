@@ -117,6 +117,7 @@ void CallAudio::stop() {
     wav_ = nullptr;
     active_ = draining_ = eof_ = false;
     failed_ = false;
+    potRead_ = false;
     count_ = sent_ = 0;
 }
 void CallAudio::poll(uint32_t now, const modemcfg::Profile &profile) {
@@ -142,9 +143,13 @@ void CallAudio::poll(uint32_t now, const modemcfg::Profile &profile) {
             return;
         }
     }
-    float level = volume::potLevel(potRaw(), kPotMax);
+    if (!potRead_ || now - potAt_ >= 50) {
+        potLevel_ = volume::potLevel(potRaw(), kPotMax);
+        potAt_ = now;
+        potRead_ = true;
+    }
     sent_ += audioStreamWrite(samples_ + sent_, count_ - sent_,
-                              volume::speakerGain(level, profile.get(modemcfg::kL)));
+                              volume::speakerGain(potLevel_, profile.get(modemcfg::kL)));
     if (eof_ && sent_ == count_) {
         draining_ = true;
         since_ = now;

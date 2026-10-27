@@ -248,7 +248,6 @@ bool modemIdle() {
 bool networkUp() {
     return net.up();
 }
-uint32_t msNow();
 
 // --- AT* commands -----------------------------------------------------------------------
 
@@ -325,8 +324,6 @@ atcmd::Reply cmdHw(atcmd::Port &port, const char *args) {
                        !strcmp(args, "LINES")
                            ? "{\"t\":\"hardware\",\"active\":true,\"mode\":\"lines\"}"
                            : "{\"t\":\"hardware\",\"active\":true}");
-    }
-    if (port.browser()) {
         hwconsole::handle(browserTerm, args);
     } else if (isRs232(port)) {
         Rs232Term t(port);
@@ -582,8 +579,7 @@ public:
                 }
                 file = dir.openNextFile();
             }
-            port.line(
-                "1200 recording: CC0 guitarguy1985; other speeds: generic public-domain fallback.");
+            port.line("Handshake recordings: Gough Lui's modem sound collection (see About).");
             return Reply::kOk;
         }
         if (!strcmp(name, "PLAY")) {
@@ -925,6 +921,12 @@ void publishWebStatus() {
                                ",\"ip\":" + webinterface::jsonString(ip) + "}",
                            true);
     }
+    // The call summary is rebuilt at most ten times a second, not on every loop pass.
+    static uint32_t callAt = 0;
+    if (callAt && now - callAt < 100) {
+        return;
+    }
+    callAt = now ? now : 1;
     const char *state = "idle";
     if ((consoleClient && consoleClient->isOpen()) || (hostClient && hostClient->isOpen())) {
         state = "test";

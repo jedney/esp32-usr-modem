@@ -1,7 +1,17 @@
 #pragma once
 #include <LittleFS.h>
+#include <sys/stat.h>
+#include <cstdio>
 #include "modemcfg.h"
 namespace hw {
+// True if a LittleFS file exists. LittleFS.exists() and open() print a core error
+// on the console for a missing file; stat() on the mounted path does not.
+inline bool fileExists(const char *path) {
+    char full[96];
+    struct stat info;
+    return snprintf(full, sizeof full, "/littlefs%s", path) < int(sizeof full) &&
+           stat(full, &info) == 0;
+}
 // LittleFS rename commits one complete blob atomically, retaining the old file if
 // a write fails. Used for history so a full phonebook cannot exhaust the small NVS.
 class FileStore : public modemcfg::Store {
@@ -19,7 +29,7 @@ public:
             return n;
         }
         // A nonempty sentinel distinguishes damaged storage from an empty history.
-        if (LittleFS.exists(path_) || LittleFS.exists(backup_)) {
+        if (fileExists(path_) || fileExists(backup_)) {
             out[0] = 0;
             return 1;
         }
@@ -37,7 +47,7 @@ public:
             LittleFS.remove(temporary_);
             return false;
         }
-        if (primaryGood_ && LittleFS.exists(path_) && !LittleFS.rename(path_, backup_)) {
+        if (primaryGood_ && fileExists(path_) && !LittleFS.rename(path_, backup_)) {
             return false;
         }
         primaryGood_ = false;
@@ -50,15 +60,18 @@ public:
         if (!ready) {
             return false;
         }
-        bool ok = !LittleFS.exists(path_) || LittleFS.remove(path_);
-        ok = (!LittleFS.exists(temporary_) || LittleFS.remove(temporary_)) && ok;
-        ok = (!LittleFS.exists(backup_) || LittleFS.remove(backup_)) && ok;
+        bool ok = !fileExists(path_) || LittleFS.remove(path_);
+        ok = (!fileExists(temporary_) || LittleFS.remove(temporary_)) && ok;
+        ok = (!fileExists(backup_) || LittleFS.remove(backup_)) && ok;
         primaryGood_ = false;
         return ok;
     }
 
 private:
     size_t read(const char *path, uint8_t *out, size_t cap) {
+        if (!fileExists(path)) {
+            return 0;
+        }
         File file = LittleFS.open(path, "r");
         if (!file) {
             return 0;
