@@ -3,7 +3,7 @@
 import importlib.util
 import os
 
-KEY = "USR_MODEM_OTA_PASSWORD"
+KEY = "USR_MODEM_PASSWORD"
 CALLBACK_PORT = 32320
 
 

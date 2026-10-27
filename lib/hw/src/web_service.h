@@ -23,6 +23,7 @@ public:
     bool connected(uint32_t id);
     size_t read(uint32_t id, uint8_t *data, size_t cap);
     void discardInput(uint32_t id);
+    bool takeSize(uint32_t id, unsigned &columns, unsigned &rows);
     bool write(uint32_t id, const uint8_t *data, size_t len);
     size_t space(uint32_t id);
     void text(uint32_t id, const std::string &message);
@@ -43,6 +44,8 @@ private:
         uint32_t id = 0;
         int fd = -1;
         bool active = false, fragmented = false, close = false;
+        bool sizeChanged = false;
+        unsigned columns = 80, rows = 25;
         std::string csrf;
         webinterface::Queue<2048> input;
         webinterface::Queue<16384> output;

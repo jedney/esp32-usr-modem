@@ -150,7 +150,7 @@ size_t Session::fromHost(const uint8_t *data, size_t len, uint32_t nowMs) {
         const Profile &p = profile();
         const uint8_t b = data[used];
         const FlowMode f = flowMode(p);
-        if (f.obeyXonXoff && (b == p.s[22] || b == p.s[23])) {
+        if (!conn_->binaryService() && f.obeyXonXoff && (b == p.s[22] || b == p.s[23])) {
             xoff_ = b == p.s[23];
             if (f.stripXonXoff) {
                 ++used;
@@ -169,7 +169,8 @@ size_t Session::fromHost(const uint8_t *data, size_t len, uint32_t nowMs) {
         if (localEcho) {
             echo_[echoLen_++] = b;
         }
-        esc_.onByte(b, nowMs, p);
+        if (!conn_->binaryService())
+            esc_.onByte(b, nowMs, p);
         ++used;
     }
     return used;
@@ -261,7 +262,7 @@ void Session::tick(uint32_t nowMs, bool dtr) {
             endCall(true);  // the far end hung up
         }
     }
-    if (mode_ == Mode::kOnline && esc_.poll(nowMs, p)) {
+    if (mode_ == Mode::kOnline && !conn_->binaryService() && esc_.poll(nowMs, p)) {
         conn_->escaped();
         mode_ = Mode::kOnlineCommand;
         if (baudControl_) {

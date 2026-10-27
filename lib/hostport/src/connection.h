@@ -19,6 +19,7 @@ public:
     virtual bool isOpen() const = 0;  // false once the far end has gone (NO CARRIER)
     virtual void close() = 0;         // hang up from this end
     virtual bool localService() const { return false; }
+    virtual bool binaryService() const { return false; }
     virtual void escaped() {}
     virtual void poll(uint32_t nowMs) { (void)nowMs; }
 };

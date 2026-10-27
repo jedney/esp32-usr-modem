@@ -34,9 +34,9 @@ def _boot_password(banner):
 def _save_password(password):
     path = REPO_ROOT / ".env"
     text = path.read_text(encoding="utf-8") if path.exists() else ""
-    row = f"USR_MODEM_OTA_PASSWORD='{password}'"
-    if re.search(r"^USR_MODEM_OTA_PASSWORD=", text, re.M):
-        text = re.sub(r"^USR_MODEM_OTA_PASSWORD=.*$", lambda _: row, text, flags=re.M)
+    row = f"USR_MODEM_PASSWORD='{password}'"
+    if re.search(r"^USR_MODEM_PASSWORD=", text, re.M):
+        text = re.sub(r"^USR_MODEM_PASSWORD=.*$", lambda _: row, text, flags=re.M)
     else:
         text = text.rstrip() + "\n" + row + "\n"
     path.write_text(text, encoding="utf-8", newline="\n")
@@ -48,7 +48,7 @@ def managed_device(console, request):
         pytest.skip("password changes need --device-tests")
     password = getattr(request.config, "_device_test_password", None)
     if password is None:
-        candidate = os.environ.get("USR_MODEM_OTA_PASSWORD", "")
+        candidate = os.environ.get("USR_MODEM_PASSWORD", "")
         password = candidate if 8 <= len(candidate) <= 32 and all(
             32 <= ord(c) <= 126 for c in candidate
         ) else "".join(secrets.choice(ALPHABET) for _ in range(12))
@@ -64,7 +64,7 @@ def managed_device(console, request):
         _ok(console, "AT*PASS=" + password)
         _ok(console, "AT*OTA=ALWAYS")
         _ok(console, "ATE1")
-        if request.config.getoption("--save-ota-password"):
+        if request.config.getoption("--save-password"):
             _save_password(password)
 
 
@@ -73,7 +73,7 @@ def _upload(password, host):
     if not pio:
         pio = str(pathlib.Path.home() / ".platformio" / "penv" / "Scripts" / "pio.exe")
     env = os.environ.copy()
-    env["USR_MODEM_OTA_PASSWORD"] = password
+    env["USR_MODEM_PASSWORD"] = password
     # Every attempt goes through the normal upload gate, including expected failures.
     env.pop("USR_MODEM_SKIP_TESTS", None)
     result = subprocess.run(

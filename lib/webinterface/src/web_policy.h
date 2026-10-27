@@ -17,6 +17,8 @@ bool allowedHost(const std::string &value, const std::string &name, const std::s
 bool allowedOrigin(const std::string &value, const std::string &name, const std::string &ip);
 std::string jsonString(const char *value);
 std::string terminalUtf8(const uint8_t *bytes, size_t len, bool cp437);
+// Strict bounded geometry envelope, distinct from terminal input.
+bool terminalSize(const std::string &message, unsigned &columns, unsigned &rows);
 int compareVersions(const std::string &a, const std::string &b);  // -2 = invalid
 // One HTTP request per connection (WebSocket upgrade is the exception). Reject
 // duplicate security headers before IDF's first-value-only header lookup.

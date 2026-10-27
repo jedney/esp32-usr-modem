@@ -63,8 +63,24 @@ reset. Loopback-plug, physical listening/panel and real Amiga checks remain open
 | v0.13 | **Internet dial-up**: PPP on `ATDT666` and SLIP on `ATDT667` (port from Zimodem), NAT, clean hang-up | 6.6 | Windows 9x or Amiga TCP stack browses the web through the modem |
 | v1.0 | **Production**: final build in the case (pin map already confirmed by Electronics, Q76, and applied in v0.6), all on-board and end-to-end tests pass, README and About complete | all | Jon's sign-off |
 
+Implemented, automated bench acceptance passed: **v0.12 Client Tests**, including the existing device-password variable
+rename and Sportster terminal/browser UI in one release commit (Jon, 27 Oct).
+See `docs/v0.12-plan.md`. Save one client profile per port (console and RS232).
+Jon selected PuTTY and authorizes installing lrzsz for transfer tests. No Amiga is
+available, so its acceptance remains outstanding. Console COM15, Unitek COM18;
+all components are wired. 361 native, 22 browser-unit, nine script and five
+design checks pass, along with three new on-board checks, nine client E2E cases,
+ten wired transfers and 12 independent transfer cases against each of two lrzsz
+versions. Final browser acceptance is 16 passed / one opt-in skip. PuTTY launch
+was blocked by computer-use product policy; its visual check and Amiga remain
+manual. Normal v0.12 and matching LittleFS are installed; Jon declined a backup.
+
 Notes:
 
+- The Sportster UI handoff is implemented in the working tree for the next bundled
+  release: 80x25 first, four model themes, adaptive wide browser layout, Phonebook
+  selection and safe keyboard/forms. Bundled and deployed as v0.12; see
+  `docs/sportster-ui-implementation.md`. v0.12 enables Client Tests on serial; its browser listing remains serial-only.
 - v0.10's configuration and v0.11's web interface must expose the shared
   `AT*ANSWERPORT` receiver setting alongside S0; the factory destination is RS232.
 - **v0.8 model update (Jon, 25 Oct):** implemented `AT*MODEL=` for Sportster 14.4k, 28.8k,

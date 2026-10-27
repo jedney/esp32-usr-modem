@@ -59,6 +59,9 @@ public:
     atcmd::Port &port() { return port_; }
     Mode mode() const { return mode_; }
     bool localOpen() const { return local_ != nullptr; }
+    bool binaryLocal() const {
+        return (local_ && local_->binaryService()) || (conn_ && conn_->binaryService());
+    }
     uint32_t payloadSent() const { return payloadSent_; }
     uint32_t payloadReceived() const { return payloadReceived_; }
     bool startLocal(Connection &connection);

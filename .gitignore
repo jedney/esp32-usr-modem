@@ -23,5 +23,5 @@ data/image-id.txt
 web/preview.html
 web/node_modules/
 
-# Local secrets: Wi-Fi and OTA passwords for tests and uploads (see .env.example)
+# Local secrets: Wi-Fi and device passwords (OTA and web) for tests and uploads (see .env.example)
 .env

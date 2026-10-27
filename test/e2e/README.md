@@ -1,8 +1,14 @@
 # End-to-end tests
 
+v0.12 adds `test_client.py` for COM15/COM18 diagnostics, confirmed per-port
+settings/reboot retention (original records restored), RTS pauses and cable
+signal restoration. `test/interop/serial_lrzsz.py` tests real X/Y/ZMODEM transfers
+through Windows pyserial and Ubuntu lrzsz without WSL serial mapping. Its source
+is deterministic generated data; uploads are discarded. Close PuTTY first.
+
 v0.11 web acceptance: add `--web-tests --web-host usr-modem.local` with
 `--console-port COM15 --rs232-port COM18`. HTTP Digest uses the existing
-`USR_MODEM_OTA_PASSWORD` in memory. The normal web suite does not upload images,
+`USR_MODEM_PASSWORD` in memory. The normal web suite does not upload images,
 rotate credentials or erase history. It tests authentication, socket tickets,
 single-menu ownership, read-only views, CSRF rejection and physical line controls.
 Full filesystem acceptance needs explicit approval because replacement erases history.
@@ -81,12 +87,13 @@ command. The password is never printed, even when a test fails.
 checks are read-only. Password changes require `--device-tests`; the reset additionally
 requires `--factory-reset`, and real firmware uploads require `--ota-upload`. The reset
 erases all settings, rejoins the Wi-Fi in `.env`, and leaves modem settings at defaults.
-The configured OTA password is restored afterwards; if none exists, one is generated.
-`--save-ota-password` saves that final credential to the git-ignored `.env`, preserving
-the other entries, so the VS Code OTA task works afterwards.
+The configured device password (OTA and web) is restored afterwards; if none exists,
+one is generated. `--save-password` saves that final credential as `USR_MODEM_PASSWORD`
+in the git-ignored `.env`, preserving the other entries, so OTA uploads and web tests
+use the same password afterwards.
 
 ```powershell
-python -m pytest test/e2e/test_device.py --console-port COM15 --device-tests --factory-reset --ota-upload --save-ota-password --tb=short
+python -m pytest test/e2e/test_device.py --console-port COM15 --device-tests --factory-reset --ota-upload --save-password --tb=short
 ```
 
 Uploads use `pio run -e s3_ota -t upload`, including the native-test gate for each

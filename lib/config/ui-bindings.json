@@ -1,0 +1,590 @@
+{
+  "status": {
+    "screen": "Main",
+    "command": "*STATUS",
+    "help": "Call, front panel, network and host serial",
+    "target": "Main"
+  },
+  "phonebook": {
+    "screen": "Main",
+    "command": "",
+    "help": "List, add, edit, delete and dial",
+    "target": "Phonebook"
+  },
+  "phonebook.list-entries": {
+    "screen": "Phonebook",
+    "command": "*PHONEBOOK?",
+    "help": "64 entries; number 1 is Amiga Retro BBS by default",
+    "target": "Phonebook"
+  },
+  "phonebook.add-edit-entry": {
+    "screen": "Phonebook",
+    "command": "*PHONEBOOK=",
+    "help": "number,host,port,TELNET|RAW[,speed]; saved immediately",
+    "target": "Phonebook",
+    "input": true
+  },
+  "phonebook.delete-entry": {
+    "screen": "Phonebook",
+    "command": "*PHONEDELETE=",
+    "help": "number; saved immediately",
+    "target": "Phonebook",
+    "input": true
+  },
+  "phonebook.dial": {
+    "screen": "Phonebook",
+    "command": "*DIAL=",
+    "help": "phonebook number or host:port; leaves menu",
+    "target": "Phonebook",
+    "input": true,
+    "secret": false,
+    "rs232Unavailable": false,
+    "leave": true
+  },
+  "settings": {
+    "screen": "Main",
+    "command": "",
+    "help": "Settings and help",
+    "target": "Settings"
+  },
+  "settings.current-stored-profiles": {
+    "screen": "Settings",
+    "command": "*SETTING?",
+    "help": "Active and stored settings",
+    "target": "Settings"
+  },
+  "settings.edit-profile-registers": {
+    "screen": "Settings",
+    "command": "",
+    "help": "All supported modem fields",
+    "target": "Profile"
+  },
+  "settings.model": {
+    "screen": "Settings",
+    "command": "*MODEL=",
+    "help": "14400|28800|33600|56000; saved immediately",
+    "target": "Settings",
+    "input": true
+  },
+  "settings.auto-answer-rings": {
+    "screen": "Settings",
+    "command": "*SETTING=S0=",
+    "help": "0 disables auto-answer; 1-255 rings; &W saves",
+    "target": "Settings",
+    "input": true
+  },
+  "settings.auto-answer-destination": {
+    "screen": "Settings",
+    "command": "*ANSWERPORT=",
+    "help": "RS232|CONSOLE; saved immediately",
+    "target": "Settings",
+    "input": true
+  },
+  "settings.host-baud": {
+    "screen": "Settings",
+    "command": "*BAUD=",
+    "help": "AUTO|300-115200; saved immediately; console fixed 115200",
+    "target": "Settings",
+    "input": true,
+    "secret": false,
+    "rs232Unavailable": false,
+    "leave": true
+  },
+  "settings.data-throttle": {
+    "screen": "Settings",
+    "command": "*THROTTLE=",
+    "help": "ON|OFF; saved immediately",
+    "target": "Settings",
+    "input": true
+  },
+  "settings.save-active-profile": {
+    "screen": "Settings",
+    "command": "*SETTING=&W",
+    "help": "0|1: save active modem settings to template",
+    "target": "Settings",
+    "input": true
+  },
+  "settings.load-stored-factory-profile": {
+    "screen": "Settings",
+    "command": "*SETTING=Z",
+    "help": "0-5: USR reset selection; leaves menu",
+    "target": "Settings",
+    "input": true,
+    "secret": false,
+    "rs232Unavailable": false,
+    "leave": true
+  },
+  "settings.load-factory-profile": {
+    "screen": "Settings",
+    "command": "*SETTING=&F",
+    "help": "0|1|2: load active profile; &W saves",
+    "target": "Settings",
+    "input": true
+  },
+  "settings.power-on-profile": {
+    "screen": "Settings",
+    "command": "*SETTING=Y",
+    "help": "0|1 saved; 2-4 factory; saved immediately",
+    "target": "Settings",
+    "input": true
+  },
+  "settings.stored-number": {
+    "screen": "Settings",
+    "command": "*SETTING=&Z",
+    "help": "slot=number; slots 0-3, saved immediately",
+    "target": "Settings",
+    "input": true
+  },
+  "settings.terminal-style": {
+    "screen": "Settings",
+    "command": "*STYLE=",
+    "help": "ANSI|CP437|PLAIN; this local session only",
+    "target": "Settings",
+    "input": true
+  },
+  "sounds": {
+    "screen": "Main",
+    "command": "",
+    "help": "Play generated tones and recorded handshakes",
+    "target": "Sounds"
+  },
+  "sounds.list-sounds": {
+    "screen": "Sounds",
+    "command": "*SOUNDS",
+    "help": "Generated tones and LittleFS recordings",
+    "target": "Sounds"
+  },
+  "sounds.play-sound": {
+    "screen": "Sounds",
+    "command": "*PLAY=",
+    "help": "DIAL|BUSY|RING|DTMF|PULSE|SWEEP|1200..56000; key cancels",
+    "target": "Sounds",
+    "input": true
+  },
+  "debug": {
+    "screen": "Main",
+    "command": "",
+    "help": "Verbosity, logs and reset diagnostics",
+    "target": "Debug"
+  },
+  "debug.view-log": {
+    "screen": "Debug",
+    "command": "*LOG",
+    "help": "Structured events; passwords and payload never recorded",
+    "target": "Debug"
+  },
+  "debug.verbosity": {
+    "screen": "Debug",
+    "command": "*LOG=",
+    "help": "0 off, 1 lifecycle, 2 detailed; RAM only",
+    "target": "Debug",
+    "input": true
+  },
+  "debug.clear-debug-log": {
+    "screen": "Debug",
+    "command": "*LOG=CLEAR",
+    "help": "Clear RAM ring buffer",
+    "target": "Debug"
+  },
+  "debug.reset-crash-information": {
+    "screen": "Debug",
+    "command": "*RESETINFO",
+    "help": "Persisted reset reason; available crash record",
+    "target": "Debug"
+  },
+  "call-history": {
+    "screen": "Main",
+    "command": "*CALLLOG",
+    "help": "Last 50 network calls; retained across restart",
+    "target": "Main"
+  },
+  "wifi-clock": {
+    "screen": "Main",
+    "command": "",
+    "help": "Network tools and time",
+    "target": "Wifi"
+  },
+  "wifi-clock.network-status": {
+    "screen": "Wifi",
+    "command": "*WIFI?",
+    "help": "SSID, IP, signal and password set/not set",
+    "target": "Wifi"
+  },
+  "wifi-clock.scan": {
+    "screen": "Wifi",
+    "command": "*WIFISCAN",
+    "help": "Scan networks; any key cancels",
+    "target": "Wifi"
+  },
+  "wifi-clock.join": {
+    "screen": "Wifi",
+    "command": "*WIFIJOIN=",
+    "help": "scan number or quoted SSID; then masked password prompt",
+    "target": "Wifi",
+    "input": true
+  },
+  "wifi-clock.wifi-toggle": {
+    "screen": "Wifi",
+    "command": "*WIFI=",
+    "help": "ON|OFF; saved immediately",
+    "target": "Wifi",
+    "input": true
+  },
+  "wifi-clock.forget-network": {
+    "screen": "Wifi",
+    "command": "*WIFIFORGET",
+    "help": "Forget SSID and password",
+    "target": "Wifi"
+  },
+  "wifi-clock.ip-configuration": {
+    "screen": "Wifi",
+    "command": "*WIFIIP=",
+    "help": "DHCP|ip,mask,gateway[,dns]; saved immediately",
+    "target": "Wifi",
+    "input": true
+  },
+  "wifi-clock.network-name": {
+    "screen": "Wifi",
+    "command": "*HOSTNAME=",
+    "help": "mDNS name; saved immediately",
+    "target": "Wifi",
+    "input": true
+  },
+  "wifi-clock.time": {
+    "screen": "Wifi",
+    "command": "*TIME",
+    "help": "NTP clock; unavailable until synchronized",
+    "target": "Wifi"
+  },
+  "wifi-clock.time-zone": {
+    "screen": "Wifi",
+    "command": "*TZ=",
+    "help": "zone or POSIX rule; saved immediately; =? lists zones",
+    "target": "Wifi",
+    "input": true
+  },
+  "wifi-clock.ntp-server": {
+    "screen": "Wifi",
+    "command": "*NTP=",
+    "help": "server name; saved immediately",
+    "target": "Wifi",
+    "input": true
+  },
+  "wifi-clock.dns-lookup": {
+    "screen": "Wifi",
+    "command": "*DNS=",
+    "help": "host; bounded cancellable lookup",
+    "target": "Wifi",
+    "input": true
+  },
+  "wifi-clock.ping": {
+    "screen": "Wifi",
+    "command": "*PING=",
+    "help": "host; bounded cancellable ICMP test",
+    "target": "Wifi",
+    "input": true
+  },
+  "updates-reset": {
+    "screen": "Main",
+    "command": "",
+    "help": "OTA, password and confirmed reset",
+    "target": "Updates"
+  },
+  "updates-reset.firmware-version": {
+    "screen": "Updates",
+    "command": "*VER",
+    "help": "Version and build",
+    "target": "Updates"
+  },
+  "updates-reset.ota-status": {
+    "screen": "Updates",
+    "command": "*OTA?",
+    "help": "Listener policy and window",
+    "target": "Updates"
+  },
+  "updates-reset.ota-policy-window": {
+    "screen": "Updates",
+    "command": "*OTA=",
+    "help": "ALWAYS|DEMAND|ON|OFF; leave menu to permit upload",
+    "target": "Updates",
+    "input": true
+  },
+  "updates-reset.change-device-password": {
+    "screen": "Updates",
+    "command": "*PASS=",
+    "help": "8-32 printable characters; saved immediately",
+    "target": "Updates",
+    "input": true,
+    "secret": true
+  },
+  "updates-reset.restart": {
+    "screen": "Updates",
+    "command": "*RESTART",
+    "help": "Requires confirmation; leaves menu",
+    "target": "Updates",
+    "input": false,
+    "secret": false,
+    "rs232Unavailable": false,
+    "leave": true
+  },
+  "updates-reset.factory-reset": {
+    "screen": "Updates",
+    "command": "*FACTORY",
+    "help": "Erase ALL settings and passwords; asks Y/N; leaves menu",
+    "target": "Updates",
+    "input": false,
+    "secret": false,
+    "rs232Unavailable": false,
+    "leave": true
+  },
+  "updates-reset.web-interface": {
+    "screen": "Updates",
+    "command": "*WEB=",
+    "help": "ON|OFF; OFF closes browser sessions",
+    "target": "Updates",
+    "input": true
+  },
+  "export-configuration": {
+    "screen": "Main",
+    "command": "*EXPORT",
+    "help": "Restore commands; no passwords",
+    "target": "Main"
+  },
+  "hardware-tests": {
+    "screen": "Main",
+    "command": "",
+    "help": "Local electronics tests",
+    "target": "Hardware"
+  },
+  "hardware-tests.guided-tests": {
+    "screen": "Hardware",
+    "command": "*HWTEST",
+    "help": "RS232 skips line/loopback steps",
+    "target": "Hardware"
+  },
+  "hardware-tests.pin-map": {
+    "screen": "Hardware",
+    "command": "*HWPINS",
+    "help": "Confirmed pin map",
+    "target": "Hardware"
+  },
+  "hardware-tests.board-information": {
+    "screen": "Hardware",
+    "command": "*HWINFO",
+    "help": "Chip, memory, firmware and filesystem",
+    "target": "Hardware"
+  },
+  "hardware-tests.files": {
+    "screen": "Hardware",
+    "command": "*HWFILES",
+    "help": "LittleFS files",
+    "target": "Hardware"
+  },
+  "hardware-tests.leds": {
+    "screen": "Hardware",
+    "command": "*HWLED=",
+    "help": "AA|CD|RD|SD|TR|CS|ARQ|ALL|OFF|AUTO|CHASE|WALK",
+    "target": "Hardware",
+    "input": true
+  },
+  "hardware-tests.amplifier": {
+    "screen": "Hardware",
+    "command": "*HWAMP=",
+    "help": "AUTO|ON|OFF",
+    "target": "Hardware",
+    "input": true
+  },
+  "hardware-tests.test-volume": {
+    "screen": "Hardware",
+    "command": "*HWVOL=",
+    "help": "0-100|POT; cap always applies",
+    "target": "Hardware",
+    "input": true
+  },
+  "hardware-tests.tone-sweep": {
+    "screen": "Hardware",
+    "command": "*HWTONE=",
+    "help": "Hz[,ms]|DIAL|BUSY|RING|SWEEP",
+    "target": "Hardware",
+    "input": true
+  },
+  "hardware-tests.dtmf": {
+    "screen": "Hardware",
+    "command": "*HWDTMF=",
+    "help": "digits",
+    "target": "Hardware",
+    "input": true
+  },
+  "hardware-tests.pulse": {
+    "screen": "Hardware",
+    "command": "*HWPULSE=",
+    "help": "digits",
+    "target": "Hardware",
+    "input": true
+  },
+  "hardware-tests.potentiometer": {
+    "screen": "Hardware",
+    "command": "*HWPOT",
+    "help": "Live ADC reading; key exits",
+    "target": "Hardware"
+  },
+  "hardware-tests.rs232-lines": {
+    "screen": "Hardware",
+    "command": "*HWLINES",
+    "help": "Unavailable on RS232: takes over this port",
+    "target": "Hardware",
+    "input": false,
+    "secret": false,
+    "rs232Unavailable": true
+  },
+  "hardware-tests.loopback": {
+    "screen": "Hardware",
+    "command": "*HWLOOP=ALL",
+    "help": "Unavailable on RS232: takes over this port",
+    "target": "Hardware",
+    "input": false,
+    "secret": false,
+    "rs232Unavailable": true
+  },
+  "hardware-tests.bridge": {
+    "screen": "Hardware",
+    "command": "*HWBRIDGE",
+    "help": "Unavailable on RS232: takes over this port",
+    "target": "Hardware",
+    "input": false,
+    "secret": false,
+    "rs232Unavailable": true
+  },
+  "hardware-tests.output-signal": {
+    "screen": "Hardware",
+    "command": "*HWSIG=",
+    "help": "DCD|RI|CTS,ON|OFF; console only while idle",
+    "target": "Hardware",
+    "input": true,
+    "secret": false,
+    "rs232Unavailable": true
+  },
+  "command-reference": {
+    "screen": "Main",
+    "command": "*REFERENCE",
+    "help": "Standard and project commands",
+    "target": "Main"
+  },
+  "about": {
+    "screen": "Main",
+    "command": "*ABOUT",
+    "help": "Version, build and credits",
+    "target": "Main"
+  },
+  "client-tests": {
+    "screen": "Main",
+    "command": "",
+    "help": "Serial only; browser lists without execution",
+    "target": "Client"
+  },
+  "client-tests.display": {
+    "screen": "Client",
+    "command": "*TEST ",
+    "help": "ANSI | PC | PLAIN | LATIN1; observe then Y/N",
+    "target": "Client",
+    "input": true
+  },
+  "client-tests.size": {
+    "screen": "Client",
+    "command": "*TEST SIZE",
+    "help": "CPR measurement, ruler/manual fallback",
+    "target": "Client",
+    "input": false
+  },
+  "client-tests.keys": {
+    "screen": "Client",
+    "command": "*TEST KEYS",
+    "help": "Raw keys; Ctrl-] ends",
+    "target": "Client",
+    "input": false
+  },
+  "client-tests.id": {
+    "screen": "Client",
+    "command": "*TEST ID",
+    "help": "ENQ, DA, DSR; bounded capture",
+    "target": "Client",
+    "input": false
+  },
+  "client-tests.echo": {
+    "screen": "Client",
+    "command": "*TEST ECHO",
+    "help": "CR/LF/CRLF and local echo; Ctrl-] ends",
+    "target": "Client",
+    "input": false
+  },
+  "client-tests.tx": {
+    "screen": "Client",
+    "command": "*TEST TX=",
+    "help": "Duration 1-30 seconds; deliberate RTS pause",
+    "target": "Client",
+    "input": true
+  },
+  "client-tests.rx": {
+    "screen": "Client",
+    "command": "*TEST RX=",
+    "help": "Duration 1-30 seconds; peer obeys CTS",
+    "target": "Client",
+    "input": true
+  },
+  "client-tests.cable": {
+    "screen": "Client",
+    "command": "*TEST CABLE",
+    "help": "RS232 only; automatic signal restoration",
+    "target": "Client",
+    "input": false
+  },
+  "client-tests.bell": {
+    "screen": "Client",
+    "command": "*TEST BELL",
+    "help": "BEL; confirm heard or silent",
+    "target": "Client",
+    "input": false
+  },
+  "client-tests.format": {
+    "screen": "Client",
+    "command": "*TEST FORMAT",
+    "help": "Configured speed/format, not guessed capability",
+    "target": "Client",
+    "input": false
+  },
+  "client-tests.transfer": {
+    "screen": "Client",
+    "command": "*TEST TRANSFER=",
+    "help": "SX=TEST,CRC,65536 | SY=ALL | SZ=LOG | RX=CRC | RY | RZ",
+    "target": "Client",
+    "input": true
+  },
+  "client-tests.summary": {
+    "screen": "Client",
+    "command": "*TEST SUMMARY",
+    "help": "Findings, saved values and last transfer",
+    "target": "Client",
+    "input": false
+  },
+  "client-tests.edit": {
+    "screen": "Client",
+    "command": "*TEST SET=",
+    "help": "ANSI|CP437|PLAIN|LATIN1,columns,rows,8|127",
+    "target": "Client",
+    "input": true
+  },
+  "client-tests.apply": {
+    "screen": "Client",
+    "command": "*TEST APPLY",
+    "help": "Confirm Y to save this port only",
+    "target": "Client",
+    "input": false
+  },
+  "client-tests.reset": {
+    "screen": "Client",
+    "command": "*TEST RESET",
+    "help": "Confirm Y to save defaults for this port",
+    "target": "Client",
+    "input": false
+  }
+}

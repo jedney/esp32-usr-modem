@@ -1,0 +1,25 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║         █   █ █████ ████        █             █     █                        ║
+║         █   █ █     █   █  ███  █      ███  █████        ████  ████          ║
+║         █   █ █████ ████  █   █ ████  █   █   █     █   █     ██             ║
+║         █   █     █ █  █  █   █ █   █ █   █   █     █   █        ██          ║
+║         █████ █████ █   █  ███  ████   ███    ██    █    ████ ████           ║
+║                        ─── Sportster 33.6k Series ───                        ║
+╠════════════════════ [ MODEM CONFIGURATION - MAIN MENU ] ═════════════════════╣
+║ > [1] Status                         │   [7] Wi-Fi and Clock                 ║
+║   [2] Phonebook                      │   [8] Updates and Reset               ║
+║   [3] Settings                       │   [9] Export Configuration            ║
+║   [4] Sounds                         │   [A] Hardware Tests                  ║
+║   [5] Debug                          │   [B] Command Reference               ║
+║   [6] Call History                   │   [C] About                           ║
+║                                      │   [D] Client Tests                    ║
+║                                                                              ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  ARROWS: navigate / switch column    ENTER: select    Q: quit                ║
+║  [D] Client Tests - serial client diagnostics                                ║
+╠══════════════════════════ [ HELP / DEVICE STATUS ] ══════════════════════════╣
+║  F1 Help  F2 Status  F3 Phonebook  F4 Settings  F10 Exit                     ║
+║  Model: 33.6k  |  Profile: --  |  Link: UNKNOWN                              ║
+║  Reference layout only. Device information is not connected.                 ║
+║  Command > █                                                                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝

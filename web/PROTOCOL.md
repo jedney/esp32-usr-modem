@@ -1,6 +1,6 @@
 # Web interface: files and protocol
 
-The page is a full-window **80 × 25 terminal** (xterm.js) showing the modem's
+The page is an adaptive **80 × 25 to 132 × 50 terminal** (xterm.js) showing the modem's
 configuration screen, with a **status bar** along the bottom:
 
 | Item | Source |
@@ -16,11 +16,10 @@ configuration screen, with a **status bar** along the bottom:
 On narrow windows the bar drops Wi-Fi, then the remote host, then the connection time,
 then the clock.
 
-Planned model presentation (Jon, 25 Oct 2026): the first configuration page must
-prominently display the selected Sportster 14.4k, 28.8k, 33.6k or 56k Series, with
-a model selector in the shared menu (equivalent to `AT*MODEL=`). Consider an ASCII
-art rendition of the selected modem above the menu. This is future configuration
-and web work (v0.10/v0.11); it does not change the current wire protocol or demo.
+The shared terminal displays the selected Sportster 14.4k, 28.8k, 33.6k or 56k
+Series and its runtime accent, with Model in Settings. The logo always stays red.
+The 80x25 cell grid and generated catalogue come from the supplied `ui/` handoff;
+wide menus add description cards and Phonebook action/details panes.
 The factory model remains 14.4k. Selection affects ATI identity and default CONNECT
 reporting only, not the supported commands, speeds or other features. See
 `docs/v0.8-plan.md` for the confirmed command, persistence and reporting rules.
@@ -35,7 +34,8 @@ IBM Plex Mono, OFL-1.1). `scripts/build_web.py` gzips both into `data/www/` when
 LittleFS image is built (`pio run -e s3 -t buildfs` or `-t uploadfs`). The firmware
 serves `data/www/<file>.gz` with `Content-Encoding: gzip`.
 
-Total size on the modem is about 120 KB.
+Assets are compressed into the existing LittleFS image, including the small
+generated `ui-data.js` catalogue for the explicitly synthetic browser demo.
 
 ## HTTP endpoints (v0.11 firmware)
 
@@ -69,18 +69,23 @@ files are not reachable. Responses set CSP, no-sniff, no-referrer and frame deni
     session always renders in UTF-8, so the PC line-drawing style uses Unicode box
     characters (xterm.js draws them itself).
   - Page → modem: keystrokes as UTF-8.
-- **Text frames** are JSON messages from the modem. Each has a type field `t`. The page
-  ignores unknown types and fields, so new firmware can add them.
+- **Text frames** carry typed JSON status, heartbeat and geometry messages. The page
+  ignores unknown server types and fields, so new firmware can add them.
 
 | `t` | Fields | When |
 |---|---|---|
-| `hello` | `name` (mDNS name), `ver` (firmware version), `csrf` (token for POSTs) | On connect |
+| `hello` | `name` (mDNS name), `ver` (firmware version), `csrf` (token for POSTs), `size` (true if geometry envelopes are supported) | On connect |
 | `led` | `m`: bit mask, bit 0 AA, 1 CD, 2 RD, 3 SD, 4 TR, 5 CS, 6 ARQ/FAX | On connect, then whenever the physical LEDs change, at most 20 per second. RD/SD flashes are the same stretched flashes as the front panel |
 | `clock` | `epoch` (UTC seconds), `tzo` (UTC offset in minutes, e.g. 780 for NZDT) | On connect, every 60 s, and when NTP or the time zone changes. `epoch` 0 = clock not set |
 | `call` | `state`: `idle`, `dialling`, `ringing`, `connected`, `ppp`, `slip`, `config`, `test`; `mode`: `telnet` or `raw`; `dir`: `out` or `in`; `number` (as dialled); `host`; `ip`; `port`; `speed` (emulated line speed); `since` (UTC seconds the call connected) | On connect and on every change |
 | `wifi` | `state`: `up`, `connecting`, `down`; `ssid`; `rssi` (dBm); `ip` | On connect, on change, and every 10 s while up |
 | `access` | `edit`: boolean | Interactive ownership changes; false means read-only |
 | `hardware` | `active`: boolean; `mode`: `lines` when applicable | Show/disable line controls and test-stop button |
+
+v0.12 serial Client Tests publish call state `test`. Their browser menu is a
+reference listing: execution and transfer handlers reject browser-originated
+requests. Serial tests retain the shared reservation, keeping other browsers
+read-only. Serial protocol bytes never enter WebSocket output.
 | `pong` | None | Reply to the browser's `{"t":"ping"}` text heartbeat |
 
 The upgrade also requires a same-modem HTTP Origin. Invalid Origin does not consume
@@ -89,6 +94,19 @@ and Origin check; it does not carry a JSON/CSRF envelope. Unknown client text fr
 cannot invoke commands. There are at most three connected browsers, one interactive
 menu across console/RS232/browser, and bounded input/output queues. A slow terminal
 that exhausts its output queue is disconnected. TCP close releases its resources.
+
+When `hello.size === true`, the owning page sends the canonical text envelope
+`{"t":"size","cols":120,"rows":45}`. Integer bounds are 1-132 columns and 1-50
+rows; the supplied page keeps at least 80x25 and fits its font on smaller windows.
+The exact key order/spelling shown is required; extra fields, fractions, signs,
+leading zeroes and trailing bytes are refused. Geometry is never terminal input.
+The server task coalesces dimensions per client under its queue mutex; only the
+modem task applies them, and only to that client's owned terminal. An observer
+cannot resize another owner's UI. The page debounces resize and resends dimensions
+on ownership/reconnect; old firmware without the capability keeps fixed 80x25.
+Compact applies below 120x45, with the richer layout enabled only when both limits
+are met. Terminal output is streamed in bounded rows and redraws are coalesced;
+rendering a full wide frame never requires pushing it all into the socket queue.
 
 Browsers connected while busy display read-only status. `E` explicitly attempts
 menu entry; queued keys are discarded when ownership changes. A second browser

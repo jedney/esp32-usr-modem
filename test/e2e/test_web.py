@@ -1,6 +1,6 @@
 """Real HTTP/Digest/WebSocket checks; no real credential changes or flash writes.
 
-The existing USR_MODEM_OTA_PASSWORD is reused in memory. Traffic is never included
+The existing USR_MODEM_PASSWORD is reused in memory. Traffic is never included
 in assertion messages. --web-tests opts in; upload acceptance is separate.
 """
 import base64
@@ -30,7 +30,7 @@ class Web:
         self.host = host
         self.base = "http://" + host
         passwords = urllib.request.HTTPPasswordMgrWithDefaultRealm()
-        passwords.add_password("usr-modem", self.base, "admin", os.environ["USR_MODEM_OTA_PASSWORD"])
+        passwords.add_password("usr-modem", self.base, "admin", os.environ["USR_MODEM_PASSWORD"])
         self.digest = urllib.request.HTTPDigestAuthHandler(passwords)
         self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}),
                                                 self.digest)
@@ -110,13 +110,32 @@ class WS:
         self.socket.settimeout(0.1)
         while time.monotonic() < end:
             try:
-                first, second = self.exact(2)
-                n = second & 127
-                if n == 126:
-                    n = struct.unpack("!H", self.exact(2))[0]
-                elif n == 127:
-                    n = struct.unpack("!Q", self.exact(8))[0]
-                data = self.exact(n)
+                # Commit consumption only after the entire frame has arrived.
+                # A timeout between header and body must retain both, especially
+                # when the larger coloured UI spans several TCP reads.
+                header = 2
+                total = None
+                if len(self.buffer) >= 2:
+                    first, second = self.buffer[:2]
+                    n = second & 127
+                    if n == 126:
+                        header = 4
+                        if len(self.buffer) >= header:
+                            n = struct.unpack("!H", self.buffer[2:4])[0]
+                    elif n == 127:
+                        header = 10
+                        if len(self.buffer) >= header:
+                            n = struct.unpack("!Q", self.buffer[2:10])[0]
+                    if len(self.buffer) >= header:
+                        total = header + n
+                if total is None or len(self.buffer) < total:
+                    part = self.socket.recv(4096)
+                    if not part:
+                        raise EOFError("WebSocket closed")
+                    self.buffer += part
+                    continue
+                data = self.buffer[header:total]
+                self.buffer = self.buffer[total:]
                 opcode = first & 15
                 if opcode == 1:
                     messages.append(json.loads(data))
@@ -134,14 +153,14 @@ class WS:
 def web(request, console):
     if not request.config.getoption("--web-tests"):
         pytest.skip("--web-tests not enabled")
-    if not os.environ.get("USR_MODEM_OTA_PASSWORD"):
+    if not os.environ.get("USR_MODEM_PASSWORD"):
         pytest.skip("Device credential not configured")
     require(console.command("AT*WEB?", timeout=15)[-1] == "OK", "Web command unavailable")
     return Web(request.config.getoption("--web-host"))
 
 
 def test_assets_require_digest_and_have_correct_gzip_mime(web):
-    for path in ("/", "/app.js", "/upload.js", "/link.js", "/api/session"):
+    for path in ("/", "/app.js", "/upload.js", "/link.js", "/geometry.js", "/ui-data.js", "/api/session"):
         code, _, _ = web.request(path, auth=False)
         require(code == 401, "Unauthenticated resource exposed")
     code, headers, body = web.request("/app.js")
@@ -169,7 +188,7 @@ def test_web_disable_closes_owner_and_serial_can_reenable(web, console):
             require(console.command("AT*WEB=OFF")[-1] == "OK", "Web OFF failed")
             time.sleep(0.3)
             require(console.command("AT")[-1] == "OK", "Stopping web damaged modem loop")
-            require(b"Configuration" in console.raw(b"AT*CONFIG\r"), "Stopping web retained reservation")
+            require(b"MODEM CONFIGURATION" in console.raw(b"AT*CONFIG\r"), "Stopping web retained reservation")
             console.raw(b"\x03", wait=0.2)
     finally:
         console.raw(b"\x03", wait=0.1)
@@ -186,7 +205,7 @@ def test_ticket_origin_single_use_and_initial_snapshots(web):
         text, messages = peer.collect(1)
         require({"hello", "led", "wifi", "clock", "call"}.issubset({m["t"] for m in messages}),
                 "Initial status snapshot incomplete")
-        require(b"Configuration" in text, "Shared browser menu missing")
+        require(b"MODEM CONFIGURATION" in text, "Shared browser menu missing")
     with web.ws(ticket) as peer:
         require(not peer.accepted, "Reused ticket accepted")
 
@@ -204,7 +223,7 @@ def test_one_browser_menu_and_second_browser_read_only(web, console):
             require(b"Settings" not in text, "Read-only input invoked menu")
         first.send(b"q\r")
         first.collect(0.4)
-        require(b"Configuration" in console.raw(b"AT*CONFIG\r"), "Quit did not release slot")
+        require(b"MODEM CONFIGURATION" in console.raw(b"AT*CONFIG\r"), "Quit did not release slot")
         console.raw(b"\x03")
 
 
@@ -238,7 +257,7 @@ def test_browser_hardware_line_toggles_restore_on_disconnect(web, manual_rs232):
     rs232 = manual_rs232
     with web.ws() as peer:
         peer.collect(0.4)
-        for keys in (b"12\r", b"12\r"):
+        for keys in (b"A\r", b"C\r"):
             peer.send(keys)
             text, _ = peer.collect(0.4)
         require(b"Live RS232" in text, "Browser line test did not start")
@@ -255,7 +274,8 @@ def test_browser_hardware_line_toggles_restore_on_disconnect(web, manual_rs232):
 
 
 def test_upload_rejects_missing_csrf_before_writing(web):
-    code, _, _ = web.request("/api/update?target=firmware&version=0.11", data=bytes(24),
+    version = (Path(__file__).resolve().parents[2] / "VERSION").read_text(encoding="utf-8").strip()
+    code, _, _ = web.request(f"/api/update?target=firmware&version={version}", data=bytes(24),
                             headers={"Origin": web.base, "Content-Type": "application/octet-stream",
                                      "X-Image-SHA256": "0" * 64})
     require(code == 403, "Missing CSRF upload accepted")
@@ -264,7 +284,7 @@ def test_upload_rejects_missing_csrf_before_writing(web):
 def test_browser_bridge_to_com18_both_directions(web, rs232):
     with web.ws() as peer:
         peer.collect(0.4)
-        for keys in (b"12\r", b"n\r", b"2\r"):
+        for keys in (b"A\r", b"E\r"):
             peer.send(keys)
             text, _ = peer.collect(0.4)
         require(b"Bridge:" in text, "Browser bridge did not start")
@@ -358,7 +378,7 @@ def test_incoming_rs232_call_keeps_browser_read_only_and_signals_follow(web, con
 def test_browser_forget_requires_confirmation_and_cancel_keeps_network(web):
     with web.ws() as peer:
         peer.collect(0.4)
-        peer.send(b"9\r")
+        peer.send(b"7\r")
         peer.collect(0.3)
         peer.send(b"5\r")
         text, _ = peer.collect(0.3)
@@ -371,14 +391,14 @@ def test_browser_forget_requires_confirmation_and_cancel_keeps_network(web):
 def test_browser_guided_stop_returns_control_without_starting_leds(web, console):
     with web.ws() as peer:
         peer.collect(0.4)
-        for keys in (b"12\r", b"1\r"):
+        for keys in (b"A\r", b"1\r"):
             peer.send(keys)
             text, _ = peer.collect(0.3)
         require(b"Enter = start" in text, "Guided test did not reach its first prompt")
         peer.send(b"\x18")
         text, _ = peer.collect(0.4)
         require(b"Summary" in text and b"skipped" in text, "Stop did not cancel guided test")
-    require(b"Configuration" in console.raw(b"AT*CONFIG\r"), "Cancelled test retained reservation")
+    require(b"MODEM CONFIGURATION" in console.raw(b"AT*CONFIG\r"), "Cancelled test retained reservation")
     console.raw(b"\x03", wait=0.1)
 
 

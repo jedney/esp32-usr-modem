@@ -1,0 +1,25 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  USRobotics          Sportster 28.8k Series                                  ║
+║ ──────────────────────────────────────────────────────────────────────────── ║
+║  MAIN  >  HARDWARE TESTS                                                     ║
+║  KEY   OPTION                                                                ║
+║  >  [1]   Guided tests                                                       ║
+║     [2]   Pin map                                                            ║
+║     [3]   Board information                                                  ║
+║     [4]   Files                                                              ║
+║     [5]   LEDs                                                               ║
+║     [6]   Amplifier                                                          ║
+║     [7]   Test volume                                                        ║
+║     [8]   Tone / sweep                                                       ║
+║     [9]   DTMF                                                               ║
+║     [A]   Pulse                                                              ║
+║     [B]   Potentiometer                                                      ║
+║     [C]   RS232 lines                                                        ║
+║     [D]   Loopback                                                           ║
+║     [E]   Bridge                                                             ║
+║     [F]   Output signal                                                      ║
+║  UP/DOWN Select  ENTER Open  ESC Back  Q Back                                ║
+║  F1 Help  F2 Main  |  Model: 28.8k  Link: UNKNOWN                            ║
+║  All actions depend on existing project services.                            ║
+║  Command > █                                                                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝

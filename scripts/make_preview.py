@@ -12,6 +12,7 @@ import base64
 import json
 import pathlib
 import re
+import runpy
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -30,6 +31,7 @@ def strip_source_map(text: str) -> str:
 
 
 def main(out: pathlib.Path) -> None:
+    runpy.run_path(str(ROOT / "scripts/generate_ui.py"))["main"]([])
     html = (SRC / "index.html").read_text(encoding="utf-8")
 
     style = (SRC / "style.css").read_text(encoding="utf-8")
@@ -40,8 +42,10 @@ def main(out: pathlib.Path) -> None:
     modules = {
         "usr-xterm": strip_source_map((VENDOR / "xterm.mjs").read_text(encoding="utf-8")),
         "usr-status": (SRC / "status.js").read_text(encoding="utf-8"),
-        "usr-demo": (SRC / "demo.js").read_text(encoding="utf-8"),
+        "usr-ui-data": (SRC / "ui-data.js").read_text(encoding="utf-8"),
+        "usr-demo": (SRC / "demo.js").read_text(encoding="utf-8").replace("'./ui-data.js'", "'usr-ui-data'"),
         "usr-upload": (SRC / "upload.js").read_text(encoding="utf-8"),
+        "usr-geometry": (SRC / "geometry.js").read_text(encoding="utf-8"),
         "usr-link": (SRC / "link.js").read_text(encoding="utf-8").replace("'./status.js'", "'usr-status'"),
     }
     app = (SRC / "app.js").read_text(encoding="utf-8")
@@ -49,6 +53,7 @@ def main(out: pathlib.Path) -> None:
     app = app.replace("'./demo.js'", "'usr-demo'")
     app = app.replace("'./upload.js'", "'usr-upload'")
     app = app.replace("'./link.js'", "'usr-link'")
+    app = app.replace("'./geometry.js'", "'usr-geometry'")
     import_map = {"imports": {k: data_url("text/javascript", v.encode()) for k, v in modules.items()}}
 
     # The modem's Content-Security-Policy forbids inline scripts; the preview needs them.
@@ -64,7 +69,7 @@ def main(out: pathlib.Path) -> None:
     )
     html = html.replace("<title>USR Modem</title>", "<title>USR Modem (preview)</title>")
     out.write_text(html, encoding="utf-8")
-    print(f"Preview: {out} ({out.stat().st_size / 1024:.0f} KB). Press D to fake a call, H to hang up.")
+    print(f"Preview: {out} ({out.stat().st_size / 1024:.0f} KB). Phonebook 4 simulates a call; D stays unavailable.")
 
 
 if __name__ == "__main__":

@@ -59,10 +59,12 @@ HardwareSerial &uart();
 // UART1's RTS output drives our CTS (DB25 5) and its CTS input reads the computer's RTS
 // (DB25 4); both are active-low at the GPIO, which matches the MAX3232's inversion.
 constexpr size_t kHostRxBuffer = 8192;
-constexpr size_t kHostTxBuffer = 2048;
+constexpr size_t kHostTxBuffer = 0;  // direct, nonblocking FIFO writes; no driver TX ring
 void hostBegin(uint32_t baud);
 void hostEnd();  // UART1 off, CTS deasserted
 bool hostActive();
+size_t hostWriteSpace();  // free hardware FIFO bytes; hostWrite never waits for RTS
+size_t hostWrite(const uint8_t *data, size_t length);
 bool hostDrain(uint32_t timeoutMs);  // bounded even when the computer holds RTS off
 void hostSetBaud(uint32_t baud);
 // ctsFromBuffer (&H1): CTS drops while the receive buffer is full; otherwise CTS is held

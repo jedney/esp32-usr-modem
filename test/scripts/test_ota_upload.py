@@ -12,7 +12,7 @@ spec.loader.exec_module(ota)
 
 def test_env_file_quoted_spaces_and_symbols(tmp_path, monkeypatch):
     path = tmp_path / ".env"
-    path.write_text("# ignored\nexport USR_MODEM_OTA_PASSWORD=' a b $ & ! '\n", encoding="utf-8")
+    path.write_text("# ignored\nexport USR_MODEM_PASSWORD=' a b $ & ! '\n", encoding="utf-8")
     monkeypatch.delenv(ota.KEY, raising=False)
     assert ota.password_from(path) == " a b $ & ! "
     monkeypatch.setenv(ota.KEY, "environment")
@@ -23,7 +23,7 @@ def test_env_file_quoted_spaces_and_symbols(tmp_path, monkeypatch):
 
 def test_missing_secret_never_invokes_uploader(tmp_path, capsys):
     assert ota.upload(tmp_path / "missing.py", "modem.local", "firmware.bin", "") == 1
-    assert "set USR_MODEM_OTA_PASSWORD" in capsys.readouterr().out
+    assert "set USR_MODEM_PASSWORD" in capsys.readouterr().out
 
 
 def test_password_passed_in_memory_and_exceptions_are_redacted(tmp_path, capsys):

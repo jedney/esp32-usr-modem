@@ -229,8 +229,25 @@ void test_raw_headers_reject_duplicates_smuggling_and_pipelining() {
     TEST_ASSERT_EQUAL(std::string::npos, browser.filtered().find("User-Agent"));
     TEST_ASSERT_LESS_THAN(1024, browser.filtered().size());
 }
+void test_terminal_geometry_is_bounded_and_cannot_be_terminal_input() {
+    unsigned columns = 80, rows = 25;
+    TEST_ASSERT_TRUE(terminalSize("{\"t\":\"size\",\"cols\":132,\"rows\":50}", columns, rows));
+    TEST_ASSERT_EQUAL(132, columns);
+    TEST_ASSERT_EQUAL(50, rows);
+    for (const char *bad :
+         {"{\"t\":\"size\",\"cols\":133,\"rows\":50}", "{\"t\":\"size\",\"cols\":80,\"rows\":0}",
+          "{\"t\":\"size\",\"cols\":-1,\"rows\":25}", "{\"t\":\"size\",\"cols\":080,\"rows\":25}",
+          "{\"t\":\"size\",\"cols\":80,\"rows\":25}AT*FACTORY",
+          "{\"t\":\"size\",\"cols\":80,\"rows\":25,\"cols\":120}",
+          "{\"t\":\"size\",\"cols\":999999999999999999999,\"rows\":25}"}) {
+        TEST_ASSERT_FALSE(terminalSize(bad, columns, rows));
+        TEST_ASSERT_EQUAL(132, columns);
+        TEST_ASSERT_EQUAL(50, rows);
+    }
+}
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_terminal_geometry_is_bounded_and_cannot_be_terminal_input);
     RUN_TEST(test_raw_headers_reject_duplicates_smuggling_and_pipelining);
     RUN_TEST(test_browser_cp437_is_utf8_and_serial_source_bytes_are_unchanged);
     RUN_TEST(test_host_and_origin_do_not_accept_rebinding_authorities);

@@ -12,6 +12,7 @@ project root comes from the build environment there and from __file__ only when 
 import gzip
 import pathlib
 import re
+import runpy
 
 FS_TARGETS = {"buildfs", "uploadfs", "uploadfsota"}
 
@@ -28,6 +29,8 @@ def web_files(root: pathlib.Path) -> dict:
         "demo.js": src / "demo.js",
         "upload.js": src / "upload.js",
         "link.js": src / "link.js",
+        "geometry.js": src / "geometry.js",
+        "ui-data.js": src / "ui-data.js",
         "xterm.mjs": vendor / "xterm.mjs",
         "xterm.css": vendor / "xterm.css",
         "ibm-plex-mono-400.woff2": vendor / "ibm-plex-mono-400.woff2",
@@ -45,6 +48,7 @@ def read_asset(path: pathlib.Path) -> bytes:
 
 
 def build(root: pathlib.Path, out_dir: pathlib.Path) -> int:
+    runpy.run_path(str(root / "scripts/generate_ui.py"))["main"]([])
     files = web_files(root)
     out_dir.mkdir(parents=True, exist_ok=True)
     for old in out_dir.glob("*.gz"):

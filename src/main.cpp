@@ -27,6 +27,8 @@
 #include "atcmd.h"
 #include "call_audio.h"
 #include "call_journal.h"
+#include "client_platform.h"
+#include "client_service.h"
 #include "config.h"
 #include "config_dialer.h"
 #include "connection.h"
@@ -89,6 +91,8 @@ hw::EspCrypto crypto;
 devicecfg::Device device(deviceStore, crypto);
 hw::OtaService ota(device);
 hw::NvsStore webStore("web", "cfg");
+hw::NvsStore clientStore("clients", "cfg");
+clienttest::Settings clientSettings(clientStore);
 webinterface::Settings webSettings(webStore);
 hw::WebService webServer(device);
 hw::EspRadio radio;
@@ -123,6 +127,8 @@ hw::FileStore historyStore("/call-history.bin", "/call-history.tmp", "/call-hist
 hw::NvsStore resetStore("diagnostics", "reset");
 config::History history(historyStore);
 config::Log debugLog;
+hw::ClientPlatform consoleClientPlatform(debugLog, false), hostClientPlatform(debugLog, true);
+clienttest::Service *consoleClient = nullptr, *hostClient = nullptr;
 uint32_t msNow();
 int64_t utcNow() {
     return net.utcNow();
@@ -131,8 +137,8 @@ config::CallJournal journal(history, debugLog, msNow, utcNow);
 char fallbackLog[4096];
 uint8_t ledMask = 0xFF;
 atcmd::Port *hardwareOwner = nullptr;
-modemcfg::Store *resetStores[] = {&store,        &netStore,   &bookStore,
-                                  &historyStore, &resetStore, &webStore};
+modemcfg::Store *resetStores[] = {&store,      &netStore, &bookStore,  &historyStore,
+                                  &resetStore, &webStore, &clientStore};
 bool restarting = false;
 uint32_t restartAt = 0;
 
@@ -400,10 +406,56 @@ atcmd::Reply cmdTestCall(atcmd::Port &port, const char *args) {
 const config::Registry registry(config::Hooks{cmdAnswerPort, cmdPhonebook, cmdPhoneDelete, cmdHelp,
                                               cmdVer, cmdBaud, cmdTestCall, cmdDialTest, cmdHw});
 
-class ConfigHardware : public config::Hardware {
+class ConfigHardware : public config::Hardware, public config::UiServices {
 public:
+    calls::Phonebook *phonebook() override { return &::phonebook; }
+    config::UiState state() const override {
+        config::UiState result;
+        result.hostBaud = rs232::baud();
+        if (journal.active() && journal.session())
+            result.reportedRate = journal.session()->reportedSpeed();
+        const char *link = journal.active()                                           ? "Connected"
+                           : outgoing && outgoing->stage() != calls::CallStage::kIdle ? "Dialling"
+                           : incoming && incoming->stage() != calls::IncomingStage::kIdle
+                               ? "Ringing"
+                               : "Idle";
+        snprintf(result.link, sizeof result.link, "%s", link);
+        return result;
+    }
     atcmd::Reply command(atcmd::Port &port, const char *name, const char *args) override {
         using atcmd::Reply;
+        if (!strcmp(name, "CLIENTEXPORT")) {
+            for (unsigned i = 0; i < 2; ++i) {
+                const auto &s = clientSettings.get(i);
+                port.printf(
+                    "; %s client: AT*TEST SET=%s,%u,%u,%u then AT*TEST APPLY (Y) on that port\r\n",
+                    i ? "RS232" : "CONSOLE", clienttest::charsetName(s.charset), s.columns, s.rows,
+                    s.backspace);
+            }
+            return Reply::kOk;
+        }
+        if (!strcmp(name, "TEST") || !strcmp(name, "SX") || !strcmp(name, "SY") ||
+            !strcmp(name, "SZ") || !strcmp(name, "RX") || !strcmp(name, "RY") ||
+            !strcmp(name, "RZ")) {
+            if (port.browser() || hardwareRunning || (callSlot.busy() && !ownsMenu(port)) ||
+                net.joinResult() == netcfg::JoinResult::kRunning ||
+                net.scanState() == netcfg::ScanState::kRunning)
+                return Reply::kError;
+            auto &service = isRs232(port) ? *hostClient : *consoleClient;
+            auto &platform = isRs232(port) ? hostClientPlatform : consoleClientPlatform;
+            auto flow = hostport::flowMode(modem->active());
+            platform.begin(port.baud(), flow.ctsFromBuffer, flow.obeyRts);
+            service.hold(ownsMenu(port));
+            if (!service.start(name, args, millis()))
+                return Reply::kError;
+            if (ownsMenu(port))
+                menuOf(port).diagnostic(service);
+            else if (!sessionOf(port).startLocal(service)) {
+                service.close();
+                return Reply::kError;
+            }
+            return Reply::kDone;
+        }
         if (!strcmp(name, "WEBEXPORT")) {
             port.printf("AT*WEB=%s\r\n", webSettings.enabled() ? "ON" : "OFF");
             return Reply::kDone;
@@ -446,6 +498,14 @@ public:
                 return Reply::kOk;
             }
             return *args == '=' && menuOf(port).setStyle(args + 1) ? Reply::kOk : Reply::kError;
+        }
+        if (!strcmp(name, "SIZE")) {
+            auto &menu = menuOf(port);
+            if (!*args || !strcmp(args, "?")) {
+                port.printf("%u,%u\r\n", menu.columns(), menu.rows());
+                return Reply::kOk;
+            }
+            return *args == '=' && menu.setSize(args + 1) ? Reply::kOk : Reply::kError;
         }
         if (!strcmp(name, "STATUS")) {
             if (*args && strcmp(args, "?")) {
@@ -840,7 +900,9 @@ void publishWebStatus() {
                            true);
     }
     const char *state = "idle";
-    if (journal.active()) {
+    if ((consoleClient && consoleClient->isOpen()) || (hostClient && hostClient->isOpen())) {
+        state = "test";
+    } else if (journal.active()) {
         state = journal.session()            ? "connected"
                 : journal.current().incoming ? "ringing"
                                              : "dialling";
@@ -959,6 +1021,9 @@ void pollBrowser() {
         }
         // Read at most one key: an action may enter an interactive hardware test,
         // whose adapter must retain the following queued keys for that test.
+        unsigned columns, rows;
+        if (webServer.takeSize(id, columns, rows))
+            browserMenu->resize(columns, rows);
         if (webServer.read(id, bytes, 1)) {
             browserSession->fromHost(bytes, 1, millis());
         }
@@ -1008,6 +1073,7 @@ void setup() {
     crypto.begin();
     device.begin();
     webSettings.begin();
+    clientSettings.begin();
     if (device.needsReset()) {
         if (device.factoryReset(resetStores, sizeof resetStores / sizeof resetStores[0])) {
             ESP.restart();
@@ -1032,6 +1098,22 @@ void setup() {
     browserSession = new hostport::Session(*modem, browserSink, kConsoleBaud, callSlot);
     browserSession->port().setBrowser(true);
     browserMenu = makeMenu(*browserSession, false);
+    consoleMenu->services(&configHardware);
+    hostMenu->services(&configHardware);
+    browserMenu->services(&configHardware);
+    browserMenu->setStyle("CP437");
+    browserMenu->color(config::Color::Rgb);
+    consoleClient = new clienttest::Service(clientSettings, 0, consoleClientPlatform);
+    hostClient = new clienttest::Service(clientSettings, 1, hostClientPlatform);
+    for (unsigned i = 0; i < 2; ++i) {
+        const auto &s = clientSettings.get(i);
+        auto *menu = i ? hostMenu : consoleMenu;
+        menu->setStyle(
+            s.charset == clienttest::Charset::Latin1 ? "ANSI" : clienttest::charsetName(s.charset));
+        menu->resize(std::min<unsigned>(s.columns, 132), std::min<unsigned>(s.rows, 50));
+        menu->backspace(s.backspace);
+        (i ? rs232::session() : *console).port().clientBackspace(s.backspace);
+    }
     char *logStorage = static_cast<char *>(ps_malloc(256 * 1024));
     debugLog.begin(logStorage ? logStorage : fallbackLog,
                    logStorage ? 256 * 1024 : sizeof fallbackLog);
@@ -1101,14 +1183,14 @@ void loop() {
     }
     incoming->poll(!rs232::suspended() && net.joinResult() != netcfg::JoinResult::kRunning &&
                    net.scanState() != netcfg::ScanState::kRunning);
-    if (net.up() && !incoming->listening() && !answerListenFailed &&
+    if (net.up() && !incoming->listening() && !answerListenFailed && !console->localOpen() &&
         console->mode() == hostport::Mode::kCommand && console->port().lineEmpty()) {
         Serial.print("Answer listener unavailable; retrying port 23.\r\n");
         answerListenFailed = true;
     } else if (incoming->listening() || !net.up()) {
         answerListenFailed = false;
     }
-    if (!rs232::suspended()) {
+    if (!rs232::suspended() && !hostClient->cable()) {
         hw::lineSet(hwtest::OutSignal::kRI, incoming->ri());
     }
     pollConsole(now);
@@ -1122,6 +1204,19 @@ void loop() {
     outgoing->poll();
     configDialer->poll();
     configHardware.poll();
+    for (unsigned i = 0; i < 2; ++i) {
+        auto *service = i ? hostClient : consoleClient;
+        if (service->changed()) {
+            const auto &s = clientSettings.get(i);
+            auto *menu = i ? hostMenu : consoleMenu;
+            menu->setStyle(s.charset == clienttest::Charset::Latin1
+                               ? "ANSI"
+                               : clienttest::charsetName(s.charset));
+            menu->resize(std::min<unsigned>(s.columns, 132), std::min<unsigned>(s.rows, 50));
+            menu->backspace(s.backspace);
+            (i ? rs232::session() : *console).port().clientBackspace(s.backspace);
+        }
+    }
     // Departures are dispatched after Session has closed the local service. No
     // listener poll occurs between releasing its slot and starting the action.
     char departure[atcmd::kLineMax + 1];

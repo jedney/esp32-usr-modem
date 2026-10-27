@@ -60,6 +60,8 @@ bool Phonebook::valid(const Entry &e) {
            validSpeed(e.speed);
 }
 bool Phonebook::begin() {
+    loaded_ = true;
+    healthy_ = false;
     for (auto &e : entries_) {
         e = Entry{};
     }
@@ -98,6 +100,7 @@ bool Phonebook::begin() {
                 }
             }
             if (ok) {
+                healthy_ = true;
                 return true;
             }
         }
@@ -107,7 +110,8 @@ bool Phonebook::begin() {
     }
     strcpy(entries_[0].number, "1");
     strcpy(entries_[0].host, "www.amigaretro.com");
-    return size == 0 ? save() : false;
+    healthy_ = size == 0 && save();
+    return healthy_;
 }
 const Entry *Phonebook::find(const char *number) const {
     for (const auto &e : entries_) {

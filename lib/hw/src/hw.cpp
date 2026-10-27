@@ -368,6 +368,18 @@ void hostEnd() {
 bool hostActive() {
     return hostOn;
 }
+size_t hostWriteSpace() {
+    return hostOn ? uart().availableForWrite() : 0;
+}
+size_t hostWrite(const uint8_t *data, size_t length) {
+    if (!hostOn || !length)
+        return 0;
+    // With no TX ring, uart_tx_chars copies only available FIFO bytes and returns
+    // immediately even when the computer holds RTS off. All host writers run on
+    // the modem loop; FIFO space can only increase between measuring and writing.
+    int written = uart_tx_chars(UART_NUM_1, reinterpret_cast<const char *>(data), length);
+    return written > 0 ? static_cast<size_t>(written) : 0;
+}
 
 bool hostDrain(uint32_t timeoutMs) {
     return !hostOn || uart_wait_tx_done(UART_NUM_1, pdMS_TO_TICKS(timeoutMs)) == ESP_OK;

@@ -1,0 +1,25 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  USRobotics          Sportster 28.8k Series                                  ║
+╠════════════════════════════ [ MAIN > PHONEBOOK ] ════════════════════════════╣
+║  PHONEBOOK ENTRIES                      PAGE 1 / 1                           ║
+║  #    NAME                       PHONE NUMBER          RATE                  ║
+║ ──────────────────────────────────────────────────────────────────────────── ║
+║                                                                              ║
+║    No saved entries loaded                                                   ║
+║    (Connect existing phonebook service to show live entries.)                ║
+║    List uses rows 7-15 for up to 9 entries per page.                         ║
+║                                                                              ║
+║                                                                              ║
+║                                                                              ║
+║                                                                              ║
+║                                                                              ║
+╠═════════════════════════════ [ SELECTED ENTRY ] ═════════════════════════════╣
+║  Name: --      Number: --      Speed: --                                     ║
+║  [I] Full details   |  [1] List   [2] Add / edit                             ║
+║  [3] Delete (requires entry)   [4] Dial (requires entry)                     ║
+╠═══════════════════════════════ [ NAVIGATION ] ═══════════════════════════════╣
+║  UP/DOWN Select  PGUP/PGDN Pages  ENTER Details  ESC Back                    ║
+║  F1 Help  F2 Main  |  Model: 28.8k  Link: UNKNOWN                            ║
+║  Status: Unbound phonebook preview; no sample numbers.                       ║
+║  Command > █                                                                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
