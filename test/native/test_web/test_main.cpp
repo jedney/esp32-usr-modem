@@ -59,6 +59,32 @@ void test_digest_checks_exact_uri_method_replay_and_expiry() {
     auth.reset();
     TEST_ASSERT_FALSE(auth.verify(digest(nonce, "00000003"), "GET", "/api/session", ha1, 8));
 }
+void test_digest_reports_stale_nonce_and_wrong_password() {
+    FakeCrypto crypto;
+    Auth auth(crypto);
+    const char *ha1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    TEST_ASSERT_TRUE(Check::kMissing == auth.check("", "GET", "/api/session", ha1, 1));
+    auto c = auth.challenge(0);
+    TEST_ASSERT_EQUAL(std::string::npos, c.find("stale"));
+    auto n = c.substr(c.find("nonce=\"") + 7, 32);
+    TEST_ASSERT_TRUE(Check::kOk == auth.check(digest(n), "GET", "/api/session", ha1, 1));
+    // Replay of the same count, an expired nonce and a nonce we never issued:
+    // the password is right, so the browser should retry without asking again.
+    TEST_ASSERT_TRUE(Check::kStale == auth.check(digest(n), "GET", "/api/session", ha1, 2));
+    TEST_ASSERT_TRUE(Check::kStale ==
+                     auth.check(digest(n, "00000002"), "GET", "/api/session", ha1, 60000));
+    TEST_ASSERT_TRUE(Check::kStale == auth.check(digest("0123456789abcdef0123456789abcdef"), "GET",
+                                                 "/api/session", ha1, 3));
+    auto s = auth.challenge(4, true);
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, s.find(", stale=true"));
+    // A wrong response is never stale, even with a fresh nonce.
+    std::string wrong = digest(n, "00000003");
+    wrong.replace(wrong.find("0123456789abcdef0123456789abcdef"), 32,
+                  "ffffffffffffffffffffffffffffffff");
+    TEST_ASSERT_TRUE(Check::kWrong == auth.check(wrong, "GET", "/api/session", ha1, 5));
+    TEST_ASSERT_TRUE(Check::kOk ==
+                     auth.check(digest(n, "00000003"), "GET", "/api/session", ha1, 6));
+}
 void test_digest_rejects_duplicate_fields_and_non_digest_schemes() {
     FakeCrypto crypto;
     Auth auth(crypto);
@@ -252,6 +278,7 @@ int main() {
     RUN_TEST(test_browser_cp437_is_utf8_and_serial_source_bytes_are_unchanged);
     RUN_TEST(test_host_and_origin_do_not_accept_rebinding_authorities);
     RUN_TEST(test_digest_checks_exact_uri_method_replay_and_expiry);
+    RUN_TEST(test_digest_reports_stale_nonce_and_wrong_password);
     RUN_TEST(test_digest_rejects_duplicate_fields_and_non_digest_schemes);
     RUN_TEST(test_tickets_are_single_use_bounded_and_expire_across_rollover);
     RUN_TEST(test_settings_default_persist_failure_and_corruption_fail_closed);

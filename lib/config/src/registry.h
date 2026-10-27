@@ -14,99 +14,43 @@ struct Hooks {
     atcmd::StarHandler cmdDialTest = nullptr;
     atcmd::StarHandler cmdHw = nullptr;
 };
-inline atcmd::Reply registryCONFIG(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "CONFIG", a);
-}
-inline atcmd::Reply registryWEB(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "WEB", a);
-}
-inline atcmd::Reply registryINTERNET(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "INTERNET", a);
-}
-inline atcmd::Reply registrySTYLE(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "STYLE", a);
-}
-inline atcmd::Reply registrySIZE(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "SIZE", a);
-}
-inline atcmd::Reply registryTEST(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "TEST", a);
-}
-inline atcmd::Reply registrySX(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "SX", a);
-}
-inline atcmd::Reply registrySY(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "SY", a);
-}
-inline atcmd::Reply registrySZ(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "SZ", a);
-}
-inline atcmd::Reply registryRX(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "RX", a);
-}
-inline atcmd::Reply registryRY(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "RY", a);
-}
-inline atcmd::Reply registryRZ(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "RZ", a);
-}
-inline atcmd::Reply registrySTATUS(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "STATUS", a);
-}
-inline atcmd::Reply registrySETTING(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "SETTING", a);
-}
-inline atcmd::Reply registryPROFILE(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "PROFILE", a);
-}
-inline atcmd::Reply registryPROFILECTL(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "PROFILECTL", a);
-}
-inline atcmd::Reply registryEXPLICIT(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "EXPLICIT", a);
-}
-inline atcmd::Reply registryRESTOREEND(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "RESTOREEND", a);
-}
-inline atcmd::Reply registryDIAL(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "DIAL", a);
-}
-inline atcmd::Reply registryREFERENCE(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "REFERENCE", a);
-}
-inline atcmd::Reply registryABOUT(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "ABOUT", a);
-}
-inline atcmd::Reply registrySOUNDS(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "SOUNDS", a);
-}
-inline atcmd::Reply registryPLAY(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "PLAY", a);
-}
-inline atcmd::Reply registryLOG(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "LOG", a);
-}
-inline atcmd::Reply registryCALLLOG(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "CALLLOG", a);
-}
-inline atcmd::Reply registryDNS(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "DNS", a);
-}
-inline atcmd::Reply registryPING(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "PING", a);
-}
-inline atcmd::Reply registryEXPORT(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "EXPORT", a);
-}
-inline atcmd::Reply registryBOOKCLEAR(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "BOOKCLEAR", a);
-}
-inline atcmd::Reply registryRESTART(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "RESTART", a);
-}
-inline atcmd::Reply registryRESETINFO(atcmd::Port &p, const char *a) {
-    return Commands::dispatch(p, "RESETINFO", a);
-}
+// Each of these AT* commands is handled by config::Commands under its own name.
+#define USR_CONFIG_COMMAND(NAME)                                        \
+    inline atcmd::Reply registry##NAME(atcmd::Port &p, const char *a) { \
+        return Commands::dispatch(p, #NAME, a);                         \
+    }
+USR_CONFIG_COMMAND(CONFIG)
+USR_CONFIG_COMMAND(WEB)
+USR_CONFIG_COMMAND(INTERNET)
+USR_CONFIG_COMMAND(STYLE)
+USR_CONFIG_COMMAND(SIZE)
+USR_CONFIG_COMMAND(TEST)
+USR_CONFIG_COMMAND(SX)
+USR_CONFIG_COMMAND(SY)
+USR_CONFIG_COMMAND(SZ)
+USR_CONFIG_COMMAND(RX)
+USR_CONFIG_COMMAND(RY)
+USR_CONFIG_COMMAND(RZ)
+USR_CONFIG_COMMAND(STATUS)
+USR_CONFIG_COMMAND(SETTING)
+USR_CONFIG_COMMAND(PROFILE)
+USR_CONFIG_COMMAND(PROFILECTL)
+USR_CONFIG_COMMAND(EXPLICIT)
+USR_CONFIG_COMMAND(RESTOREEND)
+USR_CONFIG_COMMAND(DIAL)
+USR_CONFIG_COMMAND(REFERENCE)
+USR_CONFIG_COMMAND(ABOUT)
+USR_CONFIG_COMMAND(SOUNDS)
+USR_CONFIG_COMMAND(PLAY)
+USR_CONFIG_COMMAND(LOG)
+USR_CONFIG_COMMAND(CALLLOG)
+USR_CONFIG_COMMAND(DNS)
+USR_CONFIG_COMMAND(PING)
+USR_CONFIG_COMMAND(EXPORT)
+USR_CONFIG_COMMAND(BOOKCLEAR)
+USR_CONFIG_COMMAND(RESTART)
+USR_CONFIG_COMMAND(RESETINFO)
+#undef USR_CONFIG_COMMAND
 class Registry {
 public:
     explicit Registry(const Hooks &hooks) {

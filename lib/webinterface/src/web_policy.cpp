@@ -303,7 +303,7 @@ void Auth::reset() {
         n = {};
     }
 }
-std::string Auth::challenge(uint32_t now) {
+std::string Auth::challenge(uint32_t now, bool stale) {
     char value[33];
     if (!token(value)) {
         return "";
@@ -311,40 +311,44 @@ std::string Auth::challenge(uint32_t now) {
     nonce_[next_] = {value, now, 0};
     next_ = (next_ + 1) % 8;
     return std::string("Digest realm=\"usr-modem\", qop=\"auth\", algorithm=MD5, nonce=\"") +
-           value + '"';
+           value + '"' + (stale ? ", stale=true" : "");
 }
-bool Auth::verify(const std::string &header, const std::string &method, const std::string &uri,
+Check Auth::check(const std::string &header, const std::string &method, const std::string &uri,
                   const char *ha1, uint32_t now) {
     std::map<std::string, std::string> f;
     if (!ha1 || !hex(ha1, 32) || !fields(header, f) || f["username"] != "admin" ||
         f["realm"] != "usr-modem" || f["uri"] != uri || f["qop"] != "auth" ||
         (f.count("algorithm") && f["algorithm"] != "MD5") || !hex(f["nc"], 8) ||
-        !hex(f["response"], 32) || f["cnonce"].empty() || f["cnonce"].size() > 128) {
-        return false;
+        !hex(f["response"], 32) || f["cnonce"].empty() || f["cnonce"].size() > 128 ||
+        !hex(f["nonce"], 32)) {
+        return Check::kMissing;
     }
     uint32_t count = 0;
     for (char c : f["nc"]) {
         count = (count << 4) | unsigned(c <= '9' ? c - '0' : tolower(c) - 'a' + 10);
     }
-    for (auto &n : nonce_) {
-        if (n.value.empty() || !equalSecret(f["nonce"], n.value) || now - n.at >= 60000 ||
-            count <= n.count) {
-            continue;
-        }
-        char ha2[33] = {}, expected[33] = {};
-        bool ok = crypto_.md5(method + ':' + uri, ha2) &&
-                  crypto_.md5(std::string(ha1) + ':' + n.value + ':' + f["nc"] + ':' + f["cnonce"] +
-                                  ":auth:" + ha2,
-                              expected) &&
-                  equalSecret(lower(f["response"]), expected);
-        devicecfg::wipe(ha2, sizeof ha2);
-        devicecfg::wipe(expected, sizeof expected);
-        if (ok) {
-            n.count = count;
-        }
-        return ok;
+    // The response is checked against the nonce the browser sent. Only a fresh nonce
+    // that we issued, used with a higher count than before, logs in. A correct
+    // response for any other nonce proves the password, so it is only "stale".
+    char ha2[33] = {}, expected[33] = {};
+    bool correct = crypto_.md5(method + ':' + uri, ha2) &&
+                   crypto_.md5(std::string(ha1) + ':' + f["nonce"] + ':' + f["nc"] + ':' +
+                                   f["cnonce"] + ":auth:" + ha2,
+                               expected) &&
+                   equalSecret(lower(f["response"]), expected);
+    devicecfg::wipe(ha2, sizeof ha2);
+    devicecfg::wipe(expected, sizeof expected);
+    if (!correct) {
+        return Check::kWrong;
     }
-    return false;
+    for (auto &n : nonce_) {
+        if (!n.value.empty() && equalSecret(f["nonce"], n.value) && now - n.at < 60000 &&
+            count > n.count) {
+            n.count = count;
+            return Check::kOk;
+        }
+    }
+    return Check::kStale;
 }
 void Tickets::reset() {
     for (auto &t : ticket_) {

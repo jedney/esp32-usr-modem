@@ -904,11 +904,11 @@ void Terminal::profileAction(size_t index) {
 }
 void Terminal::activate(const Action &action) {
     if (session_.port().browser() && action.screen == S::Client) {
-        feedback("Serial client test: run on console COM15 or RS232 COM18");
+        feedback("Client Tests run on the USB console or RS232 port");
         return;
     }
     if (!action.available) {
-        feedback("Client Tests (v0.12) unavailable");
+        feedback("Not available");
         return;
     }
     if (rs232_ && action.rs232Unavailable) {

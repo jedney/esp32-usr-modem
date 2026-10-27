@@ -29,7 +29,7 @@ checks received content and the modem's discard-sink CRC, and prints statistics.
 It does not save profiles or change credentials. Amiga acceptance remains a
 separate physical check.
 
-## PPP Internet interoperability (v0.13)
+## PPP Internet interoperability
 
 On the wired Windows bench, close monitors and run:
 
@@ -56,7 +56,7 @@ are g++, Python, iproute2 and ppp, with kernel PPP support and `/dev/ppp`.
 Real Windows 9x/Amiga stack/browser acceptance remains deferred by Jon because
 neither client is available. Automated modern-stack results do not close it.
 
-Complete packaged-sound batch regression (v0.14):
+Complete packaged-sound batch regression:
 
 ```powershell
 python test/interop/serial_lrzsz.py --port COM18 --baud 115200 --sounds

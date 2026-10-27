@@ -327,17 +327,21 @@ bool WebService::authorized(httpd_req_t *req) {
         return false;
     }
     std::string value = header(req, "Authorization");
-    bool valid;
+    webinterface::Check result;
     std::string challenge;
     {
         Lock lock(mutex_);
-        valid = auth_.verify(value, req->method == HTTP_POST ? "POST" : "GET", req->uri,
+        result = auth_.check(value, req->method == HTTP_POST ? "POST" : "GET", req->uri,
                              hash_.c_str(), millis());
-        if (!valid) {
-            challenge = auth_.challenge(millis());
+        if (result != webinterface::Check::kOk) {
+            challenge = auth_.challenge(millis(), result == webinterface::Check::kStale);
         }
     }
-    if (!valid) {
+    if (result == webinterface::Check::kWrong) {
+        // Slow down password guessing. This runs in the web server task only.
+        delay(1000);
+    }
+    if (result != webinterface::Check::kOk) {
         httpd_resp_set_hdr(req, "WWW-Authenticate", challenge.c_str());
         reply(req, "401 Unauthorized", "Log in as admin with the device password.");
         return false;

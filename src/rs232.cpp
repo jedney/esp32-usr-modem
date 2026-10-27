@@ -28,16 +28,15 @@ public:
         size_t done = 0;
         const uint32_t start = millis();
         while (done < len) {
-            if (millis() - start > 2000)
-                return;
+            if (millis() - start > 2000) {
+                return;  // the computer has held RTS off for 2 s: drop the rest
+            }
             int room = hw::hostWriteSpace();
             if (room > 0) {
                 size_t n = len - done < static_cast<size_t>(room) ? len - done : room;
                 size_t written = hw::hostWrite(reinterpret_cast<const uint8_t *>(data + done), n);
                 done += written;
                 toComputer += written;
-            } else if (millis() - start > 2000) {
-                return;  // the computer has held RTS off for 2 s: drop the rest
             } else {
                 delay(1);
             }

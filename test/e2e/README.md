@@ -1,127 +1,95 @@
 # End-to-end tests
 
-v0.13 adds `test_internet.py`: PPP/SLIP and legacy aliases, console and COM18
-ownership, LCP/DTR hang-up, negotiation timeout, binary NAT round trips, timed
-RTS pauses, UDP DNS, settings/export/reboot and Wi-Fi loss/redial. Run with
-`--console-port COM15 --rs232-port COM18`. Two optional PC UDP echo cases also
-need `--udp-tests --call-server-ip <PC LAN IP>` and pre-existing UDP 32322
-reachability; the suite does not change firewall policy. The default NAT cases
-use the negotiated DNS/router for ICMP and ordinary DNS rather than a new PC port.
-Use `test/interop/serial_pppd.py` for independent kernel TCP/IP HTTP acceptance.
-
-v0.12 adds `test_client.py` for COM15/COM18 diagnostics, confirmed per-port
-settings/reboot retention (original records restored), RTS pauses and cable
-signal restoration. `test/interop/serial_lrzsz.py` tests real X/Y/ZMODEM transfers
-through Windows pyserial and Ubuntu lrzsz without WSL serial mapping. Its source
-is deterministic generated data; uploads are discarded. Close PuTTY first.
-
-v0.11 web acceptance: add `--web-tests --web-host usr-modem.local` with
-`--console-port COM15 --rs232-port COM18`. HTTP Digest uses the existing
-`USR_MODEM_PASSWORD` in memory. The normal web suite does not upload images,
-rotate credentials or erase history. It tests authentication, socket tickets,
-single-menu ownership, read-only views, CSRF rejection and physical line controls.
-Full filesystem acceptance needs explicit approval because replacement erases history.
-
-These drive a real modem through its serial ports and check the responses.
+These drive a real modem through its serial ports (and Wi-Fi) and check the responses.
 
 ```powershell
 pip install -r test/e2e/requirements.txt
-python -m pytest test/e2e --console-port COM5                    # USB console only
-python -m pytest test/e2e --console-port COM5 --rs232-port COM7  # + RS232 port (v0.5)
+python -m pytest test/e2e --console-port COM15                      # USB console only
+python -m pytest test/e2e --console-port COM15 --rs232-port COM18   # + RS232 port
 ```
 
-Find the COM port numbers in Windows Device Manager → Ports (COM & LPT). The board's
-USB-serial chip appears as e.g. "USB-SERIAL CH340" or "CP210x"; the Unitek adapter
-appears as "Prolific USB-to-Serial".
+Find the COM ports in Device Manager → Ports (COM & LPT). The S3 board's USB-serial chip
+shows as "USB-SERIAL CH340" (or similar); the Unitek adapter as "Prolific USB-to-Serial".
+Tests that need a port or option you didn't give are skipped. Close the VS Code serial
+monitor and any terminal (PuTTY) first: only one program can open a COM port.
 
-Tests that need a port you didn't give are skipped. Close the VS Code serial monitor
-first: only one program can open a COM port at a time.
+## Options
 
-`test_rs232.py` (v0.5) needs both ports and the RS232 section wired (MAX3232s, bench DB9
-or DB25, Unitek adapter plugged straight in). It changes only the PC's speed, from 300 to
-115200, and checks the modem follows from "AT" alone; it also checks CTS, DCD, DTR
-hang-up and a 16 KB echo with RTS/CTS flow control. `test_session.py` needs only the
-console: it makes `AT*TESTCALL` calls and checks `+++`, `ATO`, `ATH` and `AT*BAUD`.
+| Option | Enables |
+|---|---|
+| `--console-port COMx` | All console tests (required) |
+| `--rs232-port COMy` | RS232 tests through the Unitek adapter, plugged straight into the modem |
+| `--rs232-baud <rate>` | RS232 speed the tests start at (default 38400) |
+| `--call-server-ip <PC LAN IP>` | Outgoing-call tests against a PC TCP server |
+| `--call-server-port <port>` | That server's port (default 32321) |
+| `--live-bbs` | One real call to `www.amigaretro.com:23` |
+| `--web-tests --web-host usr-modem.local` | HTTP/WebSocket tests (device password from `.env`; `--web-host` may be an IP) |
+| `--browser-upload` | Install the tested firmware through the web interface (with `--web-tests`) |
+| `--udp-tests` | Two optional PPP/SLIP UDP echo cases (PC UDP port 32322 must be reachable) |
+| `--device-tests` | Device password changes |
+| `--factory-reset` | `AT*FACTORY` (with `--device-tests`); rejoins the Wi-Fi in `.env` |
+| `--ota-upload` | Real OTA uploads (with `--device-tests`) |
+| `--save-password` | Save the final device password to `.env` as `USR_MODEM_PASSWORD` |
 
-`test_answer.py` (v0.9) connects from the PC to the modem on port 23. It discovers the
-current address from `AT*WIFI?`, temporarily selects CONSOLE for auto-answer, and
-restores the receiver, model and changed active profile settings after each test.
-It covers manual answer, exact S0 thresholds, Telnet/binary data, remote-command
-isolation while the local side is escaped, extra-caller rejection, Wi-Fi recovery
-and answer-port persistence. No PC listener or inbound firewall change is needed.
-COM18 is not used until its RS232 electronics are wired.
+Secrets come from the git-ignored `.env` at the repository root (`USR_MODEM_WIFI_SSID`,
+`USR_MODEM_WIFI_PASS`, `USR_MODEM_PASSWORD`); never put them on the command line. Do not
+use pytest `--showlocals`: test locals hold credentials. Failure messages leave out boot
+banners and upload output.
+
+## Suites
+
+| File | Needs | Covers |
+|---|---|---|
+| `test_console.py` | Console | Banner, version, `AT*DIALTEST` |
+| `test_settings.py` | Console | AT parser, result codes, S-registers, templates, `ATI`, settings kept across a restart |
+| `test_session.py` | Console | `AT*TESTCALL`: `+++`, `ATO`, `ATH`, `AT*BAUD`, LEDs |
+| `test_rs232.py` | Both ports | Speed detection 300-115200 from "AT", CTS, DCD, DTR hang-up, 16 KB echo with RTS/CTS |
+| `test_hwtest.py` | Console (bridge: both ports) | `AT*HW...` commands, pin map, bridge |
+| `test_wifi.py` | Console, Wi-Fi in `.env` | Join through the masked prompt, `ping usr-modem.local`, clock, the password appears in no output, prompt ownership across both ports |
+| `test_device.py` | Console | Device password, OTA policy; with options, password changes, factory reset and authenticated uploads |
+| `test_calls.py` | Console, `--call-server-ip` | RAW binary calls, Telnet negotiation, BUSY/NO ANSWER/NO DIAL TONE/NO CARRIER, Wi-Fi loss, model reporting, ring and connect delays, hostname digits |
+| `test_answer.py` | Console | Calls the modem on port 23 from the PC: `ATA`, `S0`, binary data, remote-caller isolation, extra callers, Wi-Fi recovery, `AT*ANSWERPORT` |
+| `test_config.py` | Console (RS232 case: both ports) | Configuration screen styles, dial 123, escape/ATO, help and hardware screens, caller rejection, export, no idle repaint |
+| `test_client.py` | Both ports | Client Tests, per-port client settings kept across a restart, RTS pauses, cable lines |
+| `test_internet.py` | Both ports | PPP/SLIP and aliases, LCP/DTR hang-up, negotiation timeout, NAT round trips, RTS pauses, DNS, settings/export, Wi-Fi loss |
+| `test_web.py` | Both ports, `--web-tests` | Digest login, socket tickets, one menu at a time, read-only views, CSRF, line controls |
+
+The suites restore what they change (answer port, model, styles, active settings,
+client records). The normal web suite never uploads images, changes passwords or erases
+history.
+
+## Outgoing calls and the Windows firewall
+
+`test_calls.py` runs a TCP server on the PC (port 32321) that the modem calls. Windows
+may need an inbound rule for the test Python: `scripts/allow_call_tests.ps1
+-ModemAddress <modem IP>` (Administrator) creates one limited to that modem on
+private networks. Remove it with
+`Remove-NetFirewallRule -DisplayName 'USR modem local call tests TCP 32321'`. The tests
+never change firewall settings themselves. Refusal (BUSY) uses conditional accept, so it
+works with that rule; `scripts/test_refusal.ps1 -ServerAddress <PC IP> -ConsolePort COM15`
+runs just the refusal and DNS checks.
 
 ```powershell
-python -m pytest test/e2e/test_answer.py --console-port COM15 --tb=short
+python -m pytest test/e2e/test_calls.py --console-port COM15 --call-server-ip 10.0.0.208 --live-bbs
 ```
 
-`test_calls.py` (v0.8) uses a PC TCP server on port 32321 and needs the PC LAN
-address reachable from the modem. It checks RAW binary transfer, fragmented Telnet
-negotiation, errors, Wi-Fi loss and stable model reporting. Model persistence needs
-only COM15. The live BBS test is opt-in and calls `www.amigaretro.com:23`.
+## Device tests
 
 ```powershell
-python -m pytest test/e2e/test_calls.py --console-port COM15 --call-server-ip 10.0.0.208 --live-bbs --tb=short
+python -m pytest test/e2e/test_device.py --console-port COM15 --device-tests --factory-reset --ota-upload --save-password
 ```
 
-Windows may require a scoped inbound rule for the actual test Python executable.
-`scripts/allow_call_tests.ps1 -ModemAddress 10.0.0.221` creates the documented
-TCP 32321 rule from that modem only on Domain/Private profiles, when run as
-Administrator after approval. Tests do not alter firewall settings. Remove the rule
-when no longer needed with `Remove-NetFirewallRule -DisplayName 'USR modem local
-call tests TCP 32321'`. Use current LAN addresses, not these example addresses.
+The factory reset erases all settings, rejoins the Wi-Fi in `.env` and leaves modem
+settings at defaults. The configured device password is restored afterwards, or a new
+one is generated (`--save-password` stores it). Uploads use `pio run -e s3_ota -t
+upload`, with the unit-test gate each time. Wrong and old passwords must fail, and the
+first successful upload stops the boot password display.
 
-TCP refusal is covered by the normal call suite. On Windows the listener uses
-`SO_CONDITIONAL_ACCEPT` / `WSAAccept` to explicitly reject requests while the existing
-program-scoped Python rule applies. A filtered closed port would test timeout instead.
-To run just refusal and DNS checks, use a normal PowerShell:
+## Other tools
 
-```powershell
-./scripts/test_refusal.ps1 -ServerAddress 10.0.0.208 -ConsolePort COM15
-```
+- `test/interop/serial_lrzsz.py`: real X/Y/ZMODEM transfers against lrzsz.
+- `test/interop/serial_pppd.py`: independent PPP and kernel TCP/IP (HTTP, DNS) through
+  the modem.
 
-The helper does not change firewall settings or require Administrator access. It
-records secret-safe pytest output in `.pio/v08-refusal.log`. DNS failure also runs
-independently in the normal suite.
-
-`test_wifi.py` (v0.6) needs only the console, plus the Wi-Fi name and password in `.env`
-at the repository root (`USR_MODEM_WIFI_SSID`, `USR_MODEM_WIFI_PASS`; copy
-`.env.example`). Without them it is skipped. It joins that network through the masked
-password prompt (the network stays saved on the modem), pings `usr-modem.local` from the
-PC, compares the modem's clock with the PC's, and checks the password appears nowhere:
-not in the boot banner, `AT*HELP`, `AT*WIFI?`, `ATI0`-`ATI7`, `AT&V` or any other show
-command. The password is never printed, even when a test fails.
-
-`test_device.py` (v0.7) checks the password, OTA policy and factory reset. Its default
-checks are read-only. Password changes require `--device-tests`; the reset additionally
-requires `--factory-reset`, and real firmware uploads require `--ota-upload`. The reset
-erases all settings, rejoins the Wi-Fi in `.env`, and leaves modem settings at defaults.
-The configured device password (OTA and web) is restored afterwards; if none exists,
-one is generated. `--save-password` saves that final credential as `USR_MODEM_PASSWORD`
-in the git-ignored `.env`, preserving the other entries, so OTA uploads and web tests
-use the same password afterwards.
-
-```powershell
-python -m pytest test/e2e/test_device.py --console-port COM15 --device-tests --factory-reset --ota-upload --save-password --tb=short
-```
-
-Uploads use `pio run -e s3_ota -t upload`, including the native-test gate for each
-attempt. The suite verifies wrong/old credentials fail, correct/new credentials work,
-and the first successful authenticated upload removes the first-boot password. The
-10-minute boundary and millisecond rollover are tested with a fake clock on the PC.
-Do not enable pytest `--showlocals`: test locals hold credentials. Failure messages
-omit boot banners and upload output. COM18 is the current Unitek port; pass it only
-after the MAX3232/DB9 section is wired.
-
-### Configuration terminal (v0.10)
-
-`python -m pytest test/e2e/test_config.py --console-port COM15` exercises direct
-ANSI/CP437/plain entry, reserved dialing, escape/ATO, help/hardware screens, incoming
-caller rejection, command/export coverage and cancelled restart confirmation. It
-restores the modified active settings and style. It neither rotates credentials nor
-executes the exported script on a live modem. Firmware must already be v0.10.
-
-Pass `--rs232-port COM18` only after confirming the MAX3232/RS232 path is wired. The
-RS232 case verifies unavailable takeover tests and restores its previous style. Real
-PC/Amiga rendering, lowest baud, hardware observation and audio listening are manual
-acceptance; automated console success does not establish those results.
+See `test/interop/README.md`. Real PC terminal and Amiga rendering, the loopback plug,
+the speaker and the front-panel lights need a person to check them.

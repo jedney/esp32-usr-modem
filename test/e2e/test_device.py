@@ -224,7 +224,16 @@ def test_factory_new_password_and_authenticated_first_use(managed_device, wifi, 
         assert _upload(changed, host), "new password cannot upload after rotation"
     finally:
         # Factory reset clears Wi-Fi; restore it even if a later assertion fails.
-        lines = console.command("AT*WIFI?")
+        # The last step is a successful OTA upload, so the modem may still be restarting.
+        lines = None
+        deadline = time.monotonic() + 30
+        while lines is None:
+            try:
+                lines = console.command("AT*WIFI?")
+            except AssertionError:
+                if time.monotonic() > deadline:
+                    raise
+                time.sleep(1)
         if not any(re.match(r"Wi-Fi:\s+connected$", line) for line in lines):
             _, after = _join(console, ssid, wifi_password)
             joined = b"Connected, IP " in after

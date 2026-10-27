@@ -102,14 +102,14 @@ export function startDemoModem({message, write}) {
         redraw();
     };
     const open = item => {
-        if (item.status === 'unavailable') feedback = 'Client Tests (v0.12) unavailable';
+        if (item.status === 'unavailable') feedback = 'Not available';
         else if (!screen) {
             stack.push({screen, selected}); screen = item; selected = 0;
             if (!item.items.length) detail = `DEMO: ${item.label}\nNo device service connected.\nThis read-only preview does not run modem commands.`;
         } else if (screen.id === 'phonebook' && item.key === '1') detail = null;
         else if (screen.id === 'phonebook' && item.key === '4') confirm = true;
         else if (item.id === 'settings.model') detail = 'DEMO model selector\n1 14.4k    2 28.8k    3 33.6k    4 56k\nChanges this preview only.';
-        else if (screen.id === 'client-tests') detail = 'Serial client test: run on console COM15 or RS232 COM18.\nBrowser lists these tests but cannot execute them.';
+        else if (screen.id === 'client-tests') detail = 'Client Tests run on the USB console or RS232 port.\nThe browser lists them but cannot run them.';
         else detail = `DEMO: ${item.label}\nAction unavailable in the preview.\nThe real modem uses its existing service.`;
         redraw();
     };

@@ -372,7 +372,7 @@ void test_browser_lists_serial_diagnostics_without_dispatch() {
     r.feed("c1");
     ScreenView view;
     view.accept(r.drain());
-    TEST_ASSERT_TRUE(view.has("Serial client test"));
+    TEST_ASSERT_TRUE(view.has("Client Tests run on the USB console"));
     TEST_ASSERT_EQUAL(0, stubCalls);
 }
 void test_client_key_alias_preserves_standard_s5() {
