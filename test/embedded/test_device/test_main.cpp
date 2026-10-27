@@ -7,6 +7,7 @@
 #include "device_crypto.h"
 #include "nvs_store.h"
 #include "pins.h"
+#include "web_policy.h"
 
 hw::EspCrypto crypto;
 bool cryptoReady = false;
@@ -103,11 +104,32 @@ void test_factory_wipes_each_project_namespace_and_generates_a_new_password() {
     TEST_ASSERT_TRUE(auth.erase());
 }
 
+void test_oversized_nvs_is_not_missing_and_preserves_credentials() {
+    hw::NvsStore store("review_nvs", "cfg");
+    TEST_ASSERT_TRUE(store.erase());
+    uint8_t small[10] = {};
+    TEST_ASSERT_EQUAL(0, store.load(small, sizeof small));
+    uint8_t oversized[devicecfg::kBlobSize + 2] = {};
+    TEST_ASSERT_TRUE(store.save(oversized, sizeof oversized));
+    TEST_ASSERT_EQUAL(modemcfg::kLoadError, store.load(small, sizeof small));
+    webinterface::Settings web(store);
+    TEST_ASSERT_FALSE(web.begin());
+    TEST_ASSERT_FALSE(web.enabled());
+    devicecfg::Device device(store, crypto);
+    TEST_ASSERT_FALSE(device.begin());
+    TEST_ASSERT_FALSE(device.ready());
+    uint8_t after[sizeof oversized] = {};
+    TEST_ASSERT_EQUAL(sizeof oversized, store.load(after, sizeof after));
+    TEST_ASSERT_EQUAL_MEMORY(oversized, after, sizeof after);
+    TEST_ASSERT_TRUE(store.erase());
+}
+
 void setup() {
     // Must precede ADC initialization. RF is off throughout this test program.
     cryptoReady = crypto.begin();
     delay(2000);
     UNITY_BEGIN();
+    RUN_TEST(test_oversized_nvs_is_not_missing_and_preserves_credentials);
     RUN_TEST(test_real_hashes_match_ota_and_fixed_digest_realm);
     RUN_TEST(test_random_passwords_are_distinct_and_have_the_decided_alphabet);
     RUN_TEST(test_offline_password_generation_preserves_pot_adc);

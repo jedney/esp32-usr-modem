@@ -244,6 +244,8 @@ void Engine::lcp(const uint8_t *p, size_t n) {
         }
         if (ready_) {
             closeNetwork();
+            started_ = now_;
+            retries_ = 0;
             lcpLocal_ = ipcpLocal_ = ipcpPeer_ = ipcpStarted_ = false;
             ++lcpId_;
             request(false);
@@ -384,6 +386,8 @@ void Engine::ipcp(const uint8_t *p, size_t n) {
     } else if (p[0] == 5) {
         control(kIpcp, 6, p[1], data, length);
         closeNetwork();
+        started_ = now_;
+        retries_ = 0;
         ipcpLocal_ = ipcpPeer_ = false;
         ++ipcpId_;
         request(true);

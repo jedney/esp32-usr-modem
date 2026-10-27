@@ -185,3 +185,20 @@ def test_password_never_shown(console, wifi):
     output += "\n".join(console.command("AT*WIFISCAN", timeout=15))
     ok = _absent(output, password)
     assert ok, "the Wi-Fi password appeared in the output"
+
+
+def test_wifi_password_prompt_owns_operation_across_ports(console, rs232):
+    """No password is entered and no network change is attempted."""
+    for port in (console, rs232):
+        port.command('ATE0Q0V1')
+    for owner, other in ((console, rs232), (rs232, console)):
+        owner.ser.reset_input_buffer()
+        owner.ser.write(b'AT*WIFIJOIN="review-prompt-only"\r')
+        assert PROMPT in _read_until(owner.ser, (PROMPT,), 3)
+        try:
+            assert 'ERROR' in other.command('AT*WIFIJOIN="other-prompt-only"')
+            assert 'ERROR' in other.command('AT*WIFISCAN')
+        finally:
+            owner.ser.write(b'\x1b')
+            assert b'ERROR' in _read_until(owner.ser, (b'ERROR',), 3)
+        assert 'OK' in owner.command('AT')

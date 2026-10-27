@@ -3,6 +3,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include "input_buffer.h"
 #include "internet.h"
 #include "internet_dialer.h"
 #include "session.h"
@@ -475,8 +476,94 @@ void test_internet_settings_commands_and_network_failure_cleanup() {
     TEST_ASSERT_FALSE(f.dialer.start(f.session, "123", false));
     TEST_ASSERT_EQUAL(1, f.fallback.starts);
 }
+
+void test_ppp_renegotiation_gets_a_fresh_deadline_and_can_reconnect() {
+    for (bool lcp : {false, true}) {
+        Fixture f;
+        f.ready();
+        f.engine.poll(60000);
+        feed(f.engine, lcp ? 0xc021 : 0x8021, control(lcp ? 1 : 5, 46, {}));
+        auto output = drain(f.engine);
+        TEST_ASSERT_FALSE(f.engine.ready());
+        f.engine.poll(60001);
+        TEST_ASSERT_TRUE(f.engine.isOpen());
+        auto request = lcp ? output[0] : output[1];
+        request.erase(request.begin(), request.begin() + 4);
+        request[0] = 2;
+        feed(f.engine, lcp ? 0xc021 : 0x8021, request);
+        if (lcp) {
+            auto ipc = drain(f.engine);
+            TEST_ASSERT_EQUAL(1, ipc.size());
+            request = ipc[0];
+            request.erase(request.begin(), request.begin() + 4);
+            request[0] = 2;
+            feed(f.engine, 0x8021, request);
+        }
+        feed(f.engine, 0x8021, control(1, 47, {3, 6, 10, 64, 64, 2}));
+        TEST_ASSERT_TRUE(f.engine.ready());
+        TEST_ASSERT_EQUAL(2, f.network.begins);
+        drain(f.engine);
+    }
+    Fixture f;
+    f.ready();
+    f.engine.poll(60000);
+    feed(f.engine, 0xc021, control(1, 46, {}));
+    drain(f.engine);
+    f.engine.poll(89999);
+    TEST_ASSERT_TRUE(f.engine.isOpen());
+    drain(f.engine);
+    f.engine.poll(90000);
+    TEST_ASSERT_FALSE(f.engine.isOpen());
+}
+void test_uart_input_buffer_retains_ppp_tail_until_reply_queue_drains() {
+    Fixture f;
+    f.ready();
+    while (f.engine.space())
+        feed(f.engine, 0xc021, control(9, 55, {0, 0, 0, 0}));
+    uint8_t byte = 0;
+    bool body = false;
+    do {
+        TEST_ASSERT_EQUAL(1, f.engine.read(&byte, 1));
+        body = body || byte != 0x7e;
+    } while (!body || byte != 0x7e || !f.engine.space());
+    Memory memory;
+    atcmd::Modem modem(memory, nullptr, 0);
+    modem.begin();
+    Sink sink;
+    hostport::CallSlot slot;
+    hostport::Session session(modem, sink, 115200, slot);
+    TEST_ASSERT_TRUE(session.startCall(f.engine));
+    Bytes data;
+    auto request = wire(0xc021, control(9, 56, {0, 0, 0, 0}));
+    for (unsigned i = 0; i < 6; ++i)
+        data.insert(data.end(), request.begin(), request.end());
+    TEST_ASSERT_LESS_OR_EQUAL(session.hostSpace(), data.size());
+    hostport::InputBuffer pending;
+    TEST_ASSERT_TRUE(pending.append(data.data(), data.size()));
+    pending.poll(session, 100);
+    TEST_ASSERT_TRUE(pending.size() > 0);
+    TEST_ASSERT_EQUAL(data.size(), pending.size() + session.payloadSent());
+    auto frames = drain(f.engine);
+    pending.poll(session, 101);
+    TEST_ASSERT_EQUAL(0, pending.size());
+    auto rest = drain(f.engine);
+    frames.insert(frames.end(), rest.begin(), rest.end());
+    unsigned replies = 0;
+    for (const auto &frame : frames)
+        if (frame[5] == 56)
+            ++replies;
+    TEST_ASSERT_EQUAL(6, replies);
+    TEST_ASSERT_EQUAL(data.size(), session.payloadSent());
+    uint8_t tooMuch[513] = {};
+    TEST_ASSERT_FALSE(pending.append(tooMuch, sizeof tooMuch));
+    session.hangUp();
+}
+
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_ppp_renegotiation_gets_a_fresh_deadline_and_can_reconnect);
+    RUN_TEST(test_uart_input_buffer_retains_ppp_tail_until_reply_queue_drains);
+
     RUN_TEST(test_settings_crc_defaults_and_rollback);
     RUN_TEST(test_settings_reject_bad_pairs_and_overlap);
     RUN_TEST(test_rfc_fcs_and_binary_packet);

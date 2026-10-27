@@ -237,8 +237,9 @@ void Service::summary() {
     text(
         "TEST SET=ANSI|CP437|PLAIN|LATIN1,cols,rows,8|127 stages manual findings.\r\n"
         "TEST APPLY confirms/save; RESET confirms/defaults.\r\n"
-        "Sources: LOG, TEST (1-16777216 bytes), HS1200.WAV/HS2400.WAV/HS9600.WAV/"
-        "HS14400.WAV/HS28800.WAV/HS33600.WAV; ALL batch.\r\n");
+        "HS9600.WAV aliases HS2400.WAV, matching playback fallback.\r\n"
+        "Sources: LOG, TEST (1-16777216 bytes), HS1200.WAV/HS2400.WAV/"
+        "HS14400.WAV/HS28800.WAV/HS33600.WAV/HS56000.WAV; ALL batch.\r\n");
 }
 size_t Service::space() const {
     if (!open_ || (finished_ && !hold_) || output_.space() < 512)

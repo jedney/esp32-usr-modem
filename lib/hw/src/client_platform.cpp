@@ -1,36 +1,34 @@
 #include "client_platform.h"
 #include <algorithm>
 #include <cstring>
+#include "catalog.h"
 namespace hw {
 namespace {
-const char *const names[] = {"USRMODEM.LOG", "HS1200.WAV",  "HS2400.WAV",  "HS9600.WAV",
-                             "HS14400.WAV",  "HS28800.WAV", "HS33600.WAV", "TEST.BIN"};
-const char *const paths[] = {"",
-                             "/sounds/handshake-1200.wav",
-                             "/sounds/handshake-2400.wav",
-                             "/sounds/handshake-9600.wav",
-                             "/sounds/handshake-14400.wav",
-                             "/sounds/handshake-28800.wav",
-                             "/sounds/handshake-33600.wav"};
+constexpr unsigned kGenerated = sounds::kAssetCount + 1;
+constexpr unsigned kUnknown = kGenerated + 1;
 }  // namespace
 clienttest::Source *ClientPlatform::source(const char *selection, uint32_t generatedSize) {
     release();
-    selected_ = 8;
+    selected_ = kUnknown;
     if (!strcmp(selection, "ALL")) {
         selected_ = 0;
-        count_ = 7;
+        count_ = kGenerated;
     } else {
         if (!strcmp(selection, "LOG"))
             selected_ = 0;
         else if (!strcmp(selection, "TEST"))
-            selected_ = 7;
+            selected_ = kGenerated;
+        else if (!strcmp(selection, "USRMODEM.LOG"))
+            selected_ = 0;
+        else if (!strcmp(selection, "HS9600.WAV"))
+            selected_ = 2;  // compatibility alias, matching 9600-baud playback
         else
-            for (unsigned i = 0; i < 7; ++i)
-                if (!strcmp(selection, names[i]))
-                    selected_ = i;
+            for (unsigned i = 0; i < sounds::kAssetCount; ++i)
+                if (!strcmp(selection, sounds::kAssets[i].name))
+                    selected_ = i + 1;
         count_ = 1;
     }
-    if (selected_ == 8)
+    if (selected_ == kUnknown)
         return nullptr;
     generatedSize_ = generatedSize;
     if (!selected_) {
@@ -45,10 +43,10 @@ clienttest::Source *ClientPlatform::source(const char *selection, uint32_t gener
         unsigned index = selected_ + i;
         if (!index)
             sizes_[i] = snapshotSize_;
-        else if (index == 7)
+        else if (index == kGenerated)
             sizes_[i] = generatedSize_;
         else {
-            File file = LittleFS.open(paths[index], "r");
+            File file = LittleFS.open(sounds::kAssets[index - 1].path, "r");
             if (!file) {
                 release();
                 return nullptr;
@@ -65,11 +63,13 @@ void ClientPlatform::release() {
 }
 const char *ClientPlatform::name(unsigned file) const {
     unsigned index = selected_ + file;
-    if (index == 7)
+    if (index == kGenerated)
         return generatedSize_ == 1048576 ? "TEST1M.BIN"
                : generatedSize_ == 65536 ? "TEST64K.BIN"
                                          : "TEST.BIN";
-    return index < 7 ? names[index] : "TEST.BIN";
+    return !index               ? "USRMODEM.LOG"
+           : index < kGenerated ? sounds::kAssets[index - 1].name
+                                : "TEST.BIN";
 }
 uint32_t ClientPlatform::size(unsigned file) const {
     return file < count_ ? sizes_[file] : 0;
@@ -81,11 +81,11 @@ size_t ClientPlatform::read(unsigned file, uint32_t offset, uint8_t *out, size_t
     unsigned index = selected_ + file;
     if (!index)
         memcpy(out, snapshot_ + offset, cap);
-    else if (index == 7)
+    else if (index == kGenerated)
         for (size_t i = 0; i < cap; ++i)
             out[i] = (offset + i) & 255;
     else {
-        File input = LittleFS.open(paths[index], "r");
+        File input = LittleFS.open(sounds::kAssets[index - 1].path, "r");
         if (!input || !input.seek(offset))
             return 0;
         return input.read(out, cap);

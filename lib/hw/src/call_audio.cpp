@@ -1,5 +1,6 @@
 #include "call_audio.h"
 #include <new>
+#include "catalog.h"
 #include "hw.h"
 #include "volume.h"
 
@@ -21,8 +22,7 @@ bool CallAudio::preview(const char *name, const modemcfg::Profile &profile) {
         char path[100];
         uint32_t speed;
         if (hwtest::parseUint(name, 300, 56000, &speed) && calls::validSpeed(speed)) {
-            snprintf(path, sizeof path, "/sounds/handshake-%u.wav",
-                     unsigned(sounds::handshakeSpeed(speed)));
+            snprintf(path, sizeof path, "%s", sounds::handshakeAsset(speed).path);
         } else {
             if (strncmp(name, "/sounds/", 8) || strstr(name, "..") || strchr(name, '\\') ||
                 strlen(name) >= sizeof path) {
@@ -83,10 +83,7 @@ bool CallAudio::start(calls::SoundStage stage, const char *digits, bool pulse, u
             source_.reset(new (std::nothrow) tones::ToneSource(1800, 0, 0));
             break;
         case SoundStage::kHandshake: {
-            char path[48];
-            snprintf(path, sizeof path, "/sounds/handshake-%u.wav",
-                     unsigned(sounds::handshakeSpeed(speed)));
-            if (!reader_.open(path)) {
+            if (!reader_.open(sounds::handshakeAsset(speed).path)) {
                 return false;
             }
             auto *wav = new (std::nothrow) sounds::WavSource(reader_);

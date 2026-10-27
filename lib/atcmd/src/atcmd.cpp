@@ -92,34 +92,51 @@ bool Modem::writeTemplate(unsigned n, uint32_t baud) {
     if (n >= modemcfg::kTemplates) {
         return false;
     }
+    auto before = nvram_.tmpl[n];
     nvram_.tmpl[n] = active_;
     nvram_.tmpl[n].s[1] = 0;
     nvram_.tmpl[n].baud = baud;  // as on the Sportster, the template keeps the port speed
-    return modemcfg::saveNvram(store_, nvram_);
+    if (modemcfg::saveNvram(store_, nvram_))
+        return true;
+    nvram_.tmpl[n] = before;
+    return false;
 }
 
 bool Modem::setHostBaud(uint32_t baud) {
     if (baud != 0 && !modemcfg::isHostRate(baud)) {
         return false;
     }
+    auto before = nvram_.hostBaud;
     nvram_.hostBaud = baud;
-    return modemcfg::saveNvram(store_, nvram_);
+    if (modemcfg::saveNvram(store_, nvram_))
+        return true;
+    nvram_.hostBaud = before;
+    return false;
 }
 
 bool Modem::setPowerOn(unsigned y) {
     if (y > modemcfg::kTemplates + 2) {
         return false;
     }
+    auto before = nvram_.y;
     nvram_.y = static_cast<uint8_t>(y);
-    return modemcfg::saveNvram(store_, nvram_);
+    if (modemcfg::saveNvram(store_, nvram_))
+        return true;
+    nvram_.y = before;
+    return false;
 }
 
 bool Modem::setPhone(unsigned slot, const char *number) {
     if (slot >= modemcfg::kPhoneSlots || strlen(number) > modemcfg::kPhoneLen) {
         return false;
     }
+    char before[modemcfg::kPhoneLen + 1];
+    memcpy(before, nvram_.phone[slot], sizeof before);
     strcpy(nvram_.phone[slot], number);  // length checked above
-    return modemcfg::saveNvram(store_, nvram_);
+    if (modemcfg::saveNvram(store_, nvram_))
+        return true;
+    memcpy(nvram_.phone[slot], before, sizeof before);
+    return false;
 }
 
 void Modem::reset(unsigned z) {

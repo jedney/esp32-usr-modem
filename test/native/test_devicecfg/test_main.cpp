@@ -15,9 +15,12 @@ class Memory : public modemcfg::Store {
 public:
     std::vector<uint8_t> bytes;
     bool failSave = false;
+    bool failLoad = false;
     bool failErase = false;
     unsigned saves = 0;
     size_t load(uint8_t *out, size_t cap) override {
+        if (failLoad)
+            return modemcfg::kLoadError;
         size_t n = bytes.size() < cap ? bytes.size() : cap;
         if (n != 0) {
             memcpy(out, bytes.data(), n);
@@ -510,8 +513,26 @@ void test_browser_password_generation_cannot_disclose_plaintext() {
     TEST_ASSERT_TRUE(has(text, "OK"));
     TEST_ASSERT_EQUAL_STRING("", r.device.bootPassword());
 }
+
+void test_unreadable_device_record_never_generates_replacement_credentials() {
+    Memory memory;
+    FakeCrypto crypto;
+    Device first(memory, crypto);
+    TEST_ASSERT_TRUE(first.begin());
+    const auto bytes = memory.bytes;
+    const unsigned saves = memory.saves;
+    memory.failLoad = true;
+    Device reload(memory, crypto);
+    TEST_ASSERT_FALSE(reload.begin());
+    TEST_ASSERT_FALSE(reload.ready());
+    TEST_ASSERT_TRUE(bytes == memory.bytes);
+    TEST_ASSERT_EQUAL(saves, memory.saves);
+}
+
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_unreadable_device_record_never_generates_replacement_credentials);
+
     RUN_TEST(test_browser_password_generation_cannot_disclose_plaintext);
     RUN_TEST(test_password_separator_and_only_value_masked);
     RUN_TEST(test_first_boot_is_random_twelve_and_saved_for_display);

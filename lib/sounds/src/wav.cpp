@@ -1,5 +1,6 @@
 #include "wav.h"
 #include <cstring>
+#include "catalog.h"
 
 namespace sounds {
 namespace {
@@ -60,14 +61,7 @@ bool inspectWav(Reader &reader, WavInfo &info) {
     return false;
 }
 uint32_t handshakeSpeed(uint32_t speed) {
-    uint32_t result = 1200;
-    const uint32_t speeds[] = {1200, 2400, 14400, 28800, 33600, 56000};
-    for (uint32_t candidate : speeds) {
-        if (speed >= candidate) {
-            result = candidate;
-        }
-    }
-    return result;
+    return handshakeAsset(speed).speed;
 }
 bool WavSource::begin() {
     WavInfo info;

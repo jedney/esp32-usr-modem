@@ -39,6 +39,7 @@
 #include "hw.h"
 #include "hwconsole.h"
 #include "incoming.h"
+#include "input_buffer.h"
 #include "internet_dialer.h"
 #include "internet_network.h"
 #include "modemcfg.h"
@@ -104,6 +105,7 @@ hw::WebService webServer(device);
 hw::EspRadio radio;
 netcfg::Net net(netStore, radio);
 SerialSink consoleSink;
+hostport::InputBuffer consoleInput;
 hostport::CallSlot callSlot;
 hostport::EchoConnection echoCall;  // AT*TESTCALL
 hostport::Panel panel;
@@ -801,14 +803,16 @@ void printBanner(modemcfg::LoadResult loaded, netcfg::LoadResult netLoaded) {
 // --- Main loop parts --------------------------------------------------------------------
 
 void pollConsole(uint32_t now) {
+    consoleInput.poll(*console, now);
     uint8_t buf[256];
-    size_t room = console->hostSpace();
+    size_t room = consoleInput.size() ? 0 : console->hostSpace();
     size_t n = 0;
     while (n < sizeof buf && n < room && Serial.available() > 0) {
         buf[n++] = static_cast<uint8_t>(Serial.read());
     }
     if (n > 0) {
-        console->fromHost(buf, n, now);
+        consoleInput.append(buf, n);
+        consoleInput.poll(*console, now);
     }
     int space = Serial.availableForWrite();
     if (space > 0) {
@@ -1217,7 +1221,7 @@ void loop() {
     internetDialer->poll();
     pollBrowser();
     if (webServer.uploading()) {
-        net.tick(now);
+        net.tick(millis());
         delay(1);
         return;
     }
@@ -1242,7 +1246,7 @@ void loop() {
     }
     pollConsole(now);
     rs232::poll(now);
-    net.tick(now);
+    net.tick(millis());
     static bool wifiWasUp = false;
     if (wifiWasUp != net.up()) {
         wifiWasUp = net.up();

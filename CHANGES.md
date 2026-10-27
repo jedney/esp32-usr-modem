@@ -14,6 +14,27 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [0.14] - 2026-10-27
+
+### Fixed
+
+- Retain serial input when PPP reply pressure or a local-service transition stops
+  a chunk partway through; retry its remaining bytes without loss.
+- Keep the full browser network rollback window when the loop supplies an older
+  timestamp. Reserve Wi-Fi joins throughout password entry on every local port.
+- Give established PPP sessions a fresh deadline and retry budget when LCP/IPCP
+  renegotiates.
+- Reject failed settings saves without changing live configuration or the radio;
+  distinguish missing NVS records from oversized or unreadable records.
+- Share the playback/download sound catalogue, include HS56000.WAV in ALL batches,
+  and preserve HS9600.WAV as an alias of its existing HS2400.WAV playback fallback.
+
+### Added
+
+- Native failure-path regressions, real scratch-NVS and packaged-sound checks,
+  wired PPP pressure/renegotiation and cross-port Wi-Fi prompt checks, and complete
+  Y/ZMODEM sound-batch verification against lrzsz.
+
 ## [0.13] - 2026-10-27
 
 ### Added

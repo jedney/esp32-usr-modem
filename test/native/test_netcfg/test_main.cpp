@@ -1039,8 +1039,151 @@ void test_browser_network_loss_actions_require_cancellable_confirmation() {
     r.type("Y\r");
     TEST_ASSERT_FALSE(r.net.settings().hasNetwork());
 }
+
+void test_browser_guard_rejects_stale_tick_and_keeps_full_window() {
+    for (uint32_t start : {101u, 0xfffffff0u}) {
+        Settings s = saved("HomeNet", "password1");
+        NetRig r(&s);
+        r.net.begin(start - 1);
+        r.radio.up();
+        r.net.tick(start - 1);
+        r.net.guardBrowserChange(start);
+        TEST_ASSERT_TRUE(r.net.setStatic(0xc0a80132, 0xffffff00, 0xc0a80101, 0xc0a80101));
+        r.net.tick(start - 1);
+        TEST_ASSERT_FALSE(r.net.settings().dhcp);
+        r.net.tick(start + 59999u);
+        TEST_ASSERT_FALSE(r.net.settings().dhcp);
+        r.net.tick(start + 60000u);
+        TEST_ASSERT_TRUE(r.net.settings().dhcp);
+    }
+}
+void test_password_prompt_reserves_ssid_and_releases_on_cancel_timeout_disconnect() {
+    CmdRig r;
+    StrSink out;
+    atcmd::Port second(r.modem, out, 38400);
+    auto typeSecond = [&](const char *text) {
+        out.s.clear();
+        while (*text)
+            second.feed(*text++);
+    };
+    r.type("AT*WIFIJOIN=\"FirstNet\"\r");
+    typeSecond("AT*WIFIJOIN=\"SecondNet\"\r");
+    CONTAINS(out.s, "ERROR");
+    typeSecond("AT*WIFISCAN\r");
+    CONTAINS(out.s, "ERROR");
+    r.type("password1\r");
+    TEST_ASSERT_EQUAL_STRING("FirstNet", r.radio.last.ssid);
+    TEST_ASSERT_EQUAL(1, r.radio.connects);
+    r.type("x");
+    r.type("AT*WIFIJOIN=\"Cancelled\"\r\x1b");
+    typeSecond("AT*WIFIJOIN=\"SecondNet\"\r");
+    CONTAINS(out.s, "Password");
+    second.feed(27);
+    pollCommands();
+    r.type("AT*WIFIJOIN=\"Timeout\"\r");
+    r.run(120000);
+    TEST_ASSERT_FALSE(r.port.busy());
+    r.type("AT*WIFIJOIN=\"Detached\"\r");
+    detachCommands(r.port);
+    TEST_ASSERT_FALSE(r.port.busy());
+    typeSecond("AT*WIFIJOIN=\"FinalNet\"\r");
+    CONTAINS(out.s, "Password");
+    typeSecond("password2\r");
+    TEST_ASSERT_EQUAL_STRING("FinalNet", r.radio.last.ssid);
+}
+void test_invalid_password_releases_prompt_reservation() {
+    CmdRig r;
+    r.type("AT*WIFIJOIN=\"FirstNet\"\rshort\r");
+    TEST_ASSERT_FALSE(r.port.busy());
+    CONTAINS(r.type("AT*WIFIJOIN=\"NextNet\"\r"), "Password");
+}
+void test_all_failed_network_setters_keep_live_and_saved_state() {
+    for (unsigned action = 0; action < 7; ++action) {
+        Settings s = saved("HomeNet", "password1");
+        s.dhcp = false;
+        s.ip = 0xc0a8012a;
+        s.mask = 0xffffff00;
+        s.gateway = s.dns = 0xc0a80101;
+        NetRig r(&s);
+        r.net.begin(0);
+        r.radio.up();
+        r.net.tick(100);
+        uint8_t before[kBlobSize], after[kBlobSize];
+        serialize(r.net.settings(), before);
+        int connects = r.radio.connects, leaves = r.radio.leaves, offs = r.radio.offs,
+            services = r.radio.services;
+        r.store.fail = true;
+        bool result = true;
+        switch (action) {
+            case 0:
+                result = r.net.setEnabled(false);
+                break;
+            case 1:
+                result = r.net.forget();
+                break;
+            case 2:
+                result = r.net.setDhcp();
+                break;
+            case 3:
+                result = r.net.setStatic(0xc0a80132, 0xffffff00, 0xc0a80101, 0xc0a80101);
+                break;
+            case 4:
+                result = r.net.setHost("other");
+                break;
+            case 5:
+                result = r.net.setNtp("other.example");
+                break;
+            case 6:
+                result = r.net.setTz("UTC");
+                break;
+        }
+        TEST_ASSERT_FALSE(result);
+        serialize(r.net.settings(), after);
+        TEST_ASSERT_EQUAL_MEMORY(before, after, sizeof before);
+        TEST_ASSERT_EQUAL(connects, r.radio.connects);
+        TEST_ASSERT_EQUAL(leaves, r.radio.leaves);
+        TEST_ASSERT_EQUAL(offs, r.radio.offs);
+        TEST_ASSERT_EQUAL(services, r.radio.services);
+        r.store.fail = false;
+        TEST_ASSERT_TRUE(r.net.setNtp("saved.example"));
+        Settings disk;
+        TEST_ASSERT_EQUAL(LoadResult::kSaved, load(r.store, &disk));
+        TEST_ASSERT_TRUE(disk.enabled);
+        TEST_ASSERT_FALSE(disk.dhcp);
+        TEST_ASSERT_EQUAL_HEX32(s.ip, disk.ip);
+        TEST_ASSERT_EQUAL_STRING(s.ssid, disk.ssid);
+        TEST_ASSERT_EQUAL_STRING(s.host, disk.host);
+        TEST_ASSERT_EQUAL_STRING(s.tz, disk.tz);
+    }
+}
+void test_wifi_off_during_browser_join_commits_only_after_successful_save() {
+    Settings s = saved("HomeNet", "password1");
+    NetRig r(&s);
+    r.net.begin(0);
+    r.net.guardBrowserChange(100);
+    TEST_ASSERT_TRUE(r.net.join("Candidate", "password2", 100));
+    r.store.fail = true;
+    TEST_ASSERT_FALSE(r.net.setEnabled(false));
+    TEST_ASSERT_EQUAL(JoinResult::kRunning, r.net.joinResult());
+    r.store.fail = false;
+    TEST_ASSERT_TRUE(r.net.setEnabled(false));
+    r.net.tick(101);
+    TEST_ASSERT_FALSE(r.net.settings().enabled);
+    TEST_ASSERT_EQUAL(JoinResult::kNone, r.net.joinResult());
+    Settings disk;
+    load(r.store, &disk);
+    TEST_ASSERT_FALSE(disk.enabled);
+    TEST_ASSERT_EQUAL_STRING("HomeNet", disk.ssid);
+}
+
 int main(int, char **) {
     UNITY_BEGIN();
+    RUN_TEST(test_browser_guard_rejects_stale_tick_and_keeps_full_window);
+    RUN_TEST(test_password_prompt_reserves_ssid_and_releases_on_cancel_timeout_disconnect);
+    RUN_TEST(test_invalid_password_releases_prompt_reservation);
+    RUN_TEST(test_all_failed_network_setters_keep_live_and_saved_state);
+    RUN_TEST(test_wifi_off_during_browser_join_commits_only_after_successful_save);
+
     RUN_TEST(test_browser_network_loss_actions_require_cancellable_confirmation);
     RUN_TEST(test_browser_join_storage_failure_restores_previous_before_reporting_success);
     RUN_TEST(test_browser_join_keeps_old_network_until_candidate_connects);

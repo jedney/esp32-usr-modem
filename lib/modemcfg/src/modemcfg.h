@@ -158,10 +158,12 @@ const char *loadResultText(LoadResult r);
 uint32_t crc32(const uint8_t *data, size_t len);
 
 // Where the blob lives. The board uses NVS (hw::NvsStore); tests use memory.
+constexpr size_t kLoadError = static_cast<size_t>(-1);
 class Store {
 public:
     virtual ~Store() = default;
-    // Copies the saved blob into buf; returns its length, or 0 if nothing is saved.
+    // Copies the blob into buf; 0 means absent, kLoadError means unreadable/oversized.
+    // Never return a partial read as an empty store. Error results must fail validation.
     virtual size_t load(uint8_t *buf, size_t cap) = 0;
     virtual bool save(const uint8_t *data, size_t len) = 0;
     virtual bool erase() = 0;
