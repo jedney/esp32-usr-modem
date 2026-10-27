@@ -2,6 +2,7 @@
 #include <LittleFS.h>
 #include <WiFi.h>
 #include <unity.h>
+#include <string>
 #include "call_audio.h"
 #include "config.h"
 #include "file_store.h"
@@ -29,7 +30,16 @@ void test_idle_menu_has_no_periodic_display_output() {
     for (const char *style : {"ANSI", "CP437", "PLAIN"}) {
         TEST_ASSERT_TRUE(terminal->setStyle(style));
         TEST_ASSERT_TRUE(terminal->open());
-        while (terminal->read(bytes, sizeof bytes)) {
+        std::string frame;
+        size_t n;
+        while ((n = terminal->read(bytes, sizeof bytes))) {
+            frame.append(reinterpret_cast<const char *>(bytes), n);
+        }
+        size_t position = 0;
+        for (const char *label : {"About", "Hardware Tests", "Client Tests", "Command Reference"}) {
+            position = frame.find(label, position);
+            TEST_ASSERT_NOT_EQUAL(std::string::npos, position);
+            position += strlen(label);
         }
         // Under five seconds: no serial geometry probe is due.
         terminal->poll(2100);

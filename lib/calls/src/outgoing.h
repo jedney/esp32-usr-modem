@@ -22,7 +22,16 @@ public:
     virtual void stop() = 0;
     virtual void poll(uint32_t now, const modemcfg::Profile &profile) = 0;
 };
-enum class CallStage : uint8_t { kIdle, kDial, kDigits, kConnecting, kHandshake, kOnline, kBusy };
+enum class CallStage : uint8_t {
+    kIdle,
+    kDial,
+    kDigits,
+    kRingback,
+    kConnecting,
+    kHandshake,
+    kOnline,
+    kBusy
+};
 class Outgoing : public hostport::Session::Dialer {
 public:
     using Clock = uint32_t (*)();
@@ -68,6 +77,7 @@ private:
     modemcfg::Profile profile_ = {};
     char digits_[33] = {};
     uint32_t lineSpeed_ = 14400, reportSpeed_ = 14400, since_ = 0;
+    uint32_t ringDelayMs_ = 1500, connectDelayMs_ = 250;
     bool pulse_ = false, dtrWasOn_ = false;
     CallStage stage_ = CallStage::kIdle;
     Observer *observer_ = nullptr;

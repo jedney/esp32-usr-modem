@@ -148,9 +148,21 @@ connection. `ATL0`/`ATL1` select low, `ATL2` medium and `ATL3` high within the p
 overall level. Every generated/WAV path applies the -7 dB speaker cap last. Call
 audio streams without blocking the maintenance loop; missing/invalid required WAVs
 abort audible calls with NO CARRIER. Upload LittleFS as well as firmware for audio.
-The 1200 recording is CC0; the five other speed files use an approved public-domain
-generic handshake fallback. They are not claimed as authentic recordings of those
-speeds. Originals, attribution and reproducible conversion are in the repository.
+
+An audible outgoing TCP call plays dial tone, dialled digits, then generated
+ringing for 1500 ms before starting TCP. After the selected handshake WAV ends,
+CONNECT is sent and payload in both directions waits another 250 ms. Socket
+servicing continues and buffered input is retained during that pause.
+
+Use `AT*RINGDELAY=1500` and `AT*CONNECTDELAY=250` to change these durations in
+milliseconds (0-60000; zero skips the corresponding delay). Query with `?`;
+changes save immediately and apply to the next call. Both settings are also in
+the Sounds menu and configuration export, survive ATZ/AT&F and reset to defaults
+with factory reset. ATM0 skips both delays; incoming calls and local services
+retain their existing sequences.
+
+The replacement recordings are credited to Gough Lui's collection in
+`credits/LICENSES.md`.
 
 Identity presets are modeled rather than complete verified ROM captures. ATI0
 product codes and ATI1 checksum are documented placeholders; ATI3/ATI9 show the
@@ -333,7 +345,7 @@ incoming callers are rejected until exit. A menu cannot interrupt an existing ca
 Remote callers never receive access to configuration or hardware commands.
 
 Use arrows and Enter, or press a displayed hotkey immediately. Main keys are
-1-9/A-D in the supplied design order; D opens Client Tests. The browser lists
+1-9/A-D; A opens About, B Hardware Tests, C Client Tests, and D Command Reference. The browser lists
 Client Tests but execution requires the console or RS232 port.
 Esc/Q goes Back in child screens; Q/F10 exits from Main. Ctrl-C exits ordinary
 menus/forms; raw client captures and transfers use the controls documented below.
@@ -386,6 +398,8 @@ Additional commands include:
 | `AT*DIAL=<number or host:port>` | Dial through the existing call engine |
 | `AT*ABOUT` | Build and licensing acknowledgements |
 | `AT*SOUNDS`, `AT*PLAY=<name or speed>` | List/preview generated tones and LittleFS WAVs; any key cancels |
+| `AT*RINGDELAY=<ms>` | Outgoing ringing duration, 0-60000 ms; default 1500; saved immediately |
+| `AT*CONNECTDELAY=<ms>` | Payload pause after handshake and CONNECT, 0-60000 ms; default 250; saved immediately |
 | `AT*LOG`, `AT*LOG=0|1|2`, `AT*LOG=CLEAR` | View, set verbosity or clear the RAM debug ring |
 | `AT*LOG=<offset>,<count>` | Read a stable slice, at most 8192 bytes; default view is the last 8192 |
 | `AT*CALLLOG` | Last 50 calls with timestamps, results, durations and payload counts |

@@ -105,10 +105,12 @@ public:
 };
 const atcmd::StarCommand commands[] = {
     {"MODEL", "AT*MODEL", "model", atcmd::cmdModel, false},
-    {"THROTTLE", "AT*THROTTLE", "throttle", atcmd::cmdThrottle, false}};
+    {"THROTTLE", "AT*THROTTLE", "throttle", atcmd::cmdThrottle, false},
+    {"RINGDELAY", "AT*RINGDELAY", "ring delay", atcmd::cmdRingDelay, false},
+    {"CONNECTDELAY", "AT*CONNECTDELAY", "connect delay", atcmd::cmdConnectDelay, false}};
 struct Rig {
     Memory store, bookStore;
-    atcmd::Modem modem{store, commands, 2};
+    atcmd::Modem modem{store, commands, sizeof commands / sizeof commands[0]};
     Phonebook book{bookStore};
     hostport::CallSlot slot;
     Output output, otherOutput;
@@ -335,6 +337,12 @@ void test_call_sequence_pulse_and_buffered_greeting() {
     TEST_ASSERT_EQUAL_STRING("1", r.sound.digits.c_str());
     r.sound.active = false;
     r.poll();
+    TEST_ASSERT_EQUAL(int(CallStage::kRingback), int(r.call.stage()));
+    TEST_ASSERT_EQUAL(int(SoundStage::kRing), int(r.sound.stages.back()));
+    TEST_ASSERT_EQUAL(0, r.socket.begins);
+    r.poll(1499);
+    TEST_ASSERT_EQUAL(int(CallStage::kRingback), int(r.call.stage()));
+    r.poll(1);
     TEST_ASSERT_EQUAL(int(CallStage::kConnecting), int(r.call.stage()));
     r.socket.status = SocketState::kOpen;
     r.socket.input = {'h', 'i'};
@@ -344,9 +352,18 @@ void test_call_sequence_pulse_and_buffered_greeting() {
     r.sound.active = false;
     r.poll();
     TEST_ASSERT_TRUE(r.session.callUp());
+    TEST_ASSERT_NOT_NULL(strstr(r.output.take().c_str(), "CONNECT"));
     uint8_t greeting[8];
+    TEST_ASSERT_EQUAL(0, r.session.toHost(greeting, sizeof greeting));
+    const uint8_t reply[] = {'o', 'k'};
+    TEST_ASSERT_EQUAL(0, r.session.hostSpace());
+    TEST_ASSERT_EQUAL(0, r.session.fromHost(reply, 2, clockMs));
+    r.poll(249);
+    TEST_ASSERT_EQUAL(0, r.session.toHost(greeting, sizeof greeting));
+    r.poll(1);
     TEST_ASSERT_EQUAL(2, r.session.toHost(greeting, sizeof greeting));
     TEST_ASSERT_EQUAL_UINT8_ARRAY("hi", greeting, 2);
+    TEST_ASSERT_EQUAL(2, r.session.fromHost(reply, 2, clockMs));
 }
 void test_redial_uses_the_complete_last_destination_and_rejects_empty() {
     Rig r;
@@ -433,7 +450,150 @@ void test_other_port_cannot_replace_dial_target() {
     r.poll();
     r.sound.active = false;
     r.poll();
+    r.poll(1500);
     TEST_ASSERT_EQUAL_STRING("www.amigaretro.com", r.socket.host.c_str());
+}
+
+void test_call_delay_commands_persist_validate_and_roll_back() {
+    Rig r;
+    TEST_ASSERT_EQUAL_UINT32(1500, r.modem.ringDelayMs());
+    TEST_ASSERT_EQUAL_UINT32(250, r.modem.connectDelayMs());
+    r.send("AT*RINGDELAY?\r");
+    TEST_ASSERT_NOT_NULL(strstr(r.output.take().c_str(), "1500"));
+    r.send("AT*CONNECTDELAY=?\r");
+    TEST_ASSERT_NOT_NULL(strstr(r.output.take().c_str(), "0-60000 ms"));
+    r.send("AT*RINGDELAY=0\rAT*CONNECTDELAY=60000\r");
+    TEST_ASSERT_EQUAL_UINT32(0, r.modem.ringDelayMs());
+    TEST_ASSERT_EQUAL_UINT32(60000, r.modem.connectDelayMs());
+    for (const char *bad : {"AT*RINGDELAY=-1\r", "AT*RINGDELAY=60001\r", "AT*CONNECTDELAY=1x\r",
+                            "AT*CONNECTDELAY=\r", "AT*RINGDELAY=999999999999\r"}) {
+        r.output.take();
+        r.send(bad);
+        TEST_ASSERT_NOT_NULL(strstr(r.output.take().c_str(), "ERROR"));
+    }
+    r.store.fail = true;
+    TEST_ASSERT_FALSE(r.modem.setCallDelay(true, 200));
+    TEST_ASSERT_FALSE(r.modem.setCallDelay(false, 300));
+    TEST_ASSERT_EQUAL_UINT32(0, r.modem.ringDelayMs());
+    TEST_ASSERT_EQUAL_UINT32(60000, r.modem.connectDelayMs());
+    atcmd::Modem restarted(r.store, nullptr, 0);
+    TEST_ASSERT_EQUAL(int(modemcfg::LoadResult::kOk), int(restarted.begin()));
+    restarted.reset(4);
+    TEST_ASSERT_EQUAL_UINT32(0, restarted.ringDelayMs());
+    TEST_ASSERT_EQUAL_UINT32(60000, restarted.connectDelayMs());
+}
+
+void test_zero_call_delays_skip_ringback_and_release_payload_at_connect() {
+    Rig r;
+    r.modem.setCallDelay(true, 0);
+    r.modem.setCallDelay(false, 0);
+    r.modem.active().v[modemcfg::kM] = 1;
+    r.send("ATDT1\r");
+    r.sound.active = false;
+    r.poll();
+    r.sound.active = false;
+    r.poll();
+    TEST_ASSERT_EQUAL(int(CallStage::kConnecting), int(r.call.stage()));
+    TEST_ASSERT_EQUAL(2, r.sound.stages.size());
+    r.socket.status = SocketState::kOpen;
+    r.socket.input = {'h', 'i'};
+    r.poll();
+    r.sound.active = false;
+    r.poll();
+    uint8_t data[2];
+    TEST_ASSERT_EQUAL(2, r.session.toHost(data, 2));
+    TEST_ASSERT_GREATER_THAN(0, r.session.hostSpace());
+}
+
+void test_custom_call_delays_are_snapshotted_and_ringback_does_not_use_s7() {
+    Rig r;
+    r.modem.setCallDelay(true, 2000);
+    r.modem.setCallDelay(false, 17);
+    r.modem.active().v[modemcfg::kM] = 1;
+    r.modem.active().s[7] = 1;
+    r.send("ATDT1\r");
+    r.modem.setCallDelay(true, 0);
+    r.modem.setCallDelay(false, 0);
+    r.sound.active = false;
+    r.poll();
+    r.sound.active = false;
+    r.poll();
+    r.poll(2000);
+    TEST_ASSERT_EQUAL(int(CallStage::kConnecting), int(r.call.stage()));
+    r.socket.status = SocketState::kOpen;
+    r.socket.input = {'h'};
+    r.poll(999);
+    TEST_ASSERT_EQUAL(int(CallStage::kHandshake), int(r.call.stage()));
+    r.sound.active = false;
+    r.poll(0);
+    TEST_ASSERT_TRUE(r.session.callUp());
+    uint8_t data;
+    r.poll(16);
+    TEST_ASSERT_EQUAL(0, r.session.toHost(&data, 1));
+    r.poll(1);
+    TEST_ASSERT_EQUAL(1, r.session.toHost(&data, 1));
+    TEST_ASSERT_EQUAL('h', data);
+}
+
+void test_ringback_snapshot_wrap_and_cancellation_keep_call_slot_safe() {
+    for (unsigned cancellation = 0; cancellation < 4; ++cancellation) {
+        clockMs = UINT32_MAX - 100;
+        wifi = true;
+        Rig r;
+        r.modem.active().v[modemcfg::kM] = 1;
+        r.modem.active().s[25] = 0;
+        r.send("ATDT1\r");
+        r.sound.active = false;
+        r.poll();
+        r.sound.active = false;
+        r.poll();
+        r.modem.setCallDelay(true, 0);
+        r.poll(1499);
+        TEST_ASSERT_EQUAL(int(CallStage::kRingback), int(r.call.stage()));
+        TEST_ASSERT_TRUE(r.slot.busy());
+        TEST_ASSERT_EQUAL(0, r.socket.begins);
+        if (cancellation == 0) {
+            r.poll(1);
+            TEST_ASSERT_EQUAL(int(CallStage::kConnecting), int(r.call.stage()));
+            r.call.cancel();
+        } else if (cancellation == 1) {
+            r.send("x");
+        } else if (cancellation == 2) {
+            r.poll(0, false);
+        } else {
+            wifi = false;
+            r.poll(0);
+        }
+        TEST_ASSERT_EQUAL(int(CallStage::kIdle), int(r.call.stage()));
+        TEST_ASSERT_FALSE(r.slot.busy());
+        TEST_ASSERT_FALSE(r.sound.running());
+        wifi = true;
+    }
+}
+
+void test_payload_hold_handles_stale_ticks_rollover_and_new_connections() {
+    for (bool raw : {false, true}) {
+        FakeSocket socket;
+        socket.status = SocketState::kOpen;
+        socket.input = {'h', 'i'};
+        TcpConnection connection(socket);
+        connection.begin(raw);
+        connection.holdPayload(UINT32_MAX - 100, 250);
+        uint8_t data[2];
+        connection.poll(UINT32_MAX - 101);
+        TEST_ASSERT_EQUAL(0, connection.read(data, 2));
+        TEST_ASSERT_EQUAL(0, connection.write(reinterpret_cast<const uint8_t *>("ok"), 2));
+        connection.poll(148);
+        TEST_ASSERT_EQUAL(0, connection.space());
+        connection.poll(149);
+        TEST_ASSERT_EQUAL(2, connection.read(data, 2));
+        TEST_ASSERT_EQUAL_UINT8_ARRAY("hi", data, 2);
+        TEST_ASSERT_EQUAL(2, connection.write(reinterpret_cast<const uint8_t *>("ok"), 2));
+        connection.holdPayload(150, 60000);
+        connection.close();
+        connection.begin(raw);
+        TEST_ASSERT_GREATER_THAN(0, connection.space());
+    }
 }
 void test_model_default_explicit_override_and_current_call_snapshot() {
     for (uint32_t model : {14400u, 28800u, 33600u, 56000u}) {
@@ -633,6 +793,11 @@ void test_wav_validation_upsampling_and_handshake_mapping() {
 
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_call_delay_commands_persist_validate_and_roll_back);
+    RUN_TEST(test_zero_call_delays_skip_ringback_and_release_payload_at_connect);
+    RUN_TEST(test_custom_call_delays_are_snapshotted_and_ringback_does_not_use_s7);
+    RUN_TEST(test_ringback_snapshot_wrap_and_cancellation_keep_call_slot_safe);
+    RUN_TEST(test_payload_hold_handles_stale_ticks_rollover_and_new_connections);
     RUN_TEST(test_phonebook_defaults_exact_keys_validation_and_atomic_save);
     RUN_TEST(test_phonebook_capacity_and_corruption);
     RUN_TEST(test_phonebook_command_roundtrip_and_strict_arguments);

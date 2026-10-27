@@ -139,3 +139,15 @@ seven PCM WAVs from Gough Lui's collection, now packaged at their matching
 and LittleFS builds and image-manifest validation. On-board, wired transfer and
 physical listening acceptance have not been rerun for these replacements.
 No v0.15 images have been installed; the installed v0.14 baseline is unchanged.
+
+Implemented, host validation passed: **v0.17 outgoing timing and menu order**.
+Audible outgoing TCP calls add configurable ringing (1500 ms) after digits and a
+payload pause (250 ms) after the handshake and CONNECT. AT*RINGDELAY and
+AT*CONNECTDELAY save immediately, appear in Sounds/export and migrate from the
+old saved format. ATM0 keeps the immediate path. Bundled at Jon's request with
+A About, B Hardware Tests, C Client Tests, D Command Reference throughout the UI.
+393 native, 23 browser-unit, 13 script and five UI layout checks pass; cppcheck,
+formatting, firmware/LittleFS builds and both affected embedded test builds pass.
+The 11 outgoing E2E cases collect successfully. No v0.17 installation or hardware
+execution has been performed; listening and actual wire timing remain acceptance
+work after installation.

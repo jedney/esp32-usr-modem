@@ -334,7 +334,7 @@ void test_rs232_menu_lists_and_blocks_takeover_actions() {
     Rig r(true);
     r.terminal.open();
     r.drain();
-    r.feed("a\r");
+    r.feed("b\r");
     ScreenView screen;
     screen.accept(r.drain());
     TEST_ASSERT_TRUE(screen.has("RS232 lines"));
@@ -369,7 +369,7 @@ void test_browser_lists_serial_diagnostics_without_dispatch() {
     r.terminal.open();
     r.drain();
     stubCalls = 0;
-    r.feed("d1");
+    r.feed("c1");
     ScreenView view;
     view.accept(r.drain());
     TEST_ASSERT_TRUE(view.has("Serial client test"));

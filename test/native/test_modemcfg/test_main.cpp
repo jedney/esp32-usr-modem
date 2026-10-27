@@ -309,7 +309,7 @@ void test_extended_speed_profiles_survive_restart_and_keep_old_auto() {
     TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kOk), static_cast<int>(loadNvram(store, &out)));
     TEST_ASSERT_TRUE(n.tmpl[0] == out.tmpl[0]);
     TEST_ASSERT_TRUE(n.tmpl[1] == out.tmpl[1]);
-    TEST_ASSERT_EQUAL_UINT8(4, kLayoutVersion);  // adds the auto-answer destination
+    TEST_ASSERT_EQUAL_UINT8(5, kLayoutVersion);  // adds outgoing call delays
     n.tmpl[0].v[kAmpN] = 39;
     uint8_t blob[kBlobSize];
     serialize(n, blob);
@@ -340,7 +340,7 @@ void test_layout_2_migration_preserves_speeds_and_validates_new_metadata() {
     TEST_ASSERT_EQUAL(8, out.tmpl[1].get(kAmpN));
     TEST_ASSERT_EQUAL_UINT32(14400, out.model);
     TEST_ASSERT_FALSE(out.throttle);
-    for (size_t index : {kBlobSizeV2 - 4, kBlobSize - 9, kBlobSize - 5}) {
+    for (size_t index : {kBlobSizeV2 - 4, kBlobSizeV4 - 9, kBlobSizeV4 - 5}) {
         serialize(n, current);
         current[index] = 255;
         crc = crc32(current, sizeof current - 4);
@@ -376,15 +376,47 @@ void test_layout_3_migration_preserves_model_and_defaults_answerport() {
     TEST_ASSERT_FALSE(out.answerConsole);
     TEST_ASSERT_EQUAL(int(LoadResult::kOk), int(deserialize(current, sizeof current, &out)));
     TEST_ASSERT_TRUE(out.answerConsole);
-    current[kBlobSize - 5] = 2;
+    current[kBlobSizeV4 - 5] = 2;
     crc = crc32(current, sizeof current - 4);
     for (unsigned i = 0; i < 4; ++i)
         current[sizeof current - 4 + i] = crc >> (8 * i);
     assertLoadFails(current, sizeof current, LoadResult::kBadValue);
 }
 
+void test_layout_4_migrates_with_default_delays_and_validates_new_values() {
+    Nvram n = factoryNvram();
+    n.model = 33600;
+    n.throttle = true;
+    n.answerConsole = true;
+    n.ringDelayMs = 5000;
+    n.connectDelayMs = 60000;
+    uint8_t current[kBlobSize], old[kBlobSizeV4];
+    serialize(n, current);
+    memcpy(old, current, sizeof old);
+    old[4] = 4;
+    uint32_t crc = crc32(old, sizeof old - 4);
+    for (unsigned i = 0; i < 4; ++i)
+        old[sizeof old - 4 + i] = crc >> (8 * i);
+    Nvram out;
+    TEST_ASSERT_EQUAL(int(LoadResult::kMigrated), int(deserialize(old, sizeof old, &out)));
+    TEST_ASSERT_EQUAL_UINT32(1500, out.ringDelayMs);
+    TEST_ASSERT_EQUAL_UINT32(250, out.connectDelayMs);
+    TEST_ASSERT_EQUAL_UINT32(n.model, out.model);
+    TEST_ASSERT_TRUE(out.throttle && out.answerConsole);
+    TEST_ASSERT_EQUAL(int(LoadResult::kOk), int(deserialize(current, sizeof current, &out)));
+    TEST_ASSERT_EQUAL_UINT32(5000, out.ringDelayMs);
+    TEST_ASSERT_EQUAL_UINT32(60000, out.connectDelayMs);
+    for (bool ring : {false, true}) {
+        (ring ? n.ringDelayMs : n.connectDelayMs) = 60001;
+        serialize(n, current);
+        assertLoadFails(current, sizeof current, LoadResult::kBadValue);
+        n = factoryNvram();
+    }
+}
+
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_layout_4_migrates_with_default_delays_and_validates_new_values);
     RUN_TEST(test_layout_3_migration_preserves_model_and_defaults_answerport);
     RUN_TEST(test_layout_2_migration_preserves_speeds_and_validates_new_metadata);
     RUN_TEST(test_factory_f1_has_the_decided_defaults);

@@ -1,6 +1,6 @@
 # USRobotics Sportster — ANSI/BBS configuration UI
 
-v0.12 integration: D opens Client Tests on serial; the browser lists them without
+v0.12 integration: C opens Client Tests on serial; the browser lists them without
 execution. The catalogue now has 72 nested actions (57 original plus 15 client
 actions). This supersedes the original disabled-placeholder instructions below.
 
@@ -75,9 +75,9 @@ The canonical screen is in `previews/main-sportster-28.8k.txt` (and one per mode
 | 24 | `Command >` / focus indicator as appropriate. |
 | 25 | Bottom frame. |
 
-The **two compact menu columns** must be 37–38 cells each, with a fixed divider. Use a `>` selection cursor or inverse video, **not colour alone**. Preserve full labels (including `Wi-Fi and Clock`, `Export Configuration`, `Client Tests`) without clipping. Disabled `D` remains grey, displays `[X]` and/or `UNAVAILABLE`, is skipped by arrow navigation, and cannot activate anything if typed. The label displays on the main menu even when the feature cannot run.
+The **two compact menu columns** must be 37–38 cells each, with a fixed divider. Use a `>` selection cursor or inverse video, **not colour alone**. Preserve full labels (including `Wi-Fi and Clock`, `Export Configuration`, `Client Tests`) without clipping. Disabled `C` remains grey, displays `[X]` and/or `UNAVAILABLE`, is skipped by arrow navigation, and cannot activate anything if typed. The label displays on the main menu even when the feature cannot run.
 
-All top-level IDs and UI keys are defined in `menu-definition.json`: `1` Status, `2` Phonebook, `3` Settings, `4` Sounds, `5` Debug, `6` Call History, `7` Wi-Fi and Clock, `8` Updates and Reset, `9` Export Configuration, `A` Hardware Tests, `B` Command Reference, `C` About, and serial-only `D` Client Tests.
+All top-level IDs and UI keys are defined in `menu-definition.json`: `1` Status, `2` Phonebook, `3` Settings, `4` Sounds, `5` Debug, `6` Call History, `7` Wi-Fi and Clock, `8` Updates and Reset, `9` Export Configuration, `A` About, `B` Hardware Tests, serial-only `C` Client Tests, and `D` Command Reference.
 
 **Main-menu layout priority at 80×25:** brand and model identity → all options → selection + disabled state → navigation → a reliable minimal footer. The wide-preview modem illustrations, individual option borders, signal icons, explanatory sentences and decorative tagline are intentionally **omitted**; putting them all into 25 rows would compromise function.
 
@@ -120,7 +120,7 @@ Status, Call History, Export Configuration, Command Reference and About have the
 | Context | Keys | Expected action |
 | --- | --- | --- |
 | Main menu | `1`–`9`, `A`–`C` | Open exact ID from JSON, case-insensitive. |
-| Main menu | `D` | Open the Client Tests reference/menu; execute on serial only. |
+| Main menu | `C` | Open the Client Tests reference/menu; execute on serial only. |
 | Main and lists | `↑`, `↓` | Select previous/next enabled item; skip unavailable. |
 | Two-column main | `←`, `→` | Change column to nearest enabled row; predictable behavior on blank seventh left row. |
 | Menus | `Enter` | Open selected enabled item. |

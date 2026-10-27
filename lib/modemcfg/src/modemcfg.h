@@ -87,6 +87,7 @@ Profile factoryProfile(unsigned n);
 constexpr uint32_t kFactoryBaud = 38400;
 constexpr unsigned kMaxLineSpeedIndex = 38;
 constexpr uint32_t kMaxLineSpeed = 56000;
+constexpr uint32_t kMaxCallDelayMs = 60000;
 
 // The host serial speeds the modem detects from "AT" and accepts for AT*BAUD (the
 // Sportster's range).
@@ -112,7 +113,9 @@ struct Nvram {
     uint32_t hostBaud;
     uint32_t model = 14400;  // device-wide identity, not changed by &F/Z
     bool throttle = false;
-    bool answerConsole = false;  // AT*ANSWERPORT, RS232 by default
+    bool answerConsole = false;     // AT*ANSWERPORT, RS232 by default
+    uint32_t ringDelayMs = 1500;    // outgoing ringback before TCP connection
+    uint32_t connectDelayMs = 250;  // payload hold after the handshake and CONNECT
 };
 
 // As shipped: Y0 = &F1, Y1 = &F2, power-on from Y0, no stored numbers, speed from "AT".
@@ -126,12 +129,14 @@ Profile powerOnProfile(const Nvram &n);
 // before it. Multi-byte values are little-endian.
 //   Layout 1 (v0.4): y, templates, phone numbers.
 //   Layout 2 (v0.5): adds hostBaud after the phone numbers.
-constexpr uint8_t kLayoutVersion = 4;
+//   Layout 5 (v0.17): appends ringback and post-CONNECT delay milliseconds.
+constexpr uint8_t kLayoutVersion = 5;
 constexpr size_t kBlobSizeV1 =
     4 + 1 + 1 + kTemplates * (kSettingCount + kSRegCount + 4) + kPhoneSlots * kPhoneLen + 4;
 constexpr size_t kBlobSizeV2 = kBlobSizeV1 + 4;
 constexpr size_t kBlobSizeV3 = kBlobSizeV2 + kTemplates + 4 + 1;
-constexpr size_t kBlobSize = kBlobSizeV3 + 1;
+constexpr size_t kBlobSizeV4 = kBlobSizeV3 + 1;
+constexpr size_t kBlobSize = kBlobSizeV4 + 8;
 
 bool validModel(uint32_t speed);
 const char *modelName(uint32_t speed);
