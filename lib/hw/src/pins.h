@@ -1,8 +1,11 @@
 // GPIO pin map (project brief 5.2, 6.14).
 //
 // *** Rev B (project brief Q89), replacing the rev A map confirmed in Q76. ***
-// Every driver and test reads its pins from this file; change them here and only here.
-// test/native/test_pins locks in these values, so a pin can't change by accident.
+// The pin NUMBERS are not in the source: scripts/pin_config.py reads USR_MODEM_PIN_* from
+// .env.example (the rev B defaults), then .env, then the environment, and passes them to
+// the compiler. Every driver and test reads its pins from this file.
+// test/native/test_pins locks in the .env.example values, so a pin can't change by accident.
+// The header layout below describes the rev B defaults.
 //
 // Board: ESP32-S3 N16R8 DevKitC-1 clone (ePartners ST8002). Header J1 = left (L), J3 =
 // right (R); pin 1 is at the antenna end.
@@ -29,31 +32,38 @@
 
 #include <cstdint>
 
+#ifndef USR_MODEM_PIN_RXD
+#error "GPIO pins are defined by scripts/pin_config.py (USR_MODEM_PIN_* in .env.example)"
+#endif
+
 namespace pins {
 
 // --- RS232, DCE (names are the RS232 signals as seen on the DB9) -------------------------
 // Modem outputs (S3 -> RS232 Pal driver input):
-constexpr int kRxd = 1;   // DB9 2, data to the computer        (UART1 TX)
-constexpr int kCts = 42;  // DB9 8, clear to send                (UART1 RTS output)
-constexpr int kDcd = 39;  // DB9 1, carrier detect                (GPIO)
-constexpr int kRi = 38;   // DB9 9, ring indicator                 (GPIO)
+constexpr int kRxd = USR_MODEM_PIN_RXD;  // DB9 2, data to the computer        (UART1 TX)
+constexpr int kCts = USR_MODEM_PIN_CTS;  // DB9 8, clear to send                (UART1 RTS output)
+constexpr int kDcd = USR_MODEM_PIN_DCD;  // DB9 1, carrier detect                (GPIO)
+constexpr int kRi = USR_MODEM_PIN_RI;    // DB9 9, ring indicator                 (GPIO)
 // Modem inputs (RS232 Pal receiver output -> S3):
-constexpr int kTxd = 2;   // DB9 3, data from the computer       (UART1 RX)
-constexpr int kRts = 41;  // DB9 7, request to send               (UART1 CTS input)
-constexpr int kDtr = 40;  // DB9 4, data terminal ready            (GPIO)
+constexpr int kTxd = USR_MODEM_PIN_TXD;  // DB9 3, data from the computer       (UART1 RX)
+constexpr int kRts = USR_MODEM_PIN_RTS;  // DB9 7, request to send               (UART1 CTS input)
+constexpr int kDtr = USR_MODEM_PIN_DTR;  // DB9 4, data terminal ready            (GPIO)
 // DSR (DB9 6) is hard-wired on from U2 V+ through 1 k: no pin.
 
 // --- Audio: MAX98357A (brief 5.3) --------------------------------------------------------
-constexpr int kI2sLrc = 11;
-constexpr int kI2sBclk = 12;
-constexpr int kI2sDin = 13;
-constexpr int kAmpSd = 14;  // HIGH = on (left channel), LOW = shutdown (10 k pull-down)
+constexpr int kI2sLrc = USR_MODEM_PIN_I2S_LRC;
+constexpr int kI2sBclk = USR_MODEM_PIN_I2S_BCLK;
+constexpr int kI2sDin = USR_MODEM_PIN_I2S_DIN;
+constexpr int kAmpSd =
+    USR_MODEM_PIN_AMP_SD;  // HIGH = on (left channel), LOW = shutdown (10 k pull-down)
 
 // --- Volume pot wiper, must be ADC1 (GPIO1-10) because ADC2 can't be used with Wi-Fi ---
-constexpr int kPot = 10;
+constexpr int kPot = USR_MODEM_PIN_POT;
 
 // --- Front-panel LEDs, in the order of hwtest::Led (AA, CD, RD, SD, TR, CS, ARQ) -------
-constexpr int kLeds[7] = {4, 5, 6, 7, 15, 16, 17};
+constexpr int kLeds[7] = {USR_MODEM_PIN_LED_AA, USR_MODEM_PIN_LED_CD, USR_MODEM_PIN_LED_RD,
+                          USR_MODEM_PIN_LED_SD, USR_MODEM_PIN_LED_TR, USR_MODEM_PIN_LED_CS,
+                          USR_MODEM_PIN_LED_ARQ};
 // GPIO -> resistor -> LED -> GND, so HIGH = lit.
 constexpr bool kLedActiveHigh = true;
 
@@ -61,12 +71,14 @@ constexpr bool kLedActiveHigh = true;
 // UART2 plays the computer: its TX is routed inside the chip onto the TXD-in pin and
 // UART1's TX onto its RX, so the test needs no wires. These two spare pins (L11, L12) are only
 // UART2's nominal pins; nothing is connected to them.
-constexpr int kTestUartTx = 18;
-constexpr int kTestUartRx = 8;
+constexpr int kTestUartTx = USR_MODEM_PIN_TEST_UART_TX;
+constexpr int kTestUartRx = USR_MODEM_PIN_TEST_UART_RX;
 
 // --- On the S3 board itself -------------------------------------------------------------
-constexpr int kRgbLed = 47;     // WS2812-type RGB LED (Jon, 22 Oct): Wi-Fi status (v0.6)
-constexpr int kConsoleTx = 43;  // UART0 via the onboard USB-serial chip: console only
-constexpr int kConsoleRx = 44;
+constexpr int kRgbLed =
+    USR_MODEM_PIN_RGB_LED;  // WS2812-type RGB LED (Jon, 22 Oct): Wi-Fi status (v0.6)
+constexpr int kConsoleTx =
+    USR_MODEM_PIN_CONSOLE_TX;  // UART0 via the onboard USB-serial chip: console only
+constexpr int kConsoleRx = USR_MODEM_PIN_CONSOLE_RX;
 
 }  // namespace pins

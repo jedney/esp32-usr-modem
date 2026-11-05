@@ -224,6 +224,12 @@ Copy `.env.example` to `.env` (git-ignored) and fill in `USR_MODEM_WIFI_SSID` an
 `USR_MODEM_WIFI_PASS` (end-to-end Wi-Fi tests) and `USR_MODEM_PASSWORD` (device password
 for OTA and the web tests). Environment variables of the same names win over the file.
 
+The same file holds the GPIO pin map as `USR_MODEM_PIN_*` lines. `.env.example` has the
+rev B values and is always read first; a line in `.env` or a real environment variable
+overrides one pin. The build stops on a duplicate pin or a number that is not an
+ESP32-S3 GPIO. Change the pins only when the board changes. `AT*HWPINS` shows the map in
+use.
+
 ### Over-the-air updates
 
 With `USR_MODEM_PASSWORD` set, run **Modem: upload over Wi-Fi / OTA (tests first)**. The
