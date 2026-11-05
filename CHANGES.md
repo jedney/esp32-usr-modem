@@ -14,6 +14,17 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [1.1] - 2026-11-05
+
+### Changed
+
+- GPIO pin map updated to the rev B layout (project brief Q89): RS232 on GPIO1, 2, 38-42
+  (right header), front-panel LEDs on GPIO4-7, 15-17 (left header). Audio (11-14) and
+  the volume pot (10) are unchanged.
+- RS232 now goes through two RS232 Pal modules; `AT*HWPINS` shows DB9 pin numbers.
+  The rev A boot-state pull-ups (Q77) are not part of this map: Electronics to confirm
+  the idle state of RXD, CTS, DCD and RI during boot.
+
 ## [1.0] - 2026-10-27
 
 First production release, after a full code, security and documentation review.

@@ -176,16 +176,16 @@ bool play(tones::Source &src) {
 // --- Pin map -----------------------------------------------------------------------------
 
 void printPins() {
-    out().print("GPIO pin map (lib/hw/src/pins.h) - confirmed (schematic rev A)\r\n");
+    out().print("GPIO pin map (lib/hw/src/pins.h) - confirmed (rev B)\r\n");
     out().print("RS232 (DCE; asserted = LOW at the GPIO):\r\n");
-    out().printf("  RXD out  GPIO%-2d  DB25 3   UART1 TX\r\n", pins::kRxd);
-    out().printf("  TXD in   GPIO%-2d  DB25 2   UART1 RX\r\n", pins::kTxd);
-    out().printf("  CTS out  GPIO%-2d  DB25 5\r\n", pins::kCts);
-    out().printf("  RTS in   GPIO%-2d  DB25 4\r\n", pins::kRts);
-    out().printf("  DTR in   GPIO%-2d  DB25 20\r\n", pins::kDtr);
-    out().printf("  DCD out  GPIO%-2d  DB25 8\r\n", pins::kDcd);
-    out().printf("  RI  out  GPIO%-2d  DB25 22\r\n", pins::kRi);
-    out().print("  DSR      hard-wired on, DB25 6\r\n");
+    out().printf("  RXD out  GPIO%-2d  DB9 2   UART1 TX\r\n", pins::kRxd);
+    out().printf("  TXD in   GPIO%-2d  DB9 3   UART1 RX\r\n", pins::kTxd);
+    out().printf("  CTS out  GPIO%-2d  DB9 8\r\n", pins::kCts);
+    out().printf("  RTS in   GPIO%-2d  DB9 7\r\n", pins::kRts);
+    out().printf("  DTR in   GPIO%-2d  DB9 4\r\n", pins::kDtr);
+    out().printf("  DCD out  GPIO%-2d  DB9 1\r\n", pins::kDcd);
+    out().printf("  RI  out  GPIO%-2d  DB9 9\r\n", pins::kRi);
+    out().print("  DSR      hard-wired on, DB9 6\r\n");
     out().printf("Audio: I2S BCLK GPIO%d, LRC GPIO%d, DIN GPIO%d, amp SD GPIO%d (HIGH = on)\r\n",
                  pins::kI2sBclk, pins::kI2sLrc, pins::kI2sDin, pins::kAmpSd);
     out().printf("Volume pot wiper: GPIO%d (ADC1)\r\n", pins::kPot);

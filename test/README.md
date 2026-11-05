@@ -28,7 +28,7 @@ Section numbers refer to the project brief.
 | Feature (brief §) | Unit | On-board | End-to-end |
 |---|---|---|---|
 | Board: 16 MB flash, 8 MB PSRAM, partitions (5.2) | — | `test_board` | — |
-| Pin map as confirmed by Electronics (Q76), no reserved or shared pins, pot on ADC1 (5.2) | `test_pins` | — | `test_hwtest.py` |
+| Pin map as confirmed by Electronics (Q89, rev B), no reserved or shared pins, pot on ADC1 (5.2) | `test_pins` | — | `test_hwtest.py` |
 | Dial strings: IP + port, host names, phonebook, special numbers, invalid → ERROR (6.3) | `test_dialstring` | `test_board` | `test_console.py` |
 | Version in banner and `AT*VER` (6.9) | — | — | `test_console.py` |
 | AT parser: several commands per line, `A/`, echo, S3/S5, S-registers, `&F &W &V &Z`, `Y`, `Z` (6.2, 6.6) | `test_atcmd` | — | `test_settings.py` |

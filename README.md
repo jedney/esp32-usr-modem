@@ -166,7 +166,7 @@ without storing it.
 
 `AT*HWTEST` walks through the electronics (LEDs, speaker, volume limit, knob, RS232
 lines, loopback) and prints a summary; `AT*HW?` lists the single tests. The GPIO map is
-in `lib/hw/src/pins.h` (confirmed by Electronics, schematic rev A) and `AT*HWPINS`
+in `lib/hw/src/pins.h` (confirmed by Electronics, rev B) and `AT*HWPINS`
 prints it. Loopback plug for `AT*HWLOOP`: join RXD-TXD, CTS-RTS and DCD-DTR (DB25 pins
 3-2, 5-4, 8-20; bench DB9 pins 2-3, 8-7, 1-4).
 

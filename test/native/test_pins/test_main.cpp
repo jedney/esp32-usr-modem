@@ -1,5 +1,5 @@
-// Checks the GPIO pin map (lib/hw/src/pins.h): it is the map Electronics confirmed (Q76,
-// schematic rev A), and it avoids the S3 board's reserved pins (project brief 5.2), so a
+// Checks the GPIO pin map (lib/hw/src/pins.h): it is the map Electronics confirmed (Q89,
+// rev B), and it avoids the S3 board's reserved pins (project brief 5.2), so a
 // pin change, by accident or one that would break the board, fails before upload.
 // Run with: pio test -e native
 #include <unity.h>
@@ -12,23 +12,23 @@
 void setUp() {}
 void tearDown() {}
 
-// The confirmed map (Q76, 24 Oct 2026, schematic rev A). If Electronics changes the
+// The confirmed map (Q89, rev B; replaces rev A, Q76). If Electronics changes the
 // board, change pins.h and these numbers together.
 void test_pin_map_is_the_confirmed_one() {
-    TEST_ASSERT_EQUAL_INT(4, pins::kRxd);
-    TEST_ASSERT_EQUAL_INT(5, pins::kTxd);
-    TEST_ASSERT_EQUAL_INT(6, pins::kCts);
-    TEST_ASSERT_EQUAL_INT(7, pins::kRts);
-    TEST_ASSERT_EQUAL_INT(15, pins::kDtr);
-    TEST_ASSERT_EQUAL_INT(16, pins::kDcd);
-    TEST_ASSERT_EQUAL_INT(17, pins::kRi);
+    TEST_ASSERT_EQUAL_INT(1, pins::kRxd);
+    TEST_ASSERT_EQUAL_INT(2, pins::kTxd);
+    TEST_ASSERT_EQUAL_INT(42, pins::kCts);
+    TEST_ASSERT_EQUAL_INT(41, pins::kRts);
+    TEST_ASSERT_EQUAL_INT(40, pins::kDtr);
+    TEST_ASSERT_EQUAL_INT(39, pins::kDcd);
+    TEST_ASSERT_EQUAL_INT(38, pins::kRi);
     TEST_ASSERT_EQUAL_INT(11, pins::kI2sLrc);
     TEST_ASSERT_EQUAL_INT(12, pins::kI2sBclk);
     TEST_ASSERT_EQUAL_INT(13, pins::kI2sDin);
     TEST_ASSERT_EQUAL_INT(14, pins::kAmpSd);
     TEST_ASSERT_EQUAL_INT(10, pins::kPot);
     // AA, CD, RD, SD, TR, CS, ARQ
-    const int leds[7] = {1, 2, 42, 41, 40, 39, 38};
+    const int leds[7] = {4, 5, 6, 7, 15, 16, 17};
     TEST_ASSERT_EQUAL_INT_ARRAY(leds, pins::kLeds, 7);
     TEST_ASSERT_TRUE(pins::kLedActiveHigh);
     TEST_ASSERT_EQUAL_INT(18, pins::kTestUartTx);
