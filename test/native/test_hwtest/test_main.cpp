@@ -276,11 +276,7 @@ void test_sweep_rises_in_frequency() {
 
 // --- Volume ----------------------------------------------------------------------------
 
-void test_cap_is_minus_7_db() {
-    TEST_ASSERT_FLOAT_WITHIN(0.002f, 0.4467f, volume::capGain());
-}
-
-void test_speaker_levels_and_pot_always_pass_through_cap() {
+void test_speaker_levels_and_pot_stay_within_full_scale() {
     TEST_ASSERT_EQUAL_FLOAT(0.25f, volume::speakerGain(1, 0));
     TEST_ASSERT_EQUAL_FLOAT(0.25f, volume::speakerGain(1, 1));
     TEST_ASSERT_EQUAL_FLOAT(0.5f, volume::speakerGain(1, 2));
@@ -289,17 +285,19 @@ void test_speaker_levels_and_pot_always_pass_through_cap() {
         TEST_ASSERT_EQUAL_FLOAT(0, volume::speakerGain(0, level));
         for (unsigned pot = 0; pot <= 4095; pot += 31) {
             float gain = volume::speakerGain(volume::potLevel(pot, 4095), level);
-            TEST_ASSERT_TRUE(volume::outputGain(gain) <= volume::capGain());
+            TEST_ASSERT_TRUE(volume::outputGain(gain) <= 1.0f);
         }
     }
 }
 
-void test_output_gain_never_exceeds_cap() {
-    TEST_ASSERT_FLOAT_WITHIN(1e-6f, volume::capGain(), volume::outputGain(1.0f));
-    TEST_ASSERT_FLOAT_WITHIN(1e-6f, volume::capGain(), volume::outputGain(5.0f));
+// No volume cap: full volume is full scale (CLS0361 2 W speaker, decisions log 7 Nov 2026).
+void test_output_gain_is_clamped_with_no_cap() {
+    TEST_ASSERT_EQUAL_FLOAT(1.0f, volume::outputGain(1.0f));
+    TEST_ASSERT_EQUAL_FLOAT(1.0f, volume::outputGain(5.0f));
+    TEST_ASSERT_EQUAL_FLOAT(0.5f, volume::outputGain(0.5f));
     TEST_ASSERT_EQUAL_FLOAT(0.0f, volume::outputGain(-1.0f));
-    int16_t loud = volume::scale(32767, volume::outputGain(1.0f));
-    TEST_ASSERT_TRUE(loud <= 14640);  // 0.447 x full scale
+    TEST_ASSERT_EQUAL_INT16(32767, volume::scale(32767, volume::outputGain(1.0f)));
+    TEST_ASSERT_EQUAL_INT16(-32768, volume::scale(-32768, volume::outputGain(1.0f)));
 }
 
 void test_level_curve_mute_monotonic_and_top() {
@@ -353,9 +351,8 @@ int main(int, char **) {
     RUN_TEST(test_pulse_counts_uk);
     RUN_TEST(test_pulse_sequence_timing);
     RUN_TEST(test_sweep_rises_in_frequency);
-    RUN_TEST(test_cap_is_minus_7_db);
-    RUN_TEST(test_speaker_levels_and_pot_always_pass_through_cap);
-    RUN_TEST(test_output_gain_never_exceeds_cap);
+    RUN_TEST(test_speaker_levels_and_pot_stay_within_full_scale);
+    RUN_TEST(test_output_gain_is_clamped_with_no_cap);
     RUN_TEST(test_level_curve_mute_monotonic_and_top);
     RUN_TEST(test_pot_level_dead_zones);
     RUN_TEST(test_scale_rounds_and_clips);

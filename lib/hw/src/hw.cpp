@@ -187,7 +187,7 @@ size_t audioStreamWrite(const int16_t *samples, size_t count, float userGain) {
         count = kBlockFrames;
     }
     int16_t stereo[kBlockFrames * 2];
-    float gain = volume::outputGain(userGain);  // cap last, including WAV playback
+    float gain = volume::outputGain(userGain);
     for (size_t i = 0; i < count; ++i) {
         stereo[i * 2] = stereo[i * 2 + 1] = volume::scale(samples[i], gain);
     }

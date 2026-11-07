@@ -282,13 +282,13 @@ modem idle.
 | Command | What it does |
 |---|---|
 | `AT*HW?` | List the hardware tests |
-| `AT*HWTEST` | Guided test of LEDs, speaker, volume cap, pot, RS232 lines and loopback |
+| `AT*HWTEST` | Guided test of LEDs, speaker, full volume, pot, RS232 lines and loopback |
 | `AT*HWPINS` | GPIO pin map |
 | `AT*HWINFO` | Chip, memory, firmware, reset reason, LittleFS |
 | `AT*HWFILES` | Files in LittleFS |
 | `AT*HWLED=<AA\|CD\|RD\|SD\|TR\|CS\|ARQ\|ALL\|OFF\|CHASE\|WALK>` | Light LEDs; `AT*HWLED=AUTO` gives them back to the modem |
 | `AT*HWAMP=<AUTO\|ON\|OFF>` | Amplifier shutdown pin (AUTO: on only while playing) |
-| `AT*HWVOL=<0-100\|POT>` | Test volume, % of the speaker cap (default 75) |
+| `AT*HWVOL=<0-100\|POT>` | Test volume, % of full volume (default 75) |
 | `AT*HWTONE=<Hz>[,<ms>]` / `DIAL` / `BUSY` / `RING` / `SWEEP` | Play a tone |
 | `AT*HWDTMF=<digits>` / `AT*HWPULSE=<digits>` | Play DTMF / UK pulse clicks |
 | `AT*HWPOT[=TONE]` | Live pot reading (TONE: a 1 kHz tone follows the knob) |
@@ -297,4 +297,4 @@ modem idle.
 | `AT*HWLOOP[=<baud>\|ALL]` | Loopback test; needs a plug joining RXD-TXD, CTS-RTS, DCD-DTR (DB25 3-2, 5-4, 8-20) |
 | `AT*HWBRIDGE[=<baud>]` | Pass bytes between the console and RS232 (default 38400; Ctrl-X ends) |
 
-All sounds, including tests, go through the -7 dB speaker cap last.
+There is no volume cap: full volume is full scale, which the 2 W speaker can take.

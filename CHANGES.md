@@ -25,6 +25,10 @@ Every change that is pushed bumps `VERSION` and adds an entry here
   overridden by `.env` or real environment variables (`scripts/pin_config.py` passes them
   to the compiler; duplicates and non-GPIO numbers stop the build). `pins.h` no longer
   holds numbers. The pin-map lock test runs only when no override is set.
+- Speaker is now the Same Sky CLS0361 (8 ohm, 2 W) with the amplifier's GAIN pin
+  unconnected (9 dB). The -7 dB firmware volume cap for the old 0.25 W speaker is
+  removed: full volume is now full scale, about 13 dB louder than before at the same
+  knob position. `AT*HWTEST` step 3 is now "Full volume".
 - RS232 now goes through two RS232 Pal modules; `AT*HWPINS` shows DB9 pin numbers.
   The rev A boot-state pull-ups (Q77) are not part of this map: Electronics to confirm
   the idle state of RXD, CTS, DCD and RI during boot.

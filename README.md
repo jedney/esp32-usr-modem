@@ -127,8 +127,8 @@ unless you confirm them. The web protocol and security rules are in
 ## Sounds, volume and lights
 
 The knob sets the overall volume; `ATL` scales within it and `ATM` chooses when the
-speaker is on. A fixed -7 dB limit protects the 0.25 W speaker and applies last to every
-sound. Handshake recordings come from Gough Lui's modem sound collection (see
+speaker is on. Full volume is the amplifier's full output, which the 2 W speaker can take,
+so there is no extra limit. Handshake recordings come from Gough Lui's modem sound collection (see
 `AT*ABOUT`). `AT*PLAY` previews any sound.
 
 | Light | Meaning |

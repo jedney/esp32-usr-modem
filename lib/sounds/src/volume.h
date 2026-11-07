@@ -1,7 +1,10 @@
-// Volume scaling and the hard speaker cap (project brief 5.3, 6.4).
+// Volume scaling (project brief 5.3, 6.4).
 //
-// Every sound goes through outputGain(), which multiplies by the cap last, so no pot,
-// ATL or test setting can drive the speaker past its rating.
+// There is no firmware volume cap. The CLS0361 speaker (8 ohm, 2 W) can take everything
+// the MAX98357A can give it: at its default 9 dB gain (GAIN pin unconnected) and 5 V,
+// full scale is about 3.6 V RMS, 1.6 W into 8 ohm, and the amp clips at about 1.4-1.8 W
+// (decisions log, 7 Nov 2026). Fit a smaller speaker or raise the amp gain and this
+// needs a cap again.
 //
 // No Arduino dependencies: this module is unit-tested on the PC.
 
@@ -11,10 +14,6 @@
 
 namespace volume {
 
-// BZ0512, 8 ohm 0.25 W, MAX98357A at 3 dB gain from 5 V: about -7 dB below full scale
-// (brief 5.3). Confirm by ear on the bench (no distortion at maximum) and change here.
-constexpr float kCapDb = -7.0f;
-
 // The quietest audible setting is this far below the loudest.
 constexpr float kRangeDb = 40.0f;
 
@@ -22,9 +21,6 @@ constexpr float kRangeDb = 40.0f;
 constexpr float kMuteBelow = 0.02f;
 
 float dbToGain(float db);
-
-// Gain of the cap, about 0.447 for -7 dB.
-float capGain();
 
 // Level 0..1 (pot position or percent / 100) to gain 0..1 on an audio (log) curve:
 // silent below kMuteBelow, then -kRangeDb .. 0 dB.
@@ -35,7 +31,7 @@ float levelToGain(float level);
 float potLevel(uint32_t raw, uint32_t maxRaw);
 float speakerGain(float pot, unsigned level);  // ATL0/1 low, ATL2 medium, ATL3 high
 
-// The gain actually applied to the samples: user gain (clamped to 0..1) times the cap.
+// The gain applied to the samples: the user gain clamped to 0..1 (1 = full scale).
 float outputGain(float userGain);
 
 // Scales one sample, with rounding and clipping.

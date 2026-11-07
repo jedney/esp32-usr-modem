@@ -5,7 +5,7 @@ const char *settingHelp(modemcfg::Setting setting) {
         "Answer sequence: 0 ITU-T, 1 Bell (emulated).",
         "Command echo: 0 off, 1 on. Password values stay masked.",
         "Online local echo: 0 on, 1 off. Configuration always masks secrets.",
-        "Speaker level: 0-3; pot and final speaker cap still apply.",
+        "Speaker level: 0-3; the volume knob still applies.",
         "Speaker: 0 silent, 1 until connect, 2 always, 3 omit dial tone.",
         "Results: 0 shown, 1 quiet, 2 quiet when answering.",
         "Result format: 0 numeric, 1 words.",

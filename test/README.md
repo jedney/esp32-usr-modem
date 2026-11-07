@@ -47,7 +47,7 @@ Section numbers refer to the project brief.
 | PPP and SLIP, aliases, private /30, NAT, hang-up (6.6) | `test_internet` | `test_internet` | `test_internet.py`; `interop/serial_pppd.py` |
 | Tones: UK dial, busy, ring, DTMF, pulse (6.4) | `test_hwtest`, `test_answer` | `test_hw`, `test_answer` | `test_hwtest.py`, `test_calls.py` |
 | Handshake WAV playback per speed (6.4) | `test_calls`, `scripts/test_sound_catalog.py` | `test_calls` | `test_calls.py` |
-| Volume: pot, `ATL`, `ATM`, -7 dB cap applied last (5.3, 6.4) | `test_hwtest`, `test_calls` | `test_calls`, `test_hw` | `AT*HWPOT=TONE`, `AT*HWTEST` |
+| Volume: pot, `ATL`, `ATM`, no cap (full volume = full scale) (5.3, 6.4) | `test_hwtest`, `test_calls` | `test_calls`, `test_hw` | `AT*HWPOT=TONE`, `AT*HWTEST` |
 | LEDs per table 5.4, `AT*HWLED=AUTO` | `test_hostport` | `test_hw` | `test_session.py`, `AT*HWTEST` |
 | Hardware tests `AT*HW...`; line, loopback and bridge refused on RS232 (6.14, Q79) | `test_hwtest`, `test_config` | `test_hw` | `test_hwtest.py`, `test_config.py` |
 | Wi-Fi: scan, masked join, retry, static IP, mDNS, ARQ/RGB, banner (6.6, 6.7) | `test_netcfg`, `test_atcmd` | `test_wifi`, `test_rs232` | `test_wifi.py`, `test_calls.py`, `test_answer.py` |

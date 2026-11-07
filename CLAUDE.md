@@ -41,8 +41,10 @@ Owner: Jon Edney. Windows 11 PC, VS Code + PlatformIO, repo at `C:\repo\esp32-us
 - **Pins only in `lib/hw/src/pins.h`.** The map is **confirmed** by Electronics (Q76,
   schematic rev A, 24 Oct 2026); `test_pins` locks the values in, so change both together
   and only when Electronics changes the board. TTL side of the MAX3232 is inverted: asserted = LOW. DSR is hard-wired on.
-- **Volume cap** (`lib/sounds/src/volume.h`, −7 dB for the 0.25 W speaker) is applied
-  last to every sound. Never add a path that skips it.
+- **No volume cap** (decided 7 Nov 2026): the CLS0361 2 W speaker takes the amp's full
+  output (MAX98357A GAIN pin unconnected = 9 dB). Every sound still goes through
+  `volume::outputGain()` (`lib/sounds/src/volume.h`). A smaller speaker or a higher amp
+  gain needs a cap there again.
 - **Secrets.** The Wi-Fi password and device password are never printed, logged,
   exported or sent to the web page (only the device password at boot until first use,
   brief 6.6). A remote caller (answer mode, port 23) can never reach command mode,
@@ -96,6 +98,6 @@ use the Python in `%LOCALAPPDATA%\Pythonin` (pytest and pyserial installed).
   (`espressif32@^6.9.0`). Partitions: 2 × 4 MB OTA app slots, ≈7.9 MB LittleFS.
 - UART0 (GPIO43/44, USB-serial chip) = maintenance console, 115200, `Serial`.
   UART1 = host RS232 via 2× MAX3232 (DCE). Native USB (GPIO19/20) kept for USB-JTAG.
-- MAX98357A I2S amp (SD pin = shutdown), BZ0512 8 Ω 0.25 W speaker, WH148 10 kΩ pot
+- MAX98357A I2S amp (SD pin = shutdown), GAIN pin unconnected (9 dB), Same Sky CLS0361 8 Ω 2 W speaker, WH148 10 kΩ pot
   on ADC1, 7 front LEDs (AA CD RD SD TR CS ARQ; ARQ = Wi-Fi status), RGB LED GPIO47.
 - Bench prototype uses a DB9 wired as DCE; the final build uses a DB25.
