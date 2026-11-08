@@ -13,7 +13,9 @@ bool Dialer::start(hostport::Session &session, const char *text, bool pulse) {
         return false;
     }
     session_ = &session;
-    menu_ = &session == &console_ ? &consoleMenu_ : &hostMenu_;
+    menu_ = &session == &console_                  ? &consoleMenu_
+            : usb_ && usbMenu_ && &session == usb_ ? usbMenu_
+                                                   : &hostMenu_;
     pulse_ = pulse;
     dtrOn_ = session.dtrOn();
     since_ = clock_();

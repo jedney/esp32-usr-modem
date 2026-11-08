@@ -130,8 +130,10 @@ struct Rig {
     Memory store;
     atcmd::Modem modem{store, commands, 5};
     hostport::CallSlot slot;
-    Output output, hostOutput;
-    hostport::Session console{modem, output, 115200, slot}, host{modem, hostOutput, 38400, slot};
+    Output output, hostOutput, usbOutput;
+    hostport::Session console{modem, output, 115200, slot}, host{modem, hostOutput, 38400, slot},
+        usb{modem, usbOutput, 115200, slot};
+    bool usbDtr = false;
     FakeSocket socket;
     FakeListener listener{socket};
     FakeSound sound;
@@ -142,8 +144,11 @@ struct Rig {
         modem.active().v[modemcfg::kM] = 0;
         console.setAnswerer(&call);
         host.setAnswerer(&call);
+        usb.setAnswerer(&call);
+        call.setUsb(&usb);
         console.tick(clockMs, true);
         host.tick(clockMs, true);
+        usb.tick(clockMs, usbDtr);
     }
     void send(const char *text, bool onHost = false) {
         (onHost ? host : console)
@@ -153,6 +158,7 @@ struct Rig {
         clockMs += elapsed;
         console.tick(clockMs, true);
         host.tick(clockMs, dtr);
+        usb.tick(clockMs, usbDtr);
         call.poll();
     }
     void ring() {
@@ -201,7 +207,8 @@ void test_s0_zero_never_auto_answers_and_s1_stays_zero() {
 void test_auto_answer_uses_selected_port_and_exact_ring_threshold() {
     for (bool console : {false, true}) {
         Rig r;
-        r.modem.setAnswerConsole(console);
+        r.modem.setAnswerPort(console ? modemcfg::AnswerPort::kConsole
+                                      : modemcfg::AnswerPort::kRs232);
         r.modem.active().s[0] = 3;
         r.ring();
         TEST_ASSERT_EQUAL(1, r.modem.active().s[1]);
@@ -220,7 +227,7 @@ void test_auto_answer_uses_selected_port_and_exact_ring_threshold() {
 }
 void test_s0_one_answers_first_ring_without_silent_delay() {
     Rig r;
-    r.modem.setAnswerConsole(true);
+    r.modem.setAnswerPort(modemcfg::AnswerPort::kConsole);
     r.modem.active().s[0] = 1;
     r.ring();
     TEST_ASSERT_TRUE(r.console.callUp());
@@ -242,6 +249,7 @@ void test_ri_uses_uk_double_ring_even_when_muted() {
 void test_ring_clock_rollover_saturation_and_delayed_poll() {
     clockMs = UINT32_MAX - 50;
     Rig r;
+    r.modem.setAnswerPort(modemcfg::AnswerPort::kRs232);  // no DTR: rings without answering
     r.modem.active().s[0] = 255;
     r.host.tick(clockMs, false);
     r.ring();
@@ -290,6 +298,7 @@ void test_pending_ath_and_atz_cancel_and_next_ata_without_caller_errors() {
 }
 void test_no_dtr_blocks_auto_answer_without_falling_back_to_console() {
     Rig r;
+    r.modem.setAnswerPort(modemcfg::AnswerPort::kRs232);  // fixed: no fallback
     r.host.tick(0, false);
     r.poll(51, false);
     r.modem.active().s[0] = 1;
@@ -392,19 +401,85 @@ void test_answerport_persistence_reset_rollback_and_busy_rejection() {
     TEST_ASSERT_EQUAL(int(atcmd::Reply::kOk), int(r.call.command(r.console.port(), "=CONSOLE")));
     atcmd::Modem again(r.store, nullptr, 0);
     again.begin();
-    TEST_ASSERT_TRUE(again.answerConsole());
+    TEST_ASSERT_EQUAL(int(modemcfg::AnswerPort::kConsole), int(again.answerPort()));
     r.modem.reset(4);
-    TEST_ASSERT_TRUE(r.modem.answerConsole());
+    TEST_ASSERT_EQUAL(int(modemcfg::AnswerPort::kConsole), int(r.modem.answerPort()));
     r.store.fail = true;
     TEST_ASSERT_EQUAL(int(atcmd::Reply::kError), int(r.call.command(r.console.port(), "=RS232")));
-    TEST_ASSERT_TRUE(r.modem.answerConsole());
+    TEST_ASSERT_EQUAL(int(modemcfg::AnswerPort::kConsole), int(r.modem.answerPort()));
     r.store.fail = false;
     r.ring();
     TEST_ASSERT_EQUAL(int(atcmd::Reply::kError), int(r.call.command(r.console.port(), "=RS232")));
     r.output.take();
     r.call.command(r.console.port(), "?");
     TEST_ASSERT_NOT_EQUAL(std::string::npos, r.output.text.find("CONSOLE"));
+    r.output.take();
     TEST_ASSERT_EQUAL(int(atcmd::Reply::kOk), int(r.call.command(r.console.port(), "=?")));
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.output.text.find("RS232,USB,CONSOLE,AUTO"));
+}
+void test_answerport_accepts_usb_and_auto_and_rejects_unknown() {
+    Rig r;
+    TEST_ASSERT_EQUAL(int(modemcfg::AnswerPort::kAuto), int(r.modem.answerPort()));
+    TEST_ASSERT_EQUAL(int(atcmd::Reply::kOk), int(r.call.command(r.console.port(), "=usb")));
+    TEST_ASSERT_EQUAL(int(modemcfg::AnswerPort::kUsb), int(r.modem.answerPort()));
+    TEST_ASSERT_EQUAL(int(atcmd::Reply::kOk), int(r.call.command(r.console.port(), "=AUTO")));
+    TEST_ASSERT_EQUAL(int(modemcfg::AnswerPort::kAuto), int(r.modem.answerPort()));
+    TEST_ASSERT_EQUAL(int(atcmd::Reply::kError), int(r.call.command(r.console.port(), "=USB2")));
+    TEST_ASSERT_EQUAL(int(atcmd::Reply::kError), int(r.call.command(r.console.port(), "=")));
+    TEST_ASSERT_EQUAL(int(modemcfg::AnswerPort::kAuto), int(r.modem.answerPort()));
+    r.output.take();
+    r.call.command(r.console.port(), "?");
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.output.text.find("AUTO"));
+}
+void test_pick_answer_port_fixed_and_auto_order() {
+    using modemcfg::AnswerPort;
+    for (AnswerPort fixed : {AnswerPort::kRs232, AnswerPort::kUsb, AnswerPort::kConsole}) {
+        for (int dtr = 0; dtr < 4; ++dtr) {
+            TEST_ASSERT_EQUAL(int(fixed), int(pickAnswerPort(fixed, dtr & 1, dtr & 2)));
+        }
+    }
+    TEST_ASSERT_EQUAL(int(AnswerPort::kRs232), int(pickAnswerPort(AnswerPort::kAuto, true, true)));
+    TEST_ASSERT_EQUAL(int(AnswerPort::kRs232), int(pickAnswerPort(AnswerPort::kAuto, true, false)));
+    TEST_ASSERT_EQUAL(int(AnswerPort::kUsb), int(pickAnswerPort(AnswerPort::kAuto, false, true)));
+    TEST_ASSERT_EQUAL(int(AnswerPort::kConsole),
+                      int(pickAnswerPort(AnswerPort::kAuto, false, false)));
+}
+void test_auto_answer_follows_dtr_rs232_then_usb_then_console() {
+    // DTR on each port; expected: 0 RS232, 1 USB, 2 console.
+    const struct {
+        bool rs232, usb;
+        int expected;
+    } cases[] = {{true, true, 0}, {true, false, 0}, {false, true, 1}, {false, false, 2}};
+    for (const auto &c : cases) {
+        Rig r;
+        r.usbDtr = c.usb;
+        r.host.tick(clockMs, c.rs232);
+        r.usb.tick(clockMs, c.usb);
+        r.poll(51, c.rs232);  // past the DTR filter
+        r.modem.active().s[0] = 1;
+        r.ring();
+        TEST_ASSERT_EQUAL(c.expected == 0, r.host.callUp());
+        TEST_ASSERT_EQUAL(c.expected == 1, r.usb.callUp());
+        TEST_ASSERT_EQUAL(c.expected == 2, r.console.callUp());
+    }
+}
+void test_auto_answer_on_usb_rings_every_port_and_drops_with_usb_dtr() {
+    Rig r;
+    r.usbDtr = true;
+    r.poll(51, false);
+    r.modem.active().s[0] = 2;
+    r.ring();
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.output.text.find("RING"));
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.hostOutput.text.find("RING"));
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.usbOutput.text.find("RING"));
+    r.poll(3000, false);
+    TEST_ASSERT_TRUE(r.usb.callUp());
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.usbOutput.text.find("CONNECT"));
+    r.usbDtr = false;
+    r.poll(1, false);  // the DTR filter times the drop from here
+    r.poll(100, false);
+    TEST_ASSERT_FALSE(r.usb.callUp());
+    TEST_ASSERT_FALSE(r.slot.busy());
 }
 void test_numeric_and_quiet_results() {
     Rig r;
@@ -459,7 +534,7 @@ void test_live_s1_not_saved_and_new_call_resets_count() {
 void test_auto_answer_does_not_interrupt_local_input_or_secret_prompt() {
     for (bool prompt : {false, true}) {
         Rig r;
-        r.modem.setAnswerConsole(true);
+        r.modem.setAnswerPort(modemcfg::AnswerPort::kConsole);
         r.modem.active().s[0] = 1;
         if (prompt) {
             r.console.port().askSecret("Password:", nullptr, nullptr);
@@ -607,6 +682,10 @@ int main() {
     RUN_TEST(test_remote_commands_and_guarded_escape_are_data_even_locally_escaped);
     RUN_TEST(test_preanswer_payload_is_preserved_and_never_parsed);
     RUN_TEST(test_answerport_persistence_reset_rollback_and_busy_rejection);
+    RUN_TEST(test_answerport_accepts_usb_and_auto_and_rejects_unknown);
+    RUN_TEST(test_pick_answer_port_fixed_and_auto_order);
+    RUN_TEST(test_auto_answer_follows_dtr_rs232_then_usb_then_console);
+    RUN_TEST(test_auto_answer_on_usb_rings_every_port_and_drops_with_usb_dtr);
     RUN_TEST(test_numeric_and_quiet_results);
     RUN_TEST(test_listen_failure_retries_and_resource_takeover_closes);
     RUN_TEST(test_live_s1_not_saved_and_new_call_resets_count);

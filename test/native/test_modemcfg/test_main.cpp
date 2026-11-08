@@ -356,7 +356,7 @@ void test_layout_3_migration_preserves_model_and_defaults_answerport() {
     Nvram n = factoryNvram();
     n.model = 56000;
     n.throttle = true;
-    n.answerConsole = true;
+    n.answerPort = AnswerPort::kConsole;
     n.tmpl[0].lineExplicit = true;
     n.tmpl[0].s[0] = 3;
     uint8_t current[kBlobSize];
@@ -373,21 +373,53 @@ void test_layout_3_migration_preserves_model_and_defaults_answerport() {
     TEST_ASSERT_TRUE(out.throttle);
     TEST_ASSERT_TRUE(out.tmpl[0].lineExplicit);
     TEST_ASSERT_EQUAL(3, out.tmpl[0].s[0]);
-    TEST_ASSERT_FALSE(out.answerConsole);
+    // Layout 3 had no answer port: the v2.0 factory default (AUTO) applies.
+    TEST_ASSERT_EQUAL(int(AnswerPort::kAuto), int(out.answerPort));
     TEST_ASSERT_EQUAL(int(LoadResult::kOk), int(deserialize(current, sizeof current, &out)));
-    TEST_ASSERT_TRUE(out.answerConsole);
-    current[kBlobSizeV4 - 5] = 2;
+    TEST_ASSERT_EQUAL(int(AnswerPort::kConsole), int(out.answerPort));
+    // Every saved value loads as itself (0, 1 from v0.9; 2 USB and 3 AUTO from v2.0) ...
+    for (uint8_t value = 0; value < kAnswerPortCount; ++value) {
+        current[kBlobSizeV4 - 5] = value;
+        crc = crc32(current, sizeof current - 4);
+        for (unsigned i = 0; i < 4; ++i)
+            current[sizeof current - 4 + i] = crc >> (8 * i);
+        TEST_ASSERT_EQUAL(int(LoadResult::kOk), int(deserialize(current, sizeof current, &out)));
+        TEST_ASSERT_EQUAL(value, static_cast<uint8_t>(out.answerPort));
+    }
+    // ... and anything above is rejected.
+    current[kBlobSizeV4 - 5] = kAnswerPortCount;
     crc = crc32(current, sizeof current - 4);
     for (unsigned i = 0; i < 4; ++i)
         current[sizeof current - 4 + i] = crc >> (8 * i);
     assertLoadFails(current, sizeof current, LoadResult::kBadValue);
 }
 
+void test_answer_port_names_parse_and_factory_default() {
+    TEST_ASSERT_EQUAL(int(AnswerPort::kAuto), int(factoryNvram().answerPort));
+    const char *names[] = {"RS232", "CONSOLE", "USB", "AUTO"};
+    for (uint8_t i = 0; i < kAnswerPortCount; ++i) {
+        TEST_ASSERT_EQUAL_STRING(names[i], answerPortName(static_cast<AnswerPort>(i)));
+        AnswerPort out = AnswerPort::kRs232;
+        TEST_ASSERT_TRUE(parseAnswerPort(names[i], &out));
+        TEST_ASSERT_EQUAL(i, static_cast<uint8_t>(out));
+    }
+    AnswerPort out = AnswerPort::kRs232;
+    TEST_ASSERT_TRUE(parseAnswerPort("usb  ", &out));
+    TEST_ASSERT_EQUAL(int(AnswerPort::kUsb), int(out));
+    TEST_ASSERT_TRUE(parseAnswerPort("Auto", &out));
+    TEST_ASSERT_EQUAL(int(AnswerPort::kAuto), int(out));
+    for (const char *bad : {"", "US", "USBX", "RS23", "CONSOLE2", " USB"}) {
+        out = AnswerPort::kRs232;
+        TEST_ASSERT_FALSE(parseAnswerPort(bad, &out));
+        TEST_ASSERT_EQUAL(int(AnswerPort::kRs232), int(out));
+    }
+}
+
 void test_layout_4_migrates_with_default_delays_and_validates_new_values() {
     Nvram n = factoryNvram();
     n.model = 33600;
     n.throttle = true;
-    n.answerConsole = true;
+    n.answerPort = AnswerPort::kUsb;
     n.ringDelayMs = 5000;
     n.connectDelayMs = 60000;
     uint8_t current[kBlobSize], old[kBlobSizeV4];
@@ -402,7 +434,8 @@ void test_layout_4_migrates_with_default_delays_and_validates_new_values() {
     TEST_ASSERT_EQUAL_UINT32(1500, out.ringDelayMs);
     TEST_ASSERT_EQUAL_UINT32(250, out.connectDelayMs);
     TEST_ASSERT_EQUAL_UINT32(n.model, out.model);
-    TEST_ASSERT_TRUE(out.throttle && out.answerConsole);
+    TEST_ASSERT_TRUE(out.throttle);
+    TEST_ASSERT_EQUAL(int(AnswerPort::kUsb), int(out.answerPort));
     TEST_ASSERT_EQUAL(int(LoadResult::kOk), int(deserialize(current, sizeof current, &out)));
     TEST_ASSERT_EQUAL_UINT32(5000, out.ringDelayMs);
     TEST_ASSERT_EQUAL_UINT32(60000, out.connectDelayMs);
@@ -417,6 +450,7 @@ void test_layout_4_migrates_with_default_delays_and_validates_new_values() {
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_layout_4_migrates_with_default_delays_and_validates_new_values);
+    RUN_TEST(test_answer_port_names_parse_and_factory_default);
     RUN_TEST(test_layout_3_migration_preserves_model_and_defaults_answerport);
     RUN_TEST(test_layout_2_migration_preserves_speeds_and_validates_new_metadata);
     RUN_TEST(test_factory_f1_has_the_decided_defaults);

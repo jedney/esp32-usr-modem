@@ -15,6 +15,11 @@ public:
           slot_(slot),
           sound_(sound),
           clock_(clock) {}
+    // The USB modem port's session and menu (v2.0).
+    void setUsb(hostport::Session *usb, Terminal *usbMenu) {
+        usb_ = usb;
+        usbMenu_ = usbMenu;
+    }
     bool start(hostport::Session &session, const char *text, bool pulse) override;
     void poll();
     void cancel();
@@ -24,6 +29,8 @@ private:
     void connect();
     hostport::Session &console_;
     Terminal &consoleMenu_, &hostMenu_;
+    hostport::Session *usb_ = nullptr;
+    Terminal *usbMenu_ = nullptr;
     calls::Outgoing &outgoing_;
     hostport::CallSlot &slot_;
     calls::CallSound &sound_;

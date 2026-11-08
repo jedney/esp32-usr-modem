@@ -4,11 +4,15 @@
 #include "client_service.h"
 #include "diagnostics.h"
 #include "hw.h"
+#include "usb_port.h"
 
 namespace hw {
 class ClientPlatform : public clienttest::Platform, public clienttest::Source {
 public:
-    explicit ClientPlatform(config::Log &log, bool rs232) : log_(log), rs232_(rs232) {}
+    // rs232: the RS232 port (signals, UART1). usb: the USB modem port (v2.0). Neither: the
+    // console (UART0).
+    ClientPlatform(config::Log &log, bool rs232, bool usb = false)
+        : log_(log), rs232_(rs232), usb_(usb) {}
     void begin(uint32_t baud, bool ctsFromBuffer, bool obeyRts) {
         baud_ = baud;
         cts_ = ctsFromBuffer;
@@ -19,8 +23,8 @@ public:
     clienttest::Source *source(const char *selection, uint32_t generatedSize) override;
     void release() override;
     uint32_t baud() const override { return baud_; }
-    bool rts() const override { return rs232_ && rtsAsserted(); }
-    bool dtr() const override { return rs232_ && dtrAsserted(); }
+    bool rts() const override { return usb_ ? usbRts() : rs232_ && rtsAsserted(); }
+    bool dtr() const override { return usb_ ? usbDtr() : rs232_ && dtrAsserted(); }
     void signal(unsigned which, bool on) override {
         if (!rs232_ || which > 2)
             return;
@@ -41,6 +45,9 @@ public:
         }
     }
     bool drained() const override {
+        if (usb_) {
+            return usbTxDrained();
+        }
         return rs232_ ? uart_wait_tx_done(UART_NUM_1, 0) == ESP_OK
                       : uart_wait_tx_done(UART_NUM_0, 0) == ESP_OK;
     }
@@ -51,7 +58,7 @@ public:
 
 private:
     config::Log &log_;
-    bool rs232_, cts_ = false, rts_ = false, dcd_ = false, ri_ = false;
+    bool rs232_, usb_, cts_ = false, rts_ = false, dcd_ = false, ri_ = false;
     uint32_t baud_ = 115200, generatedSize_ = 0;
     unsigned count_ = 0, selected_ = 0;
     char *snapshot_ = nullptr;

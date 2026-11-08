@@ -8,7 +8,7 @@ Every modem feature has tests, at these levels:
 | **Script** (`test/scripts/`, `ui/tests/`) | PC | `python -m pytest test/scripts`; `python -m unittest discover -s ui/tests` | Every push (CI) |
 | **Web unit** (`web/test/`) | PC, Node.js 20+ | `cd web; npm test` | Every push (CI) |
 | **On-board** (`test/embedded/`) | ESP32-S3 | `pio test -e s3` | Before each release |
-| **End-to-end** (`test/e2e/`) | PC driving the modem's serial ports and Wi-Fi | `python -m pytest test/e2e --console-port COMx [--rs232-port COMy]` | Before each release |
+| **End-to-end** (`test/e2e/`) | PC driving the modem's serial ports and Wi-Fi | `python -m pytest test/e2e --console-port COMx [--rs232-port COMy] [--usb-port COMz]` | Before each release |
 | **Interoperability** (`test/interop/`) | PC with lrzsz / pppd | see `test/interop/README.md` | Before releases that touch transfers or PPP |
 
 Feature logic lives in `lib/` with no hardware calls, so most of it is unit-tested on
@@ -42,13 +42,14 @@ Section numbers refer to the project brief.
 | Phonebook (6.3) | `test_calls` | `test_calls` | `test_calls.py` |
 | Outgoing calls: Telnet negotiation, 0xFF escaping, raw mode, ringing and connect delays, host-name digits (6.6) | `test_calls` | `test_calls` | `test_calls.py` |
 | Call errors: BUSY, NO ANSWER, NO DIAL TONE, NO CARRIER (6.5) | `test_calls` | — | `test_calls.py` |
-| Answer mode: port 23, RI, ring, `ATA`, `S0`, `AT*ANSWERPORT` (6.6) | `test_answer`, `test_modemcfg` | `test_answer` | `test_answer.py` |
+| Answer mode: port 23, RI, ring, `ATA`, `S0`, `AT*ANSWERPORT` incl. USB and AUTO by DTR (6.6, v2.0) | `test_answer`, `test_modemcfg` | `test_answer` | `test_answer.py`, `test_usb.py` |
+| USB modem port (Q25, v2.0): TinyUSB serial session, flow control, DTR, no reboot on 1200 baud, one call across ports; pinned TinyUSB download | `test_answer`, `test_hostport`; `test/scripts/test_network_dependencies.py` | — | `test_usb.py` |
 | Remote callers can't reach command mode (6.6, Q44) | `test_answer` | — | `test_answer.py` |
 | PPP and SLIP, aliases, private /30, NAT, hang-up (6.6) | `test_internet` | `test_internet` | `test_internet.py`; `interop/serial_pppd.py` |
 | Tones: UK dial, busy, ring, DTMF, pulse (6.4) | `test_hwtest`, `test_answer` | `test_hw`, `test_answer` | `test_hwtest.py`, `test_calls.py` |
 | Handshake WAV playback per speed (6.4) | `test_calls`, `scripts/test_sound_catalog.py` | `test_calls` | `test_calls.py` |
 | Volume: pot, `ATL`, `ATM`, no cap (full volume = full scale) (5.3, 6.4) | `test_hwtest`, `test_calls` | `test_calls`, `test_hw` | `AT*HWPOT=TONE`, `AT*HWTEST` |
-| LEDs per table 5.4, `AT*HWLED=AUTO` | `test_hostport` | `test_hw` | `test_session.py`, `AT*HWTEST` |
+| LEDs per table 5.4, `AT*HWLED=AUTO`; CD/TR/RD/SD follow RS232 or USB (v2.0) | `test_hostport` | `test_hw` | `test_session.py`, `AT*HWTEST` |
 | Hardware tests `AT*HW...`; line, loopback and bridge refused on RS232 (6.14, Q79) | `test_hwtest`, `test_config` | `test_hw` | `test_hwtest.py`, `test_config.py` |
 | Wi-Fi: scan, masked join, retry, static IP, mDNS, ARQ/RGB, banner (6.6, 6.7) | `test_netcfg`, `test_atcmd` | `test_wifi`, `test_rs232` | `test_wifi.py`, `test_calls.py`, `test_answer.py` |
 | Clock: NTP, time zones, daylight saving (6.8, Q59) | `test_netcfg` | `test_wifi` | `test_wifi.py` |
@@ -61,7 +62,7 @@ Section numbers refer to the project brief.
 | About generated from the licensing record | `scripts/test_generate_credits.py` | — | `test_config.py` |
 | Web server: Digest login (stale nonce, wrong-password delay), Host/Origin, tickets, CSRF, WebSocket, upload (6.11) | `test_web`, `scripts/test_image_manifest.py`, `scripts/test_web_peer.py` | `test_web` | `test_web.py` |
 | Web page: status bar, reconnect, sizing, upload hashing, demo (6.11) | `web/test/` | — | — |
-| Client Tests: display, size, keys, transfers, cable, client settings (6.13) | `test_client` | `test_client` | `test_client.py`; `interop/serial_lrzsz.py` |
+| Client Tests: display, size, keys, transfers, cable, client settings per port incl. USB (6.13, v2.0) | `test_client` | `test_client` | `test_client.py`; `interop/serial_lrzsz.py` |
 | Build: network libraries and image identities | `scripts/test_network_dependencies.py`, `scripts/test_image_manifest.py` | — | — |
 
 Checks that need a person (sound, LEDs, loopback plug, Amiga and Windows 9x clients)

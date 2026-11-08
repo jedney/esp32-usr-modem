@@ -5,10 +5,11 @@ Faxmodem. It has a real RS232 port (DB25, wired as a modem), speaks the Hayes AT
 set of the Sportster, plays dial, DTMF, ringing and handshake sounds, and connects your
 retro computer to Telnet BBSes and the Internet over Wi-Fi.
 
-**Version 1.0**, the first production release. What it does:
+**Version 2.0**: adds the USB modem port. What it does:
 
 - Outgoing Telnet and raw TCP calls, from a 64-entry phonebook or by host name or IP.
 - Incoming calls on Telnet port 23, with UK ringing, RI, `ATA` and auto-answer.
+- A USB modem port on the rear USB-C socket, so a modern PC needs no USB-serial adapter.
 - Internet dial-up: PPP (`ATDT666`) and SLIP (`ATDT667`) with NAT.
 - A configuration screen on either serial port or in a web browser.
 - Client Tests and X/Y/ZMODEM transfers to check a terminal and its cable.
@@ -22,6 +23,7 @@ Every command is listed in **[docs/COMMANDS.md](docs/COMMANDS.md)**.
 | Port | Use |
 |---|---|
 | RS232 (DB25) | The computer. Speed is detected from each "AT" (300-115200), or fixed with `AT*BAUD`. RTS/CTS, DTR, DCD and RI work as on a real modem; DSR is always on |
+| Rear USB-C (the S3's native USB) | **USB modem port** (v2.0): a PC sees a USB serial port that works like the RS232 port, with its own AT session. No line speed, USB flow control, DTR from the PC program; no DCD or RI (calls show by result codes). The same socket powers the modem |
 | USB-C "UART" on the S3 board | Maintenance console, 115200 8N1. Same commands as the RS232 port, plus the boot messages. Inside the case only |
 | Wi-Fi | Calls, the web interface (`http://usr-modem.local`) and OTA updates |
 
@@ -72,9 +74,10 @@ data itself runs at full speed unless `AT*THROTTLE=ON`.
 ## Incoming calls
 
 The modem listens on Telnet port 23 while on Wi-Fi. A caller hears no password prompt.
-`RING` appears on both ports, RI follows the UK double ring and the AA light flashes.
+`RING` appears on every port, RI follows the UK double ring and the AA light flashes.
 `ATA` answers on the port you type it on. `ATS0=n` answers automatically after `n`
-rings on the port chosen with `AT*ANSWERPORT` (RS232 by default). Only one call at a
+rings on the port chosen with `AT*ANSWERPORT`. The default, `AUTO`, picks the first port
+with DTR on (a program has it open), in the order RS232, USB, console. Only one call at a
 time: further callers are turned away.
 
 A caller only ever sends data. They can't reach command mode, `AT*` commands, the
@@ -247,8 +250,12 @@ and modem are on different subnets, the router must also allow modem → PC TCP 
 
 ### Debugging
 
-Connect the board's native **USB** port (GPIO19/20) and use **Run and Debug → PIO Debug
-(s3)** (built-in USB-JTAG).
+From v2.0 the native USB port (GPIO19/20) is the USB modem port, so the built-in USB-JTAG
+debugger is not available while the firmware runs. Flash over the UART USB-C port or OTA.
+To reach the ROM bootloader on the native port, hold BOOT and tap RST.
+
+Never connect a computer to both the S3's own native USB-C and the rear USB-C socket at
+the same time: they share the same data lines.
 
 ## Versioning
 

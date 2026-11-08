@@ -10,15 +10,22 @@ struct ClientSettings {
 };
 const char *charsetName(Charset charset);
 bool parseSettings(const char *text, ClientSettings &out);
+// Local serial ports with their own client record (the browser has none).
+constexpr unsigned kConsolePort = 0, kRs232Port = 1, kUsbPort = 2, kPortCount = 3;
+const char *portName(unsigned port);  // "CONSOLE", "RS232", "USB"
+// Saved as "USRC", layout 2, three 8-byte records, CRC-32. Layout 1 (two records, before
+// v2.0) is not converted: it loads as defaults (decided by Jon, v2.0).
 class Settings {
 public:
     explicit Settings(modemcfg::Store &store) : store_(store) {}
     bool begin();
-    const ClientSettings &get(unsigned port) const { return records_[port == 1]; }
+    const ClientSettings &get(unsigned port) const {
+        return records_[port < kPortCount ? port : kConsolePort];
+    }
     bool save(unsigned port, const ClientSettings &settings);
 
 private:
     modemcfg::Store &store_;
-    ClientSettings records_[2];
+    ClientSettings records_[kPortCount];
 };
 }  // namespace clienttest

@@ -107,8 +107,8 @@ public:
     bool setModel(uint32_t speed);
     bool setThrottle(bool enabled);
     bool throttle() const { return nvram_.throttle; }
-    bool answerConsole() const { return nvram_.answerConsole; }
-    bool setAnswerConsole(bool enabled);
+    modemcfg::AnswerPort answerPort() const { return nvram_.answerPort; }
+    bool setAnswerPort(modemcfg::AnswerPort port);  // saved at once
     uint32_t ringDelayMs() const { return nvram_.ringDelayMs; }
     uint32_t connectDelayMs() const { return nvram_.connectDelayMs; }
     bool setCallDelay(bool ring, uint32_t milliseconds);

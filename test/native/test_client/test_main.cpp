@@ -93,6 +93,41 @@ void test_port_profiles_persist_and_rollback() {
     TEST_ASSERT_FALSE(damaged.begin());
     TEST_ASSERT_EQUAL(80, damaged.get(1).columns);
 }
+void test_usb_profile_is_separate_and_old_layout_loads_defaults() {
+    Memory memory;
+    Settings settings(memory);
+    TEST_ASSERT_TRUE(settings.save(kUsbPort, {Charset::Cp437, 100, 40, 127}));
+    TEST_ASSERT_TRUE(settings.save(kRs232Port, {Charset::Plain, 40, 24, 8}));
+    TEST_ASSERT_FALSE(settings.save(kPortCount, {}));
+    Settings loaded(memory);
+    TEST_ASSERT_TRUE(loaded.begin());
+    TEST_ASSERT_EQUAL(100, loaded.get(kUsbPort).columns);
+    TEST_ASSERT_EQUAL(int(Charset::Cp437), int(loaded.get(kUsbPort).charset));
+    TEST_ASSERT_EQUAL(40, loaded.get(kRs232Port).columns);
+    TEST_ASSERT_EQUAL(80, loaded.get(kConsolePort).columns);
+    TEST_ASSERT_EQUAL_STRING("USB", portName(kUsbPort));
+    TEST_ASSERT_EQUAL_STRING("RS232", portName(kRs232Port));
+    TEST_ASSERT_EQUAL_STRING("CONSOLE", portName(kConsolePort));
+    // A layout 1 record (two ports, before v2.0) is not converted: defaults apply.
+    uint8_t old[26] = {'U', 'S', 'R', 'C', 1, 0};
+    for (unsigned i = 0; i < 2; ++i) {
+        uint8_t *r = old + 6 + i * 8;
+        r[0] = 2;
+        r[1] = 132;
+        r[3] = 50;
+        r[5] = 127;
+    }
+    uint32_t crc = crc32(old, 22);
+    for (unsigned i = 0; i < 4; ++i)
+        old[22 + i] = crc >> (8 * i);
+    memory.bytes.assign(old, old + sizeof old);
+    Settings legacy(memory);
+    TEST_ASSERT_FALSE(legacy.begin());
+    for (unsigned port = 0; port < kPortCount; ++port) {
+        TEST_ASSERT_EQUAL(80, legacy.get(port).columns);
+        TEST_ASSERT_EQUAL(8, legacy.get(port).backspace);
+    }
+}
 void test_settings_validation() {
     ClientSettings s;
     TEST_ASSERT_TRUE(parseSettings("LATIN1,9999,9999,127", s));
@@ -332,6 +367,7 @@ int main() {
     UNITY_BEGIN();
     RUN_TEST(test_crc_independent_vectors);
     RUN_TEST(test_port_profiles_persist_and_rollback);
+    RUN_TEST(test_usb_profile_is_separate_and_old_layout_loads_defaults);
     RUN_TEST(test_settings_validation);
     RUN_TEST(test_failed_display_does_not_replace_client_charset);
     RUN_TEST(test_x_checksum_roundtrip);

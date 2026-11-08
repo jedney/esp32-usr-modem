@@ -135,6 +135,34 @@ bool validModel(uint32_t speed) {
     return speed == 14400 || speed == 28800 || speed == 33600 || speed == 56000;
 }
 
+namespace {
+const char *const kAnswerPortNames[kAnswerPortCount] = {"RS232", "CONSOLE", "USB", "AUTO"};
+}  // namespace
+
+const char *answerPortName(AnswerPort port) {
+    uint8_t i = static_cast<uint8_t>(port);
+    return i < kAnswerPortCount ? kAnswerPortNames[i] : "RS232";
+}
+
+bool parseAnswerPort(const char *text, AnswerPort *out) {
+    for (uint8_t i = 0; i < kAnswerPortCount; ++i) {
+        const char *name = kAnswerPortNames[i];
+        const char *t = text;
+        while (*name && std::toupper(static_cast<unsigned char>(*t)) == *name) {
+            ++t;
+            ++name;
+        }
+        while (*t == ' ') {
+            ++t;
+        }
+        if (*name == 0 && *t == 0) {
+            *out = static_cast<AnswerPort>(i);
+            return true;
+        }
+    }
+    return false;
+}
+
 const char *modelName(uint32_t speed) {
     switch (speed) {
         case 28800:
@@ -245,7 +273,7 @@ void serialize(const Nvram &n, uint8_t *out) {
     putU32(p, n.model);
     p += 4;
     *p++ = n.throttle ? 1 : 0;
-    *p++ = n.answerConsole ? 1 : 0;
+    *p++ = static_cast<uint8_t>(n.answerPort);
     putU32(p, n.ringDelayMs);
     p += 4;
     putU32(p, n.connectDelayMs);
@@ -335,10 +363,10 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
         n.throttle = *p++ != 0;
     }
     if (version >= 4) {
-        if (*p > 1) {
+        if (*p >= kAnswerPortCount) {
             return LoadResult::kBadValue;
         }
-        n.answerConsole = *p++ != 0;
+        n.answerPort = static_cast<AnswerPort>(*p++);
     }
     if (version >= 5) {
         n.ringDelayMs = getU32(p);

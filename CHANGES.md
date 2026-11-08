@@ -14,6 +14,35 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.0] - 2026-11-08
+
+### Added
+
+- USB modem port (brief Q25): the S3's native USB, carried by the rear USB-C socket, is a
+  USB serial port that works like the RS232 port, with its own AT session, configuration
+  screen (`ATDT123`, `AT*CONFIG`), Client Tests record, PPP/SLIP and hardware tests. One
+  call at a time across all ports. DTR from the PC program follows `&D`; flow control is
+  USB's own, so nothing is lost when the modem is busy.
+- `AT*ANSWERPORT=USB` and `AT*ANSWERPORT=AUTO`. AUTO answers on the first port with DTR
+  on, in the order RS232, USB, console.
+- `AT*STATUS` and the boot banner show the USB port's state.
+- End-to-end tests for the USB port (`test/e2e/test_usb.py`, `--usb-port`), an on-board
+  driver test (`test/embedded/test_usb`) and unit tests for the answer-port choice, the
+  three client records and the two-port panel.
+
+### Changed
+
+- Factory answer port is now AUTO (was RS232). A saved choice is kept.
+- The CD, TR, RD and SD lights follow either the RS232 or the USB port. CS stays RS232 only.
+- Client Tests keep three records (console, RS232, USB). Records saved before v2.0 go back
+  to defaults once.
+- The `AT*TEST CABLE` refusal and the RTS-pause notes name the port instead of assuming
+  the console.
+- TinyUSB (Arduino's `arduino_tinyusb` component, pinned and hash-checked) is downloaded
+  with the LittleFS sources by `scripts/network_dependencies.py`.
+- The built-in USB-JTAG debugger is no longer available while the firmware runs, because
+  the native USB port is the modem port. Flash over the UART port or OTA.
+
 ## [1.1] - 2026-11-05
 
 Final v1.x build. Fully built, tested and working.

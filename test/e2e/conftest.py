@@ -3,6 +3,7 @@
 These tests talk to a real modem over serial ports:
   --console-port   the USB maintenance console (UART0, 115200), e.g. COM5
   --rs232-port     the RS232 port through the Unitek adapter, e.g. COM18
+  --usb-port       the USB modem port (v2.0, native USB / rear USB-C), e.g. COM21
 
 Tests that need a port that was not given are skipped, so the suite is safe to run
 anywhere.
@@ -65,6 +66,7 @@ def pytest_addoption(parser):
     parser.addoption("--console-port", default=None, help="USB console serial port")
     parser.addoption("--rs232-port", default=None, help="RS232 serial port (Unitek adapter)")
     parser.addoption("--rs232-baud", default=38400, type=int, help="RS232 host speed")
+    parser.addoption("--usb-port", default=None, help="USB modem port (v2.0 TinyUSB serial)")
     parser.addoption("--device-tests", action="store_true", help="allow device password changes")
     parser.addoption("--factory-reset", action="store_true", help="allow erasing all modem settings")
     parser.addoption("--ota-upload", action="store_true", help="allow real OTA uploads (tests first)")
@@ -147,6 +149,16 @@ def console(request):
 def rs232(request):
     ser = _open(request, "--rs232-port", request.config.getoption("--rs232-baud"))
     ser.rtscts = True
+    yield Port(ser)
+    ser.close()
+
+
+@pytest.fixture
+def usb(request):
+    # USB has no line speed or CTS: open it plainly, with DTR on (the port is "open").
+    ser = _open(request, "--usb-port", 115200)
+    ser.dtr = True
+    time.sleep(0.1)
     yield Port(ser)
     ser.close()
 
