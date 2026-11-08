@@ -1,0 +1,19 @@
+HEAT-SET INSERTS (M2.5)
+  Lid:    4 x 6 mm  case-screw bosses
+          2 x 4 mm  speaker strap bar holes
+  Base:   2 x 3 mm  DB9 holder floor bosses (rear pair = DB9 build, front pair = DB25 build; fit all 4 if you like)
+          4 x 3 mm  RS232 Pal standoffs
+          2 x 3 mm  amp standoffs (now beside the ESP32, holes at the front edge)
+          2 x 2 mm  HUSB238 standoffs
+  Holder: 2 x 3 mm  DB9 holder posts
+
+RUBBER FEET
+  4 x round Ø10 x 5.75 mm stick-on feet in the four Ø10.6 x 3.0 mm recesses (they stand 2.75 mm proud; the case sits 1.2 mm
+  higher than with the original printed feet).
+
+SCREWS (M2.5 pan head)
+  4 x 16  case join, up through the base into the lid
+  2 x 6   speaker strap bar
+  2 x 5   DB9 board to holder;  2 x 4  holder to floor bosses
+  amp, Pals, HUSB238: as on the test prints
+

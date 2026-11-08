@@ -278,7 +278,8 @@ release. [test/README.md](test/README.md) maps every feature to its tests.
 | `ui/` | Configuration screen design data shared by firmware and browser |
 | `sound/` | Handshake recordings |
 | `scripts/` | Build helpers: versioning, test gate, web bundle, OTA |
-| `case/`, `images/` | Case model and label art |
+| `case/`, `images/` | Case parts (STL), print projects, build photos, screw list and label art |
+| `electronics/` | Datasheets, pinout and models of the bought-in parts |
 | `credits/` | Attribution and the licensing record (`LICENSES.md`) |
 | `docs/` | `COMMANDS.md`, project brief, roadmap, decisions log; `history/` holds earlier version plans |
 | `.github/workflows/` | CI and release |

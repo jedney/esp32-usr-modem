@@ -16,6 +16,15 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [1.1] - 2026-11-05
 
+Final v1.x build. Fully built, tested and working.
+
+### Added
+
+- Final case print files: `case/parts/` STLs, the two Bambu Studio print projects
+  (0.4 mm main print, 0.2 mm fine parts), build photos and the screw and insert list
+  in `case/construction/`, and front labels in `case/labels/`.
+- `electronics/`: datasheets, pinout and models of the bought-in parts.
+
 ### Changed
 
 - GPIO pin map updated to the rev B layout (project brief Q89): RS232 on GPIO1, 2, 38-42
@@ -32,6 +41,8 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 - RS232 now goes through two RS232 Pal modules; `AT*HWPINS` shows DB9 pin numbers.
   The rev A boot-state pull-ups (Q77) are not part of this map: Electronics to confirm
   the idle state of RXD, CTS, DCD and RI during boot.
+- The old case files (`USRRasp-v5-*.stl`, `USR-Modem.3mf`, logo and badge) are replaced
+  by the final files in `case/`.
 
 ## [1.0] - 2026-10-27
 

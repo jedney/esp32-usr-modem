@@ -7,8 +7,9 @@ is generated from the same list.
 
 | Component | Used for | Author / source | Licence | Obligations | Status |
 |---|---|---|---|---|---|
-| RetroExternalModem case model (`3d-model/`) | 3D-printed case (modified) | luizpacheco, <https://www.thingiverse.com/thing:7063155> | CC BY-NC | Attribute; non-commercial only; modified versions keep the same terms | In repo |
-| Front label art (`images/USR*.PNG`) | Printed front label | luizpacheco (as above) | CC BY-NC | As above | In repo |
+| RetroExternalModem case model (`case/`: `parts/` STLs and the two Bambu Studio print projects) | 3D-printed case (modified, with added mounting parts) | luizpacheco, <https://www.thingiverse.com/thing:7063155> | CC BY-NC | Attribute; non-commercial only; modified versions keep the same terms | In repo |
+| Front label art (`images/USR*.PNG`, `case/labels/`) | Printed front label | luizpacheco (as above) | CC BY-NC | As above | In repo |
+| Component datasheets and models (`electronics/`) | Build reference for the amplifier, speaker, RS232 Pal, HUSB238, DB9 parts, LED and switch | Adafruit, Same Sky and the parts' suppliers (named in each file) | Manufacturers' copyright | Reference only; not part of the firmware | In repo (private) |
 | `sound/dial-up.wav`, `sound/busy-signal.wav` (removed) | Former reference sounds | caiot5, RetroExternalModem, <https://github.com/caiot5/retroexternalmodem> | GPL-3.0 | Preserve applicable notices when redistributing historical copies | Removed 27 Oct 2026; never used in firmware |
 | Zimodem Telnet handler (`handleAsciiIAC`, adapted) | Incremental Telnet parsing in `lib/calls/src/telnet.*` | Bo Zimmerman, <https://github.com/bozimmerman/Zimodem>, revision `a534e5129d88b8b09aa01fe17498d5cd5368569e`, `zimodem/pet2asc.ino` | Apache-2.0 | Original headers kept; changes marked; LICENSE and NOTICE in `credits/zimodem/` | Used in v0.8 |
 | Zimodem PPP/SLIP framing | Portable binary framing in `lib/internet/src/internet.*`; control negotiation and lifecycle rewritten for this project | Bo Zimmerman, same revision, `zimodem/zpppmode.*` and `zslipmode.*` | Apache-2.0 | Attribution/licence retained, modifications marked; existing LICENSE/NOTICE in `credits/zimodem/` | Used in v0.13; shared-IP routing is replaced by private-address NAPT |
@@ -89,6 +90,7 @@ indexes are not in increasing speed order; 38 selects 56000. These are factual
 command mappings reimplemented in this project; no code or manual pages are bundled.
 
 If the repository is ever made public, the mixed licences need a decision first:
-CC BY-NC (case) forbids commercial use, the replacement recordings' redistribution
+CC BY-NC (case) forbids commercial use, the `electronics/` datasheets are the
+manufacturers' copyright, the replacement recordings' redistribution
 terms are unspecified, and historical GPL-3.0 reference sounds retain their
 original licensing requirements if redistributed.
