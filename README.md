@@ -1,5 +1,5 @@
 # USR Modem Emulator
-
+<img width="3350" height="2260" alt="20261108_212045" src="https://github.com/user-attachments/assets/d87178f2-25f3-45a6-91df-568b987f7651" />
 An ESP32-S3 Wi-Fi "modem" in a 3D-printed replica of a 1990s US Robotics Sportster
 Faxmodem. It has a real RS232 port (DB25, wired as a modem), speaks the Hayes AT command
 set of the Sportster, plays dial, DTMF, ringing and handshake sounds, and connects your
