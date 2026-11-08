@@ -705,6 +705,26 @@ void test_panel_stretches_rd_and_sd() {
     TEST_ASSERT_EQUAL_HEX8(0, p.update(in, 2090));
 }
 
+void test_panel_follows_either_host_port() {
+    // RS232 idle, USB in a call: CD and TR light, and USB bytes flash RD/SD.
+    auto input = [](HostPortState rs232, HostPortState usb) {
+        PanelInput in = {};
+        addHostPort(in, rs232);
+        addHostPort(in, usb);
+        return in;
+    };
+    Panel p;
+    TEST_ASSERT_EQUAL_HEX8(0, p.update(input({false, false, 5, 7}, {false, false, 0, 0}), 0));
+    TEST_ASSERT_EQUAL_HEX8(mask(hwtest::kCD) | mask(hwtest::kTR),
+                           p.update(input({false, false, 5, 7}, {true, true, 0, 0}), 10));
+    TEST_ASSERT_EQUAL_HEX8(
+        mask(hwtest::kCD) | mask(hwtest::kTR) | mask(hwtest::kRD) | mask(hwtest::kSD),
+        p.update(input({false, false, 5, 7}, {true, true, 3, 2}), 20));
+    // RS232 alone still works as before.
+    TEST_ASSERT_EQUAL_HEX8(mask(hwtest::kTR),
+                           p.update(input({false, true, 5, 7}, {false, false, 3, 2}), 1000));
+}
+
 void test_panel_ring_and_wifi() {
     Panel p;
     PanelInput in = {};
@@ -762,5 +782,6 @@ int main() {
     RUN_TEST(test_panel_mirrors_lines);
     RUN_TEST(test_panel_stretches_rd_and_sd);
     RUN_TEST(test_panel_ring_and_wifi);
+    RUN_TEST(test_panel_follows_either_host_port);
     return UNITY_END();
 }

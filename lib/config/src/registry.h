@@ -56,7 +56,7 @@ public:
     explicit Registry(const Hooks &hooks) {
         const atcmd::StarCommand rows[] = {
 
-            {"ANSWERPORT", "AT*ANSWERPORT=<RS232|CONSOLE>",
+            {"ANSWERPORT", "AT*ANSWERPORT=<RS232|USB|CONSOLE|AUTO>",
              "auto-answer destination (? or =?), saved", hooks.cmdAnswerPort, false},
             {"MODEL", "AT*MODEL=<14400|28800|33600|56000>",
              "identity and default CONNECT (? or =?)", atcmd::cmdModel, false},

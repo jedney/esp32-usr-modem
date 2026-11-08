@@ -104,6 +104,15 @@ constexpr unsigned kTemplates = 2;   // Y0, Y1
 constexpr unsigned kPhoneSlots = 4;  // &Z0-&Z3
 constexpr size_t kPhoneLen = 40;     // characters per stored number
 
+// AT*ANSWERPORT: where S0 auto-answer rings through. The values are the saved byte
+// (0 and 1 are the v0.9 RS232/CONSOLE values). AUTO (v2.0 factory default) picks the first
+// port with DTR on, in the order RS232, USB, console (lib/calls pickAnswerPort).
+enum class AnswerPort : uint8_t { kRs232 = 0, kConsole = 1, kUsb = 2, kAuto = 3 };
+constexpr uint8_t kAnswerPortCount = 4;
+const char *answerPortName(AnswerPort port);  // "RS232", "CONSOLE", "USB", "AUTO"
+// Parses a name (case-insensitive, trailing spaces allowed). False if unknown.
+bool parseAnswerPort(const char *text, AnswerPort *out);
+
 struct Nvram {
     Profile tmpl[kTemplates];
     uint8_t y;  // power-on template: 0/1 = Y0/Y1, 2-4 = factory &F0-&F2
@@ -113,9 +122,9 @@ struct Nvram {
     uint32_t hostBaud;
     uint32_t model = 14400;  // device-wide identity, not changed by &F/Z
     bool throttle = false;
-    bool answerConsole = false;     // AT*ANSWERPORT, RS232 by default
-    uint32_t ringDelayMs = 1500;    // outgoing ringback before TCP connection
-    uint32_t connectDelayMs = 250;  // pause after the handshake, before CONNECT
+    AnswerPort answerPort = AnswerPort::kAuto;  // AT*ANSWERPORT
+    uint32_t ringDelayMs = 1500;                // outgoing ringback before TCP connection
+    uint32_t connectDelayMs = 250;              // pause after the handshake, before CONNECT
 };
 
 // As shipped: Y0 = &F1, Y1 = &F2, power-on from Y0, no stored numbers, speed from "AT".
@@ -130,6 +139,7 @@ Profile powerOnProfile(const Nvram &n);
 //   Layout 1 (v0.4): y, templates, phone numbers.
 //   Layout 2 (v0.5): adds hostBaud after the phone numbers.
 //   Layout 5 (v0.17): appends ringback and pre-CONNECT delay milliseconds.
+//   v2.0 keeps layout 5; the answer-port byte (layout 4) may now also be 2 (USB) or 3 (AUTO).
 constexpr uint8_t kLayoutVersion = 5;
 constexpr size_t kBlobSizeV1 =
     4 + 1 + 1 + kTemplates * (kSettingCount + kSRegCount + 4) + kPhoneSlots * kPhoneLen + 4;

@@ -124,9 +124,9 @@ bool Service::start(const char *command, const char *args, uint32_t now) {
     } else if (!strcmp(args, "APPLY") || !strcmp(args, "RESET")) {
         if (!strcmp(args, "RESET"))
             findings_ = {};
-        format("Save %s client: %s,%u,%u,%u? Y confirms; N/Esc cancels.\r\n",
-               port_ ? "RS232" : "CONSOLE", charsetName(findings_.charset), findings_.columns,
-               findings_.rows, findings_.backspace);
+        format("Save %s client: %s,%u,%u,%u? Y confirms; N/Esc cancels.\r\n", portName(port_),
+               charsetName(findings_.charset), findings_.columns, findings_.rows,
+               findings_.backspace);
         mode_ = Mode::Confirm;
     } else if (!strcmp(args, "SIZE")) {
         text(
@@ -148,13 +148,16 @@ bool Service::start(const char *command, const char *args, uint32_t now) {
         mode_ = Mode::Echo;
         duration_ = 30000;
     } else if (!strcmp(args, "FORMAT")) {
-        format("%s: %lu 8N1 (configured UART); %s\r\n", port_ ? "RS232" : "CONSOLE",
+        format("%s: %lu 8N1 (%s); %s\r\n", portName(port_),
                static_cast<unsigned long>(platform_.baud()),
-               port_ ? "RTS/CTS per active &H/&R" : "host-cable signals unavailable");
+               port_ == kUsbPort ? "USB: speed set by the PC, not used" : "configured UART",
+               port_ == kRs232Port ? "RTS/CTS per active &H/&R"
+               : port_ == kUsbPort ? "USB flow control; DTR only"
+                                   : "host-cable signals unavailable");
         complete("OK");
     } else if (!strcmp(args, "CABLE")) {
-        if (!port_) {
-            complete("Unavailable on console: run the cable test on the RS232 port.");
+        if (port_ != kRs232Port) {
+            complete("Unavailable on this port: run the cable test on the RS232 port.");
         } else {
             text(
                 "DTR/RTS live; DSR always on (hard-wired). DCD/RI/CTS toggle every 1 s.\r\n"
@@ -223,7 +226,7 @@ invalid:
 }
 void Service::summary() {
     const auto &saved = settings_.get(port_);
-    format("Client %s findings: %s,%u,%u,%u\r\nSaved: %s,%u,%u,%u\r\n", port_ ? "RS232" : "CONSOLE",
+    format("Client %s findings: %s,%u,%u,%u\r\nSaved: %s,%u,%u,%u\r\n", portName(port_),
            charsetName(findings_.charset), findings_.columns, findings_.rows, findings_.backspace,
            charsetName(saved.charset), saved.columns, saved.rows, saved.backspace);
     text("Unmeasured fields retain saved/default values; display/bell require observation.\r\n");
@@ -435,9 +438,9 @@ void Service::poll(uint32_t now) {
         complete("Confirmation timed out; saved settings retained");
     if (mode_ == Mode::Tx || mode_ == Mode::Rx || mode_ == Mode::Cable) {
         bool rts = platform_.rts(), dtr = platform_.dtr();
-        if (port_ && !rts)
+        if (port_ == kRs232Port && !rts)
             pausedMs_ += now - last_;
-        if (port_ && lastRts_ && !rts)
+        if (port_ == kRs232Port && lastRts_ && !rts)
             ++pauses_;
         if (mode_ == Mode::Cable) {
             if (rts != lastRts_ || dtr != lastDtr_)
@@ -461,7 +464,7 @@ void Service::poll(uint32_t now) {
                    static_cast<unsigned long>(bytes_), static_cast<unsigned long>(now - start_),
                    static_cast<unsigned long>(uint64_t(bytes_) * 1000 / std::max(1u, now - start_)),
                    static_cast<unsigned long>(pauses_), static_cast<unsigned long>(pausedMs_),
-                   port_ ? "" : " (console signals unavailable)");
+                   port_ == kRs232Port ? "" : " (host-cable signals unavailable)");
             if (!platform_.drained())
                 text("Output bytes above are queued; completed transmission count is unknown.\r\n");
             unsigned slot = mode_ == Mode::Tx ? 9 : mode_ == Mode::Rx ? 10 : 11;

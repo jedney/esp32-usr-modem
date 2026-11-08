@@ -25,6 +25,8 @@ their automated tests on the wired bench (console COM15, Unitek RS232 adapter CO
 | v0.13 | **Internet dial-up**: PPP (`ATDT666`), SLIP (`ATDT667`), NAT, clean hang-up | 6.6 | A TCP/IP client browses through the modem | Done with pppd; Windows 9x/Amiga check deferred |
 | v0.14-v0.18 | Review fixes, replacement sounds, menu refresh, dial timing, hostname dial digits | - | Tests pass | Done |
 | v1.0 | **Production**: full review, all on-board and end-to-end tests pass, README, command reference and About complete | all | Jon's sign-off | Released |
+| v1.1 | Rev B pin map, pins in `.env`, volume cap removed for the CLS0361 speaker | 5.2, 7 | Builds and tests pass on the rev B board | Released |
+| v2.0 | **USB modem port**: TinyUSB serial port on the native USB (rear USB-C), its own session, menu and Client Tests record; `AT*ANSWERPORT` USB and AUTO; LEDs follow either host port | 6.2, Q25 | `test_usb.py` passes against the board through the rear socket | Done |
 
 ## Checks that need a person
 
@@ -41,7 +43,8 @@ once on the finished unit:
 
 ## After v1.0
 
-- USB CDC serial on the native USB port is a v2 feature (Q25); keep GPIO19/20 free.
+- The native USB port (GPIO19/20) is the USB modem port from v2.0 (Q25); it is no longer
+  free for the USB-JTAG debugger while the firmware runs.
 - If the board ever changes, `lib/hw/src/pins.h` and the values locked in by
   `test/native/test_pins` change together.
 - New work follows the same rules: one version per branch, tests first, a

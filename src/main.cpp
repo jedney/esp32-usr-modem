@@ -17,6 +17,8 @@
 // window, and a confirmed factory reset (lib/devicecfg, hw::EspCrypto/OtaService).
 // v0.8 adds outgoing TCP/Telnet calls and streaming audio. v0.9 adds port-23
 // incoming calls, ATA/S0 and a saved RS232/console auto-answer destination.
+// v2.0: the USB modem port (usbport.cpp), a third local port on the S3's native USB with
+// its own session, menu and client record; AT*ANSWERPORT gains USB and AUTO.
 #include <Arduino.h>
 #include <LittleFS.h>
 
@@ -55,6 +57,7 @@
 #include "session.h"
 #include "tcp_listener.h"
 #include "tcp_socket.h"
+#include "usbport.h"
 #include "web_service.h"
 #include "wifi_radio.h"
 
@@ -113,7 +116,7 @@ hostport::Panel panel;
 // Set up in setup(), once the AT* table below exists.
 atcmd::Modem *modem = nullptr;
 hostport::Session *console = nullptr;
-config::Terminal *consoleMenu = nullptr, *hostMenu = nullptr;
+config::Terminal *consoleMenu = nullptr, *hostMenu = nullptr, *usbMenu = nullptr;
 hostport::Session *browserSession = nullptr;
 config::Terminal *browserMenu = nullptr;
 uint32_t browserClient = 0;
@@ -135,8 +138,9 @@ hw::FileStore historyStore("/call-history.bin", "/call-history.tmp", "/call-hist
 hw::NvsStore resetStore("diagnostics", "reset");
 config::History history(historyStore);
 config::Log debugLog;
-hw::ClientPlatform consoleClientPlatform(debugLog, false), hostClientPlatform(debugLog, true);
-clienttest::Service *consoleClient = nullptr, *hostClient = nullptr;
+hw::ClientPlatform consoleClientPlatform(debugLog, false), hostClientPlatform(debugLog, true),
+    usbClientPlatform(debugLog, false, true);
+clienttest::Service *consoleClient = nullptr, *hostClient = nullptr, *usbClient = nullptr;
 uint32_t msNow();
 int64_t utcNow() {
     return net.utcNow();
@@ -174,14 +178,46 @@ hostport::Session &sessionOf(atcmd::Port &port) {
 bool isRs232(atcmd::Port &port) {
     return &port == &rs232::session().port();
 }
+bool isUsb(atcmd::Port &port) {
+    return &port == &usbport::session().port();
+}
+
+// The local serial ports, indexed as their Client Tests records (console, RS232, USB).
+constexpr unsigned kSerialPorts = clienttest::kPortCount;
+hostport::Session &serialSession(unsigned i) {
+    return i == clienttest::kRs232Port ? rs232::session()
+           : i == clienttest::kUsbPort ? usbport::session()
+                                       : *console;
+}
+config::Terminal *serialMenu(unsigned i) {
+    return i == clienttest::kRs232Port ? hostMenu
+           : i == clienttest::kUsbPort ? usbMenu
+                                       : consoleMenu;
+}
+clienttest::Service *serialClient(unsigned i) {
+    return i == clienttest::kRs232Port ? hostClient
+           : i == clienttest::kUsbPort ? usbClient
+                                       : consoleClient;
+}
+hw::ClientPlatform &serialPlatform(unsigned i) {
+    return i == clienttest::kRs232Port ? hostClientPlatform
+           : i == clienttest::kUsbPort ? usbClientPlatform
+                                       : consoleClientPlatform;
+}
+unsigned serialIndex(atcmd::Port &port) {  // not for the browser
+    return isRs232(port) ? clienttest::kRs232Port
+           : isUsb(port) ? clienttest::kUsbPort
+                         : clienttest::kConsolePort;
+}
+
 config::Terminal &menuOf(atcmd::Port &port) {
     if (browserSession && &port == &browserSession->port()) {
         return *browserMenu;
     }
-    return isRs232(port) ? *hostMenu : *consoleMenu;
+    return *serialMenu(serialIndex(port));
 }
 bool ownsMenu(atcmd::Port &port) {
-    return consoleMenu && hostMenu && menuOf(port).isOpen();
+    return consoleMenu && hostMenu && usbMenu && menuOf(port).isOpen();
 }
 
 // --- Hardware tests on the port they were typed on ------------------------------------------
@@ -207,6 +243,17 @@ private:
 };
 
 ConsoleTerm consoleTerm;
+
+class UsbTerm : public hwconsole::Term {
+public:
+    explicit UsbTerm(atcmd::Port &port) : port_(port) {}
+    void write(const char *data, size_t len) override { port_.write(data, len); }
+    int read() override { return usbport::readKey(); }
+    bool isRs232() const override { return false; }
+
+private:
+    atcmd::Port &port_;
+};
 
 class BrowserTerm : public hwconsole::Term {
 public:
@@ -271,6 +318,9 @@ atcmd::Reply cmdHelp(atcmd::Port &port, const char *args) {
     } else if (isRs232(port)) {
         Rs232Term t(port);
         hwconsole::printHelp(t);
+    } else if (isUsb(port)) {
+        UsbTerm t(port);
+        hwconsole::printHelp(t);
     } else {
         hwconsole::printHelp(consoleTerm);
     }
@@ -328,6 +378,9 @@ atcmd::Reply cmdHw(atcmd::Port &port, const char *args) {
     } else if (isRs232(port)) {
         Rs232Term t(port);
         hwconsole::handle(t, args);  // prints its own OK / ERROR
+    } else if (isUsb(port)) {
+        UsbTerm t(port);
+        hwconsole::handle(t, args);
     } else {
         hwconsole::handle(consoleTerm, args);
     }
@@ -354,11 +407,9 @@ atcmd::Reply cmdPhoneDelete(atcmd::Port &port, const char *args) {
 }
 
 atcmd::Reply cmdAnswerPort(atcmd::Port &port, const char *args) {
-    if (ownsMenu(port) && *args == '=') {
-        if (!strcmp(args, "=RS232") || !strcmp(args, "=CONSOLE")) {
-            return modem->setAnswerConsole(!strcmp(args, "=CONSOLE")) ? atcmd::Reply::kOk
-                                                                      : atcmd::Reply::kError;
-        }
+    modemcfg::AnswerPort choice;
+    if (ownsMenu(port) && *args == '=' && modemcfg::parseAnswerPort(args + 1, &choice)) {
+        return modem->setAnswerPort(choice) ? atcmd::Reply::kOk : atcmd::Reply::kError;
     }
     return incoming->command(port, args);
 }
@@ -445,11 +496,11 @@ public:
             return result;
         }
         if (!strcmp(name, "CLIENTEXPORT")) {
-            for (unsigned i = 0; i < 2; ++i) {
+            for (unsigned i = 0; i < kSerialPorts; ++i) {
                 const auto &s = clientSettings.get(i);
                 port.printf(
                     "; %s client: AT*TEST SET=%s,%u,%u,%u then AT*TEST APPLY (Y) on that port\r\n",
-                    i ? "RS232" : "CONSOLE", clienttest::charsetName(s.charset), s.columns, s.rows,
+                    clienttest::portName(i), clienttest::charsetName(s.charset), s.columns, s.rows,
                     s.backspace);
             }
             return Reply::kOk;
@@ -461,8 +512,8 @@ public:
                 net.joinResult() == netcfg::JoinResult::kRunning ||
                 net.scanState() == netcfg::ScanState::kRunning)
                 return Reply::kError;
-            auto &service = isRs232(port) ? *hostClient : *consoleClient;
-            auto &platform = isRs232(port) ? hostClientPlatform : consoleClientPlatform;
+            auto &service = *serialClient(serialIndex(port));
+            auto &platform = serialPlatform(serialIndex(port));
             auto flow = hostport::flowMode(modem->active());
             platform.begin(port.baud(), flow.ctsFromBuffer, flow.obeyRts);
             service.hold(ownsMenu(port));
@@ -537,13 +588,18 @@ public:
                 port.printf("%u ", (ledMask >> i) & 1);
             }
             port.newline();
-            port.printf("Console: 115200; RS232: %lu; S0=%u; auto-answer=%s\r\n",
-                        static_cast<unsigned long>(rs232::baud()), modem->active().s[0],
-                        modem->answerConsole() ? "CONSOLE" : "RS232");
+            port.printf("Console: 115200; RS232: %lu; USB: %s; S0=%u; auto-answer=%s\r\n",
+                        static_cast<unsigned long>(rs232::baud()),
+                        !usbport::started()    ? "off"
+                        : usbport::dtrOn()     ? "open (DTR on)"
+                        : usbport::connected() ? "connected, closed"
+                                               : "not connected",
+                        modem->active().s[0], modemcfg::answerPortName(modem->answerPort()));
             port.printf("Outgoing stage=%u; incoming stage=%u; configuration=%s\r\n",
                         unsigned(outgoing->stage()), unsigned(incoming->stage()),
                         consoleMenu->isOpen()                  ? "CONSOLE"
                         : hostMenu->isOpen()                   ? "RS232"
+                        : usbMenu->isOpen()                    ? "USB"
                         : browserMenu && browserMenu->isOpen() ? "BROWSER"
                                                                : "off");
             if (journal.active()) {
@@ -731,6 +787,9 @@ void printSettings(modemcfg::LoadResult loaded) {
                   static_cast<unsigned>(p.get(modemcfg::kAmpR)),
                   static_cast<unsigned>(p.get(modemcfg::kAmpC)),
                   static_cast<unsigned>(p.get(modemcfg::kAmpD)));
+    Serial.printf("USB modem port: %s; auto-answer %s\r\n",
+                  usbport::started() ? "on (native USB / rear USB-C)" : "failed to start",
+                  modemcfg::answerPortName(modem->answerPort()));
     Serial.printf(
         "Echo E%u, quiet Q%u, verbal V%u, results X%u\r\n",
         static_cast<unsigned>(p.get(modemcfg::kE)), static_cast<unsigned>(p.get(modemcfg::kQ)),
@@ -857,12 +916,15 @@ void pollLeds(uint32_t now) {
     hostport::PanelInput in = {};
     in.autoAnswer = p.s[0] >= 1;
     in.ringing = incoming && incoming->ringing();
-    in.cd = (!rs232::suspended() && rs232::session().dcd()) || console->callUp();
-    in.tr = rs232::dtrOn() || p.get(modemcfg::kAmpD) == 0;
-    in.cs = hw::ctsOutAsserted();
+    in.cd = console->callUp();
+    in.tr = p.get(modemcfg::kAmpD) == 0;
+    in.cs = hw::ctsOutAsserted();  // RS232 only: USB has no CTS
     in.wifi = arqLed();
-    in.toComputer = rs232::bytesToComputer();
-    in.fromComputer = rs232::bytesFromComputer();
+    // RS232 and the USB modem port both drive CD, TR, RD and SD (Jon, v2.0).
+    hostport::addHostPort(in, {!rs232::suspended() && rs232::session().dcd(), rs232::dtrOn(),
+                               rs232::bytesToComputer(), rs232::bytesFromComputer()});
+    hostport::addHostPort(in, {usbport::session().dcd(), usbport::dtrOn(),
+                               usbport::bytesToComputer(), usbport::bytesFromComputer()});
     uint8_t mask = panel.update(in, now);
     if (mask != ledMask || mask != hw::ledsMask()) {
         hw::ledsSet(mask);
@@ -928,7 +990,8 @@ void publishWebStatus() {
     }
     callAt = now ? now : 1;
     const char *state = "idle";
-    if ((consoleClient && consoleClient->isOpen()) || (hostClient && hostClient->isOpen())) {
+    if ((consoleClient && consoleClient->isOpen()) || (hostClient && hostClient->isOpen()) ||
+        (usbClient && usbClient->isOpen())) {
         state = "test";
     } else if (internetDialer && internetDialer->active()) {
         state = !internetDialer->connected()                                   ? "dialling"
@@ -938,9 +1001,10 @@ void publishWebStatus() {
         state = journal.session()            ? "connected"
                 : journal.current().incoming ? "ringing"
                                              : "dialling";
-    } else if (console->callUp() || rs232::session().callUp()) {
+    } else if (console->callUp() || rs232::session().callUp() || usbport::session().callUp()) {
         state = "test";
-    } else if (consoleMenu->isOpen() || hostMenu->isOpen() || browserMenu->isOpen()) {
+    } else if (consoleMenu->isOpen() || hostMenu->isOpen() || usbMenu->isOpen() ||
+               browserMenu->isOpen()) {
         state = "config";
     }
     std::string call = std::string("{\"t\":\"call\",\"state\":\"") + state + '"';
@@ -995,7 +1059,7 @@ void pollBrowser() {
     if (webServer.takeUploadRequest(uploadClient)) {
         bool owner = browserClient == uploadClient && browserMenu->isOpen();
         bool allow = !hardwareRunning && owner && console->port().lineEmpty() &&
-                     rs232::session().port().lineEmpty() &&
+                     rs232::session().port().lineEmpty() && usbport::session().port().lineEmpty() &&
                      net.joinResult() != netcfg::JoinResult::kRunning &&
                      net.scanState() != netcfg::ScanState::kRunning;
         if (allow && owner) {
@@ -1136,6 +1200,7 @@ void setup() {
     }
     console = new hostport::Session(*modem, consoleSink, kConsoleBaud, callSlot);
     rs232::begin(*modem, callSlot);
+    usbport::begin(*modem, callSlot);
     auto makeMenu = [](hostport::Session &session, bool rs232Port) {
         void *memory = ps_malloc(sizeof(config::Terminal));
         return memory ? new (memory) config::Terminal(session, rs232Port)
@@ -1143,24 +1208,29 @@ void setup() {
     };
     consoleMenu = makeMenu(*console, false);
     hostMenu = makeMenu(rs232::session(), true);
+    usbMenu = makeMenu(usbport::session(), false);
     browserSession = new hostport::Session(*modem, browserSink, kConsoleBaud, callSlot);
     browserSession->port().setBrowser(true);
     browserMenu = makeMenu(*browserSession, false);
     consoleMenu->services(&configHardware);
     hostMenu->services(&configHardware);
+    usbMenu->services(&configHardware);
     browserMenu->services(&configHardware);
     browserMenu->setStyle("CP437");
     browserMenu->color(config::Color::Rgb);
-    consoleClient = new clienttest::Service(clientSettings, 0, consoleClientPlatform);
-    hostClient = new clienttest::Service(clientSettings, 1, hostClientPlatform);
-    for (unsigned i = 0; i < 2; ++i) {
+    consoleClient =
+        new clienttest::Service(clientSettings, clienttest::kConsolePort, consoleClientPlatform);
+    hostClient =
+        new clienttest::Service(clientSettings, clienttest::kRs232Port, hostClientPlatform);
+    usbClient = new clienttest::Service(clientSettings, clienttest::kUsbPort, usbClientPlatform);
+    for (unsigned i = 0; i < kSerialPorts; ++i) {
         const auto &s = clientSettings.get(i);
-        auto *menu = i ? hostMenu : consoleMenu;
+        auto *menu = serialMenu(i);
         menu->setStyle(
             s.charset == clienttest::Charset::Latin1 ? "ANSI" : clienttest::charsetName(s.charset));
         menu->resize(std::min<unsigned>(s.columns, 132), std::min<unsigned>(s.rows, 50));
         menu->backspace(s.backspace);
-        (i ? rs232::session() : *console).port().clientBackspace(s.backspace);
+        serialSession(i).port().clientBackspace(s.backspace);
     }
     char *logStorage = static_cast<char *>(ps_malloc(256 * 1024));
     debugLog.begin(logStorage ? logStorage : fallbackLog,
@@ -1180,16 +1250,20 @@ void setup() {
     outgoing->setObserver(&journal);
     configDialer = new config::Dialer(*console, *consoleMenu, *hostMenu, *outgoing, callSlot,
                                       callAudio, msNow);
+    configDialer->setUsb(&usbport::session(), usbMenu);
     internetDialer = new dialup::Dialer(*modem, internetSettings, net, callSlot, internetNetwork,
                                         callAudio, msNow, *configDialer);
     internetDialer->setObserver(&journal);
     console->setDialer(internetDialer);
     rs232::session().setDialer(internetDialer);
+    usbport::session().setDialer(internetDialer);
     incoming = new calls::Incoming(*modem, callSlot, incomingListener, incomingSocket, callAudio,
                                    *console, rs232::session(), msNow, networkUp);
     console->setAnswerer(incoming);
     incoming->setObserver(&journal);
     rs232::session().setAnswerer(incoming);
+    incoming->setUsb(&usbport::session());
+    usbport::session().setAnswerer(incoming);
     hwconsole::setPortControl(hwconsole::PortControl{modemIdle, rs232::suspend, rs232::resume});
     netcfg::LoadResult netLoaded = net.begin(millis());
     netcfg::attachCommands(net, msNow);
@@ -1248,6 +1322,7 @@ void loop() {
     }
     pollConsole(now);
     rs232::poll(now);
+    usbport::poll(now);
     net.tick(millis());
     static bool wifiWasUp = false;
     if (wifiWasUp != net.up()) {
@@ -1258,17 +1333,17 @@ void loop() {
     configDialer->poll();
     internetDialer->poll();
     configHardware.poll();
-    for (unsigned i = 0; i < 2; ++i) {
-        auto *service = i ? hostClient : consoleClient;
+    for (unsigned i = 0; i < kSerialPorts; ++i) {
+        auto *service = serialClient(i);
         if (service->changed()) {
             const auto &s = clientSettings.get(i);
-            auto *menu = i ? hostMenu : consoleMenu;
+            auto *menu = serialMenu(i);
             menu->setStyle(s.charset == clienttest::Charset::Latin1
                                ? "ANSI"
                                : clienttest::charsetName(s.charset));
             menu->resize(std::min<unsigned>(s.columns, 132), std::min<unsigned>(s.rows, 50));
             menu->backspace(s.backspace);
-            (i ? rs232::session() : *console).port().clientBackspace(s.backspace);
+            serialSession(i).port().clientBackspace(s.backspace);
         }
     }
     // Departures are dispatched after Session has closed the local service. No
@@ -1279,6 +1354,9 @@ void loop() {
     }
     if (hostMenu->takeDeparture(departure, sizeof departure)) {
         rs232::session().port().execute(departure);
+    }
+    if (usbMenu->takeDeparture(departure, sizeof departure)) {
+        usbport::session().port().execute(departure);
     }
     devicecfg::wipe(departure, sizeof departure);
     netcfg::pollCommands();  // a finished AT*WIFIJOIN or AT*WIFISCAN

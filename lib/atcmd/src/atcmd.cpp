@@ -167,13 +167,13 @@ bool Modem::setModel(uint32_t speed) {
     return false;
 }
 
-bool Modem::setAnswerConsole(bool enabled) {
-    bool before = nvram_.answerConsole;
-    nvram_.answerConsole = enabled;
+bool Modem::setAnswerPort(modemcfg::AnswerPort port) {
+    modemcfg::AnswerPort before = nvram_.answerPort;
+    nvram_.answerPort = port;
     if (modemcfg::saveNvram(store_, nvram_)) {
         return true;
     }
-    nvram_.answerConsole = before;
+    nvram_.answerPort = before;
     return false;
 }
 

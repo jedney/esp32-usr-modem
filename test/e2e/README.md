@@ -52,6 +52,7 @@ banners and upload output.
 | `test_config.py` | Console (RS232 case: both ports) | Configuration screen styles, dial 123, escape/ATO, help and hardware screens, caller rejection, export, no idle repaint |
 | `test_client.py` | Both ports | Client Tests, per-port client settings kept across a restart, RTS pauses, cable lines |
 | `test_internet.py` | Both ports | PPP/SLIP and aliases, LCP/DTR hang-up, negotiation timeout, NAT round trips, RTS pauses, DNS, settings/export, Wi-Fi loss |
+| `test_usb.py` | `--usb-port` (cross-port and AUTO answer cases: also `--rs232-port`) | USB modem port (v2.0): AT session, 16 KB echo call, `+++`/`ATH`, DTR drop hangs up, 1200 baud and DTR/RTS toggles don't reboot, one call across ports, `AT*ANSWERPORT=AUTO` picks USB or RS232 by DTR |
 | `test_web.py` | Both ports, `--web-tests` | Digest login, socket tickets, one menu at a time, read-only views, CSRF, line controls |
 
 The suites restore what they change (answer port, model, styles, active settings,

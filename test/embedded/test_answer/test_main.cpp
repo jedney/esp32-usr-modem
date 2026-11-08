@@ -14,22 +14,22 @@ void test_answer_destination_in_scratch_nvs() {
     TEST_ASSERT_TRUE(store.erase());
     atcmd::Modem modem(store, nullptr, 0);
     modem.begin();
-    TEST_ASSERT_FALSE(modem.answerConsole());
-    TEST_ASSERT_TRUE(modem.setAnswerConsole(true));
+    TEST_ASSERT_EQUAL(int(modemcfg::AnswerPort::kAuto), int(modem.answerPort()));
+    TEST_ASSERT_TRUE(modem.setAnswerPort(modemcfg::AnswerPort::kUsb));
     modem.active().s[0] = 3;
     modem.active().s[1] = 2;
     TEST_ASSERT_TRUE(modem.writeTemplate(0, 115200));
     atcmd::Modem again(store, nullptr, 0);
     again.begin();
-    TEST_ASSERT_TRUE(again.answerConsole());
+    TEST_ASSERT_EQUAL(int(modemcfg::AnswerPort::kUsb), int(again.answerPort()));
     TEST_ASSERT_EQUAL(3, again.active().s[0]);
     TEST_ASSERT_EQUAL(0, again.active().s[1]);
     again.reset(4);
-    TEST_ASSERT_TRUE(again.answerConsole());
+    TEST_ASSERT_EQUAL(int(modemcfg::AnswerPort::kUsb), int(again.answerPort()));
     TEST_ASSERT_TRUE(store.erase());
     atcmd::Modem fresh(store, nullptr, 0);
     fresh.begin();
-    TEST_ASSERT_FALSE(fresh.answerConsole());
+    TEST_ASSERT_EQUAL(int(modemcfg::AnswerPort::kAuto), int(fresh.answerPort()));
 }
 void test_nonblocking_listener_accept_reject_close_and_reopen() {
     // Loopback uses the real lwIP adapter without a saved network or external peer.

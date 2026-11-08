@@ -97,7 +97,7 @@
   "settings.auto-answer-destination": {
     "screen": "Settings",
     "command": "*ANSWERPORT=",
-    "help": "RS232|CONSOLE; saved immediately",
+    "help": "RS232|USB|CONSOLE|AUTO; saved immediately",
     "target": "Settings",
     "input": true
   },

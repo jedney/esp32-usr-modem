@@ -240,7 +240,7 @@ atcmd::Reply Commands::exportConfig(atcmd::Port &p) {
     }
     p.printf("AT*MODEL=%lu\r\nAT*THROTTLE=%s\r\nAT*ANSWERPORT=%s\r\n",
              static_cast<unsigned long>(m.model()), m.throttle() ? "ON" : "OFF",
-             m.answerConsole() ? "CONSOLE" : "RS232");
+             modemcfg::answerPortName(m.answerPort()));
     p.printf("AT*RINGDELAY=%lu\r\nAT*CONNECTDELAY=%lu\r\n",
              static_cast<unsigned long>(m.ringDelayMs()),
              static_cast<unsigned long>(m.connectDelayMs()));

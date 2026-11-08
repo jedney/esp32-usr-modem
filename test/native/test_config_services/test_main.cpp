@@ -85,9 +85,9 @@ atcmd::Reply stub(atcmd::Port &, const char *) {
     return atcmd::Reply::kOk;
 }
 atcmd::Reply answer(atcmd::Port &p, const char *a) {
-    if (!strcmp(a, "=CONSOLE") || !strcmp(a, "=RS232")) {
-        return p.modem().setAnswerConsole(!strcmp(a, "=CONSOLE")) ? atcmd::Reply::kOk
-                                                                  : atcmd::Reply::kError;
+    modemcfg::AnswerPort port;
+    if (*a == '=' && modemcfg::parseAnswerPort(a + 1, &port)) {
+        return p.modem().setAnswerPort(port) ? atcmd::Reply::kOk : atcmd::Reply::kError;
     }
     return atcmd::Reply::kError;
 }
@@ -142,7 +142,7 @@ void test_export_replays_nondefault_profiles_and_phonebook_without_secrets() {
     source.run("*PHONEBOOK=42,bbs.example.com,2323,RAW,28800");
     source.run("*MODEL=33600");
     source.run("*THROTTLE=ON");
-    source.run("*ANSWERPORT=CONSOLE");
+    source.run("*ANSWERPORT=USB");
     source.run("*RINGDELAY=4321");
     source.run("*CONNECTDELAY=567");
     source.modem.setHostBaud(19200);
@@ -184,7 +184,7 @@ void test_export_replays_nondefault_profiles_and_phonebook_without_secrets() {
     TEST_ASSERT_EQUAL(1, restored.modem.nvram().y);
     TEST_ASSERT_EQUAL(33600, restored.modem.model());
     TEST_ASSERT_TRUE(restored.modem.throttle());
-    TEST_ASSERT_TRUE(restored.modem.answerConsole());
+    TEST_ASSERT_EQUAL(int(modemcfg::AnswerPort::kUsb), int(restored.modem.answerPort()));
     TEST_ASSERT_EQUAL_UINT32(4321, restored.modem.ringDelayMs());
     TEST_ASSERT_EQUAL_UINT32(567, restored.modem.connectDelayMs());
     TEST_ASSERT_NOT_NULL(restored.phonebook.find("42"));

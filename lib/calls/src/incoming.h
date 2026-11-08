@@ -13,6 +13,11 @@ public:
     virtual void stop() = 0;
 };
 enum class IncomingStage : uint8_t { kIdle, kRinging, kHandshake, kOnline };
+
+// The port S0 auto-answer uses (AT*ANSWERPORT). A fixed setting is returned as it is; AUTO
+// picks the first port whose DTR is on, in the order RS232, USB, console. The console has
+// no DTR, so it is the fallback. Returns kRs232, kUsb or kConsole, never kAuto.
+modemcfg::AnswerPort pickAnswerPort(modemcfg::AnswerPort setting, bool rs232Dtr, bool usbDtr);
 class Incoming : public hostport::Session::Answerer {
 public:
     using Clock = Outgoing::Clock;
@@ -30,6 +35,8 @@ public:
           host_(host),
           clock_(clock),
           network_(network) {}
+    // The USB modem port's session (v2.0). Without one, USB is never chosen.
+    void setUsb(hostport::Session *usb) { usb_ = usb; }
     void poll(bool available = true);
     bool answer(hostport::Session &session) override;
     void cancel(hostport::Session &session) override;
@@ -48,6 +55,7 @@ private:
     void ring(uint32_t now);
     void ringResult(hostport::Session &session);
     bool eligible(hostport::Session &session) const;
+    hostport::Session &autoAnswerTarget();
     atcmd::Modem &modem_;
     hostport::CallSlot &slot_;
     Listener &listener_;
@@ -55,6 +63,7 @@ private:
     TcpConnection connection_;
     CallSound &sound_;
     hostport::Session &console_, &host_;
+    hostport::Session *usb_ = nullptr;
     Clock clock_;
     Network network_;
     hostport::Session *session_ = nullptr;

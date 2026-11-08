@@ -1,6 +1,8 @@
 #include "client_settings.h"
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <iterator>
 namespace clienttest {
 const char *charsetName(Charset charset) {
     static const char *const names[] = {"ANSI", "CP437", "PLAIN", "LATIN1"};
@@ -19,38 +21,51 @@ bool parseSettings(const char *text, ClientSettings &out) {
         }
     return false;
 }
+const char *portName(unsigned port) {
+    static const char *const names[kPortCount] = {"CONSOLE", "RS232", "USB"};
+    return port < kPortCount ? names[port] : "CONSOLE";
+}
+namespace {
+constexpr uint8_t kLayout = 2;
+constexpr size_t kHeader = 6, kRecord = 8;
+constexpr size_t kBody = kHeader + kPortCount * kRecord, kBlob = kBody + 4;
+}  // namespace
 bool Settings::begin() {
-    uint8_t blob[26] = {};
-    records_[0] = records_[1] = {};
-    if (store_.load(blob, sizeof blob) != sizeof blob || memcmp(blob, "USRC\1", 5) ||
-        modemcfg::crc32(blob, 22) != (uint32_t(blob[22]) | uint32_t(blob[23]) << 8 |
-                                      uint32_t(blob[24]) << 16 | uint32_t(blob[25]) << 24))
+    uint8_t blob[kBlob] = {};
+    std::fill(std::begin(records_), std::end(records_), ClientSettings{});
+    if (store_.load(blob, sizeof blob) != sizeof blob || memcmp(blob, "USRC", 4) ||
+        blob[4] != kLayout ||
+        modemcfg::crc32(blob, kBody) !=
+            (uint32_t(blob[kBody]) | uint32_t(blob[kBody + 1]) << 8 |
+             uint32_t(blob[kBody + 2]) << 16 | uint32_t(blob[kBody + 3]) << 24))
         return false;
-    for (unsigned i = 0; i < 2; ++i) {
-        const uint8_t *p = blob + 6 + i * 8;
+    for (unsigned i = 0; i < kPortCount; ++i) {
+        const uint8_t *p = blob + kHeader + i * kRecord;
         if (p[0] > 3 || (p[5] != 8 && p[5] != 127))
             return false;
         unsigned cols = p[1] | p[2] << 8, rows = p[3] | p[4] << 8;
         if (!cols || cols > 9999 || !rows || rows > 9999)
             return false;
     }
-    for (unsigned i = 0; i < 2; ++i) {
-        const uint8_t *p = blob + 6 + i * 8;
+    for (unsigned i = 0; i < kPortCount; ++i) {
+        const uint8_t *p = blob + kHeader + i * kRecord;
         records_[i] = {Charset(p[0]), uint16_t(p[1] | p[2] << 8), uint16_t(p[3] | p[4] << 8), p[5]};
     }
     return true;
 }
 bool Settings::save(unsigned port, const ClientSettings &settings) {
-    if (port > 1 || unsigned(settings.charset) > 3 || !settings.columns ||
+    if (port >= kPortCount || unsigned(settings.charset) > 3 || !settings.columns ||
         settings.columns > 9999 || !settings.rows || settings.rows > 9999 ||
         (settings.backspace != 8 && settings.backspace != 127))
         return false;
-    ClientSettings next[2] = {records_[0], records_[1]};
+    ClientSettings next[kPortCount];
+    for (unsigned i = 0; i < kPortCount; ++i)
+        next[i] = records_[i];
     next[port] = settings;
-    uint8_t blob[26] = {'U', 'S', 'R', 'C', 1, 0};
-    for (unsigned i = 0; i < 2; ++i) {
+    uint8_t blob[kBlob] = {'U', 'S', 'R', 'C', kLayout, 0};
+    for (unsigned i = 0; i < kPortCount; ++i) {
         auto &s = next[i];
-        uint8_t *p = blob + 6 + i * 8;
+        uint8_t *p = blob + kHeader + i * kRecord;
         p[0] = uint8_t(s.charset);
         p[1] = s.columns;
         p[2] = s.columns >> 8;
@@ -58,9 +73,9 @@ bool Settings::save(unsigned port, const ClientSettings &settings) {
         p[4] = s.rows >> 8;
         p[5] = s.backspace;
     }
-    uint32_t crc = modemcfg::crc32(blob, 22);
+    uint32_t crc = modemcfg::crc32(blob, kBody);
     for (unsigned i = 0; i < 4; ++i)
-        blob[22 + i] = crc >> (i * 8);
+        blob[kBody + i] = crc >> (i * 8);
     if (!store_.save(blob, sizeof blob))
         return false;
     records_[port] = settings;

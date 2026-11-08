@@ -20,7 +20,8 @@
 // [ ] = used below; ( ) = not usable (strapping, PSRAM, USB, UART0 console, RGB LED).
 // Spare: 8, 9, 18, 21, 48 (18 and 8 are also the nominal pins of the test-only UART2
 // below; nothing is connected to them). 19/20 (native USB) are also wired to the USB-C
-// PD board's D-/D+. Amp VIN and GND come from the PD board, not the S3.
+// PD board's D-/D+: from v2.0 they are the USB modem port (TinyUSB, lib/hw/src/usb_port.h),
+// reached through the rear USB-C socket. Amp VIN and GND come from the PD board, not the S3.
 //
 // RS232 goes through two RS232 Pal modules (U1, U2) with a DB9 DCE pinout. The DB9 pins
 // are given beside each signal below.

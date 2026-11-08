@@ -16,6 +16,28 @@ bool word(const char *text, const char *expected) {
 }
 }  // namespace
 
+modemcfg::AnswerPort pickAnswerPort(modemcfg::AnswerPort setting, bool rs232Dtr, bool usbDtr) {
+    using modemcfg::AnswerPort;
+    if (setting != AnswerPort::kAuto) {
+        return setting;
+    }
+    if (rs232Dtr) {
+        return AnswerPort::kRs232;
+    }
+    return usbDtr ? AnswerPort::kUsb : AnswerPort::kConsole;
+}
+
+hostport::Session &Incoming::autoAnswerTarget() {
+    switch (pickAnswerPort(modem_.answerPort(), host_.dtrOn(), usb_ && usb_->dtrOn())) {
+        case modemcfg::AnswerPort::kConsole:
+            return console_;
+        case modemcfg::AnswerPort::kUsb:
+            return usb_ ? *usb_ : host_;
+        default:
+            return host_;
+    }
+}
+
 bool Incoming::eligible(hostport::Session &session) const {
     return session.mode() == hostport::Mode::kCommand && session.port().lineEmpty() &&
            (modem_.active().get(modemcfg::kAmpD) == 0 || session.dtrOn());
@@ -36,7 +58,10 @@ void Incoming::ring(uint32_t now) {
     modem_.active().s[1] = modem_.active().s[0] ? rings_ : 0;
     ringResult(console_);
     ringResult(host_);
-    hostport::Session &target = modem_.answerConsole() ? console_ : host_;
+    if (usb_) {
+        ringResult(*usb_);
+    }
+    hostport::Session &target = autoAnswerTarget();
     if (modem_.active().s[0] && rings_ >= modem_.active().s[0] && eligible(target)) {
         answer(target);
     }
@@ -196,16 +221,16 @@ atcmd::Reply Incoming::command(atcmd::Port &port, const char *args) {
     }
     if (word(args, "=?")) {
         port.beginInfo();
-        port.line("RS232,CONSOLE");
+        port.line("RS232,USB,CONSOLE,AUTO");
     } else if (word(args, "?") || *args == 0) {
         port.beginInfo();
-        port.line(modem_.answerConsole() ? "CONSOLE" : "RS232");
+        port.line(modemcfg::answerPortName(modem_.answerPort()));
     } else {
         if (*args++ != '=' || slot_.busy()) {
             return atcmd::Reply::kError;
         }
-        bool console = word(args, "CONSOLE");
-        if ((!console && !word(args, "RS232")) || !modem_.setAnswerConsole(console)) {
+        modemcfg::AnswerPort choice;
+        if (!modemcfg::parseAnswerPort(args, &choice) || !modem_.setAnswerPort(choice)) {
             return atcmd::Reply::kError;
         }
     }
