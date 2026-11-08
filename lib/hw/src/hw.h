@@ -27,10 +27,10 @@ bool ampIsOn();
 
 // --- Audio -----------------------------------------------------------------------------
 using StopFn = bool (*)();   // polled every block (16 ms); return true to stop
-using GainFn = float (*)();  // user gain 0..1, polled every block; the cap is applied here
+using GainFn = float (*)();  // user gain 0..1, polled every block
 
-// Plays `src` at tones::kSampleRate through I2S, with the volume cap (volume.h) applied
-// last. Returns false if it was stopped early or the I2S driver couldn't start.
+// Plays `src` at tones::kSampleRate through I2S at the given gain (volume::outputGain).
+// Returns false if it was stopped early or the I2S driver couldn't start.
 bool audioPlay(tones::Source &src, GainFn gain, StopFn stop);
 bool audioReady();  // I2S driver started
 bool audioStreamBegin();

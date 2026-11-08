@@ -70,7 +70,7 @@ void test_littlefs_handshake_headers_and_streaming() {
         TEST_ASSERT_EQUAL(256, source.fill(samples, 256));
     }
 }
-void test_nonblocking_i2s_and_pot_with_volume_cap() {
+void test_nonblocking_i2s_and_pot_at_full_volume() {
     TEST_ASSERT_TRUE(hw::audioStreamBegin());
     int16_t samples[256];
     for (auto &sample : samples) {
@@ -84,7 +84,7 @@ void test_nonblocking_i2s_and_pot_with_volume_cap() {
     hw::audioStreamEnd();
     TEST_ASSERT_FALSE(hw::ampIsOn());
     TEST_ASSERT_LESS_OR_EQUAL_UINT32(hw::kPotMax, hw::potRaw());
-    TEST_ASSERT_FLOAT_WITHIN(0.00001f, volume::capGain(), volume::outputGain(1));
+    TEST_ASSERT_EQUAL_FLOAT(1.0f, volume::outputGain(1));
 }
 void setup() {
     delay(2000);
@@ -92,7 +92,7 @@ void setup() {
     RUN_TEST(test_model_metadata_in_scratch_nvs);
     RUN_TEST(test_phonebook_in_scratch_nvs);
     RUN_TEST(test_littlefs_handshake_headers_and_streaming);
-    RUN_TEST(test_nonblocking_i2s_and_pot_with_volume_cap);
+    RUN_TEST(test_nonblocking_i2s_and_pot_at_full_volume);
     UNITY_END();
 }
 void loop() {}

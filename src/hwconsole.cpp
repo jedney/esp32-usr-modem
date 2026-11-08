@@ -34,7 +34,7 @@ using hwtest::wordIs;
 constexpr char kCtrlX = 0x18;
 constexpr char kEsc = 0x1B;
 
-// Test volume: percent of the speaker cap on the audio curve, or follow the pot.
+// Test volume: percent of full volume on the audio curve, or follow the pot.
 uint32_t testVolumePct = 75;
 bool testVolumeFromPot = false;
 
@@ -153,8 +153,7 @@ void printVolume() {
     }
     float g = volume::outputGain(testGain());
     if (g > 0.0f) {
-        out().printf(" (%.1f dB below full scale; cap %.1f dB)\r\n",
-                     static_cast<double>(-20.0f * log10f(g)), static_cast<double>(-volume::kCapDb));
+        out().printf(" (%.1f dB below full scale)\r\n", static_cast<double>(-20.0f * log10f(g)));
     } else {
         out().print(" (muted)\r\n");
     }
@@ -176,16 +175,16 @@ bool play(tones::Source &src) {
 // --- Pin map -----------------------------------------------------------------------------
 
 void printPins() {
-    out().print("GPIO pin map (lib/hw/src/pins.h) - confirmed (schematic rev A)\r\n");
+    out().print("GPIO pin map (lib/hw/src/pins.h) - confirmed (rev B)\r\n");
     out().print("RS232 (DCE; asserted = LOW at the GPIO):\r\n");
-    out().printf("  RXD out  GPIO%-2d  DB25 3   UART1 TX\r\n", pins::kRxd);
-    out().printf("  TXD in   GPIO%-2d  DB25 2   UART1 RX\r\n", pins::kTxd);
-    out().printf("  CTS out  GPIO%-2d  DB25 5\r\n", pins::kCts);
-    out().printf("  RTS in   GPIO%-2d  DB25 4\r\n", pins::kRts);
-    out().printf("  DTR in   GPIO%-2d  DB25 20\r\n", pins::kDtr);
-    out().printf("  DCD out  GPIO%-2d  DB25 8\r\n", pins::kDcd);
-    out().printf("  RI  out  GPIO%-2d  DB25 22\r\n", pins::kRi);
-    out().print("  DSR      hard-wired on, DB25 6\r\n");
+    out().printf("  RXD out  GPIO%-2d  DB9 2   UART1 TX\r\n", pins::kRxd);
+    out().printf("  TXD in   GPIO%-2d  DB9 3   UART1 RX\r\n", pins::kTxd);
+    out().printf("  CTS out  GPIO%-2d  DB9 8\r\n", pins::kCts);
+    out().printf("  RTS in   GPIO%-2d  DB9 7\r\n", pins::kRts);
+    out().printf("  DTR in   GPIO%-2d  DB9 4\r\n", pins::kDtr);
+    out().printf("  DCD out  GPIO%-2d  DB9 1\r\n", pins::kDcd);
+    out().printf("  RI  out  GPIO%-2d  DB9 9\r\n", pins::kRi);
+    out().print("  DSR      hard-wired on, DB9 6\r\n");
     out().printf("Audio: I2S BCLK GPIO%d, LRC GPIO%d, DIN GPIO%d, amp SD GPIO%d (HIGH = on)\r\n",
                  pins::kI2sBclk, pins::kI2sLrc, pins::kI2sDin, pins::kAmpSd);
     out().printf("Volume pot wiper: GPIO%d (ADC1)\r\n", pins::kPot);
@@ -690,7 +689,7 @@ Step askYesNo(const char *question) {
 }
 
 void runGuided() {
-    static const char *const kNames[] = {"LEDs", "Speaker",     "Volume cap",
+    static const char *const kNames[] = {"LEDs", "Speaker",     "Full volume",
                                          "Pot",  "RS232 lines", "Loopback"};
     constexpr int kSteps = 6;
     Step result[kSteps] = {Step::kSkip, Step::kSkip, Step::kSkip,
@@ -731,8 +730,7 @@ void runGuided() {
             result[1] = askYesNo("Did you hear all six sounds clearly?");
         }
 
-        if (!prompt("3/6 Volume cap: 1 kHz then a sweep at the maximum the firmware allows.",
-                    &skip)) {
+        if (!prompt("3/6 Full volume: 1 kHz then a sweep at the highest volume.", &skip)) {
             break;
         }
         if (!skip) {
@@ -806,14 +804,14 @@ struct Command {
 
 const Command kCommands[] = {
     {"AT*HW?", "list the hardware-test commands"},
-    {"AT*HWTEST", "guided test of LEDs, speaker, volume cap, pot, RS232 lines, loopback"},
+    {"AT*HWTEST", "guided test of LEDs, speaker, full volume, pot, RS232 lines, loopback"},
     {"AT*HWPINS", "show the GPIO pin map"},
     {"AT*HWINFO", "chip, memory, firmware, reset reason, LittleFS"},
     {"AT*HWFILES", "list the files in LittleFS (sounds and web page)"},
     {"AT*HWLED=<AA|CD|RD|SD|TR|CS|ARQ|ALL|OFF|CHASE|WALK>", "light LEDs"},
     {"AT*HWLED=AUTO", "LEDs back to showing the modem's state"},
     {"AT*HWAMP=<AUTO|ON|OFF>", "amp shutdown pin (AUTO: on only while playing)"},
-    {"AT*HWVOL=<0-100|POT>", "test volume, % of the speaker cap (default 75)"},
+    {"AT*HWVOL=<0-100|POT>", "test volume, % of full volume (default 75)"},
     {"AT*HWTONE=<Hz>[,<ms>] | DIAL | BUSY | RING | SWEEP", "play a tone"},
     {"AT*HWDTMF=<digits>", "play DTMF (default 0-9 * #)"},
     {"AT*HWPULSE=<digits>", "play UK pulse-dial clicks"},

@@ -14,6 +14,36 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [1.1] - 2026-11-05
+
+Final v1.x build. Fully built, tested and working.
+
+### Added
+
+- Final case print files: `case/parts/` STLs, the two Bambu Studio print projects
+  (0.4 mm main print, 0.2 mm fine parts), build photos and the screw and insert list
+  in `case/construction/`, and front labels in `case/labels/`.
+- `electronics/`: datasheets, pinout and models of the bought-in parts.
+
+### Changed
+
+- GPIO pin map updated to the rev B layout (project brief Q89): RS232 on GPIO1, 2, 38-42
+  (right header), front-panel LEDs on GPIO4-7, 15-17 (left header). Audio (11-14) and
+  the volume pot (10) are unchanged.
+- GPIO pin numbers now come from `USR_MODEM_PIN_*` settings: defaults in `.env.example`,
+  overridden by `.env` or real environment variables (`scripts/pin_config.py` passes them
+  to the compiler; duplicates and non-GPIO numbers stop the build). `pins.h` no longer
+  holds numbers. The pin-map lock test runs only when no override is set.
+- Speaker is now the Same Sky CLS0361 (8 ohm, 2 W) with the amplifier's GAIN pin
+  unconnected (9 dB). The -7 dB firmware volume cap for the old 0.25 W speaker is
+  removed: full volume is now full scale, about 13 dB louder than before at the same
+  knob position. `AT*HWTEST` step 3 is now "Full volume".
+- RS232 now goes through two RS232 Pal modules; `AT*HWPINS` shows DB9 pin numbers.
+  The rev A boot-state pull-ups (Q77) are not part of this map: Electronics to confirm
+  the idle state of RXD, CTS, DCD and RI during boot.
+- The old case files (`USRRasp-v5-*.stl`, `USR-Modem.3mf`, logo and badge) are replaced
+  by the final files in `case/`.
+
 ## [1.0] - 2026-10-27
 
 First production release, after a full code, security and documentation review.

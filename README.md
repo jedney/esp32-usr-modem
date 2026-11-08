@@ -127,8 +127,8 @@ unless you confirm them. The web protocol and security rules are in
 ## Sounds, volume and lights
 
 The knob sets the overall volume; `ATL` scales within it and `ATM` chooses when the
-speaker is on. A fixed -7 dB limit protects the 0.25 W speaker and applies last to every
-sound. Handshake recordings come from Gough Lui's modem sound collection (see
+speaker is on. Full volume is the amplifier's full output, which the 2 W speaker can take,
+so there is no extra limit. Handshake recordings come from Gough Lui's modem sound collection (see
 `AT*ABOUT`). `AT*PLAY` previews any sound.
 
 | Light | Meaning |
@@ -166,7 +166,7 @@ without storing it.
 
 `AT*HWTEST` walks through the electronics (LEDs, speaker, volume limit, knob, RS232
 lines, loopback) and prints a summary; `AT*HW?` lists the single tests. The GPIO map is
-in `lib/hw/src/pins.h` (confirmed by Electronics, schematic rev A) and `AT*HWPINS`
+in `lib/hw/src/pins.h` (confirmed by Electronics, rev B) and `AT*HWPINS`
 prints it. Loopback plug for `AT*HWLOOP`: join RXD-TXD, CTS-RTS and DCD-DTR (DB25 pins
 3-2, 5-4, 8-20; bench DB9 pins 2-3, 8-7, 1-4).
 
@@ -224,6 +224,12 @@ Copy `.env.example` to `.env` (git-ignored) and fill in `USR_MODEM_WIFI_SSID` an
 `USR_MODEM_WIFI_PASS` (end-to-end Wi-Fi tests) and `USR_MODEM_PASSWORD` (device password
 for OTA and the web tests). Environment variables of the same names win over the file.
 
+The same file holds the GPIO pin map as `USR_MODEM_PIN_*` lines. `.env.example` has the
+rev B values and is always read first; a line in `.env` or a real environment variable
+overrides one pin. The build stops on a duplicate pin or a number that is not an
+ESP32-S3 GPIO. Change the pins only when the board changes. `AT*HWPINS` shows the map in
+use.
+
 ### Over-the-air updates
 
 With `USR_MODEM_PASSWORD` set, run **Modem: upload over Wi-Fi / OTA (tests first)**. The
@@ -272,7 +278,8 @@ release. [test/README.md](test/README.md) maps every feature to its tests.
 | `ui/` | Configuration screen design data shared by firmware and browser |
 | `sound/` | Handshake recordings |
 | `scripts/` | Build helpers: versioning, test gate, web bundle, OTA |
-| `case/`, `images/` | Case model and label art |
+| `case/`, `images/` | Case parts (STL), print projects, build photos, screw list and label art |
+| `electronics/` | Datasheets, pinout and models of the bought-in parts |
 | `credits/` | Attribution and the licensing record (`LICENSES.md`) |
 | `docs/` | `COMMANDS.md`, project brief, roadmap, decisions log; `history/` holds earlier version plans |
 | `.github/workflows/` | CI and release |

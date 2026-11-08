@@ -26,15 +26,15 @@ def test_hw_question_lists_commands(console):
 def test_pins_are_shown(console):
     lines = console.command("AT*HWPINS")
     assert lines[-1] == "OK"
-    assert any("DB25 20" in line for line in lines)
+    assert any("DB9 4" in line for line in lines)
 
 
 def test_pins_are_the_confirmed_map(console):
-    """The map Electronics confirmed (Q76, schematic rev A)."""
+    """The map Electronics confirmed (Q89, rev B)."""
     text = "\n".join(console.command("AT*HWPINS"))
-    assert "confirmed (schematic rev A)" in text
-    assert re.search(r"\bAA=GPIO1\b", text)  # not GPIO10
-    assert re.search(r"\bARQ=GPIO38\b", text)
+    assert "confirmed (rev B)" in text
+    assert re.search(r"\bAA=GPIO4\b", text)
+    assert re.search(r"\bARQ=GPIO17\b", text)
     assert "pot wiper: GPIO10" in text
     assert "LRC GPIO11" in text
     assert "BCLK GPIO12" in text

@@ -16,10 +16,6 @@ float dbToGain(float db) {
     return std::pow(10.0f, db / 20.0f);
 }
 
-float capGain() {
-    return dbToGain(kCapDb);
-}
-
 float levelToGain(float level) {
     if (level < kMuteBelow) {
         return 0.0f;
@@ -46,11 +42,9 @@ float potLevel(uint32_t raw, uint32_t maxRaw) {
 
 float outputGain(float userGain) {
     if (userGain < 0.0f) {
-        userGain = 0.0f;
-    } else if (userGain > 1.0f) {
-        userGain = 1.0f;
+        return 0.0f;
     }
-    return userGain * capGain();
+    return userGain > 1.0f ? 1.0f : userGain;
 }
 
 int16_t scale(int16_t sample, float gain) {
