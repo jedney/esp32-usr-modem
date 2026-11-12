@@ -516,53 +516,55 @@ void Terminal::planFrame() {
             return;
     drawing_ = false;
 }
-void Terminal::drawMenu() {
+// The main menu at 80x25 or more: two columns; boxes with summaries from 120x45.
+void Terminal::drawMainMenu() {
     auto &location = locations_[static_cast<unsigned>(screen_)];
-    bool compactMain = screen_ == S::Main && cols_ >= 80 && rows_ >= 25;
-    bool wide = compactMain && cols_ >= 120 && rows_ >= 45;
-    if (compactMain) {
-        unsigned divider = cols_ / 2 - 1;
-        for (unsigned i = 0; i < 13; ++i) {
-            const auto *a = item(i);
-            unsigned x = i < 6 ? 3 : divider + 3, y = 8 + (i < 6 ? i : i - 6);
-            if (wide) {
-                y = 11 + 4 * (i < 6 ? i : i - 6);
-                grid_.box(i < 6 ? 2 : divider + 2, y, divider - 2, 4);
-                x += 2;
-                ++y;
-            }
-            char row[100];
-            snprintf(row, sizeof row, "%c [%c] %s%s", location.selected == i ? '>' : ' ', a->key,
-                     a->label,
-                     a->available ? ""
-                     : wide       ? " [X] UNAVAILABLE"
-                                  : " [X]");
-            grid_.text(x - 1, y, row, a->available ? Ink::Title : Ink::Disabled, divider - 3);
-            grid_.put(x + 2, y, a->key, a->available ? Ink::Key : Ink::Disabled);
-            if (wide)
-                grid_.text(x, y + 1, a->summary, a->available ? Ink::Body : Ink::Disabled,
-                           divider - 7);
+    bool wide = cols_ >= 120 && rows_ >= 45;
+    unsigned divider = cols_ / 2 - 1;
+    for (unsigned i = 0; i < 13; ++i) {
+        const auto *a = item(i);
+        unsigned x = i < 6 ? 3 : divider + 3, y = 8 + (i < 6 ? i : i - 6);
+        if (wide) {
+            y = 11 + 4 * (i < 6 ? i : i - 6);
+            grid_.box(i < 6 ? 2 : divider + 2, y, divider - 2, 4);
+            x += 2;
+            ++y;
         }
-        if (!wide) {
-            for (unsigned y = 8; y <= 14; ++y)
-                grid_.put(divider, y, 179, Ink::Frame);
-            grid_.rule(16);
-            grid_.text(3, 17, "ARROWS: navigate / switch column   ENTER: select   Q: quit",
-                       Ink::Body, cols_ - 5);
-            grid_.text(3, 18, "[C] Client Tests - serial client diagnostics", Ink::Muted,
-                       cols_ - 5);
-        } else {
-            grid_.text(3, 8, "   ______________", Ink::Title);
-            grid_.text(3, 9, "  / USRobotics /|", Ink::Title);
-            grid_.text(3, 10, " /___________/ |", Ink::Frame);
-            grid_.text(cols_ - 22, 8, "______________", Ink::Title);
-            grid_.text(cols_ - 22, 9, "| USRobotics \\", Ink::Title);
-            grid_.text(cols_ - 22, 10, "| \\___________\\", Ink::Frame);
-            grid_.text(3, 36, "ARROWS Navigate  ENTER Select  Q Quit", Ink::Body, divider - 4);
-            grid_.text(3, 37, "[C] Client Tests - serial only", Ink::Muted, divider - 4);
-        }
+        char row[100];
+        snprintf(row, sizeof row, "%c [%c] %s%s", location.selected == i ? '>' : ' ', a->key,
+                 a->label,
+                 a->available ? ""
+                 : wide       ? " [X] UNAVAILABLE"
+                              : " [X]");
+        grid_.text(x - 1, y, row, a->available ? Ink::Title : Ink::Disabled, divider - 3);
+        grid_.put(x + 2, y, a->key, a->available ? Ink::Key : Ink::Disabled);
+        if (wide)
+            grid_.text(x, y + 1, a->summary, a->available ? Ink::Body : Ink::Disabled, divider - 7);
+    }
+    if (!wide) {
+        for (unsigned y = 8; y <= 14; ++y)
+            grid_.put(divider, y, 179, Ink::Frame);
+        grid_.rule(16);
+        grid_.text(3, 17, "ARROWS: navigate / switch column   ENTER: select   Q: quit", Ink::Body,
+                   cols_ - 5);
+        grid_.text(3, 18, "[C] Client Tests - serial client diagnostics", Ink::Muted, cols_ - 5);
+    } else {
+        grid_.text(3, 8, "   ______________", Ink::Title);
+        grid_.text(3, 9, "  / USRobotics /|", Ink::Title);
+        grid_.text(3, 10, " /___________/ |", Ink::Frame);
+        grid_.text(cols_ - 22, 8, "______________", Ink::Title);
+        grid_.text(cols_ - 22, 9, "| USRobotics \\", Ink::Title);
+        grid_.text(cols_ - 22, 10, "| \\___________\\", Ink::Frame);
+        grid_.text(3, 36, "ARROWS Navigate  ENTER Select  Q Quit", Ink::Body, divider - 4);
+        grid_.text(3, 37, "[C] Client Tests - serial only", Ink::Muted, divider - 4);
+    }
+}
+void Terminal::drawMenu() {
+    if (screen_ == S::Main && cols_ >= 80 && rows_ >= 25) {
+        drawMainMenu();
         return;
     }
+    auto &location = locations_[static_cast<unsigned>(screen_)];
     size_t count = itemCount(), visible = visibleItems();
     if (location.selected >= count)
         location.selected = count ? count - 1 : 0;
@@ -606,6 +608,47 @@ void Terminal::drawMenu() {
         grid_.text(2, 4, page, Ink::Muted, cols_ - 4);
     }
 }
+// From 120x45: the phonebook commands and the selected entry beside the list.
+void Terminal::drawPhonebookPanel(const calls::Entry *selected) {
+    unsigned x = cols_ / 2 + 2, width = cols_ - x - 2;
+    grid_.text(x, 3, "PHONEBOOK COMMANDS", Ink::Title, width);
+    for (unsigned i = 0; i < 4; ++i) {
+        const auto *a = item(i);
+        bool enabled = i < 2 || selected;
+        unsigned y = 5 + i * 4;
+        grid_.box(x - 1, y, width + 2, 4);
+        char text[96];
+        snprintf(text, sizeof text, "[%c] %s%s", a->key, a->label,
+                 enabled ? "" : " [X] UNAVAILABLE");
+        grid_.text(x + 1, y + 1, text, enabled ? Ink::Key : Ink::Disabled, width - 2);
+        grid_.text(x + 1, y + 2,
+                   i == 0   ? "Select saved entries with arrows and page keys"
+                   : i == 1 ? "Add a number or edit the selected entry"
+                   : i == 2 ? "Confirm before deleting the selected entry"
+                            : "Confirm before dialling the selected entry",
+                   Ink::Body, width - 2);
+    }
+    grid_.box(x - 1, 22, width + 2, 14);
+    grid_.text(x + 1, 23, "SELECTED ENTRY DETAILS", Ink::Title, width - 2);
+    if (selected) {
+        grid_.text(x + 1, 25, "Host (NAME):", Ink::Muted, width - 2);
+        grid_.text(x + 1, 26, selected->host, Ink::Body, width - 2);
+        if (strlen(selected->host) > width - 2)
+            grid_.text(x + 1, 27, selected->host + width - 2, Ink::Body, width - 2);
+        char text[144];
+        snprintf(text, sizeof text, "Number: %s  Port: %u  %s", selected->number, selected->port,
+                 selected->raw ? "RAW" : "TELNET");
+        grid_.text(x + 1, 29, text, Ink::Body, width - 2);
+        if (selected->speed)
+            snprintf(text, sizeof text, "Configured speed: %lu",
+                     static_cast<unsigned long>(selected->speed));
+        else
+            strcpy(text, "Configured speed: Auto (no entry override)");
+        grid_.text(x + 1, 31, text, Ink::Body, width - 2);
+        grid_.text(x + 1, 33, "[I] Full details; configured rate is not live", Ink::Key, width - 2);
+    } else
+        grid_.text(x + 1, 26, "No selected entry", Ink::Muted, width - 2);
+}
 void Terminal::drawPhonebook() {
     syncPhonebook();
     auto *book = services_ ? services_->phonebook() : nullptr;
@@ -648,47 +691,9 @@ void Terminal::drawPhonebook() {
     const auto *selected = entry();
     if (rows_ < 25)
         grid_.text(2, rows_ - 4, "1L 2E 3X 4D I?", Ink::Key, cols_ - 4);
-    if (wide) {
-        unsigned x = cols_ / 2 + 2, width = cols_ - x - 2;
-        grid_.text(x, 3, "PHONEBOOK COMMANDS", Ink::Title, width);
-        for (unsigned i = 0; i < 4; ++i) {
-            const auto *a = item(i);
-            bool enabled = i < 2 || selected;
-            unsigned y = 5 + i * 4;
-            grid_.box(x - 1, y, width + 2, 4);
-            char text[96];
-            snprintf(text, sizeof text, "[%c] %s%s", a->key, a->label,
-                     enabled ? "" : " [X] UNAVAILABLE");
-            grid_.text(x + 1, y + 1, text, enabled ? Ink::Key : Ink::Disabled, width - 2);
-            grid_.text(x + 1, y + 2,
-                       i == 0   ? "Select saved entries with arrows and page keys"
-                       : i == 1 ? "Add a number or edit the selected entry"
-                       : i == 2 ? "Confirm before deleting the selected entry"
-                                : "Confirm before dialling the selected entry",
-                       Ink::Body, width - 2);
-        }
-        grid_.box(x - 1, 22, width + 2, 14);
-        grid_.text(x + 1, 23, "SELECTED ENTRY DETAILS", Ink::Title, width - 2);
-        if (selected) {
-            grid_.text(x + 1, 25, "Host (NAME):", Ink::Muted, width - 2);
-            grid_.text(x + 1, 26, selected->host, Ink::Body, width - 2);
-            if (strlen(selected->host) > width - 2)
-                grid_.text(x + 1, 27, selected->host + width - 2, Ink::Body, width - 2);
-            char text[144];
-            snprintf(text, sizeof text, "Number: %s  Port: %u  %s", selected->number,
-                     selected->port, selected->raw ? "RAW" : "TELNET");
-            grid_.text(x + 1, 29, text, Ink::Body, width - 2);
-            if (selected->speed)
-                snprintf(text, sizeof text, "Configured speed: %lu",
-                         static_cast<unsigned long>(selected->speed));
-            else
-                strcpy(text, "Configured speed: Auto (no entry override)");
-            grid_.text(x + 1, 31, text, Ink::Body, width - 2);
-            grid_.text(x + 1, 33, "[I] Full details; configured rate is not live", Ink::Key,
-                       width - 2);
-        } else
-            grid_.text(x + 1, 26, "No selected entry", Ink::Muted, width - 2);
-    } else if (rows_ >= 25) {
+    if (wide)
+        drawPhonebookPanel(selected);
+    else if (rows_ >= 25) {
         grid_.rule(15, "[ SELECTED ENTRY ]");
         char summary[144];
         snprintf(summary, sizeof summary, "Host: %.32s  Number: %s",
@@ -778,6 +783,37 @@ void Terminal::drawResponse() {
         grid_.text(2, rows_ - 3, "More: Enter / PgDn; PgUp previous; Esc/Q Back", Ink::Function,
                    cols_ - 4);
 }
+// Stages the next piece of an export (plain scrolling text, paged with a prompt).
+// False when there is nothing to send until a key.
+bool Terminal::stageExport() {
+    if (more_) {
+        if (exportPrompt_)
+            return false;
+        const char *hint = "\r\n[More: Enter; Esc/Q returns]\r\n";
+        stageLen_ = strlen(hint);
+        memcpy(staging_, hint, stageLen_);
+        exportPrompt_ = true;
+    } else if (pos_ < length_) {
+        char c = output_[pos_++];
+        if (c == '\n') {
+            staging_[0] = '\r';
+            staging_[1] = '\n';
+            stageLen_ = 2;
+            if (++lines_ >= unsigned(std::max(1, int(rows_) - 3)) && pos_ < length_)
+                more_ = true;
+        } else {
+            staging_[0] = c;
+            stageLen_ = 1;
+        }
+    } else if (!exportFinished_) {
+        const char *hint = "\r\nEnter returns to menu.\r\n";
+        stageLen_ = strlen(hint);
+        memcpy(staging_, hint, stageLen_);
+        exportFinished_ = true;
+    } else
+        return false;
+    return true;
+}
 size_t Terminal::read(uint8_t *data, size_t cap) {
     if (diagnostic_) {
         if (stagePos_ < stageLen_) {
@@ -799,31 +835,7 @@ size_t Terminal::read(uint8_t *data, size_t cap) {
         }
         stagePos_ = stageLen_ = 0;
         if (exporting_) {
-            if (more_) {
-                if (exportPrompt_)
-                    break;
-                const char *hint = "\r\n[More: Enter; Esc/Q returns]\r\n";
-                stageLen_ = strlen(hint);
-                memcpy(staging_, hint, stageLen_);
-                exportPrompt_ = true;
-            } else if (pos_ < length_) {
-                char c = output_[pos_++];
-                if (c == '\n') {
-                    staging_[0] = '\r';
-                    staging_[1] = '\n';
-                    stageLen_ = 2;
-                    if (++lines_ >= unsigned(std::max(1, int(rows_) - 3)) && pos_ < length_)
-                        more_ = true;
-                } else {
-                    staging_[0] = c;
-                    stageLen_ = 1;
-                }
-            } else if (!exportFinished_) {
-                const char *hint = "\r\nEnter returns to menu.\r\n";
-                stageLen_ = strlen(hint);
-                memcpy(staging_, hint, stageLen_);
-                exportFinished_ = true;
-            } else
+            if (!stageExport())
                 break;
             continue;
         }

@@ -149,6 +149,7 @@ public:
 private:
     void render();
     void planFrame();
+    bool stageExport();
     void line(const char *text);
     void append(const char *text);
     void input(char c);
@@ -158,7 +159,9 @@ private:
     void drawFooter(bool main);
     const char *keyHints() const;
     void drawMenu();
+    void drawMainMenu();
     void drawPhonebook();
+    void drawPhonebookPanel(const calls::Entry *selected);
     void drawForm();
     void drawResponse();
     void key(unsigned key);
