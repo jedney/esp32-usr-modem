@@ -39,5 +39,8 @@
     ".pio": true,
     "3d-model": true
   },
-  "python.terminal.useEnvFile": true
+  "python.terminal.useEnvFile": true,
+  "cmake.configureOnOpen": false,
+  "cmake.configureOnEdit": false,
+  "cmake.automaticReconfigure": false
 }
