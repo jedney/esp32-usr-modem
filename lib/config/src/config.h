@@ -72,6 +72,18 @@ public:
 
 private:
     atcmd::Reply exportConfig(atcmd::Port &port);
+    atcmd::Reply setting(atcmd::Port &port, const char *args);
+    atcmd::Reply explicitRate(atcmd::Port &port, const char *args);
+    atcmd::Reply restoreEnd(atcmd::Port &port, const char *args);
+    atcmd::Reply profile(atcmd::Port &port, const char *args);
+    atcmd::Reply profileControl(atcmd::Port &port, const char *args);
+    atcmd::Reply bookClear(atcmd::Port &port, const char *args);
+    atcmd::Reply dial(atcmd::Port &port, const char *args);
+    atcmd::Reply reference(atcmd::Port &port, const char *args);
+    atcmd::Reply about(atcmd::Port &port, const char *args);
+    atcmd::Reply exportCommand(atcmd::Port &port, const char *args);
+    atcmd::Reply logCommand(atcmd::Port &port, const char *args);
+    atcmd::Reply callLog(atcmd::Port &port, const char *args);
     Log &log_;
     History &history_;
     calls::Phonebook &book_;

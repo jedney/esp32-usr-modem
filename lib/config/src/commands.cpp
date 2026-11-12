@@ -86,166 +86,189 @@ void Commands::attach(Commands &commands) {
 atcmd::Reply Commands::dispatch(atcmd::Port &p, const char *name, const char *args) {
     return attached ? attached->command(p, name, args) : atcmd::Reply::kError;
 }
+// The commands lib/config answers itself; the rest go to the firmware's Hardware.
 atcmd::Reply Commands::command(atcmd::Port &p, const char *name, const char *args) {
-    using atcmd::Reply;
-    if (!strcmp(name, "SETTING")) {
-        if (query(args)) {
-            atcmd::showCurrent(p);
-            atcmd::showStored(p);
-            return Reply::kOk;
+    using Handler = atcmd::Reply (Commands::*)(atcmd::Port &, const char *);
+    static const struct {
+        const char *name;
+        Handler handler;
+    } kTable[] = {
+        {"SETTING", &Commands::setting},
+        {"EXPLICIT", &Commands::explicitRate},
+        {"RESTOREEND", &Commands::restoreEnd},
+        {"PROFILE", &Commands::profile},
+        {"PROFILECTL", &Commands::profileControl},
+        {"BOOKCLEAR", &Commands::bookClear},
+        {"DIAL", &Commands::dial},
+        {"REFERENCE", &Commands::reference},
+        {"ABOUT", &Commands::about},
+        {"EXPORT", &Commands::exportCommand},
+        {"LOG", &Commands::logCommand},
+        {"CALLLOG", &Commands::callLog},
+    };
+    for (const auto &entry : kTable) {
+        if (!strcmp(name, entry.name)) {
+            return (this->*entry.handler)(p, args);
         }
-        if (*args++ != '=' || !*args || strlen(args) > atcmd::kLineMax) {
-            return Reply::kError;
-        }
-        // Only modem/profile commands are accepted by this wrapper. Network,
-        // password, call and destructive handlers retain their own entry points.
-        const char *allowed = "BEFLMQVXPTSYZ&";
-        if (!strchr(allowed, *args) || (*args == '&' && !strchr("ABCDGHIKMNPRSTUYWZF", args[1]))) {
-            return Reply::kError;
-        }
-        if (!oneSetting(args)) {  // one command only: "E0DT555" must not dial
-            return Reply::kError;
-        }
-        if (!strcmp(args, "T0") || !strcmp(args, "T1")) {
-            p.execute(args[1] == '1' ? "T" : "P");
-        } else {
-            p.execute(args);
-        }
-        return Reply::kDone;
-    }
-    if (!strcmp(name, "EXPLICIT")) {
-        if (!strcmp(args, "=0") || !strcmp(args, "=1")) {
-            p.modem().active().lineExplicit = args[1] == '1';
-            return Reply::kOk;
-        }
-        return Reply::kError;
-    }
-    if (!strcmp(name, "RESTOREEND")) {
-        unsigned baud, q, v, cr, lf;
-        char tail;
-        if (sscanf(args, "=%u,%u,%u,%u,%u%c", &baud, &q, &v, &cr, &lf, &tail) != 5 ||
-            (baud && !modemcfg::isHostRate(baud)) || q > 2 || v > 1 || cr > 255 || lf > 255 ||
-            !p.modem().setHostBaud(baud)) {
-            return Reply::kError;
-        }
-        p.result(atcmd::Result::kOk);  // acknowledge at the old framing and speed
-        p.modem().active().v[modemcfg::kQ] = q;
-        p.modem().active().v[modemcfg::kV] = v;
-        p.modem().active().s[3] = cr;
-        p.modem().active().s[4] = lf;
-        hardware_.command(p, "APPLYBAUD", "");
-        return Reply::kDone;
-    }
-    if (!strcmp(name, "PROFILE")) {
-        unsigned slot = 0, baud = 0;
-        char tail = 0;
-        if (sscanf(args, "=%u,%u%c", &slot, &baud, &tail) != 2 || slot > 1 ||
-            !modemcfg::isHostRate(baud)) {
-            return Reply::kError;
-        }
-        return p.modem().writeTemplate(slot, baud) ? Reply::kOk : Reply::kError;
-    }
-    if (!strcmp(name, "PROFILECTL")) {
-        unsigned t, cr, lf, quiet, verbal;
-        char tail;
-        if (sscanf(args, "=%u,%u,%u,%u,%u%c", &t, &cr, &lf, &quiet, &verbal, &tail) != 5 || t > 1 ||
-            cr > 255 || lf > 255 || quiet > 2 || verbal > 1) {
-            return Reply::kError;
-        }
-        auto active = p.modem().active();
-        p.modem().active() = p.modem().nvram().tmpl[t];
-        auto &a = p.modem().active();
-        a.s[3] = cr;
-        a.s[4] = lf;
-        a.v[modemcfg::kQ] = quiet;
-        a.v[modemcfg::kV] = verbal;
-        bool ok = p.modem().writeTemplate(t, a.baud);
-        p.modem().active() = active;
-        return ok ? Reply::kOk : Reply::kError;
-    }
-    if (!strcmp(name, "BOOKCLEAR")) {
-        return !*args && book_.clear() ? Reply::kOk : Reply::kError;
-    }
-    if (!strcmp(name, "DIAL")) {
-        if (*args != '=' || !args[1] || !p.link()) {
-            return Reply::kError;
-        }
-        return p.link()->dial(args + 1, false) ? Reply::kDone : Reply::kError;
-    }
-    if (!strcmp(name, "REFERENCE")) {
-        if (!query(args)) {
-            return Reply::kError;
-        }
-        p.line("AT / A/ repeat; D/DT/DP dial; DS0-3 stored dial; ATA answer; ATH hang up");
-        p.line("+++ guarded escape; ATO resume; ATI0-7,9 inquiry; +FCLASS=0 modem");
-        p.line("B E F L M Q V X; P/T dial mode; S0-S63=value or ? (S1 live ring count)");
-        p.line("&F0-2 factory active; &W0-1 save; Y0-4 power-on; Z0-5 reset; &V profiles");
-        p.line("&Z0-3=number saved dial; &A &B &C &D &G &H &I &K &M &N &P &R &S &T &U &Y");
-        atcmd::showStarHelp(p);
-        return Reply::kOk;
-    }
-    if (!strcmp(name, "ABOUT")) {
-        if (!query(args)) {
-            return Reply::kError;
-        }
-        p.printf("USR Modem Emulator v%s (%s)\r\n", FW_VERSION, FW_COMMIT);
-        p.line("USRobotics command behavior; replica project by Jon Edney.");
-        for (const char *credit : kCredits) {
-            p.line(credit);
-        }
-        return Reply::kOk;
-    }
-    if (!strcmp(name, "EXPORT")) {
-        return query(args) ? exportConfig(p) : Reply::kError;
-    }
-    if (!strcmp(name, "LOG")) {
-        if (!strcmp(args, "=CLEAR")) {
-            log_.clear();
-            return Reply::kOk;
-        }
-        if (args[0] == '=' && args[1] >= '0' && args[1] <= '2' && !args[2]) {
-            log_.level = args[1] - '0';
-            return Reply::kOk;
-        }
-        unsigned offset = log_.size() > 8192 ? log_.size() - 8192 : 0, count = 8192;
-        if (!query(args)) {
-            char tail;
-            if (sscanf(args, "=%u,%u%c", &offset, &count, &tail) != 2 || count > 8192 ||
-                offset > log_.size()) {
-                return Reply::kError;
-            }
-        }
-        p.printf("Log level %u, capacity %u bytes%s\r\n", log_.level, unsigned(log_.capacity()),
-                 log_.capacity() < 256 * 1024 ? " (reduced capacity)" : " PSRAM");
-        p.printf("Bytes %u-%u of %u; AT*LOG=offset,count reads up to 8192 bytes.\r\n", offset,
-                 unsigned(offset + count < log_.size() ? offset + count : log_.size()),
-                 unsigned(log_.size()));
-        for (size_t i = offset; i < log_.size() && i < size_t(offset) + count; ++i) {
-            char c = log_.at(i);
-            p.write(&c, 1);
-        }
-        return Reply::kOk;
-    }
-    if (!strcmp(name, "CALLLOG")) {
-        if (!query(args)) {
-            return Reply::kError;
-        }
-        p.printf("Call history: %u/50 (configured time zone, result, seconds, TX/RX payload)\r\n",
-                 unsigned(history_.size()));
-        for (size_t i = 0; i < history_.size(); ++i) {
-            const auto &r = history_.at(i);
-            char stamp[48] = "time unavailable";
-            if (r.utc > 0) {
-                netcfg::tz::formatLocal(net_.zone(), r.utc, stamp, sizeof stamp);
-            }
-            p.printf("%s %s %s %s result=%u %lus TX=%lu RX=%lu\r\n", stamp,
-                     r.incoming ? "IN" : "OUT", r.number, r.host, r.result,
-                     static_cast<unsigned long>(r.duration), static_cast<unsigned long>(r.sent),
-                     static_cast<unsigned long>(r.received));
-        }
-        return Reply::kOk;
     }
     return hardware_.command(p, name, args);
+}
+atcmd::Reply Commands::setting(atcmd::Port &p, const char *args) {
+    using atcmd::Reply;
+    if (query(args)) {
+        atcmd::showCurrent(p);
+        atcmd::showStored(p);
+        return Reply::kOk;
+    }
+    if (*args++ != '=' || !*args || strlen(args) > atcmd::kLineMax) {
+        return Reply::kError;
+    }
+    // Only modem/profile commands are accepted by this wrapper. Network,
+    // password, call and destructive handlers retain their own entry points.
+    const char *allowed = "BEFLMQVXPTSYZ&";
+    if (!strchr(allowed, *args) || (*args == '&' && !strchr("ABCDGHIKMNPRSTUYWZF", args[1]))) {
+        return Reply::kError;
+    }
+    if (!oneSetting(args)) {  // one command only: "E0DT555" must not dial
+        return Reply::kError;
+    }
+    if (!strcmp(args, "T0") || !strcmp(args, "T1")) {
+        p.execute(args[1] == '1' ? "T" : "P");
+    } else {
+        p.execute(args);
+    }
+    return Reply::kDone;
+}
+atcmd::Reply Commands::explicitRate(atcmd::Port &p, const char *args) {
+    if (!strcmp(args, "=0") || !strcmp(args, "=1")) {
+        p.modem().active().lineExplicit = args[1] == '1';
+        return atcmd::Reply::kOk;
+    }
+    return atcmd::Reply::kError;
+}
+atcmd::Reply Commands::restoreEnd(atcmd::Port &p, const char *args) {
+    unsigned baud, q, v, cr, lf;
+    char tail;
+    if (sscanf(args, "=%u,%u,%u,%u,%u%c", &baud, &q, &v, &cr, &lf, &tail) != 5 ||
+        (baud && !modemcfg::isHostRate(baud)) || q > 2 || v > 1 || cr > 255 || lf > 255 ||
+        !p.modem().setHostBaud(baud)) {
+        return atcmd::Reply::kError;
+    }
+    p.result(atcmd::Result::kOk);  // acknowledge at the old framing and speed
+    p.modem().active().v[modemcfg::kQ] = q;
+    p.modem().active().v[modemcfg::kV] = v;
+    p.modem().active().s[3] = cr;
+    p.modem().active().s[4] = lf;
+    hardware_.command(p, "APPLYBAUD", "");
+    return atcmd::Reply::kDone;
+}
+atcmd::Reply Commands::profile(atcmd::Port &p, const char *args) {
+    unsigned slot = 0, baud = 0;
+    char tail = 0;
+    if (sscanf(args, "=%u,%u%c", &slot, &baud, &tail) != 2 || slot > 1 ||
+        !modemcfg::isHostRate(baud)) {
+        return atcmd::Reply::kError;
+    }
+    return p.modem().writeTemplate(slot, baud) ? atcmd::Reply::kOk : atcmd::Reply::kError;
+}
+atcmd::Reply Commands::profileControl(atcmd::Port &p, const char *args) {
+    unsigned t, cr, lf, quiet, verbal;
+    char tail;
+    if (sscanf(args, "=%u,%u,%u,%u,%u%c", &t, &cr, &lf, &quiet, &verbal, &tail) != 5 || t > 1 ||
+        cr > 255 || lf > 255 || quiet > 2 || verbal > 1) {
+        return atcmd::Reply::kError;
+    }
+    auto active = p.modem().active();
+    p.modem().active() = p.modem().nvram().tmpl[t];
+    auto &a = p.modem().active();
+    a.s[3] = cr;
+    a.s[4] = lf;
+    a.v[modemcfg::kQ] = quiet;
+    a.v[modemcfg::kV] = verbal;
+    bool ok = p.modem().writeTemplate(t, a.baud);
+    p.modem().active() = active;
+    return ok ? atcmd::Reply::kOk : atcmd::Reply::kError;
+}
+atcmd::Reply Commands::bookClear(atcmd::Port &, const char *args) {
+    return !*args && book_.clear() ? atcmd::Reply::kOk : atcmd::Reply::kError;
+}
+atcmd::Reply Commands::dial(atcmd::Port &p, const char *args) {
+    if (*args != '=' || !args[1] || !p.link()) {
+        return atcmd::Reply::kError;
+    }
+    return p.link()->dial(args + 1, false) ? atcmd::Reply::kDone : atcmd::Reply::kError;
+}
+atcmd::Reply Commands::reference(atcmd::Port &p, const char *args) {
+    if (!query(args)) {
+        return atcmd::Reply::kError;
+    }
+    p.line("AT / A/ repeat; D/DT/DP dial; DS0-3 stored dial; ATA answer; ATH hang up");
+    p.line("+++ guarded escape; ATO resume; ATI0-7,9 inquiry; +FCLASS=0 modem");
+    p.line("B E F L M Q V X; P/T dial mode; S0-S63=value or ? (S1 live ring count)");
+    p.line("&F0-2 factory active; &W0-1 save; Y0-4 power-on; Z0-5 reset; &V profiles");
+    p.line("&Z0-3=number saved dial; &A &B &C &D &G &H &I &K &M &N &P &R &S &T &U &Y");
+    atcmd::showStarHelp(p);
+    return atcmd::Reply::kOk;
+}
+atcmd::Reply Commands::about(atcmd::Port &p, const char *args) {
+    if (!query(args)) {
+        return atcmd::Reply::kError;
+    }
+    p.printf("USR Modem Emulator v%s (%s)\r\n", FW_VERSION, FW_COMMIT);
+    p.line("USRobotics command behavior; replica project by Jon Edney.");
+    for (const char *credit : kCredits) {
+        p.line(credit);
+    }
+    return atcmd::Reply::kOk;
+}
+atcmd::Reply Commands::exportCommand(atcmd::Port &p, const char *args) {
+    return query(args) ? exportConfig(p) : atcmd::Reply::kError;
+}
+atcmd::Reply Commands::logCommand(atcmd::Port &p, const char *args) {
+    if (!strcmp(args, "=CLEAR")) {
+        log_.clear();
+        return atcmd::Reply::kOk;
+    }
+    if (args[0] == '=' && args[1] >= '0' && args[1] <= '2' && !args[2]) {
+        log_.level = args[1] - '0';
+        return atcmd::Reply::kOk;
+    }
+    unsigned offset = log_.size() > 8192 ? log_.size() - 8192 : 0, count = 8192;
+    if (!query(args)) {
+        char tail;
+        if (sscanf(args, "=%u,%u%c", &offset, &count, &tail) != 2 || count > 8192 ||
+            offset > log_.size()) {
+            return atcmd::Reply::kError;
+        }
+    }
+    p.printf("Log level %u, capacity %u bytes%s\r\n", log_.level, unsigned(log_.capacity()),
+             log_.capacity() < 256 * 1024 ? " (reduced capacity)" : " PSRAM");
+    p.printf("Bytes %u-%u of %u; AT*LOG=offset,count reads up to 8192 bytes.\r\n", offset,
+             unsigned(offset + count < log_.size() ? offset + count : log_.size()),
+             unsigned(log_.size()));
+    for (size_t i = offset; i < log_.size() && i < size_t(offset) + count; ++i) {
+        char c = log_.at(i);
+        p.write(&c, 1);
+    }
+    return atcmd::Reply::kOk;
+}
+atcmd::Reply Commands::callLog(atcmd::Port &p, const char *args) {
+    if (!query(args)) {
+        return atcmd::Reply::kError;
+    }
+    p.printf("Call history: %u/50 (configured time zone, result, seconds, TX/RX payload)\r\n",
+             unsigned(history_.size()));
+    for (size_t i = 0; i < history_.size(); ++i) {
+        const auto &r = history_.at(i);
+        char stamp[48] = "time unavailable";
+        if (r.utc > 0) {
+            netcfg::tz::formatLocal(net_.zone(), r.utc, stamp, sizeof stamp);
+        }
+        p.printf("%s %s %s %s result=%u %lus TX=%lu RX=%lu\r\n", stamp, r.incoming ? "IN" : "OUT",
+                 r.number, r.host, r.result, static_cast<unsigned long>(r.duration),
+                 static_cast<unsigned long>(r.sent), static_cast<unsigned long>(r.received));
+    }
+    return atcmd::Reply::kOk;
 }
 atcmd::Reply Commands::exportConfig(atcmd::Port &p) {
     const auto &m = p.modem();
