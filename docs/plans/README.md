@@ -31,7 +31,7 @@ whole window.
 | 02 | v2.2 | [Serial output never blocks the loop](../history/wp-02-nonblocking-sinks.md) | Opus / high | M-L | 01 |
 | 03 | v2.3 | [Hardware tests cannot freeze the modem](../history/wp-03-hwtest-bounds.md) | Sonnet / high | M | 02 |
 | 04 | v2.4 | [Incoming-call limits](../history/wp-04-incoming-limits.md) | Sonnet / high | M | 01 |
-| 05 | v2.5 | [Wi-Fi join, factory reset, scan names](wp-05-wifi-reset-scan.md) | Sonnet / medium | S-M | 01 |
+| 05 | v2.5 | [Wi-Fi join, factory reset, scan names](../history/wp-05-wifi-reset-scan.md) | Sonnet / medium | S-M | 01 |
 | 06 | v2.6 | [Web server: read-only start, hand-shakes, lock-out](wp-06-web-server.md) | Opus / medium | M-L | 02 |
 | 07 | v2.7 | [Small settings and parser guards; screen time-out](wp-07-small-guards.md) | Sonnet / medium | M-L | 01 |
 | 08 | v2.8 | [Bench harness safety](wp-08-bench-harness.md) | Sonnet / medium | M | 01 |
@@ -109,7 +109,7 @@ the package confirms each first.
 | SEC-01 | Caller who never hangs up holds the line (8-ring limit, keepalive) | 04 | done (v2.4; (c) browser reject not done, optional) |
 | SEC-02 | Wrong Digest response or half header stalls the web task | 06 | open |
 | SEC-03 | ESP-IDF 4.4 / Arduino 2.0.17 end-of-life | 18, 19 | open |
-| SEC-04 | Wi-Fi scan names printed with control bytes | 05 | open |
+| SEC-04 | Wi-Fi scan names printed with control bytes | 05 | done (v2.5) |
 | SEC-05 | Release workflow from any branch; write token in build steps | 01 | done (v2.1) |
 | SEC-06 | `AT*PASS` prints a generated password (permitted; amend rule) | 01 | done (v2.1) |
 | SEC-07a | `AT*SETTING=` checks only the first character | 07 | open |
@@ -121,8 +121,8 @@ the package confirms each first.
 | STA-02 | Browser opens the configuration screen and blocks calls | 06 | open |
 | STA-02b | Idle configuration screen holds the line (5-minute time-out) | 07 | open |
 | STA-03 | Interactive hardware tests block for ever / during a call | 03 | done (v2.3) |
-| STA-04 | Failed browser Wi-Fi join undoes later browser changes | 05 | open |
-| STA-05 | `AT*FACTORY` without LittleFS never finishes | 05 | open |
+| STA-04 | Failed browser Wi-Fi join undoes later browser changes | 05 | done (v2.5) |
+| STA-05 | `AT*FACTORY` without LittleFS never finishes | 05 | done (v2.5) |
 | STA-06 | No watchdog on the main loop | 17 | open |
 | STA-07 | Upload and unmount hand-shakes can leave stale state | 06 | open |
 | STA-08 | A full phonebook may not fit in NVS | 17 | open |
@@ -153,7 +153,7 @@ the package confirms each first.
 | 5.5-01 | Radio stays on after `AT*WIFISCAN` with Wi-Fi off | 12 | open |
 | 5.5-02 | `volatile` link state; late event overwrites `leave()` | 12 | open |
 | 5.5-03 | Second scan ends the new scan early | 12 | open |
-| 5.5-04 | `AT*WIFI=OFF`/`WIFIFORGET` in the 60 s window saves the change | 05 | open |
+| 5.5-04 | `AT*WIFI=OFF`/`WIFIFORGET` in the 60 s window saves the change | 05 | done (v2.5) |
 | 5.5-05 | Join, scan or IP change drops a call without warning | 12 | open |
 | 5.5-06 | `file_store.h` power loss between renames; no backup fallback | 12 | open |
 | 5.5-07 | DNS time counts against the 10 s ping limit | 12 | open |
@@ -176,7 +176,7 @@ the package confirms each first.
 | TG-05 | Digest parser guards, nonce cases, `ImageCheck(true, ...)` | 09 | open |
 | TG-06 | 2^32 ms wrap, throttle above 300 bps, S3/S5 edges | 09 | open |
 | TG-07 | Pin lock test skipped when `.env` overrides pins | 01 | done (v2.1) |
-| TG-08 | Tests behind STA-01, STA-04, STA-05, SEC-04, SEC-01 | 02, 04, 05 | open (STA-01 part done v2.2; SEC-01 part done v2.4) |
+| TG-08 | Tests behind STA-01, STA-04, STA-05, SEC-04, SEC-01 | 02, 04, 05 | open (STA-01 part done v2.2; SEC-01 part done v2.4; STA-04, STA-05, SEC-04 parts done v2.5) |
 | TG-09 | e2e serial ports have no write time-out (runs hang) | 08 | open |
 | TG-10 | Asserts can print the Wi-Fi or device password | 08 | open |
 | TG-11 | `test_board` uses the production settings store | 08 | open |

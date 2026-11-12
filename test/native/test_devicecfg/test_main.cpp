@@ -17,6 +17,7 @@ public:
     bool failSave = false;
     bool failLoad = false;
     bool failErase = false;
+    bool noFilesystem = false;  // FileStore::erase(): not mounted means nothing to erase
     unsigned saves = 0;
     size_t load(uint8_t *out, size_t cap) override {
         if (failLoad)
@@ -36,7 +37,7 @@ public:
         return true;
     }
     bool erase() override {
-        if (failErase) {
+        if (failErase && !noFilesystem) {
             return false;
         }
         bytes.clear();
@@ -463,6 +464,16 @@ void test_factory_last_erase_failure_keeps_recovery_marker() {
     TEST_ASSERT_TRUE(again.factoryReset(r.stores, 3));
 }
 
+void test_factory_completes_when_a_store_has_no_filesystem() {
+    Rig r;
+    r.bookStore.failErase = true;     // would stop the reset ...
+    r.bookStore.noFilesystem = true;  // ... but "not mounted" counts as erased
+    TEST_ASSERT_TRUE(r.device.factoryReset(r.stores, 3));
+    Device again(r.auth, r.crypto);
+    TEST_ASSERT_TRUE(again.begin());
+    TEST_ASSERT_FALSE(again.needsReset());
+}
+
 void test_modem_factory_templates_and_reset_keep_device_credentials() {
     Rig r;
     auto saved = r.auth.bytes;
@@ -559,6 +570,7 @@ int main() {
     RUN_TEST(test_factory_interruption_is_retried_after_restart);
     RUN_TEST(test_factory_marker_failure_does_not_erase_anything);
     RUN_TEST(test_factory_last_erase_failure_keeps_recovery_marker);
+    RUN_TEST(test_factory_completes_when_a_store_has_no_filesystem);
     RUN_TEST(test_modem_factory_templates_and_reset_keep_device_credentials);
     RUN_TEST(test_help_includes_every_device_command_without_credentials);
     return UNITY_END();

@@ -58,10 +58,11 @@ Section numbers refer to the project brief.
 | Hardware tests `AT*HW...`; line, loopback and bridge refused on RS232 (6.14, Q79); 5-minute key time-out, LED patterns refused during a call, per-owner holds (v2.3) | `test_hwtest`, `test_config` | `test_hw` | `test_hwtest.py`, `test_config.py` |
 | Wi-Fi: scan, masked join, retry, static IP, mDNS, ARQ/RGB, banner (6.6, 6.7) | `test_netcfg`, `test_atcmd` | `test_wifi`, `test_rs232` | `test_wifi.py`, `test_calls.py`, `test_answer.py` |
 | Clock: NTP, time zones, daylight saving (6.8, Q59) | `test_netcfg` | `test_wifi` | `test_wifi.py` |
+| Browser Wi-Fi changes: 60 s check, failed join, `AT*WIFI=OFF`/`FORGET` in the window; scan names without control bytes | `test_netcfg` | — | — |
 | Wi-Fi password never shown or exported (6.6, 6.8) | `test_netcfg`, `test_config_services` | — | `test_wifi.py`, `test_config.py` |
 | Device password: first boot, first use, change, hashes only, masked input (6.6) | `test_devicecfg` | `test_device` | `test_device.py` |
 | OTA: password, ALWAYS/DEMAND, 10-minute window (6.6) | `test_devicecfg`, `scripts/test_ota_upload.py` (`.env` BOM, UTF-16) | `test_device` | `test_device.py` |
-| `AT*FACTORY`: Y/N, timeout, every namespace, interrupted reset (6.7) | `test_devicecfg` | `test_device` | `test_device.py --factory-reset` |
+| `AT*FACTORY`: Y/N, timeout, every namespace, interrupted reset, no filesystem (6.7) | `test_devicecfg` | `test_device` | `test_device.py --factory-reset` |
 | Configuration screen, styles, sizes, `AT*` parity, `AT*HELP`, no idle repaint (6.8) | `test_config`, `test_config_services`, `scripts/test_generate_ui.py` (single-key hotkeys), `ui/tests` | `test_config` | `test_config.py` |
 | Export and replay without secrets, logs, call history (6.8) | `test_config`, `test_config_services` | `test_config` | `test_config.py` |
 | About generated from the licensing record | `scripts/test_generate_credits.py` | — | `test_config.py` |

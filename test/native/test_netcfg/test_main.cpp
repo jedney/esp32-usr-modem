@@ -1176,9 +1176,58 @@ void test_wifi_off_during_browser_join_commits_only_after_successful_save() {
     TEST_ASSERT_EQUAL_STRING("HomeNet", disk.ssid);
 }
 
+void test_browser_change_after_failed_browser_join_is_not_rolled_back() {
+    Settings s = saved("HomeNet", "password1");
+    CmdRig r(&s);
+    r.radio.up();
+    r.run(100);
+    r.net.guardBrowserChange(gNow);
+    TEST_ASSERT_TRUE(r.net.join("Other", "password2", gNow, 60000));
+    r.radio.fail(Reason::kWrongPassword);
+    r.net.tick(gNow + 10);  // the join fails; the browser has already gone
+    detachCommands(r.port);
+    r.radio.up();
+    r.run(1000);
+    r.net.guardBrowserChange(gNow);
+    TEST_ASSERT_TRUE(r.net.setStatic(0x0a000032, 0xffffff00, 0x0a000001, 0x0a000001));
+    r.run(1000);
+    TEST_ASSERT_FALSE(r.net.settings().dhcp);
+}
+
+void test_wifi_off_in_browser_window_does_not_save_the_unverified_change() {
+    Settings s = saved("HomeNet", "password1");
+    NetRig r(&s);
+    r.net.begin(0);
+    r.radio.up();
+    r.net.tick(1);
+    r.net.guardBrowserChange(10);
+    TEST_ASSERT_TRUE(r.net.setStatic(0x0a000032, 0xffffff00, 0x0a000001, 0x0a000001));
+    TEST_ASSERT_TRUE(r.net.setEnabled(false));
+    r.net.tick(70000);
+    Settings disk;
+    load(r.store, &disk);
+    TEST_ASSERT_FALSE(disk.enabled);
+    TEST_ASSERT_TRUE(disk.dhcp);
+    TEST_ASSERT_TRUE(r.net.settings().dhcp);
+}
+
+void test_scan_list_replaces_control_bytes_in_names() {
+    CmdRig r;
+    r.radio.found = {entry("Evil\x1b[2J\x07Net", -54, 6, Security::kWpa2)};
+    r.type("AT*WIFISCAN\r");
+    r.radio.scanDone = true;
+    std::string o = r.run(500);
+    CONTAINS(o, "Evil?[2J?Net");
+    NOT_CONTAINS(o, "\x1b[2J");
+    NOT_CONTAINS(o, "\x07");
+}
+
 int main(int, char **) {
     UNITY_BEGIN();
     RUN_TEST(test_browser_guard_rejects_stale_tick_and_keeps_full_window);
+    RUN_TEST(test_browser_change_after_failed_browser_join_is_not_rolled_back);
+    RUN_TEST(test_wifi_off_in_browser_window_does_not_save_the_unverified_change);
+    RUN_TEST(test_scan_list_replaces_control_bytes_in_names);
     RUN_TEST(test_password_prompt_reserves_ssid_and_releases_on_cancel_timeout_disconnect);
     RUN_TEST(test_invalid_password_releases_prompt_reservation);
     RUN_TEST(test_all_failed_network_setters_keep_live_and_saved_state);

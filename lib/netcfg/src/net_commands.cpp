@@ -171,7 +171,15 @@ void showScan(Port &port) {
     }
     for (size_t i = 0; i < net->scanCount(); ++i) {
         const ScanEntry &e = net->scanEntry(i);
-        port.printf("%2u  %-32s %4d dBm  ch %2u  %s", static_cast<unsigned>(i + 1), e.ssid,
+        // A neighbour chooses this name: no control bytes may reach the terminal.
+        char name[sizeof e.ssid];
+        size_t n = 0;
+        for (; n + 1 < sizeof name && e.ssid[n] != '\0'; ++n) {
+            const unsigned char c = static_cast<unsigned char>(e.ssid[n]);
+            name[n] = (c < 0x20 || c == 0x7F) ? '?' : static_cast<char>(c);
+        }
+        name[n] = '\0';
+        port.printf("%2u  %-32s %4d dBm  ch %2u  %s", static_cast<unsigned>(i + 1), name,
                     static_cast<int>(e.rssi), static_cast<unsigned>(e.channel),
                     securityText(e.security));
         port.newline();
@@ -284,6 +292,9 @@ void detachCommands(Port &port) {
         // socket disappears. The candidate is owned by Net, not by this Port.
         pendingPort = nullptr;
         pendingOp = Op::kNone;
+        // Nobody will collect a finished result: a stale failure would undo the
+        // browser's next change.
+        net->clearJoin();
     }
 }
 
