@@ -2,11 +2,13 @@
 //   pio test -e s3
 #include <Arduino.h>
 #include <esp_partition.h>
+#include <esp_task_wdt.h>
 #include <unity.h>
 
 #include <cstring>
 
 #include "dialstring.h"
+#include "hw.h"
 #include "modemcfg.h"
 #include "nvs_store.h"
 
@@ -61,6 +63,22 @@ void test_settings_survive_in_nvs() {
                       static_cast<int>(modemcfg::loadNvram(store, &out)));
 }
 
+// STA-06: the watchdog panics after 15 s, and hw::feedWatchdog() keeps a watched loop task
+// alive for longer than that. If feeding failed, the board would reset here.
+void test_fed_loop_watchdog_outlasts_its_timeout() {
+    TEST_ASSERT_TRUE(CONFIG_ESP_TASK_WDT_PANIC);
+    TEST_ASSERT_EQUAL(15, CONFIG_ESP_TASK_WDT_TIMEOUT_S);
+    enableLoopWDT();
+    TEST_ASSERT_EQUAL(ESP_OK, esp_task_wdt_status(nullptr));  // this task is watched
+    uint32_t start = millis();
+    while (millis() - start < 17000) {
+        hw::feedWatchdog();
+        delay(100);
+    }
+    disableLoopWDT();
+    TEST_ASSERT_EQUAL(ESP_ERR_NOT_FOUND, esp_task_wdt_status(nullptr));
+}
+
 void setup() {
     delay(2000);  // give the USB-serial monitor time to attach
     UNITY_BEGIN();
@@ -69,6 +87,7 @@ void setup() {
     RUN_TEST(test_two_ota_slots_exist);
     RUN_TEST(test_dialstring_runs_on_target);
     RUN_TEST(test_settings_survive_in_nvs);
+    RUN_TEST(test_fed_loop_watchdog_outlasts_its_timeout);
     UNITY_END();
 }
 

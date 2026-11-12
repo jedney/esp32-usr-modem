@@ -14,6 +14,34 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.17] - 2026-11-13
+
+### Added
+
+- A watchdog restarts the modem when its main loop stops for 15 s (STA-06). The restart
+  writes a crash record; `AT*RESETINFO` then says "task watchdog". Hardware tests and
+  ArduinoOTA uploads, which run for longer inside one loop pass, keep it fed.
+- `AT*STATUS` shows the least free stack so far of the main loop, network and web server
+  tasks (5.5-08).
+- On-board tests: a full phonebook (64 of the longest entries) saved, changed and shrunk
+  in NVS beside the other settings (STA-08); a watched task kept fed past the watchdog
+  time-out. End-to-end: the network task's stack headroom after the PPP and SLIP tests.
+
+### Changed
+
+- The task watchdog no longer watches the CPU 1 idle task (Arduino's default), because
+  `loop()` runs there; the loop task itself is watched instead. The CPU 0 idle task is
+  still watched, and now also restarts the modem.
+
+### Bench checks for Jon (needed before release)
+
+- On-board tests: `pio test -e s3 -f embedded/test_board -f embedded/test_calls` (USB;
+  re-upload the firmware after). Record the NVS figures the phonebook test prints.
+- A soak with the new firmware: calls in and out, the web page open, a PPP session, an
+  ArduinoOTA upload and a web image upload, `AT*HWTEST` steps left waiting for a key over
+  a minute, and `AT*CONFIG`. Afterwards `AT*RESETINFO` must not say "task watchdog".
+- `e2e/test_internet.py` to the end, and note the stack headroom it prints.
+
 ## [2.16] - 2026-11-13
 
 ### Changed

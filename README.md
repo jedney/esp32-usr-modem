@@ -174,6 +174,8 @@ without storing it.
 - `AT*FACTORY` erases everything and restarts with a new device password (asks Y/N).
 - `AT*LOG`, `AT*CALLLOG`, `AT*STATUS` and `AT*RESETINFO` help with problems. The debug log
   holds events only, never typed text, passwords or call data.
+- A watchdog restarts the modem if its main loop stops for 15 s; `AT*RESETINFO` then says
+  "task watchdog" and shows the crash record.
 
 ## Hardware tests
 

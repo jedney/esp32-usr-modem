@@ -56,6 +56,11 @@
 #include "web_service.h"
 #include "wifi_radio.h"
 
+// STA-06: sdkconfig.defaults turns the task watchdog's panic on; the 15 s is in the
+// AT*RESETINFO text (hwconsole.cpp) and the decisions log.
+static_assert(CONFIG_ESP_TASK_WDT_PANIC && CONFIG_ESP_TASK_WDT_TIMEOUT_S == 15,
+              "Task watchdog: expected CONFIG_ESP_TASK_WDT_PANIC=y and a 15 s time-out");
+
 #ifndef FW_VERSION
 #define FW_VERSION "0.0"
 #endif
@@ -690,6 +695,10 @@ private:
         netcfg::formatIp(net.link().ip, ip, sizeof ip);
         port.printf("Wi-Fi: %s, %s, %d dBm, IP %s\r\n", net.stateText(), net.settings().ssid,
                     net.link().rssi, ip);
+        // 5.5-08: the least free stack so far, for the bench record.
+        port.printf("Stack headroom: loop %d B, lwIP %d B, web %d B\r\n",
+                    hw::stackHeadroom("loopTask"), hw::stackHeadroom("tiT"),
+                    hw::stackHeadroom("httpd"));
         port.printf("Flow &H%u &R%u; DTR &D%u; DCD &C%u; serial &B%u\r\n",
                     modem->active().get(modemcfg::kAmpH), modem->active().get(modemcfg::kAmpR),
                     modem->active().get(modemcfg::kAmpD), modem->active().get(modemcfg::kAmpC),
@@ -1416,6 +1425,18 @@ void setup() {
     printBanner(loaded, netLoaded);
     char skip[netcfg::Net::kNoticeMax];
     net.takeNotice(skip, sizeof skip);  // the banner has already said it
+    // STA-06: from here the task watchdog restarts the modem if one loop() pass takes 15 s.
+    // The core feeds it before each pass. Work that can take longer inside one pass feeds
+    // it as it goes (hw::feedWatchdog()):
+    //   - interactive hardware tests (hwconsole.cpp readKey() and testDelay(): every test
+    //     loop, the tone and pot tests, the RS232 bridge, up to the 5-minute key time-out);
+    //   - an ArduinoOTA upload, received inside OtaService::poll() (its progress callback).
+    // Checked and short enough without feeding: AT*FACTORY (NVS erases and file removes),
+    // RS232 speed changes (hostDrain(), 2 s at most), the restart (0.5 s), Wi-Fi join and
+    // scan, DNS and TCP connects (all asynchronous). The web upload, image staging and
+    // LittleFS erase run on the web server task while loop() keeps passing. setup() itself
+    // (the 8 s wait for Wi-Fi, a pending factory reset) is not watched.
+    enableLoopWDT();
 }
 
 void loop() {

@@ -1,8 +1,11 @@
 #include <Arduino.h>
 #include <LittleFS.h>
+#include <nvs.h>
 #include <unity.h>
 #include "call_audio.h"
+#include "devicecfg.h"
 #include "hw.h"
+#include "net_settings.h"
 #include "nvs_store.h"
 #include "phonebook.h"
 #include "volume.h"
@@ -57,6 +60,102 @@ void test_phonebook_in_scratch_nvs() {
     delete book;
     TEST_ASSERT_TRUE(store.erase());
 }
+// STA-08: a full phonebook (64 entries, 5,321 bytes in one blob) must save, change and
+// shrink with the modem's other settings in NVS too. NVS writes the new blob before it
+// frees the old one, so a change needs room for both. The NVS figures are printed for
+// the decisions log.
+struct OtherSetting {
+    const char *ns;  // the production namespace (src/main.cpp)
+    size_t size;     // about what a set-up modem stores there
+};
+const OtherSetting kOtherSettings[] = {
+    {"modem", modemcfg::kBlobSize},
+    {"net", netcfg::kBlobSize},
+    {"device", devicecfg::kBlobSize},
+    {"web", 32},
+    {"clients", 64},
+    {"internet", 160},
+    {"diagnostics", 3},
+    {"phy", 1904},  // the radio's calibration data (ESP32-S3, ESP-IDF 4.4)
+};
+constexpr size_t kOtherCount = sizeof kOtherSettings / sizeof kOtherSettings[0];
+
+size_t usedEntries(const char *ns) {
+    nvs_handle_t handle;
+    if (nvs_open(ns, NVS_READONLY, &handle) != ESP_OK) {
+        return 0;
+    }
+    size_t used = 0;
+    nvs_get_used_entry_count(handle, &used);
+    nvs_close(handle);
+    return used;
+}
+void printNvs(const char *when) {
+    nvs_stats_t stats{};
+    TEST_ASSERT_EQUAL(ESP_OK, nvs_get_stats(nullptr, &stats));
+    char line[128];
+    snprintf(line, sizeof line, "NVS %s: %u used, %u free of %u entries (32 bytes each)", when,
+             unsigned(stats.used_entries), unsigned(stats.free_entries),
+             unsigned(stats.total_entries));
+    TEST_MESSAGE(line);
+}
+void eraseScratch() {
+    for (size_t i = 0; i < kOtherCount; ++i) {
+        char ns[16];
+        snprintf(ns, sizeof ns, "v17o%u", unsigned(i));
+        hw::NvsStore(ns, "cfg").erase();
+    }
+    hw::NvsStore("v17book", "cfg").erase();
+}
+calls::Entry longEntry(unsigned i) {
+    calls::Entry e;
+    snprintf(e.number, sizeof e.number, "5551234%04u", i);  // 11 digits, the longest
+    snprintf(e.host, sizeof e.host, "bbs%02u.%s.com", i % 100,
+             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");  // 63 characters
+    e.speed = 33600;
+    return e;
+}
+void test_full_phonebook_fits_beside_the_other_settings() {
+    eraseScratch();
+    printNvs("at start");
+    // A board that never stored a setting gets a stand-in of about its size, so NVS holds
+    // what a fully set-up modem holds. Settings already stored are counted as they are.
+    for (size_t i = 0; i < kOtherCount; ++i) {
+        if (usedEntries(kOtherSettings[i].ns) == 0) {
+            char ns[16];
+            snprintf(ns, sizeof ns, "v17o%u", unsigned(i));
+            static uint8_t fill[2048];
+            memset(fill, 0x5a, sizeof fill);
+            TEST_ASSERT_TRUE(hw::NvsStore(ns, "cfg").save(fill, kOtherSettings[i].size));
+        }
+    }
+    printNvs("with the other settings");
+    hw::NvsStore store("v17book", "cfg");
+    auto *book = new calls::Phonebook(store);  // 6 KB: on the heap, not the loop stack
+    TEST_ASSERT_TRUE(book->begin());           // the factory entry
+    for (unsigned i = 1; i < calls::kPhonebookCount; ++i) {
+        char message[32];
+        snprintf(message, sizeof message, "entry %u", i);
+        TEST_ASSERT_TRUE_MESSAGE(book->put(longEntry(i)), message);
+    }
+    printNvs("with 64 entries");
+    calls::Entry edited = longEntry(7);
+    edited.host[0] = 'x';
+    edited.speed = 0;
+    TEST_ASSERT_TRUE(book->put(edited));  // a change: old and new blob side by side
+    TEST_ASSERT_TRUE(book->remove(longEntry(9).number));
+    delete book;
+    book = new calls::Phonebook(store);
+    TEST_ASSERT_TRUE(book->begin());
+    TEST_ASSERT_TRUE(book->healthy());
+    TEST_ASSERT_NOT_NULL(book->find(longEntry(7).number));
+    TEST_ASSERT_EQUAL_STRING(edited.host, book->find(longEntry(7).number)->host);
+    TEST_ASSERT_NULL(book->find(longEntry(9).number));
+    TEST_ASSERT_NOT_NULL(book->find(longEntry(63).number));
+    delete book;
+    eraseScratch();
+    printNvs("after clean-up");
+}
 void test_littlefs_handshake_headers_and_streaming() {
     TEST_ASSERT_TRUE(LittleFS.begin(false));
     for (uint32_t speed : {1200u, 2400u, 14400u, 28800u, 33600u, 56000u}) {
@@ -91,6 +190,7 @@ void setup() {
     UNITY_BEGIN();
     RUN_TEST(test_model_metadata_in_scratch_nvs);
     RUN_TEST(test_phonebook_in_scratch_nvs);
+    RUN_TEST(test_full_phonebook_fits_beside_the_other_settings);
     RUN_TEST(test_littlefs_handshake_headers_and_streaming);
     RUN_TEST(test_nonblocking_i2s_and_pot_at_full_volume);
     UNITY_END();

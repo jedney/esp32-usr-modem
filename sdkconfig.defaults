@@ -24,6 +24,17 @@ CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024
 CONFIG_HTTPD_MAX_URI_LEN=512
 CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
 CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
+# v2.17 (STA-06): the task watchdog restarts the modem when a watched task stops for 15 s:
+# the Arduino loop (enableLoopWDT() at the end of setup()) and the CPU 0 idle task (Wi-Fi,
+# lwIP, web server). Not the CPU 1 idle task, as in Arduino's own defaults: loop() runs
+# there and a busy loop (the on-board test programs, a hardware test fed keys without a
+# pause) would starve it; the loop task itself is watched instead. The panic writes a core
+# dump; AT*RESETINFO then shows "task watchdog".
+CONFIG_ESP_TASK_WDT=y
+CONFIG_ESP_TASK_WDT_PANIC=y
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=15
+CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y
+# CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1 is not set
 CONFIG_LITTLEFS_PAGE_SIZE=256
 CONFIG_LITTLEFS_OBJ_NAME_LEN=64
 # v2.0: the native USB port (GPIO19/20) is the USB modem port, a TinyUSB CDC-ACM device

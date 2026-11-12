@@ -3,6 +3,9 @@
 #include <driver/i2s.h>
 #include <driver/rmt.h>
 #include <driver/uart.h>
+#include <esp_task_wdt.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <hal/uart_ll.h>
 #include <soc/gpio_periph.h>
 
@@ -511,6 +514,17 @@ size_t captureRead(autobaud::Run *runs, size_t cap) {
     }
     vRingbufferReturnItem(rmtRing, items);
     return n;  // the decoder treats the time after the last run as idle
+}
+
+// --- Task watchdog -------------------------------------------------------------------
+
+void feedWatchdog() {
+    esp_task_wdt_reset();  // ESP_ERR_NOT_FOUND from a task the watchdog doesn't watch
+}
+
+int stackHeadroom(const char *task) {
+    TaskHandle_t handle = xTaskGetHandle(task);
+    return handle ? static_cast<int>(uxTaskGetStackHighWaterMark(handle)) : -1;  // bytes
 }
 
 }  // namespace hw

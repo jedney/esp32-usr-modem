@@ -240,7 +240,7 @@ or changed.
 | `AT*CONFIG` | Open the configuration screen now (`ATDT123` opens it after dial sounds). A screen with no key for 5 minutes closes itself ("Screen closed after 5 minutes idle."), drops unsaved edits and frees the line. A running test or command is not cut off; the 5 minutes start again when it ends |
 | `AT*STYLE[?]` / `=<ANSI\|CP437\|PLAIN>` | Screen style for this port. This boot |
 | `AT*SIZE[?]` / `=<cols>,<rows>` | Screen size for this port, 1-132 by 1-50. This boot |
-| `AT*STATUS` | Model, front panel, ports, call and Wi-Fi |
+| `AT*STATUS` | Model, front panel, ports, call and Wi-Fi, and the least free stack so far of the main loop, the network (lwIP) task and the web server, in bytes (-1: task not running) |
 | `AT*SETTING[?]` / `=<modem command>` | Show the profiles, or change a setting through the normal checks (`AT*SETTING=S0=2`). Exactly one setting command is accepted (`E0`, `&N8`, `S7=45`, `S7.1=1`, `&Z2=host`); anything after it, such as `E0DT555`, gives `ERROR` |
 | `AT*HELP` / `AT*?` | List project commands and hardware tests |
 | `AT*REFERENCE` | All AT and AT* commands |
@@ -258,7 +258,7 @@ or changed.
 | `AT*CALLLOG` | The last 50 calls, kept across restarts |
 | `AT*DNS=<host>` | Look up a name. Any key cancels |
 | `AT*PING=<host>` | Ping a host (not during an Internet call). Any key cancels |
-| `AT*RESETINFO` | Why the modem last restarted, and any crash summary |
+| `AT*RESETINFO` | Why the modem last restarted, and any crash summary. "task watchdog" means the main loop stopped for 15 s and the watchdog restarted the modem |
 | `AT*EXPORT` | Print commands that restore this configuration, without passwords |
 
 To restore an export, paste it in command mode with no call or menu open; join Wi-Fi and

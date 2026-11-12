@@ -43,7 +43,7 @@ whole window.
 | 14 | v2.14 | [`main.cpp` tidy-up](../history/wp-14-main-tidy.md) | Opus / medium | M-L | 02, 03, 06 |
 | 15 | v2.15 | [Configuration screen repaint](../history/wp-15-menu-repaint.md) | Opus / high | L | 07 |
 | 16 | v2.16 | [Configuration screen code tidy-up](../history/wp-16-menu-tidy.md) | Sonnet / high | M | 15 |
-| 17 | v2.17 | [Watchdog and phonebook capacity](wp-17-watchdog-phonebook.md) | Opus / high | M | 02, 03, 14 |
+| 17 | v2.17 | [Watchdog and phonebook capacity](../history/wp-17-watchdog-phonebook.md) | Opus / high | M | 02, 03, 14 |
 | 18 | v3.0 | [Framework spike](wp-18-framework-spike.md) | Opus / high | L | 01-17 merged (the spike itself can run earlier) |
 | 19 | v3.0 | [Framework migration](wp-19-framework-migration.md) | Opus / high | 3-5 × L | 18 |
 
@@ -123,9 +123,9 @@ the package confirms each first.
 | STA-03 | Interactive hardware tests block for ever / during a call | 03 | done (v2.3) |
 | STA-04 | Failed browser Wi-Fi join undoes later browser changes | 05 | done (v2.5) |
 | STA-05 | `AT*FACTORY` without LittleFS never finishes | 05 | done (v2.5) |
-| STA-06 | No watchdog on the main loop | 17 | open |
+| STA-06 | No watchdog on the main loop | 17 | done (v2.17; bench check: on-board `test_board` and a soak) |
 | STA-07 | Upload and unmount hand-shakes can leave stale state | 06 | done (v2.6) |
-| STA-08 | A full phonebook may not fit in NVS | 17 | open |
+| STA-08 | A full phonebook may not fit in NVS | 17 | open (v2.17: on-board test written; run it on the bench) |
 | STA-09a | S3/S4/S5 accept 0-255 (printable S3) | 07 | done (v2.7) |
 | STA-09b | `AT*BAUD` changes RS232 speed during an RS232 call | 03 | done (v2.3) |
 | STA-09c | `restoreBrowserResources()` cancels other ports' holds | 03 | done (v2.3) |
@@ -157,7 +157,7 @@ the package confirms each first.
 | 5.5-05 | Join, scan or IP change drops a call without warning | 12 | done (v2.12) |
 | 5.5-06 | `file_store.h` power loss between renames; no backup fallback | 12 | done (v2.12; the bad-CRC fallback already worked) |
 | 5.5-07 | DNS time counts against the 10 s ping limit | 12 | done (v2.12; bench check) |
-| 5.5-08 | Two 1.5 KB copies on the 6 KB lwIP stack | 17 | open |
+| 5.5-08 | Two 1.5 KB copies on the 6 KB lwIP stack | 17 | open (v2.17: `AT*STATUS` and an e2e check added; record the value on the bench) |
 | 5.5-09 | IPCP Terminate-Request resets the 30 s time-out | 10 | done (v2.10) |
 | 5.5-10 | Transfer inactivity reset by any byte; missing "OO" | 10 | done (v2.10) |
 | 5.5-11 | Size probe looks only at the first `ESC[` | 10 | done (v2.10) |
