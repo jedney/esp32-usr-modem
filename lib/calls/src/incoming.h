@@ -20,6 +20,10 @@ enum class IncomingStage : uint8_t { kIdle, kRinging, kHandshake, kOnline };
 modemcfg::AnswerPort pickAnswerPort(modemcfg::AnswerPort setting, bool rs232Dtr, bool usbDtr);
 class Incoming : public hostport::Session::Answerer {
 public:
+    // An unanswered call is dropped after this many rings (SEC-01; about 24 s). S0 above it
+    // answers on this ring.
+    static constexpr uint8_t kMaxRings = 8;
+    static constexpr uint32_t kRingPeriodMs = 3000;
     using Clock = Outgoing::Clock;
     using Network = Outgoing::Network;
     Incoming(atcmd::Modem &modem, hostport::CallSlot &slot, Listener &listener, Socket &socket,

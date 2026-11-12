@@ -14,6 +14,30 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.4] - 2026-11-12
+
+### Added
+
+- An incoming call that nobody answers is dropped after 8 rings (about 24 s): the socket
+  is closed, the line is freed, the ring sound and RI stop, and the call log records it.
+  `S0` above 8 counts as 8, so it answers on ring 8. The limit is fixed (no `AT*` command).
+- TCP keepalive on every call socket (idle 60 s, then 6 probes 10 s apart). A peer that
+  vanishes without hanging up now ends the call with `NO CARRIER` after about 2 minutes.
+- Tests: the remote `+++` with guard times on the console, RS232 and USB answer ports; a
+  mixed Telnet `DO`/`WILL`/`DONT` storm and two Telnet ends settling; reading stops when
+  the send queue is full; Telnet commands from an answer-mode caller before and after `ATA`;
+  `S7` during the handshake sound.
+
+### Changed
+
+- The ring count no longer climbs to 255: it stops at 8, where the call is dropped. The
+  help for `S0` (configuration screen) says so.
+
+### Fixed
+
+- `S7` no longer drops an outgoing call whose connection is already open while the
+  handshake sound is still playing (a short `S7` gave `NO ANSWER` on a good connection).
+
 ## [2.3] - 2026-11-12
 
 ### Changed

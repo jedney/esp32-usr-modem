@@ -255,8 +255,9 @@ void Outgoing::poll() {
         finish(atcmd::Result::kNoCarrier);
         return;
     }
-    // The pause before CONNECT is a fixed, configured wait, so S7 does not apply to it.
-    if (stage_ != CallStage::kConnectDelay && now - since_ >= uint32_t(profile_.s[7]) * 1000) {
+    // S7 limits the wait for the network connection. Once it is open, the handshake sound and
+    // the fixed, configured pause before CONNECT are not part of that wait.
+    if (stage_ == CallStage::kConnecting && now - since_ >= uint32_t(profile_.s[7]) * 1000) {
         finish(state == SocketState::kResolving ? atcmd::Result::kNoDialTone
                                                 : atcmd::Result::kNoAnswer);
         return;

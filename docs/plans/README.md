@@ -30,7 +30,7 @@ whole window.
 | 01 | v2.1 | [Process gates, docs and decisions](../history/wp-01-process-gates.md) | Sonnet / medium | M | - |
 | 02 | v2.2 | [Serial output never blocks the loop](../history/wp-02-nonblocking-sinks.md) | Opus / high | M-L | 01 |
 | 03 | v2.3 | [Hardware tests cannot freeze the modem](../history/wp-03-hwtest-bounds.md) | Sonnet / high | M | 02 |
-| 04 | v2.4 | [Incoming-call limits](wp-04-incoming-limits.md) | Sonnet / high | M | 01 |
+| 04 | v2.4 | [Incoming-call limits](../history/wp-04-incoming-limits.md) | Sonnet / high | M | 01 |
 | 05 | v2.5 | [Wi-Fi join, factory reset, scan names](wp-05-wifi-reset-scan.md) | Sonnet / medium | S-M | 01 |
 | 06 | v2.6 | [Web server: read-only start, hand-shakes, lock-out](wp-06-web-server.md) | Opus / medium | M-L | 02 |
 | 07 | v2.7 | [Small settings and parser guards; screen time-out](wp-07-small-guards.md) | Sonnet / medium | M-L | 01 |
@@ -106,7 +106,7 @@ the package confirms each first.
 
 | Finding | Summary | WP | Status |
 | --- | --- | --- | --- |
-| SEC-01 | Caller who never hangs up holds the line (8-ring limit, keepalive) | 04 | open |
+| SEC-01 | Caller who never hangs up holds the line (8-ring limit, keepalive) | 04 | done (v2.4; (c) browser reject not done, optional) |
 | SEC-02 | Wrong Digest response or half header stalls the web task | 06 | open |
 | SEC-03 | ESP-IDF 4.4 / Arduino 2.0.17 end-of-life | 18, 19 | open |
 | SEC-04 | Wi-Fi scan names printed with control bytes | 05 | open |
@@ -161,7 +161,7 @@ the package confirms each first.
 | 5.5-09 | IPCP Terminate-Request resets the 30 s time-out | 10 | open |
 | 5.5-10 | Transfer inactivity reset by any byte; missing "OO" | 10 | open |
 | 5.5-11 | Size probe looks only at the first `ESC[` | 10 | open |
-| 5.5-12 | S7 runs during the handshake sound | 04 | open |
+| 5.5-12 | S7 runs during the handshake sound | 04 | done (v2.4; confirmed by a test) |
 | 5.5-13 | `captureBegin()` failure ignored; `runs` unchecked | 02 | done (v2.2) |
 | 5.5-14 | Menu paging, Alt+letter after cancel, "too long" flag | 15 | open |
 | 5.5-15 | `validPassword` rejects UTF-8; `validServer` accepts `a..b` | 12 | open |
@@ -169,14 +169,14 @@ the package confirms each first.
 | 5.5-17 | Upload double press, reconnect loop, no reload | 11 | open |
 | 5.5-18 | `.env` BOM/UTF-16, `bump_version` CRLF, hotkey substring | 01 | done (v2.1) |
 | 5.5-19 | `AT*FACTORY` leaves driver-stored Wi-Fi credentials | 12 | open |
-| TG-01 | Remote `+++` test has no guard times | 04 | open |
+| TG-01 | Remote `+++` test has no guard times | 04 | done (v2.4) |
 | TG-02 | No canary sweep for both passwords and the Digest hash | 09 | open |
 | TG-03 | No hostile PPP or X/Y/ZMODEM input tests | 10 | open |
-| TG-04 | Telnet storm, full queue, IAC from an answer-mode caller | 04 | open |
+| TG-04 | Telnet storm, full queue, IAC from an answer-mode caller | 04 | done (v2.4) |
 | TG-05 | Digest parser guards, nonce cases, `ImageCheck(true, ...)` | 09 | open |
 | TG-06 | 2^32 ms wrap, throttle above 300 bps, S3/S5 edges | 09 | open |
 | TG-07 | Pin lock test skipped when `.env` overrides pins | 01 | done (v2.1) |
-| TG-08 | Tests behind STA-01, STA-04, STA-05, SEC-04, SEC-01 | 02, 04, 05 | open (STA-01 part done v2.2) |
+| TG-08 | Tests behind STA-01, STA-04, STA-05, SEC-04, SEC-01 | 02, 04, 05 | open (STA-01 part done v2.2; SEC-01 part done v2.4) |
 | TG-09 | e2e serial ports have no write time-out (runs hang) | 08 | open |
 | TG-10 | Asserts can print the Wi-Fi or device password | 08 | open |
 | TG-11 | `test_board` uses the production settings store | 08 | open |

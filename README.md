@@ -77,9 +77,11 @@ data itself runs at full speed unless `AT*THROTTLE=ON`.
 The modem listens on Telnet port 23 while on Wi-Fi. A caller hears no password prompt.
 `RING` appears on every port, RI follows the UK double ring and the AA light flashes.
 `ATA` answers on the port you type it on. `ATS0=n` answers automatically after `n`
-rings on the port chosen with `AT*ANSWERPORT`. The default, `AUTO`, picks the first port
+rings (at most 8) on the port chosen with `AT*ANSWERPORT`. The default, `AUTO`, picks the first port
 with DTR on (a program has it open), in the order RS232, USB, console. Only one call at a
-time: further callers are turned away.
+time: further callers are turned away. A call that nobody answers is dropped after 8
+rings (about 24 s), and a caller who vanishes without hanging up is dropped after about
+2 minutes (TCP keepalive).
 
 A caller only ever sends data. They can't reach command mode, `AT*` commands, the
 configuration screen or the hardware tests, even with `+++` or Telnet commands.

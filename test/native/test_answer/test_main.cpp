@@ -254,19 +254,110 @@ void test_ri_uses_uk_double_ring_even_when_muted() {
     r.poll(2000);
     TEST_ASSERT_TRUE(r.call.ri());
 }
-void test_ring_clock_rollover_saturation_and_delayed_poll() {
+void test_ring_clock_rollover_and_delayed_poll() {
     clockMs = UINT32_MAX - 50;
     Rig r;
     r.modem.setAnswerPort(modemcfg::AnswerPort::kRs232);  // no DTR: rings without answering
     r.modem.active().s[0] = 255;
     r.host.tick(clockMs, false);
     r.ring();
-    r.poll(9000, false);
+    r.poll(9000, false);  // one late poll is one ring, not a burst
     TEST_ASSERT_EQUAL(2, r.modem.active().s[1]);
-    for (unsigned i = 0; i < 260; ++i)
-        r.poll(3000, false);
-    TEST_ASSERT_EQUAL(255, r.modem.active().s[1]);
     TEST_ASSERT_TRUE(r.call.ringing());
+}
+// SEC-01: a caller nobody answers is dropped after kMaxRings rings (8, about 24 s).
+class Journal : public Observer {
+public:
+    unsigned started_ = 0, connected_ = 0, ended_ = 0;
+    bool incoming = false;
+    atcmd::Result result = atcmd::Result::kOk;
+    void started(bool in, const Entry &) override {
+        ++started_;
+        incoming = in;
+    }
+    void connected(hostport::Session &) override { ++connected_; }
+    void ended(atcmd::Result r) override {
+        ++ended_;
+        result = r;
+    }
+};
+void test_unanswered_call_is_dropped_after_eight_rings_for_any_s0() {
+    // S0 = 0 never answers; S0 = 255 is treated as 8, but there is no DTR to answer with.
+    for (unsigned s0 : {0u, 255u}) {
+        Rig r;
+        Journal journal;
+        r.call.setObserver(&journal);
+        r.modem.setAnswerPort(modemcfg::AnswerPort::kRs232);
+        r.modem.active().s[0] = s0;
+        r.modem.active().v[modemcfg::kM] = 1;  // the ring sound plays until the drop
+        r.host.tick(clockMs, false);
+        r.ring();
+        TEST_ASSERT_EQUAL(1, journal.started_);
+        TEST_ASSERT_TRUE(journal.incoming);
+        for (unsigned ring = 2; ring <= 8; ++ring) {
+            r.poll(3000, false);
+            TEST_ASSERT_TRUE(r.call.ringing());
+            TEST_ASSERT_EQUAL(s0 ? ring : 0, r.modem.active().s[1]);
+        }
+        r.poll(2999, false);  // 8th ring was 2999 ms ago: still ringing
+        TEST_ASSERT_TRUE(r.call.ringing());
+        TEST_ASSERT_TRUE(r.sound.active);
+        r.poll(1, false);  // the 9th ring would be due: drop instead
+        TEST_ASSERT_FALSE(r.call.ringing());
+        TEST_ASSERT_EQUAL(int(IncomingStage::kIdle), int(r.call.stage()));
+        TEST_ASSERT_FALSE(r.slot.busy());
+        TEST_ASSERT_FALSE(r.call.ri());
+        TEST_ASSERT_FALSE(r.sound.active);
+        TEST_ASSERT_EQUAL(int(SocketState::kClosed), int(r.socket.state()));
+        TEST_ASSERT_EQUAL(0, r.modem.active().s[1]);
+        TEST_ASSERT_EQUAL(1, journal.ended_);
+        TEST_ASSERT_EQUAL(0, journal.connected_);
+        TEST_ASSERT_EQUAL(int(atcmd::Result::kNoCarrier), int(journal.result));
+        // The line is free again: the next caller rings.
+        r.ring();
+        TEST_ASSERT_TRUE(r.call.ringing());
+        TEST_ASSERT_EQUAL(2, journal.started_);
+    }
+}
+void test_s0_above_eight_answers_on_ring_eight() {
+    for (unsigned s0 : {8u, 20u, 255u}) {
+        Rig r;
+        r.modem.setAnswerPort(modemcfg::AnswerPort::kConsole);
+        r.modem.active().s[0] = s0;
+        r.ring();
+        for (unsigned ring = 2; ring <= 7; ++ring) {
+            r.poll(3000);
+            TEST_ASSERT_FALSE(r.console.callUp());
+            TEST_ASSERT_EQUAL(ring, r.modem.active().s[1]);
+        }
+        r.poll(3000);  // ring 8
+        TEST_ASSERT_TRUE(r.console.callUp());
+        TEST_ASSERT_NOT_EQUAL(std::string::npos, r.output.text.find("CONNECT"));
+    }
+}
+void test_s0_below_eight_still_answers_on_its_own_ring() {
+    Rig r;
+    r.modem.setAnswerPort(modemcfg::AnswerPort::kConsole);
+    r.modem.active().s[0] = 7;
+    r.ring();
+    for (unsigned i = 0; i < 5; ++i) {
+        r.poll(3000);
+    }
+    TEST_ASSERT_FALSE(r.console.callUp());
+    r.poll(3000);
+    TEST_ASSERT_TRUE(r.console.callUp());
+}
+void test_answering_before_the_drop_keeps_the_call() {
+    Rig r;
+    r.ring();
+    for (unsigned i = 0; i < 6; ++i) {
+        r.poll(3000);
+    }
+    r.send("ATA\r");  // 18 s: before the drop
+    TEST_ASSERT_TRUE(r.console.callUp());
+    r.poll(60000);
+    TEST_ASSERT_TRUE(r.console.callUp());
+    TEST_ASSERT_TRUE(r.slot.busy());
 }
 void test_extra_callers_rejected_during_ring_and_online() {
     Rig r;
@@ -393,6 +484,82 @@ void test_remote_commands_and_guarded_escape_are_data_even_locally_escaped() {
     r.send("ATO\r");
     TEST_ASSERT_EQUAL_STRING(attack.c_str(), r.receive().c_str());
     TEST_ASSERT_TRUE(r.socket.output.find("password") == std::string::npos);
+}
+// TG-01: guard times on the remote side. If remote bytes ever reached the escape detector,
+// "data", 1.2 s of silence, "+++", 1.2 s of silence would drop the call into command mode.
+void test_remote_escape_with_guard_times_stays_data_on_every_answer_port() {
+    using modemcfg::AnswerPort;
+    for (AnswerPort port : {AnswerPort::kConsole, AnswerPort::kRs232, AnswerPort::kUsb}) {
+        Rig r;
+        r.usbDtr = true;
+        r.poll(51, true);
+        r.poll(51, true);  // past the DTR filters
+        r.modem.setAnswerPort(port);
+        hostport::Session &local = port == AnswerPort::kConsole ? r.console
+                                   : port == AnswerPort::kRs232 ? r.host
+                                                                : r.usb;
+        Output &out = port == AnswerPort::kConsole ? r.output
+                      : port == AnswerPort::kRs232 ? r.hostOutput
+                                                   : r.usbOutput;
+        r.ring();
+        const char *ata = "ATA\r";
+        local.fromHost(reinterpret_cast<const uint8_t *>(ata), strlen(ata), clockMs);
+        TEST_ASSERT_TRUE(local.callUp());
+        out.take();
+        std::string received;
+        auto drain = [&]() {  // the real loop reads the port on every pass
+            uint8_t bytes[64];
+            received.append(reinterpret_cast<char *>(bytes), local.toHost(bytes, sizeof bytes));
+        };
+        r.socket.input = "data";
+        for (int i = 0; i < 12; ++i) {
+            r.poll(100, true);
+            drain();
+        }
+        r.socket.input = "+++";
+        for (int i = 0; i < 12; ++i) {
+            r.poll(100, true);
+            drain();
+        }
+        TEST_ASSERT_TRUE(local.callUp());
+        TEST_ASSERT_EQUAL(int(hostport::Mode::kOnline), int(local.mode()));
+        TEST_ASSERT_EQUAL(std::string::npos, out.text.find("OK"));
+        TEST_ASSERT_EQUAL_STRING("data+++", received.c_str());
+        TEST_ASSERT_EQUAL(std::string::npos, r.socket.output.find("OK"));  // no reply to caller
+    }
+}
+// TG-04: Telnet commands from a caller are consumed by the Telnet layer, before and after
+// ATA. They never become data and never reach an AT parser.
+void test_iac_from_a_caller_never_becomes_data_or_commands() {
+    Rig r;
+    r.socket.chunk = 1;
+    r.ring();
+    const std::string iac =
+        "\xFF\xFD\x63\xFF\xFB\x01\xFF\xFE\x63\xFF\xFA\x18\x01\xFF\xF0"
+        "\xFF\xFA\x63"
+        "AT*PASS=canary\r"
+        "\xFF\xF0";
+    r.socket.input = "A" + iac + "B";
+    for (size_t i = 0, n = r.socket.input.size() + 20; i < n; ++i) {
+        r.poll(30);
+    }
+    r.send("ATA\r");
+    TEST_ASSERT_TRUE(r.console.callUp());
+    TEST_ASSERT_EQUAL_STRING("AB", r.receive().c_str());  // only the real data, after ATA
+    r.socket.input = iac +
+                     "C\xFF\xFF"
+                     "D";
+    for (size_t i = 0, n = r.socket.input.size() + 20; i < n; ++i) {
+        r.poll(30);
+    }
+    TEST_ASSERT_EQUAL_STRING(
+        "C\xFF"
+        "D",
+        r.receive().c_str());
+    TEST_ASSERT_EQUAL(0, dispatched);
+    TEST_ASSERT_TRUE(r.console.callUp());
+    TEST_ASSERT_EQUAL(std::string::npos, r.output.text.find("ERROR"));
+    TEST_ASSERT_EQUAL(std::string::npos, r.output.text.find("canary"));
 }
 void test_preanswer_payload_is_preserved_and_never_parsed() {
     Rig r;
@@ -707,7 +874,11 @@ int main() {
     RUN_TEST(test_auto_answer_uses_selected_port_and_exact_ring_threshold);
     RUN_TEST(test_s0_one_answers_first_ring_without_silent_delay);
     RUN_TEST(test_ri_uses_uk_double_ring_even_when_muted);
-    RUN_TEST(test_ring_clock_rollover_saturation_and_delayed_poll);
+    RUN_TEST(test_ring_clock_rollover_and_delayed_poll);
+    RUN_TEST(test_unanswered_call_is_dropped_after_eight_rings_for_any_s0);
+    RUN_TEST(test_s0_above_eight_answers_on_ring_eight);
+    RUN_TEST(test_s0_below_eight_still_answers_on_its_own_ring);
+    RUN_TEST(test_answering_before_the_drop_keeps_the_call);
     RUN_TEST(test_extra_callers_rejected_during_ring_and_online);
     RUN_TEST(test_existing_call_prevents_acceptance);
     RUN_TEST(test_pending_ath_and_atz_cancel_and_next_ata_without_caller_errors);
@@ -716,6 +887,8 @@ int main() {
     RUN_TEST(test_handshake_completion_and_failures_cleanup);
     RUN_TEST(test_remote_disconnect_and_wifi_loss_release_every_stage);
     RUN_TEST(test_remote_commands_and_guarded_escape_are_data_even_locally_escaped);
+    RUN_TEST(test_remote_escape_with_guard_times_stays_data_on_every_answer_port);
+    RUN_TEST(test_iac_from_a_caller_never_becomes_data_or_commands);
     RUN_TEST(test_preanswer_payload_is_preserved_and_never_parsed);
     RUN_TEST(test_answerport_persistence_reset_rollback_and_busy_rejection);
     RUN_TEST(test_answerport_accepts_usb_and_auto_and_rejects_unknown);

@@ -87,7 +87,7 @@ are stored for compatibility only.
 
 | Register | Meaning | Factory |
 |---|---|---|
-| S0 | Auto-answer after this many rings; 0 manual (`ATA`) only | 0 |
+| S0 | Auto-answer after this many rings; 0 manual (`ATA`) only. A call nobody answers is dropped after 8 rings (about 24 s), so a value above 8 answers on ring 8 | 0 |
 | S1 | Ring count of the current call (read only, never saved) | 0 |
 | S2 | Escape character; above 127 disables `+++` | 43 (`+`) |
 | S3 | Command terminator | 13 (CR) |
@@ -132,9 +132,20 @@ are stored for compatibility only.
 `NO ANSWER`, with numeric forms under `ATV0`. For calls:
 
 - `BUSY`: the remote host refused the connection.
-- `NO ANSWER`: no connection within `S7` seconds.
+- `NO ANSWER`: no connection within `S7` seconds. `S7` counts only the wait for the network
+  connection; once it is open, the handshake sound is not cut short.
 - `NO DIAL TONE`: no Wi-Fi, or the host name could not be looked up.
 - `NO CARRIER`: the call ended, a key was pressed while dialling, or a sound file is missing.
+  It also follows when the other end vanishes without hanging up: the modem sends TCP
+  keepalive probes (idle 60 s, then 6 probes 10 s apart), so a dead peer ends the call
+  after about 2 minutes. This applies to outgoing and incoming calls.
+
+### Incoming calls
+
+A call on port 23 rings every 3 s (`RING` on every port, RI and the ring sound). Nobody
+answering is not the end of the line: after **8 rings** (about 24 s) the modem hangs up on
+the caller, frees the line and records it in the call log. The limit is fixed: it has no
+`AT*` command. `S0` above 8 counts as 8. `ATA` before the 8th ring answers as usual.
 
 ## Dialling
 
