@@ -14,6 +14,12 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.14] - 2026-11-13
+
+### Changed
+
+- Tidy main.cpp; skip web status with no browser
+
 ## [2.13] - 2026-11-12
 
 ### Added

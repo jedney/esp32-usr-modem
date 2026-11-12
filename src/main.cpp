@@ -1,24 +1,19 @@
-// USR Modem Emulator - firmware entry point.
+// USR Modem Emulator - firmware entry point: creates the services and runs the main loop.
 //
-// v0.5: two serial ports run the Sportster AT command parser (lib/atcmd) on the same
-// settings stored in NVS (lib/modemcfg, hw::NvsStore):
-//   - the USB maintenance console (UART0, fixed 115200 8N1);
+// Four local ports run the Sportster AT command parser (lib/atcmd) on one set of settings
+// stored in NVS (lib/modemcfg, hw::NvsStore). Each has a session (lib/hostport) with
+// command, online and online-command modes, and its own configuration screen (lib/config):
+//   - the maintenance console (UART0, fixed 115200 8N1);
 //   - the RS232 host port (UART1, rs232.cpp): speed from "AT" or AT*BAUD, flow control,
-//     DTR, DCD.
-// Each port has a session (lib/hostport) with command, online and online-command modes;
-// AT*TESTCALL makes a test call to a built-in echo. The front-panel LEDs follow brief
-// table 5.4. Project commands are in the AT* table below; AT*HW... are the hardware
-// tests (hwconsole.cpp).
-//
-// v0.6: Wi-Fi (one saved network, DHCP or static IP), mDNS name and the NTP clock
-// (lib/netcfg, hw::EspRadio). ARQ and the on-board RGB LED show the Wi-Fi state. The
-// boot banner waits up to 8 s for the network; later changes are printed on the console.
-// v0.7: device credentials, password-authenticated OTA with an optional ten-minute
-// window, and a confirmed factory reset (lib/devicecfg, hw::EspCrypto/OtaService).
-// v0.8 adds outgoing TCP/Telnet calls and streaming audio. v0.9 adds port-23
-// incoming calls, ATA/S0 and a saved RS232/console auto-answer destination.
-// v2.0: the USB modem port (usbport.cpp), a third local port on the S3's native USB with
-// its own session, menu and client record; AT*ANSWERPORT gains USB and AUTO.
+//     DTR, DCD, RI;
+//   - the USB modem port on the S3's native USB (usbport.cpp);
+//   - the browser terminal (web page, hw::WebService), read-only until E is pressed.
+// One call at a time (hostport::CallSlot): outgoing Telnet/TCP (calls::Outgoing),
+// incoming on port 23 (calls::Incoming), PPP/SLIP Internet dial-up (lib/internet) and the
+// AT*TESTCALL echo. Wi-Fi, mDNS and the NTP clock are in lib/netcfg; device credentials,
+// OTA and factory reset in lib/devicecfg. The front-panel LEDs follow brief table 5.4.
+// Project commands are in lib/config (registry.cpp) with the hooks below; AT*HW... are
+// the hardware tests (hwconsole.cpp), run on the port they were typed on.
 #include <Arduino.h>
 #include <LittleFS.h>
 
@@ -953,19 +948,26 @@ void browserWaiting(uint32_t id) {
     webServer.write(id, reinterpret_cast<const uint8_t *>(message), sizeof message - 1);
     browserAccess(id, false);
 }
-void publishWebStatus() {
-    static uint32_t ledAt = 0, wifiAt = 0, clockAt = 0;
-    uint32_t now = millis();
-    if (now - ledAt >= 50) {
-        ledAt = now;
+// --- Web page status messages (web/PROTOCOL.md) ---------------------------------------
+// Each one is rebuilt on its own interval or when it changes; `force` rebuilds it now.
+
+void publishLeds(uint32_t now, bool force) {
+    static uint32_t at = 0;
+    if (force || now - at >= 50) {
+        at = now;
         webServer.snapshot(0, "{\"t\":\"led\",\"m\":" + std::to_string(hw::ledsMask()) + "}");
     }
-    int64_t epoch = net.utcNow();
-    int offset = epoch > 0 ? netcfg::tz::offsetAt(net.zone(), epoch) / 60 : 0;
+}
+
+void publishClock(uint32_t now, bool force) {
+    static uint32_t at = 0;
     static int lastOffset = -9999;
     static bool clockSet = false;
-    if (!clockAt || now - clockAt >= 60000 || clockSet != (epoch > 0) || offset != lastOffset) {
-        clockAt = now;
+    static netcfg::tz::OffsetCache offsets;  // offsetAt() is slow for every pass (PERF-02)
+    int64_t epoch = net.utcNow();
+    int offset = epoch > 0 ? offsets.at(net.zone(), epoch) / 60 : 0;
+    if (force || now - at >= 60000 || clockSet != (epoch > 0) || offset != lastOffset) {
+        at = now;
         clockSet = epoch > 0;
         lastOffset = offset;
         webServer.snapshot(1,
@@ -973,31 +975,32 @@ void publishWebStatus() {
                                ",\"tzo\":" + std::to_string(offset) + "}",
                            true);
     }
+}
+
+void publishWifi(uint32_t now, bool force) {
+    static uint32_t at = 0;
     static netcfg::LinkState lastState = netcfg::LinkState::kOff;
     static uint32_t lastIp = 0;
-    if (!wifiAt || now - wifiAt >= 10000 || net.link().state != lastState ||
-        net.link().ip != lastIp) {
-        wifiAt = now;
-        lastState = net.link().state;
-        lastIp = net.link().ip;
-        char ip[16];
-        netcfg::formatIp(net.link().ip, ip, sizeof ip);
-        const char *state = net.up()                                             ? "up"
-                            : net.link().state == netcfg::LinkState::kConnecting ? "connecting"
-                                                                                 : "down";
-        webServer.snapshot(2,
-                           std::string("{\"t\":\"wifi\",\"state\":\"") + state +
-                               "\",\"ssid\":" + webinterface::jsonString(net.settings().ssid) +
-                               ",\"rssi\":" + std::to_string(net.link().rssi) +
-                               ",\"ip\":" + webinterface::jsonString(ip) + "}",
-                           true);
-    }
-    // The call summary is rebuilt at most ten times a second, not on every loop pass.
-    static uint32_t callAt = 0;
-    if (callAt && now - callAt < 100) {
+    if (!force && now - at < 10000 && net.link().state == lastState && net.link().ip == lastIp) {
         return;
     }
-    callAt = now ? now : 1;
+    at = now;
+    lastState = net.link().state;
+    lastIp = net.link().ip;
+    char ip[16];
+    netcfg::formatIp(net.link().ip, ip, sizeof ip);
+    const char *state = net.up()                                             ? "up"
+                        : net.link().state == netcfg::LinkState::kConnecting ? "connecting"
+                                                                             : "down";
+    webServer.snapshot(2,
+                       std::string("{\"t\":\"wifi\",\"state\":\"") + state +
+                           "\",\"ssid\":" + webinterface::jsonString(net.settings().ssid) +
+                           ",\"rssi\":" + std::to_string(net.link().rssi) +
+                           ",\"ip\":" + webinterface::jsonString(ip) + "}",
+                       true);
+}
+
+const char *webCallState() {
     const char *state = "idle";
     if ((consoleClient && consoleClient->isOpen()) || (hostClient && hostClient->isOpen()) ||
         (usbClient && usbClient->isOpen())) {
@@ -1016,7 +1019,17 @@ void publishWebStatus() {
                browserMenu->isOpen()) {
         state = "config";
     }
-    std::string call = std::string("{\"t\":\"call\",\"state\":\"") + state + '"';
+    return state;
+}
+
+// The call summary is rebuilt at most ten times a second, not on every loop pass.
+void publishCall(uint32_t now, bool force) {
+    static uint32_t at = 0;
+    if (!force && now - at < 100) {
+        return;
+    }
+    at = now;
+    std::string call = std::string("{\"t\":\"call\",\"state\":\"") + webCallState() + '"';
     if (journal.active()) {
         const auto &r = journal.current();
         const bool internet = r.kind == calls::Kind::Ppp || r.kind == calls::Kind::Slip;
@@ -1045,6 +1058,26 @@ void publishWebStatus() {
     }
     webServer.snapshot(3, call + "}");
 }
+
+// Nothing is built while no browser is connected (PERF-02). A browser that arrives
+// after none gets all four messages rebuilt in the same pass.
+void publishWebStatus() {
+    static bool hadBrowser = false;
+    bool browser = false;
+    for (unsigned i = 0; i < hw::WebService::kClients && !browser; ++i) {
+        browser = webServer.clientId(i) != 0;
+    }
+    bool force = browser && !hadBrowser;
+    hadBrowser = browser;
+    if (!browser) {
+        return;
+    }
+    uint32_t now = millis();
+    publishLeds(now, force);
+    publishClock(now, force);
+    publishWifi(now, force);
+    publishCall(now, force);
+}
 void pollBrowser() {
     char ip[16];
     netcfg::formatIp(net.link().ip, ip, sizeof ip);
@@ -1071,7 +1104,7 @@ void pollBrowser() {
                      rs232::session().port().lineEmpty() && usbport::session().port().lineEmpty() &&
                      net.joinResult() != netcfg::JoinResult::kRunning &&
                      net.scanState() != netcfg::ScanState::kRunning;
-        if (allow && owner) {
+        if (allow) {  // only the browser with the configuration screen may upload
             webServer.discardInput(browserClient);
             browserSession->hangUp();
             hwconsole::restoreBrowserResources();
@@ -1162,10 +1195,14 @@ void pollBrowser() {
             browserSession->tick(millis(), true);
             hwconsole::restoreBrowserResources();
             if (!strncmp(departure, "*DIAL=", 6)) {
-                browserSession->port().line("Dialling on the RS232 host port.");
-                if (rs232::session().mode() == hostport::Mode::kCommand &&
-                    rs232::session().port().lineEmpty()) {
-                    rs232::session().port().execute(departure);
+                // Check first that the RS232 port can take the dial (MNT-05a).
+                auto &host = rs232::session();
+                if (host.mode() == hostport::Mode::kCommand && !host.localOpen() &&
+                    host.port().lineEmpty()) {
+                    browserSession->port().line("Dialling on the RS232 host port.");
+                    host.port().execute(departure);
+                } else {
+                    browserSession->port().line("The RS232 host port is busy: not dialled.");
                 }
             } else {
                 browserSession->port().execute(departure);
@@ -1304,7 +1341,6 @@ void loop() {
     }
     const uint32_t now = millis();
     internetNetwork.poll();
-    internetDialer->poll();
     pollBrowser();
     if (webServer.uploading()) {
         net.tick(millis());
