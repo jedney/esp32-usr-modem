@@ -58,7 +58,7 @@ public:
     bool erase() override {
         bool ready = bool(LittleFS.open("/"));
         if (!ready) {
-            return false;
+            return true;  // not mounted: there is nothing to erase
         }
         bool ok = !fileExists(path_) || LittleFS.remove(path_);
         ok = (!fileExists(temporary_) || LittleFS.remove(temporary_)) && ok;

@@ -178,6 +178,7 @@ private:
     uint32_t joinAt_ = 0;
     uint32_t joinTryAt_ = 0;
     uint32_t joinTimeout_ = kJoinTimeoutMs;
+    Settings baseline();
     Settings browserPrevious_ = {};
     bool browserGuard_ = false;
     uint32_t browserAt_ = 0;

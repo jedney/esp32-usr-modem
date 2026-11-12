@@ -14,6 +14,24 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.5] - 2026-11-12
+
+### Fixed
+
+- After a failed Wi-Fi join from the browser, later browser changes (host name, static IP)
+  were answered `OK` and then undone a moment later. A finished join result nobody collected
+  is now cleared when the browser goes and when the next browser change starts.
+- `AT*FACTORY` can finish when LittleFS is not mounted: "not mounted" now counts as
+  "nothing to erase". Before, the reset stopped part-way and repeated at every boot.
+- `AT*WIFISCAN` shows control bytes in a network name (escape sequences, bell) as `?`, so
+  a neighbour's name can't clear the screen or fake a prompt.
+- `AT*WIFI=OFF` and `AT*WIFIFORGET` inside the browser's 60-second window no longer save
+  the browser's unverified change: they start from the settings before it.
+
+### Added
+
+- Tests for all four fixes in `test_netcfg` and `test_devicecfg`.
+
 ## [2.4] - 2026-11-12
 
 ### Added

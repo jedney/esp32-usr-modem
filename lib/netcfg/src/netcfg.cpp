@@ -84,6 +84,7 @@ bool Net::store() {
 void Net::guardBrowserChange(uint32_t nowMs) {
     now_ = nowMs;
     if (!browserGuard_) {
+        clearJoin();  // an old result nobody collected must not fail this change
         browserPrevious_ = s_;
         browserAt_ = nowMs;
         browserGuard_ = true;
@@ -321,11 +322,23 @@ bool Net::apply(const Settings &next, bool cancel) {
         wipe(candidate_.pass, sizeof candidate_.pass);
     }
     s_ = next;
+    if (cancel) {
+        tz::resolve(s_.tz, &zone_, nullptr, 0);  // a dropped browser change may have set it
+    }
     return true;
 }
 
+// The settings a command builds on: while a browser change is unverified, the previous ones.
+// The unverified change is dropped, not saved.
+Settings Net::baseline() {
+    if (!browserGuard_) {
+        return s_;
+    }
+    return browserPrevious_;
+}
+
 bool Net::setEnabled(bool on) {
-    Settings next = s_;
+    Settings next = baseline();
     next.enabled = on;
     bool ok = apply(next, true);
     wipe(next.pass, sizeof next.pass);
@@ -343,7 +356,7 @@ bool Net::setEnabled(bool on) {
 }
 
 bool Net::forget() {
-    Settings next = s_;
+    Settings next = baseline();
     wipe(next.ssid, sizeof next.ssid);
     wipe(next.pass, sizeof next.pass);
     if (!apply(next, true))
