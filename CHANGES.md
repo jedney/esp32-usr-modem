@@ -18,7 +18,24 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ### Changed
 
-- Tidy main.cpp; skip web status with no browser
+- The web page's status messages are built only while a browser is connected; a browser
+  that connects after none gets all of them at once. The clock's UTC offset is cached and
+  worked out again once a minute or when the time zone changes (PERF-02).
+- `src/main.cpp` tidied (MNT-04): one hardware-test terminal class for the RS232 and USB
+  ports, one helper for each repeated block, the firmware's `AT*` commands in a table,
+  and `pollBrowser`, the web status and `setup()` split into named steps. The Internet
+  dialer is polled once per loop pass instead of twice. No other behaviour change.
+
+### Fixed
+
+- A dial chosen in the browser's configuration screen said "Dialling on the RS232 host
+  port." and then did nothing when that port was busy. It now checks first and says the
+  port is busy (MNT-05a).
+
+### Bench checks for Jon (optional)
+
+- `ATI`, a call, `AT*CONFIG`, the web page (status, `E`, a dial from the phonebook) and
+  `AT*HWLED`.
 
 ## [2.13] - 2026-11-12
 

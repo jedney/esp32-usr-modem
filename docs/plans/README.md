@@ -40,7 +40,7 @@ whole window.
 | 11 | v2.11 | [Web page tests and flows](../history/wp-11-web-page.md) | Sonnet / medium | M | 06 |
 | 12 | v2.12 | [Network and storage follow-ups](../history/wp-12-network-storage.md) | Sonnet / high | M-L | 05 |
 | 13 | v2.13 | [Shared native test fixtures](../history/wp-13-test-fixtures.md) | Sonnet / medium | M | 09, 10 |
-| 14 | v2.14 | [`main.cpp` tidy-up](wp-14-main-tidy.md) | Opus / medium | M-L | 02, 03, 06 |
+| 14 | v2.14 | [`main.cpp` tidy-up](../history/wp-14-main-tidy.md) | Opus / medium | M-L | 02, 03, 06 |
 | 15 | v2.15 | [Configuration screen repaint](wp-15-menu-repaint.md) | Opus / high | L | 07 |
 | 16 | v2.16 | [Configuration screen code tidy-up](wp-16-menu-tidy.md) | Sonnet / high | M | 15 |
 | 17 | v2.17 | [Watchdog and phonebook capacity](wp-17-watchdog-phonebook.md) | Opus / high | M | 02, 03, 14 |
@@ -134,13 +134,13 @@ the package confirms each first.
 | STA-09f | Damaged phonebook replaced by the next edit | 07 | done (v2.7) |
 | STA-09g | `sizes_[8]` fits 7 sounds + 1 exactly | 07 | done (v2.7) |
 | PERF-01 | Configuration screen repainted in full on every key | 15 | open |
-| PERF-02 | Web status rebuilt every pass with no browser | 14 | open |
+| PERF-02 | Web status rebuilt every pass with no browser | 14 | done (v2.14) |
 | PERF-03 | Browser output cap, PPP buffer wipe, page hashing | - | accepted (measure first; recorded in WP-01) |
 | MNT-01 | CI version job can never fail | 01 | done (v2.1) |
 | MNT-02 | `uploadfsota` not gated; cppcheck errors don't fail CI | 01 | done (v2.1) |
 | MNT-03 | Text still describes a volume limit | 01 | done (v2.1) |
-| MNT-04 | Long functions in `main.cpp`, `menu.cpp`, `commands.cpp` | 14, 16 | open |
-| MNT-05a | "Dialling on the RS232 host port" printed before the check | 14 | open |
+| MNT-04 | Long functions in `main.cpp`, `menu.cpp`, `commands.cpp` | 14, 16 | open (`main.cpp` done v2.14) |
+| MNT-05a | "Dialling on the RS232 host port" printed before the check | 14 | done (v2.14) |
 | MNT-05b | `demo.js` box characters replaced by `?` | 11 | done (v2.11) |
 | MNT-05c | `build/` not in `.gitignore` | 01 | done (v2.1) |
 | MNT-05d | CLAUDE.md says `espressif32@^6.9.0` | 01 | done (v2.1) |
