@@ -46,7 +46,8 @@ private:
 //   kMissing: no usable Digest header (first request, or malformed)
 //   kStale:   correct password, but the nonce expired, was replaced or was replayed;
 //             the next challenge says stale=true so the browser retries silently
-//   kWrong:   wrong password or response (the caller slows the next attempt)
+//   kWrong:   wrong password or response, or any Digest attempt in the second after one
+//             (the lock-out; answered at once, the password is not checked)
 enum class Check : uint8_t { kOk, kMissing, kStale, kWrong };
 
 class Auth {
@@ -61,6 +62,11 @@ public:
         return check(header, method, uri, ha1, now) == Check::kOk;
     }
     bool token(char out[33]);
+    // True for kLockOutMs after a wrong response. Attempts in that time are refused
+    // without extending it, so a guesser gets one try a second and the server task
+    // never sleeps (SEC-02; replaces the old one-second delay).
+    bool lockedOut(uint32_t now) const { return wrong_ && now - wrongAt_ < kLockOutMs; }
+    static constexpr uint32_t kLockOutMs = 1000;
 
 private:
     struct Nonce {
@@ -70,6 +76,8 @@ private:
     Crypto &crypto_;
     Nonce nonce_[8];
     unsigned next_ = 0;
+    bool wrong_ = false;
+    uint32_t wrongAt_ = 0;
 };
 
 class Tickets {

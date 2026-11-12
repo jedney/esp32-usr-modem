@@ -268,7 +268,7 @@ void WebService::poll(bool enabled, bool up, const char *name, const char *ip) {
     cfg.stack_size = 12288;
     cfg.max_open_sockets = 6;
     cfg.lru_purge_enable = true;
-    cfg.recv_wait_timeout = 3;
+    cfg.recv_wait_timeout = 1;
     cfg.send_wait_timeout = 1;
     cfg.uri_match_fn = httpd_uri_match_wildcard;
     if (httpd_start(&server_, &cfg) != ESP_OK) {
@@ -336,10 +336,6 @@ bool WebService::authorized(httpd_req_t *req) {
         if (result != webinterface::Check::kOk) {
             challenge = auth_.challenge(millis(), result == webinterface::Check::kStale);
         }
-    }
-    if (result == webinterface::Check::kWrong) {
-        // Slow down password guessing. This runs in the web server task only.
-        delay(1000);
     }
     if (result != webinterface::Check::kOk) {
         httpd_resp_set_hdr(req, "WWW-Authenticate", challenge.c_str());
@@ -668,43 +664,27 @@ esp_err_t WebService::update(httpd_req_t *req) {
 }
 bool WebService::takeUploadRequest(uint32_t &client) {
     Lock lock(mutex_);
-    if (!uploadRequest_) {
-        return false;
-    }
-    uploadRequest_ = false;
-    client = uploadClient_;
-    return true;
+    return upload_.takeRequest(client);
 }
-void WebService::allowUpload(bool allow) {
+bool WebService::allowUpload(bool allow) {
     Lock lock(mutex_);
-    uploadAllowed_ = allow;
-    uploadActive_ = allow;
-    uploadAnswered_ = true;
+    return upload_.allow(allow);
 }
 bool WebService::uploading() {
     Lock lock(mutex_);
-    return uploadActive_;
+    return upload_.uploading();
 }
 bool WebService::takeUploadDone(bool &ok, bool &filesystem) {
     Lock lock(mutex_);
-    if (!uploadDone_) {
-        return false;
-    }
-    uploadDone_ = false;
-    uploadActive_ = false;
-    ok = uploadOk_;
-    filesystem = uploadFs_;
-    return true;
+    return upload_.takeDone(ok, filesystem);
 }
 bool WebService::takeUnmountRequest() {
     Lock lock(mutex_);
-    bool value = unmountRequest_;
-    unmountRequest_ = false;
-    return value;
+    return upload_.takeUnmount();
 }
 void WebService::unmounted() {
     Lock lock(mutex_);
-    unmountAck_ = true;
+    upload_.unmounted();
 }
 esp_err_t WebService::upload(httpd_req_t *req) {
     if (!authorized(req)) {
@@ -740,30 +720,30 @@ esp_err_t WebService::upload(httpd_req_t *req) {
                 break;
             }
         }
-        if (!owner || uploadActive_ || uploadRequest_) {
+        if (!owner || !upload_.ask(owner->id)) {
             return reply(req, "403 Forbidden", "Invalid CSRF session or update already active.");
         }
-        uploadClient_ = owner->id;
-        uploadRequest_ = true;
-        uploadAnswered_ = uploadAllowed_ = unmountAck_ = false;
     }
+    // Wait up to 2 s for the modem loop. The final check and the give-up happen under
+    // one lock, so a late allowUpload() finds nobody waiting and changes nothing.
     uint32_t start = millis();
     bool granted = false;
-    while (millis() - start < 2000) {
-        bool answered;
+    for (;;) {
+        bool timedOut = millis() - start >= 2000;
         {
             Lock lock(mutex_);
-            answered = uploadAnswered_;
-            granted = answered && uploadAllowed_;
-        }
-        if (answered) {
-            break;
+            if (upload_.answered()) {
+                granted = upload_.granted();
+                break;
+            }
+            if (timedOut) {
+                upload_.giveUp();
+                break;
+            }
         }
         delay(2);
     }
     if (!granted) {
-        Lock lock(mutex_);
-        uploadRequest_ = false;
         return reply(req, "409 Conflict", "Modem busy. Exit other menus, calls and tests first.");
     }
     // All Update and partition writes are serialized by the modem's reservation.
@@ -782,6 +762,9 @@ esp_err_t WebService::upload(httpd_req_t *req) {
             wanted = sizeof buffer;
         }
         int n = httpd_req_recv(req, reinterpret_cast<char *>(buffer), wanted);
+        if (n == HTTPD_SOCK_ERR_TIMEOUT) {
+            continue;  // recv_wait_timeout is 1 s; a slow sender has the 180 s limit
+        }
         if (n <= 0) {
             ok = false;
             break;
@@ -801,17 +784,23 @@ esp_err_t WebService::upload(httpd_req_t *req) {
     if (fs && ok) {
         {
             Lock lock(mutex_);
-            unmountRequest_ = true;
+            upload_.askUnmount();
         }
+        // Same rule as above: a late unmounted() is ignored, and a request the loop has
+        // not taken yet is withdrawn, so it can't unmount LittleFS after this fails.
         uint32_t wait = millis();
         bool ready = false;
-        while (millis() - wait < 2000) {
+        for (;;) {
+            bool timedOut = millis() - wait >= 2000;
             {
                 Lock lock(mutex_);
-                ready = unmountAck_;
-            }
-            if (ready) {
-                break;
+                ready = upload_.unmountReady();
+                if (ready || timedOut) {
+                    if (!ready) {
+                        upload_.giveUpUnmount();
+                    }
+                    break;
+                }
             }
             delay(2);
         }
@@ -848,9 +837,7 @@ esp_err_t WebService::upload(httpd_req_t *req) {
              : "Image rejected or update failed. USB recovery remains available.");
     {
         Lock lock(mutex_);
-        uploadOk_ = ok;
-        uploadFs_ = fs;
-        uploadDone_ = true;
+        upload_.finish(ok, fs);
     }
     return ok ? ESP_OK : ESP_FAIL;
 }

@@ -145,6 +145,13 @@ class WS:
                 pass
         return bytes(text), messages
 
+    def enter(self):
+        """Every browser starts read-only; E opens the configuration screen when free."""
+        text, messages = self.collect(0.4)
+        self.send(b"e")
+        more, later = self.collect(0.4)
+        return text + more, messages + later
+
     def close(self):
         self.socket.close()
 
@@ -171,6 +178,25 @@ def test_assets_require_digest_and_have_correct_gzip_mime(web):
         require(web.request(path)[0] == 404, "Non-web file exposed")
 
 
+def test_wrong_password_locks_out_for_a_second_without_stalling(web):
+    passwords = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+    passwords.add_password("usr-modem", web.base, "admin", "not-the-password")
+    wrong = urllib.request.build_opener(urllib.request.ProxyHandler({}),
+                                        urllib.request.HTTPDigestAuthHandler(passwords))
+    start = time.monotonic()
+    try:
+        code = wrong.open(web.base + "/api/session", timeout=10).code
+    except urllib.error.HTTPError as error:
+        code = error.code
+    require(code == 401, "Wrong password accepted")
+    # No sleep in the server task: the 401s (and urllib's retries) come back at once.
+    require(time.monotonic() - start < 0.8, "Wrong password stalled the web server")
+    # Inside the lock-out even the right password is refused; a second later it works.
+    require(web.request("/api/session")[0] == 401, "Lock-out did not refuse the next attempt")
+    time.sleep(1.1)
+    require(web.request("/api/session")[0] == 200, "Lock-out lasted longer than a second")
+
+
 def test_wrong_host_is_rejected_before_auth(web):
     require(web.request("/api/session", headers={"Host": "attacker.invalid"}, auth=False)[0] == 403,
             "Foreign Host was accepted")
@@ -184,7 +210,7 @@ def test_large_browser_headers_are_validated_before_compacting(web):
 def test_web_disable_closes_owner_and_serial_can_reenable(web, console):
     try:
         with web.ws() as peer:
-            peer.collect(0.4)
+            peer.enter()
             require(console.command("AT*WEB=OFF")[-1] == "OK", "Web OFF failed")
             time.sleep(0.3)
             require(console.command("AT")[-1] == "OK", "Stopping web damaged modem loop")
@@ -205,19 +231,37 @@ def test_ticket_origin_single_use_and_initial_snapshots(web):
         text, messages = peer.collect(1)
         require({"hello", "led", "wifi", "clock", "call"}.issubset({m["t"] for m in messages}),
                 "Initial status snapshot incomplete")
+        require(b"Read-only" in text and b"MODEM CONFIGURATION" not in text,
+                "Browser did not start read-only")
+        peer.send(b"e")
+        text, messages = peer.collect(0.6)
         require(b"MODEM CONFIGURATION" in text, "Shared browser menu missing")
+        require(any(m.get("t") == "access" and m.get("edit") for m in messages),
+                "E did not grant edit access")
     with web.ws(ticket) as peer:
         require(not peer.accepted, "Reused ticket accepted")
+
+
+def test_open_browser_claims_nothing(web, console):
+    with web.ws() as peer:
+        require(peer.accepted, "Browser refused")
+        peer.collect(0.4)
+        require(b"MODEM CONFIGURATION" in console.raw(b"AT*CONFIG\r"), "Idle browser holds the modem")
+        console.raw(b"\x03", wait=0.2)
 
 
 def test_one_browser_menu_and_second_browser_read_only(web, console):
     with web.ws() as first:
         require(first.accepted, "Browser refused")
-        first.collect(0.4)
+        first.enter()
         with web.ws() as second:
             text, messages = second.collect(0.5)
             require(b"Read-only" in text, "Second browser took menu ownership")
             require(console.command("AT*CONFIG")[-1] == "ERROR", "Serial menu stole browser slot")
+            second.send(b"e")
+            _, messages = second.collect(0.3)
+            require(not any(m.get("t") == "access" and m.get("edit") for m in messages),
+                    "Second browser took the menu with E")
             second.send(b"3\r")
             text, _ = second.collect(0.3)
             require(b"Settings" not in text, "Read-only input invoked menu")
@@ -256,7 +300,7 @@ def manual_rs232(rs232):
 def test_browser_hardware_line_toggles_restore_on_disconnect(web, manual_rs232):
     rs232 = manual_rs232
     with web.ws() as peer:
-        peer.collect(0.4)
+        peer.enter()
         for keys in (b"B\r", b"C\r"):
             peer.send(keys)
             text, _ = peer.collect(0.4)
@@ -283,7 +327,7 @@ def test_upload_rejects_missing_csrf_before_writing(web):
 
 def test_browser_bridge_to_com18_both_directions(web, rs232):
     with web.ws() as peer:
-        peer.collect(0.4)
+        peer.enter()
         for keys in (b"B\r", b"E\r"):
             peer.send(keys)
             text, _ = peer.collect(0.4)
@@ -311,7 +355,7 @@ def test_http_firmware_install_reboots_into_same_tested_version(web, console, re
     version = (root / "VERSION").read_text().strip()
     require(f"USRMODEM/1/FIRMWARE/{version}\n".encode() in image, "Build normal firmware first")
     with web.ws() as peer:
-        _, messages = peer.collect(0.6)
+        _, messages = peer.enter()
         hello = next((m for m in messages if m.get("t") == "hello"), None)
         require(hello is not None, "No authenticated upload session")
         code, _, _ = web.request(f"/api/update?target=firmware&version={version}", data=image,
@@ -325,7 +369,7 @@ def test_http_firmware_install_reboots_into_same_tested_version(web, console, re
 
 def test_read_only_socket_csrf_cannot_claim_an_upload(web):
     with web.ws() as first:
-        first.collect(0.4)
+        first.enter()
         with web.ws() as second:
             _, messages = second.collect(0.4)
             hello = next(m for m in messages if m.get("t") == "hello")
@@ -377,7 +421,7 @@ def test_incoming_rs232_call_keeps_browser_read_only_and_signals_follow(web, con
 
 def test_browser_forget_requires_confirmation_and_cancel_keeps_network(web):
     with web.ws() as peer:
-        peer.collect(0.4)
+        peer.enter()
         peer.send(b"7\r")
         peer.collect(0.3)
         peer.send(b"5\r")
@@ -390,7 +434,7 @@ def test_browser_forget_requires_confirmation_and_cancel_keeps_network(web):
 
 def test_browser_guided_stop_returns_control_without_starting_leds(web, console):
     with web.ws() as peer:
-        peer.collect(0.4)
+        peer.enter()
         for keys in (b"B\r", b"1\r"):
             peer.send(keys)
             text, _ = peer.collect(0.3)
@@ -404,7 +448,7 @@ def test_browser_guided_stop_returns_control_without_starting_leds(web, console)
 
 def test_browser_quit_restores_actual_panel_leds(web):
     with web.ws() as peer:
-        _, initial = peer.collect(0.4)
+        _, initial = peer.enter()
         peer.send(b"q\r")
         _, messages = peer.collect(0.7)
         masks = [m["m"] for m in initial + messages if m.get("t") == "led"]
