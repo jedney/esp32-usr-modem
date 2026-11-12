@@ -1301,15 +1301,10 @@ void Terminal::input(char c) {
         swallowEnter_ = false;
     key(static_cast<unsigned char>(c));
 }
+// One decoded key: Ctrl-L and F1 work everywhere; the rest go to the view in focus.
 void Terminal::key(unsigned key) {
     if (capturing_) {
-        if (key == 27) {
-            // A masked prompt is cancelled directly. A wait (scan, ping, DNS, play) gets the
-            // key, as a typed key on the command line does, so the command stops too.
-            if (!session_.port().cancelPrompt() && session_.port().busy())
-                session_.port().feed(static_cast<char>(27));
-            finishResponse();
-        }
+        capturedKey(key);
         return;
     }
     if (key == 12) {  // Ctrl-L: draw the whole screen again
@@ -1320,111 +1315,136 @@ void Terminal::key(unsigned key) {
         help();
         return;
     }
-    if (focus_ == Focus::Help) {
-        if (key == 27 || key == 'q' || key == 'Q') {
+    if (focus_ == Focus::Help)
+        helpKey(key);
+    else if (focus_ == Focus::Form)
+        formKey(key);
+    else if (focus_ == Focus::Confirm)
+        confirmKey(key);
+    else if (response_ || focus_ == Focus::Details)
+        responseKey(key);
+    else
+        menuKey(key);
+}
+// A command started from the screen is running: only Esc reaches the screen.
+void Terminal::capturedKey(unsigned key) {
+    if (key != 27)
+        return;
+    // A masked prompt is cancelled directly. A wait (scan, ping, DNS, play) gets the
+    // key, as a typed key on the command line does, so the command stops too.
+    if (!session_.port().cancelPrompt() && session_.port().busy())
+        session_.port().feed(static_cast<char>(27));
+    finishResponse();
+}
+// Moves a page through output or help text, or leaves it after the last page.
+void Terminal::pageKey(unsigned key) {
+    if (key == kPageDown || key == '\r' || key == '\n' || key == ' ') {
+        if (more_)
+            responseLine_ += responseRows();
+        else
             back();
-            return;
-        }
-        if (key == kPageDown || key == '\r' || key == '\n') {
-            if (more_)
-                responseLine_ += responseRows();
-            else
-                back();
-        } else if (key == kPageUp)
-            responseLine_ = responseLine_ > responseRows() ? responseLine_ - responseRows() : 0;
-        render();
+    } else if (key == kPageUp)
+        responseLine_ = responseLine_ > responseRows() ? responseLine_ - responseRows() : 0;
+}
+void Terminal::helpKey(unsigned key) {
+    if (key == 27 || key == 'q' || key == 'Q') {
+        back();
         return;
     }
-    if (focus_ == Focus::Form) {
-        if (key == 27) {
-            clearInput();
-            focus_ = Focus::Menu;
-            feedback("Edit cancelled");
-            return;
+    if (key != ' ')  // Space does not page help
+        pageKey(key);
+    render();
+}
+void Terminal::formKey(unsigned key) {
+    if (key == 27) {
+        clearInput();
+        focus_ = Focus::Menu;
+        feedback("Edit cancelled");
+        return;
+    }
+    if (key == kLeft && cursor_)
+        --cursor_;
+    else if (key == kRight && cursor_ < inputLen_)
+        ++cursor_;
+    else if (key == kHome)
+        cursor_ = 0;
+    else if (key == kEnd)
+        cursor_ = inputLen_;
+    else if (key == 21) {
+        devicecfg::wipe(input_, sizeof input_);
+        inputLen_ = cursor_ = 0;
+        inputOverflow_ = false;
+    } else if (key == '\t') {
+        while (cursor_ < inputLen_ && input_[cursor_++] != ',') {
         }
-        if (key == kLeft && cursor_)
-            --cursor_;
-        else if (key == kRight && cursor_ < inputLen_)
-            ++cursor_;
-        else if (key == kHome)
+        if (cursor_ == inputLen_)
             cursor_ = 0;
-        else if (key == kEnd)
-            cursor_ = inputLen_;
-        else if (key == 21) {
-            devicecfg::wipe(input_, sizeof input_);
-            inputLen_ = cursor_ = 0;
-            inputOverflow_ = false;
-        } else if (key == '\t') {
-            while (cursor_ < inputLen_ && input_[cursor_++] != ',') {
-            }
-            if (cursor_ == inputLen_)
-                cursor_ = 0;
-        } else if (key == backspace_ && cursor_) {
-            memmove(input_ + cursor_ - 1, input_ + cursor_, inputLen_ - cursor_ + 1);
-            --cursor_;
-            --inputLen_;
-        } else if (key == kDelete && cursor_ < inputLen_) {
-            memmove(input_ + cursor_, input_ + cursor_ + 1, inputLen_ - cursor_);
-            --inputLen_;
-        } else if (key == '\r' || key == '\n') {
-            submit();
-            return;
-        } else if (key >= 32 && key < 127) {
-            if (inputLen_ + 1 >= sizeof input_) {
-                if (!inputOverflow_)
-                    feedback("Input too long; clear (Ctrl-U) or cancel (Esc) the form");
-                inputOverflow_ = true;
-            } else {
-                memmove(input_ + cursor_ + 1, input_ + cursor_, inputLen_ - cursor_ + 1);
-                input_[cursor_++] = key;
-                ++inputLen_;
-            }
-        }
-        render();
+    } else if (key == backspace_ && cursor_) {
+        memmove(input_ + cursor_ - 1, input_ + cursor_, inputLen_ - cursor_ + 1);
+        --cursor_;
+        --inputLen_;
+    } else if (key == kDelete && cursor_ < inputLen_) {
+        memmove(input_ + cursor_, input_ + cursor_ + 1, inputLen_ - cursor_);
+        --inputLen_;
+    } else if (key == '\r' || key == '\n') {
+        submit();
+        return;
+    } else if (key >= 32 && key < 127)
+        typeCharacter(static_cast<char>(key));
+    render();
+}
+void Terminal::typeCharacter(char c) {
+    if (inputLen_ + 1 >= sizeof input_) {
+        if (!inputOverflow_)
+            feedback("Input too long; clear (Ctrl-U) or cancel (Esc) the form");
+        inputOverflow_ = true;
         return;
     }
-    if (focus_ == Focus::Confirm) {
-        if (key == 'y' || key == 'Y') {
-            dispatchPending();
-            swallowEnter_ = true;
-        } else if (key == 'n' || key == 'N' || key == 27) {
-            clearInput();
-            focus_ = Focus::Menu;
-            feedback("Action cancelled");
-            swallowEnter_ = true;
-        }
+    memmove(input_ + cursor_ + 1, input_ + cursor_, inputLen_ - cursor_ + 1);
+    input_[cursor_++] = c;
+    ++inputLen_;
+}
+void Terminal::confirmKey(unsigned key) {
+    if (key == 'y' || key == 'Y') {
+        dispatchPending();
+        swallowEnter_ = true;
+    } else if (key == 'n' || key == 'N' || key == 27) {
+        clearInput();
+        focus_ = Focus::Menu;
+        feedback("Action cancelled");
+        swallowEnter_ = true;
+    }
+}
+// Command output or phonebook details. The export scrolls instead of paging.
+void Terminal::responseKey(unsigned key) {
+    if (exporting_) {
+        exportKey(key);
         return;
     }
-    if (response_ || focus_ == Focus::Details) {
-        if (exporting_) {
-            if (key == 27 || key == 'q' || key == 'Q')
-                back();
-            else if (key == '\r' || key == '\n' || key == ' ' || key == kPageDown) {
-                if (more_) {
-                    more_ = false;
-                    exportPrompt_ = false;
-                    lines_ = 0;
-                } else if (exportFinished_)
-                    back();
-            }
-            return;
-        }
-        if (key == 27 || key == 'q' || key == 'Q') {
+    if (key == 27 || key == 'q' || key == 'Q') {
+        back();
+        return;
+    }
+    if ((key == 'r' || key == 'R') && liveStatus_)
+        execute("*STATUS");
+    else
+        pageKey(key);
+    render();
+}
+void Terminal::exportKey(unsigned key) {
+    if (key == 27 || key == 'q' || key == 'Q')
+        back();
+    else if (key == '\r' || key == '\n' || key == ' ' || key == kPageDown) {
+        if (more_) {
+            more_ = false;
+            exportPrompt_ = false;
+            lines_ = 0;
+        } else if (exportFinished_)
             back();
-            return;
-        }
-        if (key == kPageDown || key == '\r' || key == '\n' || key == ' ') {
-            if (more_)
-                responseLine_ += responseRows();
-            else
-                back();
-        } else if (key == kPageUp)
-            responseLine_ = responseLine_ > responseRows() ? responseLine_ - responseRows() : 0;
-        else if ((key == 'r' || key == 'R') && liveStatus_)
-            execute("*STATUS");
-        render();
-        return;
     }
+}
+// A menu or the phonebook list: leave, function keys, moves, then Enter and hotkeys.
+void Terminal::menuKey(unsigned key) {
     if (key == kF10 && screen_ == S::Main) {
         close();
         return;
@@ -1445,54 +1465,13 @@ void Terminal::key(unsigned key) {
         activate(*a);
         return;
     }
-    auto &location = locations_[static_cast<unsigned>(screen_)];
-    if (key == kUp || key == kDown) {
-        navigate(key == kUp ? -1 : 1);
+    if (moveKey(key))
         return;
-    }
-    if (screen_ == S::Main && cols_ >= 80 && rows_ >= 25 && (key == kLeft || key == kRight)) {
-        if (key == kRight && location.selected < 6)
-            location.selected += 6;
-        else if (key == kLeft && location.selected >= 6)
-            location.selected = std::min<size_t>(5, location.selected - 6);
-        render();
-        return;
-    }
-    if (key == kPageUp || key == kPageDown) {
-        if (screen_ == S::Phonebook)
-            navigate((key == kPageUp ? -1 : 1) * int(phonebookPageSize()));
-        else {
-            int offset = int(location.selected) + (key == kPageUp ? -1 : 1) * int(visibleItems());
-            location.selected = std::max(0, std::min(int(itemCount()) - 1, offset));
-            if (!enabled(location.selected))
-                navigate(key == kPageUp ? -1 : 1);
-            render();
-        }
-        return;
-    }
     if (screen_ == S::Phonebook && (key == 'i' || key == 'I' || key == '\r' || key == '\n')) {
-        const auto *e = entry();
-        if (!e) {
-            feedback("No selected entry");
-            return;
-        }
-        clearOutput();
-        char text[256];
-        snprintf(text, sizeof text, "Host: %s\nNumber: %s\nPort: %u\nProtocol: %s\n", e->host,
-                 e->number, e->port, e->raw ? "RAW" : "TELNET");
-        append(text);
-        if (e->speed) {
-            snprintf(text, sizeof text, "Configured speed: %lu\n",
-                     static_cast<unsigned long>(e->speed));
-            append(text);
-        } else
-            line("Configured speed: Auto (no entry override)");
-        line("NAME uses the saved host. Rate is not a live measurement.");
-        snprintf(resultTitle_, sizeof resultTitle_, "Phonebook / Details");
-        focus_ = Focus::Details;
-        render();
+        showEntryDetails();
         return;
     }
+    auto &location = locations_[static_cast<unsigned>(screen_)];
     if (key == '\r' || key == '\n') {
         if (screen_ == S::Profile)
             profileAction(location.selected);
@@ -1500,6 +1479,61 @@ void Terminal::key(unsigned key) {
             activate(*item(location.selected));
         return;
     }
+    hotkey(key);
+}
+// Arrows and pages move the selection. False if `key` is not a move.
+bool Terminal::moveKey(unsigned key) {
+    auto &location = locations_[static_cast<unsigned>(screen_)];
+    if (key == kUp || key == kDown) {
+        navigate(key == kUp ? -1 : 1);
+        return true;
+    }
+    if (screen_ == S::Main && cols_ >= 80 && rows_ >= 25 && (key == kLeft || key == kRight)) {
+        if (key == kRight && location.selected < 6)
+            location.selected += 6;
+        else if (key == kLeft && location.selected >= 6)
+            location.selected = std::min<size_t>(5, location.selected - 6);
+        render();
+        return true;
+    }
+    if (key != kPageUp && key != kPageDown)
+        return false;
+    if (screen_ == S::Phonebook)
+        navigate((key == kPageUp ? -1 : 1) * int(phonebookPageSize()));
+    else {
+        int offset = int(location.selected) + (key == kPageUp ? -1 : 1) * int(visibleItems());
+        location.selected = std::max(0, std::min(int(itemCount()) - 1, offset));
+        if (!enabled(location.selected))
+            navigate(key == kPageUp ? -1 : 1);
+        render();
+    }
+    return true;
+}
+void Terminal::showEntryDetails() {
+    const auto *e = entry();
+    if (!e) {
+        feedback("No selected entry");
+        return;
+    }
+    clearOutput();
+    char text[256];
+    snprintf(text, sizeof text, "Host: %s\nNumber: %s\nPort: %u\nProtocol: %s\n", e->host,
+             e->number, e->port, e->raw ? "RAW" : "TELNET");
+    append(text);
+    if (e->speed) {
+        snprintf(text, sizeof text, "Configured speed: %lu\n",
+                 static_cast<unsigned long>(e->speed));
+        append(text);
+    } else
+        line("Configured speed: Auto (no entry override)");
+    line("NAME uses the saved host. Rate is not a live measurement.");
+    snprintf(resultTitle_, sizeof resultTitle_, "Phonebook / Details");
+    focus_ = Focus::Details;
+    render();
+}
+// The letter or digit shown next to an item opens it at once.
+void Terminal::hotkey(unsigned key) {
+    auto &location = locations_[static_cast<unsigned>(screen_)];
     unsigned upper = key < 128 ? std::toupper(static_cast<unsigned char>(key)) : key;
     if (screen_ == S::Profile) {
         const char *found = upper < 128 ? strchr(kKeys, upper) : nullptr;

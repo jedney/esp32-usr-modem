@@ -162,6 +162,18 @@ private:
     void drawForm();
     void drawResponse();
     void key(unsigned key);
+    void capturedKey(unsigned key);
+    void pageKey(unsigned key);
+    void helpKey(unsigned key);
+    void formKey(unsigned key);
+    void typeCharacter(char c);
+    void confirmKey(unsigned key);
+    void responseKey(unsigned key);
+    void exportKey(unsigned key);
+    void menuKey(unsigned key);
+    bool moveKey(unsigned key);
+    void showEntryDetails();
+    void hotkey(unsigned key);
     void sequence();
     void activate(const Action &action);
     void submit();
