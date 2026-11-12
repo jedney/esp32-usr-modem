@@ -343,9 +343,9 @@ void test_oversized_input_is_rejected_without_dispatching_prefix() {
     TEST_ASSERT_EQUAL(14400, r.modem.model());
     TEST_ASSERT_TRUE(r.terminal.isOpen());
 }
-#include "ui_cases.h"
 #include "repaint_cases.h"
 #include "review_cases.h"
+#include "ui_cases.h"
 void test_browser_lists_serial_diagnostics_without_dispatch() {
     Rig r;
     r.session.port().setBrowser(true);
