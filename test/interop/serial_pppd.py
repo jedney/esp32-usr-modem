@@ -71,8 +71,9 @@ def main():
     server = http.server.ThreadingHTTPServer(('0.0.0.0', 32321), Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     report = {}
-    with serial.Serial(args.console_port, 115200, timeout=0.05) as maintenance, \
-            serial.Serial(args.rs232_port, args.baud, timeout=0.02, rtscts=True) as host:
+    with serial.Serial(args.console_port, 115200, timeout=0.05, write_timeout=5) as maintenance, \
+            serial.Serial(args.rs232_port, args.baud, timeout=0.02, rtscts=True,
+                          write_timeout=5) as host:
         console, terminal = Port(maintenance), Port(host)
         console.command('AT*INTERNET=HANGUP', timeout=12)
         terminal.command('ATQ0V1E0M0&B1&H1&R2&I0&D2&C1F0')

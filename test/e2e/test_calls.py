@@ -259,7 +259,8 @@ def test_connection_deadline_and_any_key_cancel(call_console, server_ip):
         assert lines[-1] == "NO ANSWER"
     assert console.command("ATM1S6=5S7=5")[-1] == "OK"
     console.ser.reset_input_buffer()
-    console.ser.write(b"ATDT1\r")
+    # 192.0.2.1 (RFC 5737 TEST-NET-1) never answers, so the connection stays pending.
+    console.ser.write(b"ATDT192.0.2.1:23\r")
     time.sleep(0.1)
     result = console.raw(b"x", wait=0.5)
     cancelled = b"NO CARRIER" in result

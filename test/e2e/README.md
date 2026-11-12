@@ -23,6 +23,7 @@ monitor and any terminal (PuTTY) first: only one program can open a COM port.
 | `--call-server-ip <PC LAN IP>` | Outgoing-call tests against a PC TCP server |
 | `--call-server-port <port>` | That server's port (default 32321) |
 | `--live-bbs` | One real call to `www.amigaretro.com:23` |
+| `--live-internet` | Tests that need the Internet (the DNS lookup in the NAT test) |
 | `--web-tests --web-host usr-modem.local` | HTTP/WebSocket tests (device password from `.env`; `--web-host` may be an IP) |
 | `--browser-upload` | Install the tested firmware through the web interface (with `--web-tests`) |
 | `--udp-tests` | Two optional PPP/SLIP UDP echo cases (PC UDP port 32322 must be reachable) |
@@ -35,6 +36,12 @@ Secrets come from the git-ignored `.env` at the repository root (`USR_MODEM_WIFI
 `USR_MODEM_WIFI_PASS`, `USR_MODEM_PASSWORD`); never put them on the command line. Do not
 use pytest `--showlocals`: test locals hold credentials. Failure messages leave out boot
 banners and upload output.
+
+Every test has a 300 s time-out (`pytest.ini`, plugin `pytest-timeout`; install with
+`pip install -r test/e2e/requirements.txt`) and the serial ports have a 5 s write time-out,
+so a silent modem or a missing CTS fails the test instead of hanging the run. A slow test
+can raise its own limit with `@pytest.mark.timeout(600)`. `--device-tests` refuses to run
+without a valid `USR_MODEM_PASSWORD` in `.env` unless `--save-password` is given.
 
 ## Suites
 

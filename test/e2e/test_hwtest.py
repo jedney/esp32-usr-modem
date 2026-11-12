@@ -97,14 +97,15 @@ def test_bridge_passes_data_both_ways(console, rs232):
     baud = rs232.ser.baudrate
     console.ser.reset_input_buffer()
     console.ser.write(f"AT*HWBRIDGE={baud}\r".encode())
-    assert b"Bridge" in _read_for(console.ser, 0.5)
-    rs232.ser.reset_input_buffer()
+    try:
+        assert b"Bridge" in _read_for(console.ser, 0.5)
+        rs232.ser.reset_input_buffer()
 
-    rs232.ser.write(b"from-pc\r\n")
-    assert b"from-pc" in _read_for(console.ser, 0.5)
+        rs232.ser.write(b"from-pc\r\n")
+        assert b"from-pc" in _read_for(console.ser, 0.5)
 
-    console.ser.write(b"to-pc")
-    assert b"to-pc" in _read_for(rs232.ser, 0.5)
-
-    console.ser.write(b"\x18")  # Ctrl-X ends the bridge
+        console.ser.write(b"to-pc")
+        assert b"to-pc" in _read_for(rs232.ser, 0.5)
+    finally:
+        console.ser.write(b"\x18")  # Ctrl-X ends the bridge, even after a failure
     assert b"OK" in _read_for(console.ser, 0.5)

@@ -134,12 +134,16 @@ def test_bulk_echo_with_hardware_flow_control(console, rs232, baud):
     data = bytes((i * 7 + 3) % 256 for i in range(16384)).replace(b"+", b"-")
     received = b""
     deadline = time.monotonic() + len(data) * 10 / baud * 2 + 5
-    rs232.ser.write_timeout = 0
+    old_timeout = rs232.ser.write_timeout
+    rs232.ser.write_timeout = 0  # non-blocking, so reading continues while CTS holds writes
     sent = 0
-    while len(received) < len(data) and time.monotonic() < deadline:
-        if sent < len(data):
-            sent += rs232.ser.write(data[sent : sent + 1024]) or 0
-        received += rs232.ser.read(rs232.ser.in_waiting or 1)
+    try:
+        while len(received) < len(data) and time.monotonic() < deadline:
+            if sent < len(data):
+                sent += rs232.ser.write(data[sent : sent + 1024]) or 0
+            received += rs232.ser.read(rs232.ser.in_waiting or 1)
+    finally:
+        rs232.ser.write_timeout = old_timeout
     assert len(received) == len(data)
     assert received == data
 

@@ -67,11 +67,18 @@ def test_join_with_masked_password(console, wifi):
         pytest.skip("network name contains a quote")
     lines = console.command("AT*WIFISCAN", timeout=15)
     assert lines[-1] == "OK"
+    # Joining replaces the saved network. If the modem is on another network, a wrong
+    # .env password would lose that one for good, so refuse instead.
+    saved = [x.split(":", 1)[1].strip() for x in console.command("AT*WIFI?")
+             if x.startswith("Network:")]
+    if saved and saved[0] and saved[0] != ssid:
+        pytest.skip("the modem has another network saved; AT*WIFIFORGET first to run this test")
     before, after = _join(console, ssid, password)
     echoed = after.split(b"\r", 1)[0]
-    assert echoed == b"*" * len(password), "the password was not echoed as stars"
-    assert b"Connected, IP " in after
-    assert after.rstrip().endswith(b"OK")
+    masked = echoed == b"*" * len(password)  # boolean: a failed compare must not print it
+    assert masked, "the password was not echoed as stars"
+    connected = b"Connected, IP " in after and after.rstrip().endswith(b"OK")
+    assert connected, "the join did not connect"
     ok = _absent(before + after, password) if password else True
     assert ok, "the password appeared in the output"
 

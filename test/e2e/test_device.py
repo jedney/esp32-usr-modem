@@ -49,9 +49,14 @@ def managed_device(console, request):
     password = getattr(request.config, "_device_test_password", None)
     if password is None:
         candidate = os.environ.get("USR_MODEM_PASSWORD", "")
-        password = candidate if 8 <= len(candidate) <= 32 and all(
-            32 <= ord(c) <= 126 for c in candidate
-        ) else "".join(secrets.choice(ALPHABET) for _ in range(12))
+        known = 8 <= len(candidate) <= 32 and all(32 <= ord(c) <= 126 for c in candidate)
+        if not known and not request.config.getoption("--save-password"):
+            pytest.exit(
+                "--device-tests would set a random device password nobody knows. Put a "
+                "valid USR_MODEM_PASSWORD in .env, or add --save-password.",
+                returncode=2,
+            )
+        password = candidate if known else "".join(secrets.choice(ALPHABET) for _ in range(12))
         request.config._device_test_password = password
     _ok(console, "ATE0Q0V1")
     _ok(console, "AT*PASS=" + password)
