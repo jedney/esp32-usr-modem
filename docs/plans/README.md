@@ -36,7 +36,7 @@ whole window.
 | 07 | v2.7 | [Small settings and parser guards; screen time-out](../history/wp-07-small-guards.md) | Sonnet / medium | M-L | 01 |
 | 08 | v2.8 | [Bench harness safety](../history/wp-08-bench-harness.md) | Sonnet / medium | M | 01 |
 | 09 | v2.9 | [Security regression tests](../history/wp-09-security-tests.md) | Sonnet / high | M | 07 |
-| 10 | v2.10 | [Hostile-input tests: PPP, X/Y/ZMODEM](wp-10-hostile-input.md) | Sonnet / high | M-L | 01 |
+| 10 | v2.10 | [Hostile-input tests: PPP, X/Y/ZMODEM](../history/wp-10-hostile-input.md) | Sonnet / high | M-L | 01 |
 | 11 | v2.11 | [Web page tests and flows](wp-11-web-page.md) | Sonnet / medium | M | 06 |
 | 12 | v2.12 | [Network and storage follow-ups](wp-12-network-storage.md) | Sonnet / high | M-L | 05 |
 | 13 | v2.13 | [Shared native test fixtures](wp-13-test-fixtures.md) | Sonnet / medium | M | 09, 10 |
@@ -144,7 +144,7 @@ the package confirms each first.
 | MNT-05b | `demo.js` box characters replaced by `?` | 11 | open |
 | MNT-05c | `build/` not in `.gitignore` | 01 | done (v2.1) |
 | MNT-05d | CLAUDE.md says `espressif32@^6.9.0` | 01 | done (v2.1) |
-| MNT-05e | `transfer.h` has no licence / changed mark | 10 | open |
+| MNT-05e | `transfer.h` has no licence / changed mark | 10 | done (v2.10) |
 | MNT-05f | `web/PROTOCOL.md` three mismatches | 06 | done (v2.6) |
 | MNT-05g | Hand-sized tables without `static_assert` | 07 | done (v2.7) |
 | MNT-05h | Web file list kept in three places | 11 | open |
@@ -158,9 +158,9 @@ the package confirms each first.
 | 5.5-06 | `file_store.h` power loss between renames; no backup fallback | 12 | open |
 | 5.5-07 | DNS time counts against the 10 s ping limit | 12 | open |
 | 5.5-08 | Two 1.5 KB copies on the 6 KB lwIP stack | 17 | open |
-| 5.5-09 | IPCP Terminate-Request resets the 30 s time-out | 10 | open |
-| 5.5-10 | Transfer inactivity reset by any byte; missing "OO" | 10 | open |
-| 5.5-11 | Size probe looks only at the first `ESC[` | 10 | open |
+| 5.5-09 | IPCP Terminate-Request resets the 30 s time-out | 10 | done (v2.10) |
+| 5.5-10 | Transfer inactivity reset by any byte; missing "OO" | 10 | done (v2.10) |
+| 5.5-11 | Size probe looks only at the first `ESC[` | 10 | done (v2.10) |
 | 5.5-12 | S7 runs during the handshake sound | 04 | done (v2.4; confirmed by a test) |
 | 5.5-13 | `captureBegin()` failure ignored; `runs` unchecked | 02 | done (v2.2) |
 | 5.5-14 | Menu paging, Alt+letter after cancel, "too long" flag | 15 | open |
@@ -171,7 +171,7 @@ the package confirms each first.
 | 5.5-19 | `AT*FACTORY` leaves driver-stored Wi-Fi credentials | 12 | open |
 | TG-01 | Remote `+++` test has no guard times | 04 | done (v2.4) |
 | TG-02 | No canary sweep for both passwords and the Digest hash | 09 | done (v2.9) |
-| TG-03 | No hostile PPP or X/Y/ZMODEM input tests | 10 | open |
+| TG-03 | No hostile PPP or X/Y/ZMODEM input tests | 10 | done (v2.10) |
 | TG-04 | Telnet storm, full queue, IAC from an answer-mode caller | 04 | done (v2.4) |
 | TG-05 | Digest parser guards, nonce cases, `ImageCheck(true, ...)` | 09 | done (v2.9) |
 | TG-06 | 2^32 ms wrap, throttle above 300 bps, S3/S5 edges | 09 | done (v2.9) |

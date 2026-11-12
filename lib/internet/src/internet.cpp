@@ -385,9 +385,14 @@ void Engine::ipcp(const uint8_t *p, size_t n) {
         }
     } else if (p[0] == 5) {
         control(kIpcp, 6, p[1], data, length);
+        // Only a link that was up gets a fresh deadline to renegotiate. Before that, the
+        // 30 s run from the start, so a peer cannot keep a half-open link for ever (5.5-09).
+        const bool wasUp = ready_;
         closeNetwork();
-        started_ = now_;
-        retries_ = 0;
+        if (wasUp) {
+            started_ = now_;
+            retries_ = 0;
+        }
         ipcpLocal_ = ipcpPeer_ = false;
         ++ipcpId_;
         request(true);

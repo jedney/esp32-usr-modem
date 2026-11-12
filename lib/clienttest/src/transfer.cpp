@@ -68,6 +68,7 @@ bool Transfer::start(Protocol protocol, bool sending, Source *source, uint32_t n
     blockSize_ = protocol == Protocol::X1k || protocol == Protocol::Y ? 1024 : 128;
     knownSize_ = metadata_ = final_ = zescaped_ = zreceiving_ = false;
     afterEot_ = lastEofValid_ = false;
+    finAt_ = 0;
     zparse_ = zformat_ = ztype_ = zend_ = zcrcBytes_ = ztrailer_ = 0;
     nibble_ = -1;
     fileSize_ = 0;
@@ -93,8 +94,8 @@ size_t Transfer::write(const uint8_t *data, size_t len) {
     size_t n = 0;
     while (n < len && running() && rx_.put(data[n]))
         ++n;
-    if (n)
-        activity_ = now_;
+    // A byte alone does not count as activity: noise could then hold the transfer open
+    // until the 30 minute limit. The protocol code calls alive() for real progress.
     pump();
     return n;
 }
@@ -102,6 +103,9 @@ void Transfer::pump() {
     uint8_t b = 0;
     while (running() && !tx_.size() && rx_.read(&b, 1))
         byte(b);
+}
+void Transfer::alive() {
+    activity_ = now_;
 }
 void Transfer::byte(uint8_t b) {
     // CAN within a block/subpacket is data. Cancellation requires consecutive CAN
@@ -137,6 +141,11 @@ void Transfer::poll(uint32_t now) {
     pump();
     if (now - start_ >= 30 * 60 * 1000u) {
         cancel(Outcome::Timeout);
+        return;
+    }
+    // The sender's "OO" after ZFIN is optional: the files are in, so stop after a short wait.
+    if (protocol_ == Protocol::Z && !sending_ && state_ == 5 && now - finAt_ >= kFinWaitMs) {
+        finish(Outcome::Success);
         return;
     }
     if (now - activity_ >= 5000) {
@@ -258,6 +267,9 @@ void Transfer::xbyte(uint8_t b) {
                 state_, b, sequence_, offset_);
 #endif
     if (sending_) {
+        if ((state_ == 0 && (b == 'C' || b == 21)) || (state_ == 3 && b == 'C') ||
+            (state_ == 4 && b == 'C') || ((state_ == 1 || state_ == 2) && (b == 6 || b == 21)))
+            alive();
         if (state_ == 0 && (b == 'C' || b == 21)) {
             crc_ = b == 'C';
             xsend(protocol_ == Protocol::Y);
@@ -295,6 +307,8 @@ void Transfer::xbyte(uint8_t b) {
         return;
     }
     if (!used_) {
+        if (b == 4 || b == 1 || b == 2)
+            alive();
         if (b == 4) {
             if (protocol_ == Protocol::Y && afterEot_) {
                 put(6);
@@ -322,6 +336,7 @@ void Transfer::xbyte(uint8_t b) {
         }
         return;
     }
+    alive();  // inside a block: slow links must not be retried
     buffer_[used_++ - 1] = b;
     if (used_ - 1 == need_)
         xframe();
@@ -462,21 +477,28 @@ void Transfer::zbyte(uint8_t b) {
     } else
         can_ = 0;
     if (state_ == 5 && !sending_) {
-        if (b == 'O' && ++used_ == 2)
-            finish(Outcome::Success);
+        if (b == 'O') {
+            alive();
+            if (++used_ == 2)
+                finish(Outcome::Success);
+        }
         return;
     }
     if (!zreceiving_ && zparse_ < 3) {
         if (zparse_ == 0) {
-            if (b == '*')
+            if (b == '*') {
                 zparse_ = 1;
+                alive();
+            }
         } else if (zparse_ == 1) {
-            if (b == 24)
+            if (b == 24) {
                 zparse_ = 2;
-            else if (b != '*')
+                alive();
+            } else if (b != '*')
                 zparse_ = 0;
         } else {
             if (b == 'A' || b == 'B' || b == 'C') {
+                alive();
                 zformat_ = b;
                 z32_ = b == 'C';
                 used_ = 0;
@@ -494,6 +516,7 @@ void Transfer::zbyte(uint8_t b) {
             zparse_ = 0;
             return;
         }
+        alive();
         if (nibble_ < 0) {
             nibble_ = n;
             return;
@@ -520,6 +543,7 @@ void Transfer::zbyte(uint8_t b) {
             return;
         }
     }
+    alive();
     zdecoded(b);
 }
 void Transfer::zdecoded(uint8_t b) {
@@ -630,6 +654,7 @@ void Transfer::zhandle() {
         zheader(8);
         state_ = 5;
         used_ = 0;
+        finAt_ = now_;
     } else
         zheader(6);  // no remote commands or unsupported extensions
 }

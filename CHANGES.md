@@ -14,6 +14,34 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.10] - 2026-11-12
+
+### Added
+
+- Tests: a table of malformed PPP frames (LCP, IPCP, PAP and IP lengths, options that run
+  past the end, unknown codes, bad FCS, oversize frames) at each stage of the negotiation,
+  each checked for the right drop, reject or silence and for a good negotiation after it
+  (TG-03). A table of bad XMODEM/YMODEM blocks (repeat, skip, complement, CRC, block 0
+  names and sizes, the 16-file batch limit, cancel sequences) and of bad ZMODEM headers
+  and subpackets (CRC, format, type, cancel, wrong positions, ZFILE metadata). The X-1K
+  "wrap" test now sends more than 256 blocks, so the block number really wraps.
+
+### Changed
+
+- ZMODEM: a receiver that gets ZFIN but no "OO" ends as a success after 2 s, not as a
+  time-out after about 55 s (5.5-10).
+
+### Fixed
+
+- PPP: an IPCP Terminate-Request no longer starts a fresh 30 s negotiation time-out
+  before the link has been up, so a peer cannot keep a half-open link for ever (5.5-09).
+- X/Y/ZMODEM: stray bytes from the peer no longer postpone the retry and time-out
+  counts; only bytes that belong to a block, header or expected answer do (5.5-10).
+- Client Tests size probe: the reply is found even when the terminal echoes the query
+  back first (5.5-11).
+- `transfer.h` carries the Apache-2.0 notice and the "changed for USR Modem" mark like
+  `transfer.cpp` (MNT-05e).
+
 ## [2.9] - 2026-11-12
 
 ### Added

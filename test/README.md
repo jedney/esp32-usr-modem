@@ -52,7 +52,7 @@ Section numbers refer to the project brief.
 | Unanswered call dropped after 8 rings for `S0` 0 and above 8; `S0` above 8 answers on ring 8; journal entry (SEC-01, v2.4) | `test_answer` | — | `test_answer.py` (bench) |
 | Telnet storm bounded, two ends settle, full send queue stops reading; `S7` doesn't cut the handshake (TG-04, 5.5-12, v2.4) | `test_calls` | — | `test_calls.py` |
 | TCP keepalive on call sockets (SEC-01, v2.4) | — (lwIP only; checked by the s3 build) | — | Bench: pull the caller's network cable, `NO CARRIER` in about 2 minutes |
-| PPP and SLIP, aliases, private /30, NAT, hang-up (6.6) | `test_internet` | `test_internet` | `test_internet.py`; `interop/serial_pppd.py` |
+| PPP and SLIP, aliases, private /30, NAT, hang-up; table of malformed LCP/IPCP/PAP/IP frames (TG-03, v2.10) (6.6) | `test_internet` | `test_internet` | `test_internet.py`; `interop/serial_pppd.py` |
 | Tones: UK dial, busy, ring, DTMF, pulse (6.4) | `test_hwtest`, `test_answer` | `test_hw`, `test_answer` | `test_hwtest.py`, `test_calls.py` |
 | Handshake WAV playback per speed (6.4) | `test_calls`, `scripts/test_sound_catalog.py` | `test_calls` | `test_calls.py` |
 | Volume: pot, `ATL`, `ATM`, no cap (full volume = full scale) (5.3, 6.4) | `test_hwtest`, `test_calls` | `test_calls`, `test_hw` | `AT*HWPOT=TONE`, `AT*HWTEST` |
@@ -70,7 +70,7 @@ Section numbers refer to the project brief.
 | About generated from the licensing record | `scripts/test_generate_credits.py` | — | `test_config.py` |
 | Web server: Digest login (stale nonce, wrong-password lock-out, parameter/size limits, nonce table, real MD5, falling count), filesystem image check, Host/Origin, tickets, CSRF, WebSocket, upload and unmount hand-shakes (late answers), browsers start read-only (6.11) | `test_web`, `scripts/test_image_manifest.py`, `scripts/test_web_peer.py` | `test_web` | `test_web.py` |
 | Web page: status bar, reconnect, sizing, upload hashing, demo (6.11) | `web/test/` | — | — |
-| Client Tests: display, size, keys, transfers, cable, client settings per port incl. USB (6.13, v2.0) | `test_client` | `test_client` | `test_client.py`; `interop/serial_lrzsz.py` |
+| Client Tests: display, size (echoed query), keys, transfers (block numbers wrap past 255), hostile X/Y/ZMODEM blocks and headers, noise and slow-link timing, ZFIN without "OO", cable, client settings per port incl. USB (6.13, TG-03, v2.0, v2.10) | `test_client` | `test_client` | `test_client.py`; `interop/serial_lrzsz.py` |
 | Build: network libraries (checked before cached) and image identities | `scripts/test_network_dependencies.py`, `scripts/test_image_manifest.py` | — | — |
 
 Checks that need a person (sound, LEDs, loopback plug, Amiga and Windows 9x clients)

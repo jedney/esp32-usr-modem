@@ -301,19 +301,23 @@ void Service::byte(uint8_t b) {
         }
         input_[length_++] = b;
         input_[length_] = 0;
-        char *reply = strstr(input_, "\x1b[");
-        unsigned rows, cols;
-        int used = 0;
-        if (reply && sscanf(reply, "\x1b[%u;%uR%n", &rows, &cols, &used) == 2 && used && rows &&
-            rows <= 9999 && cols && cols <= 9999) {
-            findings_.columns = cols;
-            findings_.rows = rows;
-            snprintf(observations_[5], sizeof observations_[5], "%u x %u measured", cols, rows);
-            text(
-                "\x1b"
-                "8");
-            format("Measured %u columns x %u rows; viewport capped at 132x50.\r\n", cols, rows);
-            complete("OK");
+        // Look at every ESC [ in the buffer: a terminal that echoes our query puts an
+        // "ESC [ 6 n" in front of the real reply (5.5-11).
+        for (char *reply = strstr(input_, "\x1b["); reply; reply = strstr(reply + 1, "\x1b[")) {
+            unsigned rows, cols;
+            int used = 0;
+            if (sscanf(reply, "\x1b[%u;%uR%n", &rows, &cols, &used) == 2 && used && rows &&
+                rows <= 9999 && cols && cols <= 9999) {
+                findings_.columns = cols;
+                findings_.rows = rows;
+                snprintf(observations_[5], sizeof observations_[5], "%u x %u measured", cols, rows);
+                text(
+                    "\x1b"
+                    "8");
+                format("Measured %u columns x %u rows; viewport capped at 132x50.\r\n", cols, rows);
+                complete("OK");
+                break;
+            }
         }
     } else if (mode_ == Mode::ManualSize) {
         if (b == '\r' || b == '\n') {
