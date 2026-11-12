@@ -14,6 +14,29 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.8] - 2026-11-12
+
+### Changed
+
+- End-to-end tests (no firmware change): every serial port has a 5 s write time-out and
+  every test a 300 s time-out (`pytest-timeout`, `test/e2e/pytest.ini`), so a silent
+  modem fails a test instead of hanging the run.
+- The default end-to-end run no longer dials a real BBS or needs the Internet: the
+  "any key cancels a dial" test dials 192.0.2.1 (never answers); the DNS lookup in the
+  NAT test needs the new `--live-internet`.
+- `--device-tests` stops at once if no valid `USR_MODEM_PASSWORD` is in `.env` and
+  `--save-password` is not given (the random password would be lost).
+- The masked Wi-Fi join test is skipped when the modem has another network saved.
+- The on-board `test_board` uses a scratch settings namespace, not the modem's own.
+
+### Fixed
+
+- Failed e2e asserts no longer print the Wi-Fi password echo.
+- The bridge test always sends Ctrl-X; the bulk echo test restores the write time-out.
+- `test_internet.py` looked for `NO DIALTONE`; the modem prints `NO DIAL TONE`.
+- Two `test_hwtest` assertions could not fail; they now check for clipping and the
+  unclamped gain.
+
 ## [2.7] - 2026-11-12
 
 ### Added

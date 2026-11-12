@@ -34,7 +34,7 @@ whole window.
 | 05 | v2.5 | [Wi-Fi join, factory reset, scan names](../history/wp-05-wifi-reset-scan.md) | Sonnet / medium | S-M | 01 |
 | 06 | v2.6 | [Web server: read-only start, hand-shakes, lock-out](../history/wp-06-web-server.md) | Opus / medium | M-L | 02 |
 | 07 | v2.7 | [Small settings and parser guards; screen time-out](../history/wp-07-small-guards.md) | Sonnet / medium | M-L | 01 |
-| 08 | v2.8 | [Bench harness safety](wp-08-bench-harness.md) | Sonnet / medium | M | 01 |
+| 08 | v2.8 | [Bench harness safety](../history/wp-08-bench-harness.md) | Sonnet / medium | M | 01 |
 | 09 | v2.9 | [Security regression tests](wp-09-security-tests.md) | Sonnet / high | M | 07 |
 | 10 | v2.10 | [Hostile-input tests: PPP, X/Y/ZMODEM](wp-10-hostile-input.md) | Sonnet / high | M-L | 01 |
 | 11 | v2.11 | [Web page tests and flows](wp-11-web-page.md) | Sonnet / medium | M | 06 |
@@ -177,13 +177,13 @@ the package confirms each first.
 | TG-06 | 2^32 ms wrap, throttle above 300 bps, S3/S5 edges | 09 | open |
 | TG-07 | Pin lock test skipped when `.env` overrides pins | 01 | done (v2.1) |
 | TG-08 | Tests behind STA-01, STA-04, STA-05, SEC-04, SEC-01 | 02, 04, 05 | open (STA-01 part done v2.2; SEC-01 part done v2.4; STA-04, STA-05, SEC-04 parts done v2.5) |
-| TG-09 | e2e serial ports have no write time-out (runs hang) | 08 | open |
-| TG-10 | Asserts can print the Wi-Fi or device password | 08 | open |
-| TG-11 | `test_board` uses the production settings store | 08 | open |
-| TG-12 | e2e state left behind on failure | 08 | open |
-| TG-13 | Default run dials a real BBS; `NO DIALTONE` string | 08 | open |
+| TG-09 | e2e serial ports have no write time-out (runs hang) | 08 | done (v2.8) |
+| TG-10 | Asserts can print the Wi-Fi or device password | 08 | done (v2.8) |
+| TG-11 | `test_board` uses the production settings store | 08 | done (v2.8) |
+| TG-12 | e2e state left behind on failure | 08 | done (v2.8) |
+| TG-13 | Default run dials a real BBS; `NO DIALTONE` string | 08 | done (v2.8) |
 | TG-14 | `app.js` untested; "conflicting identity" test has no conflict | 11 | open |
 | TG-15 | No tests for browser limit, floods, interrupted upload, etc. | 11 | open |
 | TG-16 | Fakes copied between suites and drifted | 13 | open |
-| TG-17 | Two assertions cannot fail; RS232 on-board tests ignored | 08 | open |
+| TG-17 | Two assertions cannot fail; RS232 on-board tests ignored | 08 | done (v2.8) |
 | Leave alone | Digest MD5 and OTA MD5, unsalted hashes, no image signature, no secure boot, nonce table of 8, PPP idle/host limit/CR-NUL, 410 cppcheck style notes, vendored xterm.js | - | accepted (review section 8) |

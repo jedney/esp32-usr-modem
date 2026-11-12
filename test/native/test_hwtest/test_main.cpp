@@ -176,7 +176,12 @@ void test_endless_tone_keeps_filling() {
 void test_uk_dial_tone_has_both_frequencies_and_no_clipping() {
     tones::ToneSource src(tones::kUkDialTone, 1000);
     std::vector<int16_t> s = render(src, 16000);
-    TEST_ASSERT_TRUE(peak(s) <= 32767);
+    // int16 samples can't exceed full scale, so test for clipping: no run of full-scale samples.
+    int clipped = 0;
+    for (int16_t v : s) {
+        clipped += (v >= 32767 || v <= -32768) ? 1 : 0;
+    }
+    TEST_ASSERT_TRUE(clipped < 3);
     TEST_ASSERT_FLOAT_WITHIN(0.05f, 0.5f, toneLevel(s.data(), s.size(), 350.0f, 16000));
     TEST_ASSERT_FLOAT_WITHIN(0.05f, 0.5f, toneLevel(s.data(), s.size(), 450.0f, 16000));
     TEST_ASSERT_TRUE(toneLevel(s.data(), s.size(), 400.0f, 16000) < 0.05f);
@@ -285,7 +290,7 @@ void test_speaker_levels_and_pot_stay_within_full_scale() {
         TEST_ASSERT_EQUAL_FLOAT(0, volume::speakerGain(0, level));
         for (unsigned pot = 0; pot <= 4095; pot += 31) {
             float gain = volume::speakerGain(volume::potLevel(pot, 4095), level);
-            TEST_ASSERT_TRUE(volume::outputGain(gain) <= 1.0f);
+            TEST_ASSERT_TRUE(gain >= 0.0f && gain <= 1.0f);  // before outputGain() clamps it
         }
     }
 }

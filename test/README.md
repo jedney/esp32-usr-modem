@@ -19,7 +19,9 @@ test program: upload the firmware again afterwards. End-to-end options are in
 
 On the fitted board the RS232 receivers drive the UART pins, so the internal-loopback
 cases in `embedded/test_rs232` skip; `e2e/test_rs232.py` covers the port through the
-Unitek adapter instead.
+Unitek adapter instead. All nine `embedded/test_rs232` cases are ignored on the fitted
+board (no loopback plug), so the `test_rs232` entries in the matrix below mean "present, but
+skipped on the bench". `embedded/test_board` writes only the scratch namespace `test_board`.
 
 ## Feature matrix
 

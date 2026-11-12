@@ -136,7 +136,7 @@ def dial(ser, number):
         received.extend(ser.read(1))
         if re.search(rb'CONNECT[^\r\n]*\r\n$', received):
             return
-        if b'ERROR\r\n' in received or b'NO DIALTONE\r\n' in received:
+        if b'ERROR\r\n' in received or b'NO DIAL TONE\r\n' in received:
             raise AssertionError('Internet dial refused (response omitted)')
     raise AssertionError('No Internet CONNECT (response omitted)')
 
@@ -300,7 +300,7 @@ def ip_response(peer, protocol, timeout=10):
 
 
 @pytest.mark.parametrize('number', ['666', '667'])
-def test_internet_nat_icmp_binary_rts_and_udp_dns(ports, number):
+def test_internet_nat_icmp_binary_rts_and_udp_dns(ports, number, request):
     console, host = ports
     dial(host.ser, number)
     peer = Peer(host.ser, number == '667')
@@ -325,6 +325,8 @@ def test_internet_nat_icmp_binary_rts_and_udp_dns(ports, number):
     assert response[:2] == b'\0\0' and checksum(response) == 0
     assert response[4:] == struct.pack('!HH', 0x5513, 1) + payload
     assert packet[16:20] == socket.inet_aton(peer.local)
+    if not request.config.getoption('--live-internet'):
+        return  # the DNS lookup of example.com needs the Internet
     query = struct.pack('!HHHHHH', 0x5513, 0x0100, 1, 0, 0, 0)
     query += b'\x07example\x03com\0' + struct.pack('!HH', 1, 1)
     peer.send(0x21, udp_packet(peer.local, dns, 48765, 53, query))

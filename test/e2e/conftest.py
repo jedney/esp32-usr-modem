@@ -61,6 +61,8 @@ def pytest_addoption(parser):
     parser.addoption("--web-host", default="usr-modem.local", help="modem HTTP hostname or IPv4")
     parser.addoption("--call-server-ip", default=None, help="PC LAN address reachable from modem")
     parser.addoption("--call-server-port", default=32321, type=int, help="local call test TCP port")
+    parser.addoption("--live-internet", action="store_true",
+                     help="allow tests that need the Internet (a real DNS lookup)")
     parser.addoption("--live-bbs", action="store_true", help="allow a live outgoing BBS call")
     parser.addoption("--udp-tests", action="store_true", help="PC UDP 32322 is already reachable for Internet echo acceptance")
     parser.addoption("--console-port", default=None, help="USB console serial port")
@@ -133,7 +135,7 @@ def _open(request, option, baud):
         pytest.skip(f"{option} not given")
     if serial is None:
         pytest.skip("pyserial not installed (pip install -r test/e2e/requirements.txt)")
-    ser = serial.Serial(port_name, baud, timeout=0.1)
+    ser = serial.Serial(port_name, baud, timeout=0.1, write_timeout=5)
     time.sleep(0.2)
     return ser
 

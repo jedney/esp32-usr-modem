@@ -34,12 +34,11 @@ void test_dialstring_runs_on_target() {
     TEST_ASSERT_EQUAL_INT(static_cast<int>(dialstring::Kind::IpAddress), static_cast<int>(r.kind));
 }
 
-// NVS keeps the modem settings across a restart (v0.4). The saved settings are put back
-// afterwards, so running the tests doesn't change the modem's configuration.
+// NVS keeps the modem settings across a restart (v0.4). This uses a scratch namespace, so
+// the modem's own saved settings are never touched, even if the test fails half way.
 void test_settings_survive_in_nvs() {
-    hw::NvsStore store;
-    uint8_t before[modemcfg::kBlobSize + 1];
-    size_t beforeLen = store.load(before, sizeof before);
+    hw::NvsStore store("test_board", "cfg");
+    TEST_ASSERT_TRUE(store.erase());
 
     modemcfg::Nvram n = modemcfg::factoryNvram();
     n.tmpl[0].s[7] = 45;
@@ -48,7 +47,7 @@ void test_settings_survive_in_nvs() {
     strcpy(n.phone[0], "170064142064");
     TEST_ASSERT_TRUE(modemcfg::saveNvram(store, n));
 
-    hw::NvsStore again;  // a fresh handle, as after a restart
+    hw::NvsStore again("test_board", "cfg");  // a fresh handle, as after a restart
     modemcfg::Nvram out;
     TEST_ASSERT_EQUAL(static_cast<int>(modemcfg::LoadResult::kOk),
                       static_cast<int>(modemcfg::loadNvram(again, &out)));
@@ -60,10 +59,6 @@ void test_settings_survive_in_nvs() {
     TEST_ASSERT_TRUE(store.erase());
     TEST_ASSERT_EQUAL(static_cast<int>(modemcfg::LoadResult::kEmpty),
                       static_cast<int>(modemcfg::loadNvram(store, &out)));
-
-    if (beforeLen > 0) {
-        TEST_ASSERT_TRUE(store.save(before, beforeLen));
-    }
 }
 
 void setup() {
