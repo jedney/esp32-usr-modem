@@ -16,9 +16,35 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [2.15] - 2026-11-13
 
+### Added
+
+- **Ctrl-L** in the configuration screen draws the whole screen again.
+
 ### Changed
 
-- Configuration screen sends only what changed
+- The configuration screen sends only the cells that changed since the last frame
+  (PERF-01). An arrow key at 80x25 was 3.0 KB (5.1 KB in RGB colour), 12-21 s at
+  2400 bit/s; it is now 68 B (102 B), under half a second. A full frame is still sent
+  first, after a resize, a style, colour or theme change, Ctrl-L, and after anything else
+  wrote to the port (for example a hardware test run from the screen). Plain-text style
+  still sends the whole screen on every key.
+- "Input too long" shows as soon as a character is dropped, not only at Enter.
+- Tests that started a fresh terminal view part-way through now keep one view from the
+  start, as a real terminal does.
+
+### Fixed
+
+- Output and help pages on terminals taller or shorter than 25 rows repeated lines when
+  paging (5.5-14).
+- Alt+letter (Esc and a key together) cancelled a form or left the screen, then ran the
+  letter as a hotkey. It is now ignored (5.5-14).
+- A duplicate condition in the screen footer (cppcheck, MNT-05j).
+
+### Bench checks for Jon (optional)
+
+- PuTTY at 2400 bit/s on the RS232 port: `AT*CONFIG`, move around the menus, open a form,
+  press Ctrl-L. Also run `AT*HWLED` from Hardware Tests and check the screen is redrawn
+  in full when it ends.
 
 ## [2.14] - 2026-11-13
 

@@ -145,7 +145,7 @@ void Terminal::write(const char *data, size_t len) {
         output_[length_++] = c;
     }
     if (capturing_ && !exporting_)
-        responseLine_ = responseLines_ >= visibleItems() ? responseLines_ - visibleItems() + 1 : 0;
+        responseLine_ = responseLines_ >= responseRows() ? responseLines_ - responseRows() + 1 : 0;
     if (!capturing_ && !response_)
         response_ = true;
     render();
@@ -262,6 +262,14 @@ void Terminal::render() {
 }
 size_t Terminal::visibleItems() const {
     return std::min(15, std::max(1, int(rows_) - 10));
+}
+// Lines of text the output and help views show: their page step (5.5-14). The small
+// layout shows one line.
+size_t Terminal::responseRows() const {
+    if (cols_ < 20 || rows_ < 8)
+        return 1;
+    unsigned top = rows_ < 12 ? 3 : 5, bottom = rows_ >= 25 ? rows_ - 5 : rows_ - 3;
+    return bottom > top ? bottom - top : 1;
 }
 size_t Terminal::phonebookPageSize() const {
     return rows_ >= 25 ? 9 : std::min(9, std::max(1, int(rows_) - 12));
@@ -448,12 +456,11 @@ void Terminal::buildFrame() {
                  CellGrid::modelShort(model_), state.link, host, rate);
     }
     if (rows_ >= 25) {
-        if (main)
+        if (main) {
             grid_.rule(rows_ - 6, "[ HELP / DEVICE STATUS ]");
-        if (main)
             grid_.text(3, rows_ - 5, "F1 Help  F2 Status  F3 Phonebook  F4 Settings  F10 Exit",
                        Ink::Function, cols_ - 5);
-        else
+        } else
             grid_.text(
                 3, rows_ - 5,
                 capturing_
@@ -723,7 +730,8 @@ void Terminal::drawResponse() {
         "immediately.\nEsc or Q: Back; Q/F10 on Main: exit. Ctrl-C: exit.\nF1: contextual help. "
         "F2: Main in children.\nMain F2/F3/F4: Status/Phonebook/Settings.\nPhonebook: PgUp/PgDn "
         "pages; I/Enter details.\nForms: arrows/Home/End edit; Backspace/Delete erase.\nTab moves "
-        "through comma-separated fields; Ctrl-U clears.\nY confirms a reviewed change; N/Esc "
+        "through comma-separated fields; Ctrl-U clears.\nCtrl-L draws the whole screen again."
+        "\nY confirms a reviewed change; N/Esc "
         "cancels.\nRATE is a configured override, never a live measurement.\nNAME is the saved "
         "host; no separate names are stored.\nUse AT*SIZE=columns,rows outside the menu for serial "
         "sizing.\n";
@@ -736,7 +744,7 @@ void Terminal::drawResponse() {
     // Reflow the captured single-cell transcript at the current geometry. This
     // keeps a resize safe even when a service wrote at the previous width.
     unsigned col = 0, y = rows_ < 12 ? 3 : 5;
-    unsigned bottom = rows_ >= 25 ? rows_ - 5 : rows_ - 3;
+    unsigned bottom = y + responseRows();
     while (offset < len && y < bottom) {
         unsigned char c = text[offset++];
         if (c == '\r')
@@ -833,8 +841,8 @@ size_t Terminal::read(uint8_t *data, size_t cap) {
                 const char *start = drawColor_ == Color::Rgb
                                         ? "\x1b[?25l\x1b[?7l\x1b[0m\x1b[48;2;3;5;7m"
                                         : "\x1b[?25l\x1b[?7l\x1b[0m\x1b[40m";
-                stageLen_ = snprintf(staging_, sizeof staging_, "%s%s", start,
-                                     fullFrame_ ? "\x1b[2J" : "");
+                stageLen_ =
+                    snprintf(staging_, sizeof staging_, "%s%s", start, fullFrame_ ? "\x1b[2J" : "");
             }
         } else if (drawRow_ <= grid_.rows()) {
             unsigned y = drawRow_ - 1, from, end;
@@ -1003,7 +1011,7 @@ void Terminal::submit() {
     if (!prompt_)
         return;
     if (inputOverflow_ || inputLen_ == 0) {
-        feedback(inputOverflow_ ? "Input too long; clear or cancel the form"
+        feedback(inputOverflow_ ? "Input too long; clear (Ctrl-U) or cancel (Esc) the form"
                                 : "A value is required");
         return;
     }
@@ -1234,6 +1242,10 @@ void Terminal::input(char c) {
         }
         if (escapeLen_ == 1 && c != '[' && c != 'O') {
             escapeLen_ = 0;
+            // Esc with a printable key at once is Alt+key, which the screen does not use:
+            // drop both, so it neither cancels (or exits) nor runs a hotkey (5.5-14).
+            if (c >= 32 && c <= 126)
+                return;
             key(27);
             if (open_)
                 input(c);
@@ -1307,11 +1319,11 @@ void Terminal::key(unsigned key) {
         }
         if (key == kPageDown || key == '\r' || key == '\n') {
             if (more_)
-                responseLine_ += visibleItems();
+                responseLine_ += responseRows();
             else
                 back();
         } else if (key == kPageUp)
-            responseLine_ = responseLine_ > visibleItems() ? responseLine_ - visibleItems() : 0;
+            responseLine_ = responseLine_ > responseRows() ? responseLine_ - responseRows() : 0;
         render();
         return;
     }
@@ -1350,9 +1362,11 @@ void Terminal::key(unsigned key) {
             submit();
             return;
         } else if (key >= 32 && key < 127) {
-            if (inputLen_ + 1 >= sizeof input_)
+            if (inputLen_ + 1 >= sizeof input_) {
+                if (!inputOverflow_)
+                    feedback("Input too long; clear (Ctrl-U) or cancel (Esc) the form");
                 inputOverflow_ = true;
-            else {
+            } else {
                 memmove(input_ + cursor_ + 1, input_ + cursor_, inputLen_ - cursor_ + 1);
                 input_[cursor_++] = key;
                 ++inputLen_;
@@ -1393,11 +1407,11 @@ void Terminal::key(unsigned key) {
         }
         if (key == kPageDown || key == '\r' || key == '\n' || key == ' ') {
             if (more_)
-                responseLine_ += visibleItems();
+                responseLine_ += responseRows();
             else
                 back();
         } else if (key == kPageUp)
-            responseLine_ = responseLine_ > visibleItems() ? responseLine_ - visibleItems() : 0;
+            responseLine_ = responseLine_ > responseRows() ? responseLine_ - responseRows() : 0;
         else if ((key == 'r' || key == 'R') && liveStatus_)
             execute("*STATUS");
         render();

@@ -107,7 +107,12 @@ incoming calls are turned away. A screen with no key for 5 minutes closes itself
 forgotten one does not hold the line.
 
 - Arrow keys and Enter, or press the hotkey shown. **F1** is help, **Esc/Q** goes back,
-  **Q/F10** leaves from the main menu, **Ctrl-C** leaves a form.
+  **Q/F10** leaves from the main menu, **Ctrl-C** leaves a form, **Ctrl-L** draws the
+  whole screen again.
+- After the first frame a key sends only what changed on the screen: an arrow key is about
+  70 bytes (100 in RGB colour) at 80x25, so the screen is usable at 2400 bit/s. The first
+  frame is 3-5 KB (12-22 s at 2400). `AT*STYLE=PLAIN` has no cursor control, so it sends the
+  whole screen (about 2 KB) on every key.
 - Screens: status, phonebook, all modem settings with help, Wi-Fi and clock, Internet,
   sounds, updates, logs, A About, B Hardware Tests, C Client Tests, D Command Reference.
 - 80x25 is the standard size; larger terminals (up to 132x50) get a wider layout. The

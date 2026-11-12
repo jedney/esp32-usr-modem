@@ -175,7 +175,9 @@ bool CellGrid::changed(const CellGrid &before, unsigned y, unsigned &from, unsig
     if (y >= rows_)
         return false;
     const Cell *now = cells_ + y * kMaxCols, *was = before.cells_ + y * kMaxCols;
-    auto same = [&](unsigned x) { return now[x].glyph == was[x].glyph && now[x].ink == was[x].ink; };
+    auto same = [&](unsigned x) {
+        return now[x].glyph == was[x].glyph && now[x].ink == was[x].ink;
+    };
     unsigned first = 0;
     while (first < cols_ && same(first))
         ++first;

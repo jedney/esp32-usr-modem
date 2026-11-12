@@ -345,6 +345,7 @@ void test_oversized_input_is_rejected_without_dispatching_prefix() {
 }
 #include "ui_cases.h"
 #include "repaint_cases.h"
+#include "review_cases.h"
 void test_browser_lists_serial_diagnostics_without_dispatch() {
     Rig r;
     r.session.port().setBrowser(true);
@@ -436,5 +437,8 @@ int main() {
     RUN_TEST(test_every_main_menu_move_sends_only_the_change);
     RUN_TEST(test_resize_refresh_style_colour_and_port_output_send_a_full_frame);
     RUN_TEST(test_changes_only_screen_matches_a_full_repaint);
+    RUN_TEST(test_output_pages_step_by_the_lines_shown);
+    RUN_TEST(test_alt_letter_neither_cancels_a_form_nor_runs_a_hotkey);
+    RUN_TEST(test_input_too_long_is_shown_at_once_and_kept_until_cleared);
     return UNITY_END();
 }

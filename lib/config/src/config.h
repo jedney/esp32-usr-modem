@@ -161,6 +161,7 @@ private:
     const Action *item(size_t index) const;
     size_t itemCount() const;
     size_t visibleItems() const;
+    size_t responseRows() const;
     size_t phonebookPageSize() const;
     bool enabled(size_t index) const;
     void profileAction(size_t index);
