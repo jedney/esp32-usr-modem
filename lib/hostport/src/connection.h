@@ -1,5 +1,7 @@
-// The far end of a call, as the host port sees it. v0.5 has one kind: the AT*TESTCALL
-// echo call. Telnet and raw TCP calls follow in v0.8, answered calls in v0.9.
+// The far end of a call, as the host port sees it. Kinds: Telnet/raw TCP calls
+// (`calls::TcpConnection`), PPP/SLIP (`internet::Engine`), the configuration screen
+// (`config::Terminal`), the client tests (`clienttest::Service`), and the AT*TESTCALL echo
+// call below.
 //
 // No Arduino dependencies: unit-tested on the PC.
 

@@ -14,6 +14,30 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.7] - 2026-11-12
+
+### Added
+
+- A configuration screen with no key for 5 minutes closes itself and frees the line.
+  A serial port prints "Screen closed after 5 minutes idle."; the browser returns to
+  its read-only view.
+
+### Changed
+
+- `S3`, `S4` and `S5` accept 0-127, and `S3` can't be a printable character. A stored
+  profile that breaks the rule falls back to factory settings.
+- `AT*SETTING=` takes exactly one setting command; `AT*SETTING=E0DT555` now gives `ERROR`.
+- A damaged phonebook is no longer replaced by the next edit: `AT*PHONEBOOK=` and
+  `AT*PHONEDELETE=` give `ERROR` until `AT*BOOKCLEAR`.
+- Table sizes are checked at build time (settings, setting help, client-test sizes).
+
+### Fixed
+
+- Esc in the configuration screen now cancels a scan, ping, DNS lookup or sound
+  started from it.
+- A failed read of the stored settings is treated as damaged settings.
+- Stale comments in `connection.h` and `atcmd.cpp`.
+
 ## [2.6] - 2026-11-12
 
 ### Changed

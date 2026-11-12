@@ -223,6 +223,19 @@ void test_phonebook_capacity_and_corruption() {
     TEST_ASSERT_FALSE(damaged.begin());
     TEST_ASSERT_EQUAL_STRING("www.amigaretro.com", damaged.find("1")->host);
     TEST_ASSERT_TRUE(before == store.bytes);
+    // Edits are refused while the stored phonebook is damaged; it is not saved over.
+    Entry add;
+    strcpy(add.number, "7");
+    strcpy(add.host, "bbs.example.com");
+    TEST_ASSERT_FALSE(damaged.put(add));
+    TEST_ASSERT_FALSE(damaged.remove("1"));
+    TEST_ASSERT_TRUE(before == store.bytes);
+    // AT*BOOKCLEAR is the way out.
+    TEST_ASSERT_TRUE(damaged.clear());
+    TEST_ASSERT_TRUE(damaged.put(add));
+    Phonebook again(store);
+    TEST_ASSERT_TRUE(again.begin());
+    TEST_ASSERT_NOT_NULL(again.find("7"));
 }
 void test_phonebook_command_roundtrip_and_strict_arguments() {
     Rig r;

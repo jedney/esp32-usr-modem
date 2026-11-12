@@ -772,7 +772,7 @@ bool Port::runCommand(const char *&p, bool *stop) {
         case '+':
             return runPlus(p);
         default:
-            return false;  // includes D and A until calls exist (v0.8, v0.9)
+            return false;  // unknown command letter
     }
 }
 
@@ -804,12 +804,16 @@ bool Port::runSRegister(const char *&p) {
             return false;
         }
         uint8_t mask = static_cast<uint8_t>(1u << b);
-        a.s[r] = static_cast<uint8_t>(v ? (a.s[r] | mask) : (a.s[r] & ~mask));
+        const unsigned bits = v ? (a.s[r] | mask) : (a.s[r] & ~mask);
+        if (!modemcfg::sRegisterAllowed(r, bits)) {
+            return false;
+        }
+        a.s[r] = static_cast<uint8_t>(bits);
         return true;
     }
     if (*p == '=') {
         ++p;
-        if (!number(p, 255, &v)) {
+        if (!number(p, 255, &v) || !modemcfg::sRegisterAllowed(r, v)) {
             return false;
         }
         a.s[r] = static_cast<uint8_t>(v);

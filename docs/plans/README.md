@@ -33,7 +33,7 @@ whole window.
 | 04 | v2.4 | [Incoming-call limits](../history/wp-04-incoming-limits.md) | Sonnet / high | M | 01 |
 | 05 | v2.5 | [Wi-Fi join, factory reset, scan names](../history/wp-05-wifi-reset-scan.md) | Sonnet / medium | S-M | 01 |
 | 06 | v2.6 | [Web server: read-only start, hand-shakes, lock-out](../history/wp-06-web-server.md) | Opus / medium | M-L | 02 |
-| 07 | v2.7 | [Small settings and parser guards; screen time-out](wp-07-small-guards.md) | Sonnet / medium | M-L | 01 |
+| 07 | v2.7 | [Small settings and parser guards; screen time-out](../history/wp-07-small-guards.md) | Sonnet / medium | M-L | 01 |
 | 08 | v2.8 | [Bench harness safety](wp-08-bench-harness.md) | Sonnet / medium | M | 01 |
 | 09 | v2.9 | [Security regression tests](wp-09-security-tests.md) | Sonnet / high | M | 07 |
 | 10 | v2.10 | [Hostile-input tests: PPP, X/Y/ZMODEM](wp-10-hostile-input.md) | Sonnet / high | M-L | 01 |
@@ -112,27 +112,27 @@ the package confirms each first.
 | SEC-04 | Wi-Fi scan names printed with control bytes | 05 | done (v2.5) |
 | SEC-05 | Release workflow from any branch; write token in build steps | 01 | done (v2.1) |
 | SEC-06 | `AT*PASS` prints a generated password (permitted; amend rule) | 01 | done (v2.1) |
-| SEC-07a | `AT*SETTING=` checks only the first character | 07 | open |
+| SEC-07a | `AT*SETTING=` checks only the first character | 07 | done (v2.7) |
 | SEC-07b | `pin_config.py` accepts absent, flash/PSRAM and USB GPIOs | 01 | done (v2.1) |
 | SEC-07c | Actions by tag, `pip install` unpinned, caches in release | 01 | done (v2.1) |
 | SEC-07d | Download cached before its SHA-256 is checked | 01 | done (v2.1) |
 | SEC-07e | Read buffers that can hold a password not wiped | 02 | done (v2.2) |
 | STA-01 | Unread serial port freezes the loop 2 s per result (High) | 02 | done (v2.2) |
 | STA-02 | Browser opens the configuration screen and blocks calls | 06 | done (v2.6) |
-| STA-02b | Idle configuration screen holds the line (5-minute time-out) | 07 | open |
+| STA-02b | Idle configuration screen holds the line (5-minute time-out) | 07 | done (v2.7) |
 | STA-03 | Interactive hardware tests block for ever / during a call | 03 | done (v2.3) |
 | STA-04 | Failed browser Wi-Fi join undoes later browser changes | 05 | done (v2.5) |
 | STA-05 | `AT*FACTORY` without LittleFS never finishes | 05 | done (v2.5) |
 | STA-06 | No watchdog on the main loop | 17 | open |
 | STA-07 | Upload and unmount hand-shakes can leave stale state | 06 | done (v2.6) |
 | STA-08 | A full phonebook may not fit in NVS | 17 | open |
-| STA-09a | S3/S4/S5 accept 0-255 (printable S3) | 07 | open |
+| STA-09a | S3/S4/S5 accept 0-255 (printable S3) | 07 | done (v2.7) |
 | STA-09b | `AT*BAUD` changes RS232 speed during an RS232 call | 03 | done (v2.3) |
 | STA-09c | `restoreBrowserResources()` cancels other ports' holds | 03 | done (v2.3) |
-| STA-09d | Esc during screen-started scan/ping/DNS/play doesn't cancel | 07 | open |
-| STA-09e | Failed NVS read passed to `deserialize()` as a huge length | 07 | open |
-| STA-09f | Damaged phonebook replaced by the next edit | 07 | open |
-| STA-09g | `sizes_[8]` fits 7 sounds + 1 exactly | 07 | open |
+| STA-09d | Esc during screen-started scan/ping/DNS/play doesn't cancel | 07 | done (v2.7) |
+| STA-09e | Failed NVS read passed to `deserialize()` as a huge length | 07 | done (v2.7) |
+| STA-09f | Damaged phonebook replaced by the next edit | 07 | done (v2.7) |
+| STA-09g | `sizes_[8]` fits 7 sounds + 1 exactly | 07 | done (v2.7) |
 | PERF-01 | Configuration screen repainted in full on every key | 15 | open |
 | PERF-02 | Web status rebuilt every pass with no browser | 14 | open |
 | PERF-03 | Browser output cap, PPP buffer wipe, page hashing | - | accepted (measure first; recorded in WP-01) |
@@ -146,9 +146,9 @@ the package confirms each first.
 | MNT-05d | CLAUDE.md says `espressif32@^6.9.0` | 01 | done (v2.1) |
 | MNT-05e | `transfer.h` has no licence / changed mark | 10 | open |
 | MNT-05f | `web/PROTOCOL.md` three mismatches | 06 | done (v2.6) |
-| MNT-05g | Hand-sized tables without `static_assert` | 07 | open |
+| MNT-05g | Hand-sized tables without `static_assert` | 07 | done (v2.7) |
 | MNT-05h | Web file list kept in three places | 11 | open |
-| MNT-05i | Stale comments (`hwconsole.h`, `connection.h`, `atcmd.cpp:764`) | 03, 07 | open (`hwconsole.h` done v2.3) |
+| MNT-05i | Stale comments (`hwconsole.h`, `connection.h`, `atcmd.cpp:764`) | 03, 07 | done (`hwconsole.h` v2.3; `connection.h`, `atcmd.cpp` v2.7) |
 | MNT-05j | cppcheck notes `hwconsole.cpp:895`, `menu.cpp:449` | 03, 15 | open (`hwconsole.cpp` done v2.3) |
 | 5.5-01 | Radio stays on after `AT*WIFISCAN` with Wi-Fi off | 12 | open |
 | 5.5-02 | `volatile` link state; late event overwrites `leave()` | 12 | open |

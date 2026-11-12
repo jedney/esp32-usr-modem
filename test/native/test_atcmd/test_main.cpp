@@ -242,13 +242,27 @@ void test_line_too_long_is_error() {
 void test_s3_and_s4_change_the_line_end() {
     MemStore st;
     Rig r(st);
-    r.type("ATS3=64S4=33\r");
-    std::string out = r.type("ATE0@");
-    TEST_ASSERT_EQUAL_STRING("ATE0@@!OK@!", out.c_str());
+    r.type("ATS3=30S4=33\r");
+    std::string out = r.type("ATE0\x1e");
+    TEST_ASSERT_EQUAL_STRING("ATE0\x1e\x1e!OK\x1e!", out.c_str());
     TEST_ASSERT_EQUAL_STRING("", r.type("AT\r").c_str());  // CR no longer ends a line
-    r.type("@");
-    r.type("ATS3=13S4=10@");
+    r.type("\x1e");
+    r.type("ATS3=13S4=10\x1e");
     TEST_ASSERT_EQUAL_STRING("\r\nOK\r\n", r.type("AT\r").c_str());
+}
+
+void test_s3_s4_s5_are_limited_to_0_127_and_s3_is_never_printable() {
+    MemStore st;
+    Rig r(st);
+    ENDS_WITH(r.type("ATS3=49\r"), "ERROR\r\n");  // '1' would end every line
+    ENDS_WITH(r.type("ATS3=32\r"), "ERROR\r\n");
+    ENDS_WITH(r.type("ATS3=126\r"), "ERROR\r\n");
+    ENDS_WITH(r.type("ATS3=200\r"), "ERROR\r\n");
+    ENDS_WITH(r.type("ATS4=128\r"), "ERROR\r\n");
+    ENDS_WITH(r.type("ATS5=255\r"), "ERROR\r\n");
+    ENDS_WITH(r.type("ATS4.7=1\r"), "ERROR\r\n");  // bit 7 would make 138
+    ENDS_WITH(r.type("ATS4=127S4=10S5=0S5=8\r"), "OK\r\n");
+    ENDS_WITH(r.type("ATS3?\r"), "013\r\n\r\nOK\r\n");
 }
 
 void test_s5_changes_backspace() {
@@ -1004,6 +1018,7 @@ int main() {
     RUN_TEST(test_a_slash_with_nothing_before_is_plain_ok);
     RUN_TEST(test_line_too_long_is_error);
     RUN_TEST(test_s3_and_s4_change_the_line_end);
+    RUN_TEST(test_s3_s4_s5_are_limited_to_0_127_and_s3_is_never_printable);
     RUN_TEST(test_s5_changes_backspace);
     RUN_TEST(test_several_commands_per_line);
     RUN_TEST(test_first_bad_command_stops_the_line);

@@ -896,8 +896,8 @@ void Terminal::profileAction(size_t index) {
     } else {
         unsigned reg = index - modemcfg::kSettingCount;
         snprintf(profileCommand_, sizeof profileCommand_, "*SETTING=S%u=", reg);
-        snprintf(profileHelp_, sizeof profileHelp_, "S%u: %s Enter 0-255; active only, &W saves.",
-                 reg, registerHelp(reg));
+        snprintf(profileHelp_, sizeof profileHelp_, "S%u: %s Enter 0-%u; active only, &W saves.",
+                 reg, registerHelp(reg), reg >= 3 && reg <= 5 ? 127u : 255u);
     }
     profileField_ = {S::Settings, "Profile field", profileCommand_, profileHelp_, S::Profile, true};
     activate(profileField_);
@@ -1062,6 +1062,16 @@ void Terminal::poll(uint32_t now) {
     now_ = now;
     if (!open_)
         return;
+    // A running client test or command has its own limits; count the idle time from its end.
+    if (diagnostic_ || capturing_)
+        activityAt_ = now;
+    else if (now - activityAt_ >= kIdleCloseMs) {
+        bool browser = session_.port().browser();
+        close();
+        if (!browser)
+            session_.port().print("\r\nScreen closed after 5 minutes idle.\r\n");
+        return;
+    }
     if (diagnostic_) {
         diagnostic_->poll(now);
         if (!diagnostic_->isOpen()) {
@@ -1243,7 +1253,10 @@ void Terminal::input(char c) {
 void Terminal::key(unsigned key) {
     if (capturing_) {
         if (key == 27) {
-            session_.port().cancelPrompt();
+            // A masked prompt is cancelled directly. A wait (scan, ping, DNS, play) gets the
+            // key, as a typed key on the command line does, so the command stops too.
+            if (!session_.port().cancelPrompt() && session_.port().busy())
+                session_.port().feed(static_cast<char>(27));
             finishResponse();
         }
         return;

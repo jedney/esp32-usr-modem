@@ -221,6 +221,42 @@ void test_out_of_range_value_is_refused_even_with_good_crc() {
     assertLoadFails(blob, sizeof blob, LoadResult::kBadValue);
 }
 
+void test_stored_line_end_registers_out_of_range_fall_back_to_factory() {
+    uint8_t blob[kBlobSize];
+    const struct {
+        int reg;
+        uint8_t value;
+    } bad[] = {{3, 49}, {3, 0x20}, {3, 0x7E}, {3, 200}, {4, 128}, {5, 255}};
+    for (const auto &b : bad) {
+        Nvram n = factoryNvram();
+        n.tmpl[0].s[b.reg] = b.value;
+        serialize(n, blob);
+        assertLoadFails(blob, sizeof blob, LoadResult::kBadValue);
+    }
+    Nvram ok = factoryNvram();
+    ok.tmpl[0].s[3] = 0x1F;
+    ok.tmpl[0].s[4] = 127;
+    ok.tmpl[0].s[5] = 0;
+    serialize(ok, blob);
+    Nvram out;
+    TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kOk),
+                      static_cast<int>(deserialize(blob, sizeof blob, &out)));
+}
+
+class FailingStore : public MemStore {
+public:
+    size_t load(uint8_t *, size_t) override { return kLoadError; }
+};
+
+void test_unreadable_store_is_a_bad_size_and_stays_untouched() {
+    FailingStore store;
+    Nvram n;
+    TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kBadSize),
+                      static_cast<int>(loadNvram(store, &n)));
+    TEST_ASSERT_EQUAL(0, store.saves);
+    TEST_ASSERT_EQUAL(0, static_cast<int>(store.len));
+}
+
 void test_host_baud_round_trip_and_range() {
     Nvram in = factoryNvram();
     TEST_ASSERT_EQUAL_UINT32(0, in.hostBaud);  // detect from "AT"
@@ -453,6 +489,8 @@ int main() {
     RUN_TEST(test_answer_port_names_parse_and_factory_default);
     RUN_TEST(test_layout_3_migration_preserves_model_and_defaults_answerport);
     RUN_TEST(test_layout_2_migration_preserves_speeds_and_validates_new_metadata);
+    RUN_TEST(test_stored_line_end_registers_out_of_range_fall_back_to_factory);
+    RUN_TEST(test_unreadable_store_is_a_bad_size_and_stays_untouched);
     RUN_TEST(test_factory_f1_has_the_decided_defaults);
     RUN_TEST(test_factory_s_registers);
     RUN_TEST(test_factory_f0_and_f2_differ_only_in_flow_control_and_results);

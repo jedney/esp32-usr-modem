@@ -39,7 +39,7 @@ public:
 };
 unsigned stubCalls = 0;
 calls::Phonebook *activeBook = nullptr;
-bool stubAsync = false;
+bool stubAsync = false, stubWait = false, waitCancelled = false;
 std::string secretReceived;
 atcmd::Reply receiveSecret(atcmd::Port &, const char *text, void *) {
     secretReceived = text;
@@ -47,6 +47,11 @@ atcmd::Reply receiveSecret(atcmd::Port &, const char *text, void *) {
 }
 atcmd::Reply stub(atcmd::Port &port, const char *) {
     ++stubCalls;
+    if (stubWait) {
+        stubWait = false;
+        port.wait([](void *) { waitCancelled = true; }, nullptr);
+        return atcmd::Reply::kPending;
+    }
     if (stubAsync) {
         stubAsync = false;
         for (unsigned i = 0; i < 30; ++i)
@@ -432,6 +437,9 @@ int main() {
     RUN_TEST(test_phonebook_paging_details_selection_and_storage_failure);
     RUN_TEST(test_phonebook_empty_missing_hook_and_changed_entry_confirmation);
     RUN_TEST(test_resize_mid_escape_and_secret_confirmation_timeout);
+    RUN_TEST(test_esc_cancels_a_waiting_command_started_from_the_screen);
+    RUN_TEST(test_idle_screen_closes_after_five_minutes_and_a_key_resets_it);
+    RUN_TEST(test_idle_timeout_survives_the_clock_wrap);
     RUN_TEST(test_cell_text_has_fixed_width_and_cannot_inject_controls);
     RUN_TEST(test_menu_actions_have_production_at_star_handlers);
     RUN_TEST(test_direct_menu_reserves_without_carrier_and_releases);

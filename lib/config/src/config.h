@@ -85,6 +85,7 @@ private:
 class Terminal : public hostport::Connection, public atcmd::Sink {
 public:
     static constexpr size_t kOutputSize = 32768;
+    static constexpr uint32_t kIdleCloseMs = 5u * 60u * 1000u;  // no key: the screen closes
     Terminal(hostport::Session &session, bool rs232) : session_(session), rs232_(rs232) {}
     bool open();
     bool isOpen() const override { return open_; }

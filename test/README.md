@@ -34,13 +34,13 @@ Section numbers refer to the project brief.
 | AT parser: several commands per line, `A/`, echo, S3/S5, S-registers, `&F &W &V &Z`, `Y`, `Z` (6.2, 6.6) | `test_atcmd` | — | `test_settings.py` |
 | Result codes, X0-X4, verbal/numeric/quiet, Q2 when answering (6.5) | `test_atcmd`, `test_answer` | — | `test_settings.py`, `test_calls.py`, `test_answer.py` |
 | `ATI0`-`ATI7`, `+FCLASS` (6.6) | `test_atcmd` | — | `test_settings.py` |
-| Settings kept across a restart, `&F0`-`&F2`, damaged settings → factory, old layouts converted (6.7) | `test_modemcfg`, `test_atcmd` | `test_board` | `test_settings.py`, `test_session.py` |
+| Settings kept across a restart, `&F0`-`&F2`, damaged or unreadable settings → factory, old layouts converted; S3/S4/S5 limited to 0-127 and S3 never printable (6.7, STA-09a/e, v2.7) | `test_modemcfg`, `test_atcmd` | `test_board` | `test_settings.py`, `test_session.py` |
 | RS232 speed from "AT" at 300-115200, fixed with `AT*BAUD` (6.2) | `test_hostport` (`CallSlot::heldBy` for the "refused during an RS232 call" rule, v2.3) | `test_rs232` | `test_rs232.py`, `test_session.py` |
 | RTS/CTS and XON/XOFF, DTR `&D` with S25, DCD `&C`, RI (6.2) | `test_hostport` | `test_rs232` | `test_rs232.py`, `test_answer.py` |
 | A port nobody reads never blocks the modem: `RING` dropped at once, a reply waits once then the port is stalled (STA-01, v2.2) | `test_hostport` (`test_sink_gate_*`), `test_answer` | — | `test_rs232.py`, `test_usb.py` (bench) |
 | `+++` guard time, `ATO`, `ATH`, `ATZ`, `F0`, `AT*TESTCALL` (6.2) | `test_hostport`, `test_atcmd` | — | `test_session.py`, `test_rs232.py` |
 | `&N` line speed, `AT*MODEL`, throttling, CONNECT text (6.2) | `test_calls`, `test_hostport`, `test_atcmd` | `test_calls` | `test_session.py`, `test_calls.py` |
-| Phonebook (6.3) | `test_calls` | `test_calls` | `test_calls.py` |
+| Phonebook; damaged book refuses edits until `AT*BOOKCLEAR` (6.3, STA-09f, v2.7) | `test_calls` | `test_calls` | `test_calls.py` |
 | Outgoing calls: Telnet negotiation, 0xFF escaping, raw mode, ringing and connect delays, host-name digits (6.6) | `test_calls` | `test_calls` | `test_calls.py` |
 | Call errors: BUSY, NO ANSWER, NO DIAL TONE, NO CARRIER (6.5) | `test_calls` | — | `test_calls.py` |
 | Answer mode: port 23, RI, ring, `ATA`, `S0`, `AT*ANSWERPORT` incl. USB and AUTO by DTR (6.6, v2.0) | `test_answer`, `test_modemcfg` | `test_answer` | `test_answer.py`, `test_usb.py` |
@@ -63,7 +63,7 @@ Section numbers refer to the project brief.
 | Device password: first boot, first use, change, hashes only, masked input (6.6) | `test_devicecfg` | `test_device` | `test_device.py` |
 | OTA: password, ALWAYS/DEMAND, 10-minute window (6.6) | `test_devicecfg`, `scripts/test_ota_upload.py` (`.env` BOM, UTF-16) | `test_device` | `test_device.py` |
 | `AT*FACTORY`: Y/N, timeout, every namespace, interrupted reset, no filesystem (6.7) | `test_devicecfg` | `test_device` | `test_device.py --factory-reset` |
-| Configuration screen, styles, sizes, `AT*` parity, `AT*HELP`, no idle repaint (6.8) | `test_config`, `test_config_services`, `scripts/test_generate_ui.py` (single-key hotkeys), `ui/tests` | `test_config` | `test_config.py` |
+| Configuration screen, styles, sizes, `AT*` parity, `AT*HELP`, no idle repaint, closes after 5 minutes idle, Esc cancels a waiting command, `AT*SETTING=` takes one command (6.8, STA-02b/09d, SEC-07a, v2.7) | `test_config`, `test_config_services`, `scripts/test_generate_ui.py` (single-key hotkeys), `ui/tests` | `test_config` | `test_config.py` |
 | Export and replay without secrets, logs, call history (6.8) | `test_config`, `test_config_services` | `test_config` | `test_config.py` |
 | About generated from the licensing record | `scripts/test_generate_credits.py` | — | `test_config.py` |
 | Web server: Digest login (stale nonce, wrong-password lock-out), Host/Origin, tickets, CSRF, WebSocket, upload and unmount hand-shakes (late answers), browsers start read-only (6.11) | `test_web`, `scripts/test_image_manifest.py`, `scripts/test_web_peer.py` | `test_web` | `test_web.py` |

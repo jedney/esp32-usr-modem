@@ -201,6 +201,20 @@ void test_setting_wrapper_applies_validation_and_tone_choice() {
     TEST_ASSERT_EQUAL(1, r.modem.active().get(modemcfg::kTone));
     TEST_ASSERT_NOT_EQUAL(std::string::npos, r.run("*SETTING=*FACTORY").find("ERROR"));
 }
+void test_setting_wrapper_accepts_exactly_one_setting_command() {
+    Rig r;
+    for (const char *bad : {"*SETTING=E0DT555", "*SETTING=E0A", "*SETTING=E1H", "*SETTING=E0E1",
+                            "*SETTING=Q0S7=45", "*SETTING=S7=45E0", "*SETTING=&N8Z", "*SETTING=E1x",
+                            "*SETTING=&C1H", "*SETTING=S7=4x", "*SETTING=E-1"}) {
+        TEST_ASSERT_NOT_EQUAL_MESSAGE(std::string::npos, r.run(bad).find("ERROR"), bad);
+    }
+    TEST_ASSERT_EQUAL(1, r.modem.active().get(modemcfg::kE));  // none of them ran
+    for (const char *good : {"*SETTING=E0", "*SETTING=&N8", "*SETTING=S7=45", "*SETTING=S7.1=1",
+                             "*SETTING=&Z2=bbs.example.net"}) {
+        TEST_ASSERT_EQUAL_MESSAGE(std::string::npos, r.run(good).find("ERROR"), good);
+    }
+    TEST_ASSERT_EQUAL(0, r.modem.active().get(modemcfg::kE));
+}
 void test_log_range_is_bounded_and_verbosity_does_not_capture_raw_text() {
     Rig r;
     r.log.event(3, Event::Boot);
@@ -433,6 +447,7 @@ int main() {
     RUN_TEST(test_menu_export_retains_complete_replayable_lines_across_pages);
     RUN_TEST(test_export_replays_nondefault_profiles_and_phonebook_without_secrets);
     RUN_TEST(test_setting_wrapper_applies_validation_and_tone_choice);
+    RUN_TEST(test_setting_wrapper_accepts_exactly_one_setting_command);
     RUN_TEST(test_log_range_is_bounded_and_verbosity_does_not_capture_raw_text);
     RUN_TEST(test_journal_records_payload_and_cleanup_once_with_clock_wrap);
     RUN_TEST(test_reserved_dial_is_offline_local_and_can_escape_ato_hangup);

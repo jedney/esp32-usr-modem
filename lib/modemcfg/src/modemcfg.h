@@ -61,6 +61,18 @@ int findSetting(char prefix, char letter);
 
 bool settingAllows(Setting s, unsigned value);
 
+// S3 (carriage return), S4 (line feed) and S5 (backspace) are 0-127, and S3 is never a
+// printable character (0x20-0x7E): otherwise every such character would end a line.
+constexpr bool sRegisterAllowed(unsigned reg, unsigned value) {
+    if (reg < 3 || reg > 5) {
+        return true;
+    }
+    return value <= 127 && !(reg == 3 && value >= 0x20 && value <= 0x7E);
+}
+constexpr bool lineEndRegistersAllowed(unsigned s3, unsigned s4, unsigned s5) {
+    return sRegisterAllowed(3, s3) && sRegisterAllowed(4, s4) && sRegisterAllowed(5, s5);
+}
+
 // --- Profile (the active settings, or one stored template) ---------------------------------
 constexpr size_t kSRegCount = 64;  // S0-S63; Sportster registers end at S54
 
