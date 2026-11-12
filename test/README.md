@@ -11,6 +11,14 @@ Every modem feature has tests, at these levels:
 | **End-to-end** (`test/e2e/`) | PC driving the modem's serial ports and Wi-Fi | `python -m pytest test/e2e --console-port COMx [--rs232-port COMy] [--usb-port COMz]` | Before each release |
 | **Interoperability** (`test/interop/`) | PC with lrzsz / pppd | see `test/interop/README.md` | Before releases that touch transfers or PPP |
 
+Shared fakes for the unit tests live in `test/native/support/fakes.h`: `fakes::MemoryStore`
+(`failSave`, `failLoad`, `failErase`, `failNextSaves`, counters), `fakes::TextSink` and
+`fakes::RecordingSound` (`fail`, `broken`). A suite includes it as `"../support/fakes.h"`
+after `#define FAKES_STORE`, `FAKES_SINK` and/or `FAKES_SOUND`. Suites still on their own
+copies: the `MemStore` in `test_atcmd`, `test_hostport`, `test_netcfg` and `test_modemcfg`,
+the `Memory` in `test_devicecfg`, the `Store` in `test_web`, the radios in `test_netcfg`,
+`test_config_services` and `test_internet`, and the sockets in `test_answer` and `test_calls`.
+
 Feature logic lives in `lib/` with no hardware calls, so most of it is unit-tested on
 the PC. On-board tests cover the hardware layer (`lib/hw`); end-to-end tests cover
 behaviour as a user sees it. Running the on-board tests replaces the firmware with a
@@ -41,7 +49,7 @@ Section numbers refer to the project brief.
 | RTS/CTS and XON/XOFF, DTR `&D` with S25, DCD `&C`, RI (6.2) | `test_hostport` | `test_rs232` | `test_rs232.py`, `test_answer.py` |
 | A port nobody reads never blocks the modem: `RING` dropped at once, a reply waits once then the port is stalled (STA-01, v2.2) | `test_hostport` (`test_sink_gate_*`), `test_answer` | — | `test_rs232.py`, `test_usb.py` (bench) |
 | `+++` guard time, DTR hold and throttle credit across the 2^32 ms clock wrap, S3/S5 at 0 and 127, `ATO`, `ATH`, `ATZ`, `F0`, `AT*TESTCALL` (6.2, TG-06, v2.9) | `test_hostport`, `test_atcmd` | — | `test_session.py`, `test_rs232.py` |
-| `&N` line speed, `AT*MODEL`, throttling at 300, 2400 and 115200 bps, CONNECT text (6.2) | `test_calls`, `test_hostport`, `test_atcmd` | `test_calls` | `test_session.py`, `test_calls.py` |
+| `&N` line speed, `AT*MODEL`, throttling at 300, 2400 and 115200 bps, CONNECT text; a sound that cannot start or breaks ends the call at every stage (6.2, TG-16, v2.13) | `test_calls`, `test_hostport`, `test_atcmd` | `test_calls` | `test_session.py`, `test_calls.py` |
 | Phonebook; damaged book refuses edits until `AT*BOOKCLEAR` (6.3, STA-09f, v2.7) | `test_calls` | `test_calls` | `test_calls.py` |
 | Outgoing calls: Telnet negotiation, 0xFF escaping, raw mode, ringing and connect delays, host-name digits (6.6) | `test_calls` | `test_calls` | `test_calls.py` |
 | Call errors: BUSY, NO ANSWER, NO DIAL TONE, NO CARRIER (6.5) | `test_calls` | — | `test_calls.py` |
@@ -66,7 +74,7 @@ Section numbers refer to the project brief.
 | OTA: password, ALWAYS/DEMAND, 10-minute window (6.6) | `test_devicecfg`, `scripts/test_ota_upload.py` (`.env` BOM, UTF-16) | `test_device` | `test_device.py` |
 | `AT*FACTORY`: Y/N, timeout, every namespace, interrupted reset, no filesystem (6.7) | `test_devicecfg` | `test_device` | `test_device.py --factory-reset` |
 | Configuration screen, styles, sizes, `AT*` parity, `AT*HELP`, no idle repaint, closes after 5 minutes idle, Esc cancels a waiting command, `AT*SETTING=` takes one command (6.8, STA-02b/09d, SEC-07a, v2.7) | `test_config`, `test_config_services`, `scripts/test_generate_ui.py` (single-key hotkeys), `ui/tests` | `test_config` | `test_config.py` |
-| Export and replay without secrets, logs, call history (6.8) | `test_config`, `test_config_services` | `test_config` | `test_config.py` |
+| Export and replay without secrets, logs, call history; refused store writes leave the live setting alone (6.8, TG-16, v2.13) | `test_config`, `test_config_services` | `test_config` | `test_config.py` |
 | About generated from the licensing record | `scripts/test_generate_credits.py` | — | `test_config.py` |
 | Web server: Digest login (stale nonce, wrong-password lock-out, parameter/size limits, nonce table, real MD5, falling count), filesystem image check, Host/Origin, tickets, CSRF, WebSocket, upload and unmount hand-shakes (late answers), browsers start read-only (6.11) | `test_web`, `scripts/test_image_manifest.py`, `scripts/test_web_peer.py` | `test_web` | `test_web.py` |
 | Network names as UTF-8 in the web page's JSON (5.5-16, v2.12) | `test_web` | — | — |

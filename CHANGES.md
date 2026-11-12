@@ -14,6 +14,24 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.13] - 2026-11-12
+
+### Added
+
+- `test/native/support/fakes.h`: one in-memory settings store, one text sink and one call
+  sound for the PC unit tests, each able to fail on demand (TG-16).
+- Tests the drifted copies were hiding: a sound that cannot start, or breaks while playing,
+  ends a call with NO CARRIER at the dial tone, digits and handshake stages and frees the
+  line (`test_calls`); a refused store write for the phonebook, the network name, the modem
+  profile (`&W`) and the device password reports an error and changes nothing
+  (`test_config_services`).
+
+### Changed
+
+- `test_answer`, `test_calls`, `test_client`, `test_config`, `test_config_services` and
+  `test_internet` use the shared fakes instead of their own copies (tests only; no firmware
+  change). Suites still on their own copies are listed in `test/README.md`.
+
 ## [2.12] - 2026-11-12
 
 ### Added

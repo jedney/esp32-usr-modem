@@ -3,31 +3,13 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#define FAKES_STORE
+#include "../support/fakes.h"
 #include "client_service.h"
 using namespace clienttest;
 void setUp() {}
 void tearDown() {}
-class Memory : public modemcfg::Store {
-public:
-    std::vector<uint8_t> bytes;
-    bool fail = false;
-    size_t load(uint8_t *out, size_t cap) override {
-        size_t n = std::min(cap, bytes.size());
-        if (n)
-            memcpy(out, bytes.data(), n);
-        return n;
-    }
-    bool save(const uint8_t *data, size_t len) override {
-        if (fail)
-            return false;
-        bytes.assign(data, data + len);
-        return true;
-    }
-    bool erase() override {
-        bytes.clear();
-        return true;
-    }
-};
+using Memory = fakes::MemoryStore;
 class FileSource : public Source {
 public:
     uint32_t length = 8193;
@@ -85,7 +67,7 @@ void test_port_profiles_persist_and_rollback() {
     Settings loaded(memory);
     TEST_ASSERT_TRUE(loaded.begin());
     TEST_ASSERT_EQUAL(132, loaded.get(1).columns);
-    memory.fail = true;
+    memory.failSave = true;
     TEST_ASSERT_FALSE(loaded.save(1, {}));
     TEST_ASSERT_EQUAL(127, loaded.get(1).backspace);
     memory.bytes[8] ^= 1;
@@ -264,7 +246,7 @@ void test_save_requires_confirmation_and_failed_save_is_reported() {
     TEST_ASSERT_TRUE(memory.bytes.empty());
     TEST_ASSERT_TRUE(service.start("TEST", "APPLY", 4));
     drain(service);
-    memory.fail = true;
+    memory.failSave = true;
     feed(service, "y");
     TEST_ASSERT_TRUE(drain(service).find("save failed") != std::string::npos);
     TEST_ASSERT_EQUAL(8, settings.get(0).backspace);

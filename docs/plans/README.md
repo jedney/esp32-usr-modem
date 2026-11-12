@@ -39,7 +39,7 @@ whole window.
 | 10 | v2.10 | [Hostile-input tests: PPP, X/Y/ZMODEM](../history/wp-10-hostile-input.md) | Sonnet / high | M-L | 01 |
 | 11 | v2.11 | [Web page tests and flows](../history/wp-11-web-page.md) | Sonnet / medium | M | 06 |
 | 12 | v2.12 | [Network and storage follow-ups](../history/wp-12-network-storage.md) | Sonnet / high | M-L | 05 |
-| 13 | v2.13 | [Shared native test fixtures](wp-13-test-fixtures.md) | Sonnet / medium | M | 09, 10 |
+| 13 | v2.13 | [Shared native test fixtures](../history/wp-13-test-fixtures.md) | Sonnet / medium | M | 09, 10 |
 | 14 | v2.14 | [`main.cpp` tidy-up](wp-14-main-tidy.md) | Opus / medium | M-L | 02, 03, 06 |
 | 15 | v2.15 | [Configuration screen repaint](wp-15-menu-repaint.md) | Opus / high | L | 07 |
 | 16 | v2.16 | [Configuration screen code tidy-up](wp-16-menu-tidy.md) | Sonnet / high | M | 15 |
@@ -184,6 +184,6 @@ the package confirms each first.
 | TG-13 | Default run dials a real BBS; `NO DIALTONE` string | 08 | done (v2.8) |
 | TG-14 | `app.js` untested; "conflicting identity" test has no conflict | 11 | done (v2.11) |
 | TG-15 | No tests for browser limit, floods, interrupted upload, etc. | 11 | done (v2.11; cases written, run on the bench with --flood-tests, --upload-tests, --usb-unplug) |
-| TG-16 | Fakes copied between suites and drifted | 13 | open |
+| TG-16 | Fakes copied between suites and drifted | 13 | done (v2.13; six suites converted, the rest listed in test/README.md) |
 | TG-17 | Two assertions cannot fail; RS232 on-board tests ignored | 08 | done (v2.8) |
 | Leave alone | Digest MD5 and OTA MD5, unsalted hashes, no image signature, no secure boot, nonce table of 8, PPP idle/host limit/CR-NUL, 410 cppcheck style notes, vendored xterm.js | - | accepted (review section 8) |

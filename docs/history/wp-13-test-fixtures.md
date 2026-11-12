@@ -50,3 +50,13 @@ clang-format. No firmware build.
 ## Done when
 
 Each fake exists once, can fail on demand, and every suite passes.
+
+## Result (v2.13)
+
+Converted: `test_answer`, `test_calls`, `test_client`, `test_config`, `test_config_services`,
+`test_internet` (store, sink, sound as each had them). Not converted (still own copies):
+`MemStore` in `test_atcmd`, `test_hostport`, `test_netcfg`, `test_modemcfg`; `Memory` in
+`test_devicecfg`; `Store` in `test_web`; the radios in `test_netcfg`, `test_config_services`,
+`test_internet`; the sockets in `test_answer`, `test_calls`; `StrSink` (field `s`) in
+`test_atcmd`, `test_hostport`, `test_netcfg`. New failure-path tests: sound failure at three
+stages and a broken sound in `test_calls`; refused store writes in `test_config_services`.

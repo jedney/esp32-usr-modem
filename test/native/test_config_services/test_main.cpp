@@ -2,6 +2,10 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#define FAKES_STORE
+#define FAKES_SINK
+#define FAKES_SOUND
+#include "../support/fakes.h"
 #include "call_journal.h"
 #include "config.h"
 #include "config_dialer.h"
@@ -9,30 +13,8 @@
 using namespace config;
 void setUp() {}
 void tearDown() {}
-class Store : public modemcfg::Store {
-public:
-    std::vector<uint8_t> bytes;
-    size_t load(uint8_t *p, size_t n) override {
-        n = n < bytes.size() ? n : bytes.size();
-        if (n) {
-            memcpy(p, bytes.data(), n);
-        }
-        return n;
-    }
-    bool save(const uint8_t *p, size_t n) override {
-        bytes.assign(p, p + n);
-        return true;
-    }
-    bool erase() override {
-        bytes.clear();
-        return true;
-    }
-};
-class Sink : public atcmd::Sink {
-public:
-    std::string text;
-    void write(const char *p, size_t n) override { text.append(p, n); }
-};
+using Store = fakes::MemoryStore;
+using Sink = fakes::TextSink;
 class Radio : public netcfg::Radio {
 public:
     bool up = false;  // a join succeeds at once
@@ -280,22 +262,7 @@ public:
     size_t read(uint8_t *, size_t) override { return 0; }
     void close() override {}
 };
-class Sound : public calls::CallSound {
-public:
-    bool on = false;
-    unsigned starts = 0;
-    std::vector<calls::SoundStage> stages;
-    bool start(calls::SoundStage stage, const char *, bool, uint32_t,
-               const modemcfg::Profile &) override {
-        ++starts;
-        stages.push_back(stage);
-        on = true;
-        return true;
-    }
-    bool running() const override { return on; }
-    void stop() override { on = false; }
-    void poll(uint32_t, const modemcfg::Profile &) override {}
-};
+using Sound = fakes::RecordingSound;
 void test_reserved_dial_is_offline_local_and_can_escape_ato_hangup() {
     Rig r;
     Sink other;
@@ -336,9 +303,9 @@ void test_reserved_dial_audio_stages_and_cancel_release_reservation() {
     r.run("DT123");
     TEST_ASSERT_TRUE(r.slot.busy());
     TEST_ASSERT_FALSE(r.session.callUp());
-    sound.on = false;
+    sound.active = false;
     dialer.poll();
-    sound.on = false;
+    sound.active = false;
     dialer.poll();
     clockMs += 1501;
     dialer.poll();
@@ -459,6 +426,46 @@ void test_menu_export_retains_complete_replayable_lines_across_pages() {
     feed("\r");
     TEST_ASSERT_NOT_EQUAL(std::string::npos, drain().find("Configuration"));
 }
+// TG-16: these stores could not fail, so a refused write was never tested. Each command says
+// ERROR and leaves the live setting as it was; with the store working again it succeeds.
+void test_store_write_failures_are_reported_and_change_nothing() {
+    Rig r;
+    r.bookStore.failSave = true;
+    TEST_ASSERT_NOT_EQUAL(std::string::npos,
+                          r.run("*PHONEBOOK=42,bbs.example.com,2323,RAW,28800").find("ERROR"));
+    TEST_ASSERT_NULL(r.phonebook.find("42"));
+    r.bookStore.failSave = false;
+    TEST_ASSERT_NOT_EQUAL(std::string::npos,
+                          r.run("*PHONEBOOK=42,bbs.example.com,2323,RAW,28800").find("OK"));
+    TEST_ASSERT_NOT_NULL(r.phonebook.find("42"));
+
+    r.netStore.failSave = true;
+    const std::string host = r.net.settings().host;
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.run("*HOSTNAME=other-name").find("ERROR"));
+    TEST_ASSERT_EQUAL_STRING(host.c_str(), r.net.settings().host);
+    r.netStore.failSave = false;
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.run("*HOSTNAME=other-name").find("OK"));
+    TEST_ASSERT_EQUAL_STRING("other-name", r.net.settings().host);
+
+    // Saving the modem profile (&W) with a failing store reports it; the live profile stays.
+    r.run("*SETTING=S7=33");
+    TEST_ASSERT_EQUAL(33, r.modem.active().s[7]);
+    r.settings.failSave = true;
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.run("*SETTING=&W").find("ERROR"));
+    TEST_ASSERT_EQUAL(33, r.modem.active().s[7]);
+    r.settings.failSave = false;
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.run("*SETTING=&W").find("OK"));
+
+    // A password change that cannot be stored is refused and the old password still works.
+    r.auth.failSave = true;
+    const std::string digest = r.device.digestHash();
+    TEST_ASSERT_FALSE(r.device.change("NewPassword99"));
+    TEST_ASSERT_EQUAL_STRING(digest.c_str(), r.device.digestHash());
+    r.auth.failSave = false;
+    TEST_ASSERT_TRUE(r.device.change("NewPassword99"));
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(digest.c_str(), r.device.digestHash()));
+}
+
 // 5.5-05: a join, a scan or an address change would drop the call, so each is refused.
 void test_wifi_join_scan_and_address_change_are_refused_during_a_call() {
     Rig r;
@@ -667,6 +674,7 @@ int main() {
     RUN_TEST(test_local_service_f0_never_echoes_password_and_escape_wipes_prompt);
     RUN_TEST(test_menu_command_results_are_readable_with_nonstandard_at_format);
     RUN_TEST(test_outgoing_history_failure_and_same_burst_redial_are_recorded_once);
+    RUN_TEST(test_store_write_failures_are_reported_and_change_nothing);
     RUN_TEST(test_wifi_join_scan_and_address_change_are_refused_during_a_call);
     RUN_TEST(test_no_output_contains_either_password_or_its_stored_forms);
     return UNITY_END();

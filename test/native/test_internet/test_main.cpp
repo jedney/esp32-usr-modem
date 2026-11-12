@@ -3,6 +3,10 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#define FAKES_STORE
+#define FAKES_SINK
+#define FAKES_SOUND
+#include "../support/fakes.h"
 #include "input_buffer.h"
 #include "internet.h"
 #include "internet_dialer.h"
@@ -11,26 +15,7 @@
 using Bytes = std::vector<uint8_t>;
 void setUp() {}
 void tearDown() {}
-class Memory : public modemcfg::Store {
-public:
-    Bytes data;
-    bool fail = false;
-    size_t load(uint8_t *out, size_t cap) override {
-        size_t n = std::min(data.size(), cap);
-        std::copy_n(data.begin(), n, out);
-        return n;
-    }
-    bool save(const uint8_t *in, size_t n) override {
-        if (fail)
-            return false;
-        data.assign(in, in + n);
-        return true;
-    }
-    bool erase() override {
-        data.clear();
-        return true;
-    }
-};
+using Memory = fakes::MemoryStore;
 class Network : public dialup::Network {
 public:
     bool live = false, fail = false;
@@ -196,11 +181,11 @@ void test_settings_crc_defaults_and_rollback() {
     dialup::Settings restored(memory);
     TEST_ASSERT_TRUE(restored.begin());
     TEST_ASSERT_EQUAL_HEX32(options.peer, restored.get().peer);
-    memory.fail = true;
+    memory.failSave = true;
     options.dns = 0x08080808;
     TEST_ASSERT_FALSE(restored.save(options));
     TEST_ASSERT_EQUAL_HEX32(0x01010101, restored.get().dns);
-    memory.data[8] ^= 1;
+    memory.bytes[8] ^= 1;
     TEST_ASSERT_FALSE(restored.begin());
     TEST_ASSERT_EQUAL_HEX32(0x0a404001, restored.get().local);
 }
@@ -352,11 +337,7 @@ void test_slip_binary_and_bad_escape_resynchronization() {
     TEST_ASSERT_FALSE(f.engine.isOpen());
     TEST_ASSERT_EQUAL(dialup::Reason::Network, f.engine.reason());
 }
-class Sink : public atcmd::Sink {
-public:
-    std::string text;
-    void write(const char *p, size_t n) override { text.append(p, n); }
-};
+using Sink = fakes::TextSink;
 void test_binary_call_suppresses_echo_escape_and_software_flow() {
     Memory memory;
     atcmd::Modem modem(memory, nullptr, 0);
@@ -393,16 +374,7 @@ public:
     int64_t lastSync() override { return 0; }
     void mac(uint8_t out[6]) override { memset(out, 0, 6); }
 };
-class Sound : public calls::CallSound {
-public:
-    bool start(calls::SoundStage, const char *, bool, uint32_t,
-               const modemcfg::Profile &) override {
-        return true;
-    }
-    bool running() const override { return false; }
-    void stop() override {}
-    void poll(uint32_t, const modemcfg::Profile &) override {}
-};
+using Sound = fakes::RecordingSound;
 class Fallback : public hostport::Session::Dialer {
 public:
     unsigned starts = 0;
