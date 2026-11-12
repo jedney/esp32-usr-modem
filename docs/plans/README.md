@@ -35,7 +35,7 @@ whole window.
 | 06 | v2.6 | [Web server: read-only start, hand-shakes, lock-out](../history/wp-06-web-server.md) | Opus / medium | M-L | 02 |
 | 07 | v2.7 | [Small settings and parser guards; screen time-out](../history/wp-07-small-guards.md) | Sonnet / medium | M-L | 01 |
 | 08 | v2.8 | [Bench harness safety](../history/wp-08-bench-harness.md) | Sonnet / medium | M | 01 |
-| 09 | v2.9 | [Security regression tests](wp-09-security-tests.md) | Sonnet / high | M | 07 |
+| 09 | v2.9 | [Security regression tests](../history/wp-09-security-tests.md) | Sonnet / high | M | 07 |
 | 10 | v2.10 | [Hostile-input tests: PPP, X/Y/ZMODEM](wp-10-hostile-input.md) | Sonnet / high | M-L | 01 |
 | 11 | v2.11 | [Web page tests and flows](wp-11-web-page.md) | Sonnet / medium | M | 06 |
 | 12 | v2.12 | [Network and storage follow-ups](wp-12-network-storage.md) | Sonnet / high | M-L | 05 |
@@ -170,11 +170,11 @@ the package confirms each first.
 | 5.5-18 | `.env` BOM/UTF-16, `bump_version` CRLF, hotkey substring | 01 | done (v2.1) |
 | 5.5-19 | `AT*FACTORY` leaves driver-stored Wi-Fi credentials | 12 | open |
 | TG-01 | Remote `+++` test has no guard times | 04 | done (v2.4) |
-| TG-02 | No canary sweep for both passwords and the Digest hash | 09 | open |
+| TG-02 | No canary sweep for both passwords and the Digest hash | 09 | done (v2.9) |
 | TG-03 | No hostile PPP or X/Y/ZMODEM input tests | 10 | open |
 | TG-04 | Telnet storm, full queue, IAC from an answer-mode caller | 04 | done (v2.4) |
-| TG-05 | Digest parser guards, nonce cases, `ImageCheck(true, ...)` | 09 | open |
-| TG-06 | 2^32 ms wrap, throttle above 300 bps, S3/S5 edges | 09 | open |
+| TG-05 | Digest parser guards, nonce cases, `ImageCheck(true, ...)` | 09 | done (v2.9) |
+| TG-06 | 2^32 ms wrap, throttle above 300 bps, S3/S5 edges | 09 | done (v2.9) |
 | TG-07 | Pin lock test skipped when `.env` overrides pins | 01 | done (v2.1) |
 | TG-08 | Tests behind STA-01, STA-04, STA-05, SEC-04, SEC-01 | 02, 04, 05 | open (STA-01 part done v2.2; SEC-01 part done v2.4; STA-04, STA-05, SEC-04 parts done v2.5) |
 | TG-09 | e2e serial ports have no write time-out (runs hang) | 08 | done (v2.8) |

@@ -40,8 +40,8 @@ Section numbers refer to the project brief.
 | RS232 speed from "AT" at 300-115200, fixed with `AT*BAUD` (6.2) | `test_hostport` (`CallSlot::heldBy` for the "refused during an RS232 call" rule, v2.3) | `test_rs232` | `test_rs232.py`, `test_session.py` |
 | RTS/CTS and XON/XOFF, DTR `&D` with S25, DCD `&C`, RI (6.2) | `test_hostport` | `test_rs232` | `test_rs232.py`, `test_answer.py` |
 | A port nobody reads never blocks the modem: `RING` dropped at once, a reply waits once then the port is stalled (STA-01, v2.2) | `test_hostport` (`test_sink_gate_*`), `test_answer` | — | `test_rs232.py`, `test_usb.py` (bench) |
-| `+++` guard time, `ATO`, `ATH`, `ATZ`, `F0`, `AT*TESTCALL` (6.2) | `test_hostport`, `test_atcmd` | — | `test_session.py`, `test_rs232.py` |
-| `&N` line speed, `AT*MODEL`, throttling, CONNECT text (6.2) | `test_calls`, `test_hostport`, `test_atcmd` | `test_calls` | `test_session.py`, `test_calls.py` |
+| `+++` guard time, DTR hold and throttle credit across the 2^32 ms clock wrap, S3/S5 at 0 and 127, `ATO`, `ATH`, `ATZ`, `F0`, `AT*TESTCALL` (6.2, TG-06, v2.9) | `test_hostport`, `test_atcmd` | — | `test_session.py`, `test_rs232.py` |
+| `&N` line speed, `AT*MODEL`, throttling at 300, 2400 and 115200 bps, CONNECT text (6.2) | `test_calls`, `test_hostport`, `test_atcmd` | `test_calls` | `test_session.py`, `test_calls.py` |
 | Phonebook; damaged book refuses edits until `AT*BOOKCLEAR` (6.3, STA-09f, v2.7) | `test_calls` | `test_calls` | `test_calls.py` |
 | Outgoing calls: Telnet negotiation, 0xFF escaping, raw mode, ringing and connect delays, host-name digits (6.6) | `test_calls` | `test_calls` | `test_calls.py` |
 | Call errors: BUSY, NO ANSWER, NO DIAL TONE, NO CARRIER (6.5) | `test_calls` | — | `test_calls.py` |
@@ -61,14 +61,14 @@ Section numbers refer to the project brief.
 | Wi-Fi: scan, masked join, retry, static IP, mDNS, ARQ/RGB, banner (6.6, 6.7) | `test_netcfg`, `test_atcmd` | `test_wifi`, `test_rs232` | `test_wifi.py`, `test_calls.py`, `test_answer.py` |
 | Clock: NTP, time zones, daylight saving (6.8, Q59) | `test_netcfg` | `test_wifi` | `test_wifi.py` |
 | Browser Wi-Fi changes: 60 s check, failed join, `AT*WIFI=OFF`/`FORGET` in the window; scan names without control bytes | `test_netcfg` | — | — |
-| Wi-Fi password never shown or exported (6.6, 6.8) | `test_netcfg`, `test_config_services` | — | `test_wifi.py`, `test_config.py` |
+| Wi-Fi and device password, OTA hash and Digest hash never in any output: canary sweep over every `AT*` command, `AT&V`, `ATI`, export, logs and every configuration screen (6.6, 6.8, TG-02, v2.9) | `test_netcfg`, `test_config_services` (`test_no_output_contains_either_password_or_its_stored_forms`) | — | `test_wifi.py`, `test_config.py` |
 | Device password: first boot, first use, change, hashes only, masked input (6.6) | `test_devicecfg` | `test_device` | `test_device.py` |
 | OTA: password, ALWAYS/DEMAND, 10-minute window (6.6) | `test_devicecfg`, `scripts/test_ota_upload.py` (`.env` BOM, UTF-16) | `test_device` | `test_device.py` |
 | `AT*FACTORY`: Y/N, timeout, every namespace, interrupted reset, no filesystem (6.7) | `test_devicecfg` | `test_device` | `test_device.py --factory-reset` |
 | Configuration screen, styles, sizes, `AT*` parity, `AT*HELP`, no idle repaint, closes after 5 minutes idle, Esc cancels a waiting command, `AT*SETTING=` takes one command (6.8, STA-02b/09d, SEC-07a, v2.7) | `test_config`, `test_config_services`, `scripts/test_generate_ui.py` (single-key hotkeys), `ui/tests` | `test_config` | `test_config.py` |
 | Export and replay without secrets, logs, call history (6.8) | `test_config`, `test_config_services` | `test_config` | `test_config.py` |
 | About generated from the licensing record | `scripts/test_generate_credits.py` | — | `test_config.py` |
-| Web server: Digest login (stale nonce, wrong-password lock-out), Host/Origin, tickets, CSRF, WebSocket, upload and unmount hand-shakes (late answers), browsers start read-only (6.11) | `test_web`, `scripts/test_image_manifest.py`, `scripts/test_web_peer.py` | `test_web` | `test_web.py` |
+| Web server: Digest login (stale nonce, wrong-password lock-out, parameter/size limits, nonce table, real MD5, falling count), filesystem image check, Host/Origin, tickets, CSRF, WebSocket, upload and unmount hand-shakes (late answers), browsers start read-only (6.11) | `test_web`, `scripts/test_image_manifest.py`, `scripts/test_web_peer.py` | `test_web` | `test_web.py` |
 | Web page: status bar, reconnect, sizing, upload hashing, demo (6.11) | `web/test/` | — | — |
 | Client Tests: display, size, keys, transfers, cable, client settings per port incl. USB (6.13, v2.0) | `test_client` | `test_client` | `test_client.py`; `interop/serial_lrzsz.py` |
 | Build: network libraries (checked before cached) and image identities | `scripts/test_network_dependencies.py`, `scripts/test_image_manifest.py` | — | — |

@@ -1,4 +1,6 @@
 #include <unity.h>
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -402,6 +404,266 @@ void test_upload_handshake_late_unmount_is_ignored() {
     h.giveUpUnmount();
     TEST_ASSERT_TRUE(h.unmountReady());
 }
+// --- TG-05: Authorization parser limits, nonce table, real MD5, filesystem images -----------
+std::string nonceOf(const std::string &challenge) {
+    return challenge.substr(challenge.find("nonce=\"") + 7, 32);
+}
+void test_authorization_parser_refuses_unterminated_quote_and_too_many_parameters() {
+    FakeCrypto crypto;
+    Auth auth(crypto);
+    const char *ha1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    auto freshNonce = [&]() {
+        auth.reset();
+        return nonceOf(auth.challenge(0));
+    };
+    auto n = freshNonce();
+    TEST_ASSERT_TRUE(Check::kOk == auth.check(digest(n), "GET", "/api/session", ha1, 1));
+    // Closing quote missing at the end; a quote opened in an extra field; a quote that ends
+    // in a backslash.
+    n = freshNonce();
+    std::string open = digest(n);
+    open.pop_back();
+    TEST_ASSERT_TRUE(Check::kMissing == auth.check(open, "GET", "/api/session", ha1, 1));
+    n = freshNonce();
+    TEST_ASSERT_TRUE(Check::kMissing == auth.check(digest(n) + ", extra=\"never closed", "GET",
+                                                   "/api/session", ha1, 1));
+    n = freshNonce();
+    TEST_ASSERT_TRUE(Check::kMissing == auth.check(digest(n) + ", extra=\"ends in escape\\", "GET",
+                                                   "/api/session", ha1, 1));
+    // 12 parameters are accepted; the 13th is refused. digest() already has 8.
+    n = freshNonce();
+    TEST_ASSERT_TRUE(Check::kOk == auth.check(digest(n) + ", a1=1, a2=2, a3=3, a4=4", "GET",
+                                              "/api/session", ha1, 1));
+    n = freshNonce();
+    TEST_ASSERT_TRUE(Check::kMissing == auth.check(digest(n) + ", a1=1, a2=2, a3=3, a4=4, a5=5",
+                                                   "GET", "/api/session", ha1, 1));
+}
+void test_authorization_header_is_limited_to_900_bytes() {
+    FakeCrypto crypto;
+    Auth auth(crypto);
+    const char *ha1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    auto n = nonceOf(auth.challenge(0));
+    const std::string head = digest(n) + ", pad=";
+    std::string exact = head + std::string(900 - head.size(), 'x');
+    TEST_ASSERT_EQUAL(900, exact.size());
+    TEST_ASSERT_TRUE(Check::kOk == auth.check(exact, "GET", "/api/session", ha1, 1));
+    auth.reset();
+    n = nonceOf(auth.challenge(0));
+    const std::string head2 = digest(n) + ", pad=";
+    std::string over = head2 + std::string(901 - head2.size(), 'x');
+    TEST_ASSERT_EQUAL(901, over.size());
+    TEST_ASSERT_TRUE(Check::kMissing == auth.check(over, "GET", "/api/session", ha1, 1));
+    // A value over the limit of its own field.
+    auth.reset();
+    n = nonceOf(auth.challenge(0));
+    std::string longCnonce = digest(n);
+    longCnonce.replace(longCnonce.find("browser"), 7, std::string(129, 'c'));
+    TEST_ASSERT_TRUE(Check::kMissing == auth.check(longCnonce, "GET", "/api/session", ha1, 1));
+}
+void test_ninth_challenge_evicts_the_oldest_nonce_and_a_falling_count_is_stale() {
+    FakeCrypto crypto;
+    Auth auth(crypto);
+    const char *ha1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    std::vector<std::string> nonces;
+    for (unsigned i = 0; i < 9; ++i) {
+        nonces.push_back(nonceOf(auth.challenge(10 + i)));
+    }
+    // The ninth challenge took the place of the first (the oldest) nonce.
+    TEST_ASSERT_TRUE(Check::kStale ==
+                     auth.check(digest(nonces[0]), "GET", "/api/session", ha1, 100));
+    // The other eight still work. Attempts are 2 s apart so the lock-out never applies.
+    for (unsigned i = 1; i < 9; ++i) {
+        TEST_ASSERT_TRUE(Check::kOk ==
+                         auth.check(digest(nonces[i]), "GET", "/api/session", ha1, 100 + i * 2000));
+    }
+    // A count that goes backwards is a replay: right password, so stale, never logged in.
+    auth.reset();
+    auto n = nonceOf(auth.challenge(0));
+    TEST_ASSERT_TRUE(Check::kOk ==
+                     auth.check(digest(n, "00000005"), "GET", "/api/session", ha1, 1));
+    TEST_ASSERT_TRUE(Check::kStale ==
+                     auth.check(digest(n, "00000003"), "GET", "/api/session", ha1, 2000));
+    TEST_ASSERT_TRUE(Check::kStale ==
+                     auth.check(digest(n, "00000005"), "GET", "/api/session", ha1, 4000));
+    TEST_ASSERT_TRUE(Check::kOk ==
+                     auth.check(digest(n, "00000006"), "GET", "/api/session", ha1, 6000));
+}
+// MD5 from RFC 1321, written for this test (the firmware uses the core's routines).
+std::string md5hex(const std::string &text) {
+    static const unsigned shifts[64] = {7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+                                        5, 9,  14, 20, 5, 9,  14, 20, 5, 9,  14, 20, 5, 9,  14, 20,
+                                        4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+                                        6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21};
+    uint32_t k[64];
+    for (int i = 0; i < 64; ++i) {
+        k[i] = uint32_t(std::floor(std::fabs(std::sin(double(i + 1))) * 4294967296.0));
+    }
+    std::string data = text;
+    data += char(0x80);
+    while (data.size() % 64 != 56) {
+        data += char(0);
+    }
+    const uint64_t bits = uint64_t(text.size()) * 8;
+    for (int i = 0; i < 8; ++i) {
+        data += char((bits >> (8 * i)) & 0xff);
+    }
+    uint32_t a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
+    for (size_t block = 0; block < data.size(); block += 64) {
+        uint32_t m[16];
+        for (int i = 0; i < 16; ++i) {
+            m[i] = 0;
+            for (int j = 3; j >= 0; --j) {
+                m[i] = (m[i] << 8) | uint8_t(data[block + i * 4 + j]);
+            }
+        }
+        uint32_t a = a0, b = b0, c = c0, d = d0;
+        for (int i = 0; i < 64; ++i) {
+            uint32_t f;
+            int g;
+            if (i < 16) {
+                f = (b & c) | (~b & d);
+                g = i;
+            } else if (i < 32) {
+                f = (d & b) | (~d & c);
+                g = (5 * i + 1) % 16;
+            } else if (i < 48) {
+                f = b ^ c ^ d;
+                g = (3 * i + 5) % 16;
+            } else {
+                f = c ^ (b | ~d);
+                g = (7 * i) % 16;
+            }
+            f = f + a + k[i] + m[g];
+            a = d;
+            d = c;
+            c = b;
+            b = b + ((f << shifts[i]) | (f >> (32 - shifts[i])));
+        }
+        a0 += a;
+        b0 += b;
+        c0 += c;
+        d0 += d;
+    }
+    char out[33];
+    const uint32_t words[4] = {a0, b0, c0, d0};
+    for (int w = 0; w < 4; ++w) {
+        for (int i = 0; i < 4; ++i) {
+            snprintf(out + w * 8 + i * 2, 3, "%02x", unsigned((words[w] >> (8 * i)) & 0xff));
+        }
+    }
+    return out;
+}
+class RealCrypto : public FakeCrypto {
+public:
+    bool md5(const std::string &text, char out[33]) override {
+        strcpy(out, md5hex(text).c_str());
+        return !fail;
+    }
+};
+void test_md5_vectors_and_the_rfc2617_digest_formula() {
+    TEST_ASSERT_EQUAL_STRING("d41d8cd98f00b204e9800998ecf8427e", md5hex("").c_str());
+    TEST_ASSERT_EQUAL_STRING("900150983cd24fb0d6963f7d28e17f72", md5hex("abc").c_str());
+    TEST_ASSERT_EQUAL_STRING(
+        "57edf4a22be3c955ac49da2e2107b67a",
+        md5hex("12345678901234567890123456789012345678901234567890123456789012345678901234567890")
+            .c_str());
+    // RFC 2617 section 3.5 example (qop=auth): the response a browser would send.
+    const std::string ha1 = md5hex("Mufasa:testrealm@host.com:Circle Of Life");
+    const std::string ha2 = md5hex("GET:/dir/index.html");
+    TEST_ASSERT_EQUAL_STRING("939e7578ed9e3c518a452acee763bce9", ha1.c_str());
+    TEST_ASSERT_EQUAL_STRING(
+        "6629fae49393a05397450978507c4ef1",
+        md5hex(ha1 + ":dcd98b7102dd2f0e8b11d0f600bfb0c093:00000001:0a4f113b:auth:" + ha2).c_str());
+}
+void test_digest_login_works_end_to_end_with_real_md5() {
+    RealCrypto crypto;
+    Auth auth(crypto);
+    const std::string ha1 = md5hex("admin:usr-modem:CorrectHorse9");
+    auto browser = [&](const std::string &nonce, const char *nc, const std::string &password,
+                       const char *method) {
+        const std::string key = md5hex("admin:usr-modem:" + password);
+        const std::string response = md5hex(key + ':' + nonce + ':' + nc + ":browser:auth:" +
+                                            md5hex(std::string(method) + ":/api/session"));
+        return "Digest username=\"admin\", realm=\"usr-modem\", nonce=\"" + nonce +
+               "\", uri=\"/api/session\", response=\"" + response + "\", qop=auth, nc=" + nc +
+               ", cnonce=\"browser\"";
+    };
+    auto n = nonceOf(auth.challenge(0));
+    TEST_ASSERT_TRUE(Check::kWrong == auth.check(browser(n, "00000001", "WrongPassword1", "GET"),
+                                                 "GET", "/api/session", ha1.c_str(), 5));
+    // Inside the lock-out second the right answer is refused; after it, it works.
+    TEST_ASSERT_TRUE(Check::kWrong == auth.check(browser(n, "00000001", "CorrectHorse9", "GET"),
+                                                 "GET", "/api/session", ha1.c_str(), 500));
+    TEST_ASSERT_TRUE(Check::kOk == auth.check(browser(n, "00000001", "CorrectHorse9", "GET"), "GET",
+                                              "/api/session", ha1.c_str(), 1005));
+    // The same response again is a replay; a response made for GET fails for POST.
+    TEST_ASSERT_TRUE(Check::kStale == auth.check(browser(n, "00000001", "CorrectHorse9", "GET"),
+                                                 "GET", "/api/session", ha1.c_str(), 2000));
+    TEST_ASSERT_TRUE(Check::kWrong == auth.check(browser(n, "00000002", "CorrectHorse9", "GET"),
+                                                 "POST", "/api/session", ha1.c_str(), 3000));
+    TEST_ASSERT_TRUE(Check::kOk == auth.check(browser(n, "00000003", "CorrectHorse9", "GET"), "GET",
+                                              "/api/session", ha1.c_str(), 5000));
+}
+// A filesystem image has one exact size and the LITTLEFS marker; a firmware marker is not
+// enough, and neither is the right marker in the wrong-sized image.
+std::string fsImage(size_t length, const std::string &marker, size_t at) {
+    std::string image(length, '\xff');
+    image.replace(at, marker.size(), marker);
+    return image;
+}
+bool feedImage(ImageCheck &check, const std::string &image, size_t chunk) {
+    bool ok = true;
+    for (size_t i = 0; i < image.size() && ok; i += chunk) {
+        const size_t n = std::min(chunk, image.size() - i);
+        ok = check.write(reinterpret_cast<const uint8_t *>(image.data() + i), n);
+    }
+    return ok;
+}
+void test_filesystem_image_needs_exact_size_and_littlefs_marker() {
+    const size_t size = 0x7e0000;
+    const std::string marker = "USRMODEM/1/LITTLEFS/0.11\n";
+    {
+        ImageCheck ok(true, "0.11", size);
+        // The marker straddles a 4096-byte chunk boundary.
+        TEST_ASSERT_TRUE(feedImage(ok, fsImage(size, marker, 4096 - 7), 4096));
+        TEST_ASSERT_TRUE(ok.complete());
+    }
+    {
+        ImageCheck shortImage(true, "0.11", size - 1);
+        TEST_ASSERT_TRUE(feedImage(shortImage, fsImage(size - 1, marker, 100), 4096));
+        TEST_ASSERT_FALSE(shortImage.complete());
+    }
+    {
+        ImageCheck longImage(true, "0.11", size + 1);  // refused before any data
+        TEST_ASSERT_FALSE(longImage.write(reinterpret_cast<const uint8_t *>(marker.data()), 1));
+        TEST_ASSERT_FALSE(longImage.complete());
+    }
+    {
+        ImageCheck noMarker(true, "0.11", size);
+        TEST_ASSERT_TRUE(feedImage(noMarker, std::string(size, '\xff'), 65536));
+        TEST_ASSERT_FALSE(noMarker.complete());
+    }
+    {
+        ImageCheck firmwareMarker(true, "0.11", size);
+        TEST_ASSERT_TRUE(
+            feedImage(firmwareMarker, fsImage(size, "USRMODEM/1/FIRMWARE/0.11\n", 100), 65536));
+        TEST_ASSERT_FALSE(firmwareMarker.complete());
+    }
+    {
+        ImageCheck wrongVersion(true, "0.11", size);
+        TEST_ASSERT_TRUE(
+            feedImage(wrongVersion, fsImage(size, "USRMODEM/1/LITTLEFS/0.10\n", 100), 65536));
+        TEST_ASSERT_FALSE(wrongVersion.complete());
+    }
+    {
+        ImageCheck extra(true, "0.11", size);
+        TEST_ASSERT_TRUE(feedImage(extra, fsImage(size, marker, 100), 65536));
+        TEST_ASSERT_FALSE(extra.write(reinterpret_cast<const uint8_t *>(marker.data()), 1));
+        TEST_ASSERT_FALSE(extra.complete());
+    }
+    ImageCheck badVersion(true, "0.11-dev", size);
+    TEST_ASSERT_FALSE(badVersion.write(reinterpret_cast<const uint8_t *>(marker.data()), 1));
+}
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_terminal_geometry_is_bounded_and_cannot_be_terminal_input);
@@ -421,5 +683,11 @@ int main() {
     RUN_TEST(test_version_order_is_numeric_and_invalid_is_distinct);
     RUN_TEST(test_image_identity_header_length_and_chunk_boundaries);
     RUN_TEST(test_json_escapes_untrusted_strings);
+    RUN_TEST(test_authorization_parser_refuses_unterminated_quote_and_too_many_parameters);
+    RUN_TEST(test_authorization_header_is_limited_to_900_bytes);
+    RUN_TEST(test_ninth_challenge_evicts_the_oldest_nonce_and_a_falling_count_is_stale);
+    RUN_TEST(test_md5_vectors_and_the_rfc2617_digest_formula);
+    RUN_TEST(test_digest_login_works_end_to_end_with_real_md5);
+    RUN_TEST(test_filesystem_image_needs_exact_size_and_littlefs_marker);
     return UNITY_END();
 }

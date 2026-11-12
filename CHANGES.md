@@ -14,6 +14,23 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.9] - 2026-11-12
+
+### Added
+
+- Test (no firmware change): a canary sweep stores a Wi-Fi password and a device password,
+  then runs every `AT*` command (read forms), `AT&V`, `ATI0`-`ATI7`, `AT*EXPORT`,
+  `AT*STATUS`, the logs and every configuration screen, and fails if either password,
+  its OTA hash or its Digest hash appears in any output, in plain, lower or upper case.
+  New commands are covered because the sweep walks the command table (TG-02).
+- Tests for the web login guards: an unterminated quote, the 12-parameter and 900-byte
+  limits, the 8-nonce table (the ninth evicts the oldest), a falling nonce count, a real
+  MD5 (RFC 1321 and RFC 2617 vectors) with a Digest login end to end, and filesystem
+  image checks (exact size, marker, version) (TG-05).
+- Tests for the host port: the `+++` guard time, the DTR hold and the throttle credit
+  across the 2^32 ms clock wrap, the throttle at 300, 2400 and 115200 bps, and S3/S5 at 0
+  and 127 (TG-06).
+
 ## [2.8] - 2026-11-12
 
 ### Changed

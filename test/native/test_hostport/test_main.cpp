@@ -899,6 +899,140 @@ void test_call_slot_says_who_holds_it() {
     TEST_ASSERT_FALSE(slot.heldBy(&b));
 }
 
+// --- TG-06: the 2^32 ms clock wrap, throttle rates, S3/S5 limits -------------------------------
+constexpr uint32_t kNearWrap = 0xffffff00u;  // 256 ms before the clock wraps to 0
+
+void test_escape_guard_times_hold_across_the_clock_wrap() {
+    Profile p = f1();  // S12 = 50 (1 s)
+    EscapeDetector e;
+    e.reset(0xfffffa00u);
+    plus(e, kNearWrap, p);  // 1280 ms of quiet before it
+    plus(e, kNearWrap + 100, p);
+    plus(e, kNearWrap + 200, p);  // wraps: 0x000000c8
+    TEST_ASSERT_FALSE(e.poll(kNearWrap + 200 + 999, p));
+    TEST_ASSERT_TRUE(e.poll(kNearWrap + 200 + 1000, p));
+    TEST_ASSERT_FALSE(e.poll(kNearWrap + 200 + 5000, p));  // once only
+
+    // Data 768 ms before the first "+" (the wrap lies between them): not enough guard time.
+    e.reset(0xfffffe00u);
+    plus(e, kNearWrap, p, 'x');
+    plus(e, kNearWrap + 0x300, p);
+    plus(e, kNearWrap + 0x310, p);
+    plus(e, kNearWrap + 0x320, p);
+    TEST_ASSERT_FALSE(e.poll(kNearWrap + 0x320 + 5000, p));
+
+    // Too slow between the "+" characters across the wrap: starts a new sequence.
+    e.reset(0xfffffa00u);
+    plus(e, kNearWrap, p);
+    plus(e, kNearWrap + 1100, p);
+    plus(e, kNearWrap + 1200, p);
+    plus(e, kNearWrap + 1300, p);
+    TEST_ASSERT_TRUE(e.poll(kNearWrap + 2300, p));
+}
+
+void test_session_escape_works_when_the_clock_wraps_during_the_guard_time() {
+    Rig r;
+    r.now = 0xfffffa00u;
+    r.s.tick(r.now, true);
+    r.call();
+    r.wait(1100);  // guard time before; now = 0x0000004c is past the wrap
+    r.send("+++");
+    r.wait(1100);
+    TEST_ASSERT_LESS_THAN_UINT32(0x10000u, r.now);
+    TEST_ASSERT_EQUAL_STRING("\r\nOK\r\n", r.out.take().c_str());
+    TEST_ASSERT_EQUAL(static_cast<int>(Mode::kOnlineCommand), static_cast<int>(r.s.mode()));
+}
+
+void test_dtr_hold_holds_across_the_clock_wrap() {
+    Profile p = f1();  // S25 = 5 (50 ms)
+    DtrFilter d;
+    d.reset(true);
+    TEST_ASSERT_FALSE(d.update(false, 0xffffffe0u, p));
+    TEST_ASSERT_FALSE(d.update(false, 0xffffffe0u + 49, p));  // 0x00000011
+    TEST_ASSERT_TRUE(d.update(false, 0xffffffe0u + 50, p));
+    TEST_ASSERT_FALSE(d.on());
+    // A glitch shorter than the hold, with the wrap in the middle, is ignored.
+    d.reset(true);
+    d.update(false, 0xfffffff0u, p);
+    d.update(true, 0xfffffff0u + 30, p);
+    TEST_ASSERT_FALSE(d.update(true, 0xfffffff0u + 200, p));
+    TEST_ASSERT_TRUE(d.on());
+
+    Rig r;  // and through a whole session: DTR low for 100 ms over the wrap hangs up
+    r.now = 0xffffffd0u;
+    r.s.tick(r.now, true);
+    r.call();
+    r.wait(100, false);
+    TEST_ASSERT_FALSE(r.s.callUp());
+    TEST_ASSERT_EQUAL_STRING("\r\nNO CARRIER\r\n", r.out.take().c_str());
+}
+
+// Bytes the throttle lets through after `ms` of quiet, starting at `start`.
+size_t throttled(uint32_t speed, uint32_t start, uint32_t ms) {
+    Rig r;
+    TEST_ASSERT_TRUE(r.modem.setThrottle(true));
+    r.now = start;
+    r.s.tick(r.now, true);
+    r.echo.open(r.now, 0);
+    TEST_ASSERT_TRUE(r.s.startCall(r.echo, speed));
+    r.out.take();
+    r.wait(ms);
+    static uint8_t data[4096];
+    memset(data, 'x', sizeof data);
+    return r.s.fromHost(data, sizeof data, r.now);
+}
+
+void test_throttle_allows_speed_over_ten_bytes_a_second_at_any_rate() {
+    // 10 bits a byte: 2400 bps = 240 B/s, so 50 ms = 12 bytes and the burst cap is 24 bytes.
+    TEST_ASSERT_EQUAL(12, throttled(2400, 5000, 50));
+    TEST_ASSERT_EQUAL(24, throttled(2400, 5000, 100));
+    TEST_ASSERT_EQUAL(24, throttled(2400, 5000, 2000));
+    // 115200 bps = 11520 B/s, so 10 ms = 115 bytes; the cap is 1152 bytes.
+    TEST_ASSERT_EQUAL(115, throttled(115200, 5000, 10));
+    TEST_ASSERT_EQUAL(1152, throttled(115200, 5000, 100));
+    TEST_ASSERT_EQUAL(1152, throttled(115200, 5000, 2000));
+    // 300 bps: 30 B/s; the cap is 3 bytes.
+    TEST_ASSERT_EQUAL(3, throttled(300, 5000, 1000));
+}
+
+void test_throttle_credit_is_the_same_across_the_clock_wrap() {
+    TEST_ASSERT_EQUAL(12, throttled(2400, 0xffffffe0u, 50));  // 0xffffffe0 + 50 wraps
+    TEST_ASSERT_EQUAL(24, throttled(2400, 0xffffffe0u, 2000));
+    TEST_ASSERT_EQUAL(115, throttled(115200, 0xfffffffcu, 10));  // wraps after 4 ms
+    TEST_ASSERT_EQUAL(1152, throttled(115200, 0xfffffffcu, 2000));
+    TEST_ASSERT_EQUAL(throttled(9600, 1000, 70), throttled(9600, 0xffffffe0u, 70));
+}
+
+// S3 (end of line) and S5 (backspace) at both ends of their range, on the host port.
+void test_s3_zero_and_127_end_the_line_on_the_host_port() {
+    for (unsigned s3 : {0u, 127u}) {
+        Rig r;
+        char set[16];
+        snprintf(set, sizeof set, "ATS3=%u\r", s3);
+        r.send(set);
+        r.out.take();
+        TEST_ASSERT_EQUAL(s3, r.modem.active().s[3]);
+        r.send(std::string("ATX3") + char(s3));
+        const std::string out = r.out.take();
+        TEST_ASSERT_NOT_EQUAL(std::string::npos, out.find("OK", 4));  // after the echo
+        TEST_ASSERT_EQUAL(3, r.modem.active().get(modemcfg::kX));
+        TEST_ASSERT_EQUAL(char(s3), out[out.size() - 2]);  // results end with S3, S4
+    }
+}
+
+void test_s5_zero_and_127_erase_one_character_on_the_host_port() {
+    for (unsigned s5 : {0u, 127u}) {
+        Rig r;
+        char set[16];
+        snprintf(set, sizeof set, "ATS5=%u\r", s5);
+        r.send(set);
+        r.out.take();
+        TEST_ASSERT_EQUAL(s5, r.modem.active().s[5]);
+        r.send(std::string("ATX5") + char(s5) + "3\r");  // X5 typed, erased, X3 kept
+        r.out.take();
+        TEST_ASSERT_EQUAL(3, r.modem.active().get(modemcfg::kX));
+    }
+}
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_call_slot_says_who_holds_it);
@@ -954,5 +1088,12 @@ int main() {
     RUN_TEST(test_sink_gate_one_write_never_takes_longer_than_the_cap);
     RUN_TEST(test_sink_gate_port_that_takes_nothing_does_not_spin);
     RUN_TEST(test_sink_gate_empty_write_is_free);
+    RUN_TEST(test_escape_guard_times_hold_across_the_clock_wrap);
+    RUN_TEST(test_session_escape_works_when_the_clock_wraps_during_the_guard_time);
+    RUN_TEST(test_dtr_hold_holds_across_the_clock_wrap);
+    RUN_TEST(test_throttle_allows_speed_over_ten_bytes_a_second_at_any_rate);
+    RUN_TEST(test_throttle_credit_is_the_same_across_the_clock_wrap);
+    RUN_TEST(test_s3_zero_and_127_end_the_line_on_the_host_port);
+    RUN_TEST(test_s5_zero_and_127_erase_one_character_on_the_host_port);
     return UNITY_END();
 }

@@ -35,10 +35,17 @@ public:
 };
 class Radio : public netcfg::Radio {
 public:
+    bool up = false;  // a join succeeds at once
     void connect(const netcfg::Settings &) override {}
     void leave() override {}
     void off() override {}
-    netcfg::LinkInfo link() override { return {}; }
+    netcfg::LinkInfo link() override {
+        netcfg::LinkInfo info = {};
+        if (up) {
+            info.state = netcfg::LinkState::kUp;
+        }
+        return info;
+    }
     bool scanStart() override { return false; }
     int scanResult(netcfg::ScanEntry *, int) override { return -2; }
     void startServices(const netcfg::Settings &) override {}
@@ -50,10 +57,19 @@ class Crypto : public devicecfg::Crypto {
 public:
     uint32_t value = 0;
     uint32_t randomWord() override { return ++value; }
-    bool hashes(const char *, char a[33], char b[33]) override {
-        memset(a, '1', 32);
-        memset(b, '2', 32);
-        a[32] = b[32] = 0;
+    // Different hashes for different passwords, so a leaked hash can be searched for.
+    static void hex(uint32_t seed, const char *text, char out[33]) {
+        for (int word = 0; word < 4; ++word) {
+            uint32_t h = 2166136261u ^ (seed + uint32_t(word) * 7919u);
+            for (const char *c = text; *c; ++c) {
+                h = (h ^ uint8_t(*c)) * 16777619u;
+            }
+            snprintf(out + word * 8, 9, "%08x", unsigned(h));
+        }
+    }
+    bool hashes(const char *password, char a[33], char b[33]) override {
+        hex(1, password, a);
+        hex(2, password, b);
         return true;
     }
 };
@@ -442,6 +458,175 @@ void test_menu_export_retains_complete_replayable_lines_across_pages() {
     feed("\r");
     TEST_ASSERT_NOT_EQUAL(std::string::npos, drain().find("Configuration"));
 }
+// --- TG-02: neither password nor any stored form of it appears in any output ---------------
+struct Services : config::UiServices {
+    calls::Phonebook *book;
+    explicit Services(calls::Phonebook &b) : book(&b) {}
+    calls::Phonebook *phonebook() override { return book; }
+    config::UiState state() const override { return {}; }
+};
+std::string upper(std::string text) {
+    for (auto &c : text) {
+        c = char(toupper(static_cast<unsigned char>(c)));
+    }
+    return text;
+}
+// Reads everything the configuration screen has ready.
+std::string drainScreen(Terminal &t) {
+    std::string out;
+    uint8_t bytes[256];
+    size_t n;
+    while ((n = t.read(bytes, sizeof bytes)) != 0) {
+        out.append(reinterpret_cast<char *>(bytes), n);
+        TEST_ASSERT_LESS_THAN(400000, out.size());
+    }
+    return out;
+}
+void press(Terminal &t, const char *keys) {
+    for (; *keys; ++keys) {
+        uint8_t c = uint8_t(*keys);
+        t.write(&c, 1);
+    }
+}
+// Opens every configuration screen through the menu and returns all that was drawn.
+std::string tourScreens(Rig &r, Services &services, size_t *visited) {
+    std::string all;
+    Terminal screen(r.session, false);
+    screen.services(&services);
+    screen.setStyle("PLAIN");  // no cursor moves: a secret cannot be split by them
+    screen.open();
+    all += drainScreen(screen);
+    size_t count;
+    const Action *a = actions(count);
+    bool seen[10] = {true};  // Main is drawn by open()
+    for (int pass = 0; pass < 3; ++pass) {
+        for (size_t i = 0; i < count; ++i) {
+            // A navigation row has no command; its hot key opens the screen it names.
+            if (a[i].screen != Screen::Main || *a[i].command || !a[i].key) {
+                continue;
+            }
+            press(screen, std::string(1, a[i].key).c_str());
+            all += drainScreen(screen);
+            seen[unsigned(a[i].target)] = true;
+            // Second level: rows of the opened screen that open yet another screen.
+            for (size_t j = 0; j < count; ++j) {
+                if (a[j].screen == a[i].target && !*a[j].command && a[j].key) {
+                    press(screen, std::string(1, a[j].key).c_str());
+                    all += drainScreen(screen);
+                    seen[unsigned(a[j].target)] = true;
+                    press(screen, "\x1b");
+                    all += drainScreen(screen);
+                }
+            }
+            press(screen, "\x1b");
+            all += drainScreen(screen);
+        }
+        if (pass == 0) {
+            *visited = 0;
+            for (bool s : seen) {
+                *visited += s;
+            }
+        }
+    }
+    screen.close();
+    return all;
+}
+void test_no_output_contains_either_password_or_its_stored_forms() {
+    const char wifiCanary[] = "CanaryWiFi7Q";
+    const char deviceCanary[] = "CanaryDev3Z9";
+    Rig r;
+    r.radio.up = true;
+    TEST_ASSERT_TRUE(r.net.join("CanaryNet", wifiCanary, 0));
+    r.net.tick(10);
+    TEST_ASSERT_EQUAL(int(netcfg::JoinResult::kJoined), int(r.net.joinResult()));
+    TEST_ASSERT_EQUAL_STRING(wifiCanary, r.net.settings().pass);  // it really was stored
+    TEST_ASSERT_TRUE(r.device.change(deviceCanary));
+    r.run("*LOG=2");
+    r.run("*PHONEBOOK=42,bbs.example.com,2323,RAW,28800");
+    // Everything that must stay out of every output.
+    std::vector<std::string> secrets = {wifiCanary, deviceCanary, r.device.otaHash(),
+                                        r.device.digestHash()};
+    TEST_ASSERT_EQUAL(32, strlen(r.device.otaHash()));
+    TEST_ASSERT_EQUAL(32, strlen(r.device.digestHash()));
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(r.device.otaHash(), r.device.digestHash()));
+    const std::string ota = r.device.otaHash(), digest = r.device.digestHash();
+
+    // Commands that would destroy the canaries, restart, or take over the port. They are
+    // skipped by name; their other argument forms are not (AT*PASS? and the like).
+    const std::vector<std::string> skippedBare = {"PASS", "FACTORY", "RESTART", "WIFIFORGET",
+                                                  "BOOKCLEAR"};
+    const std::vector<std::string> skippedAll = {"HW",       "SX",       "SY",   "SZ",     "RX",
+                                                 "RY",       "RZ",       "TEST", "CONFIG", "PLAY",
+                                                 "TESTCALL", "WIFIJOIN", "DIAL"};
+    std::string seen;
+    size_t commands = 0;
+    auto sweep = [&](const std::string &line) {
+        auto out = r.run(line.c_str());
+        if (r.session.port().busy()) {  // a prompt or wait was started: end it
+            r.session.port().cancelPrompt();
+            r.session.port().feed(char(27));
+        }
+        seen += out;
+    };
+    for (size_t i = 0; i < registry.size(); ++i) {
+        const std::string name = registry.data()[i].name;
+        auto in = [&](const std::vector<std::string> &list) {
+            for (const auto &item : list) {
+                if (item == name) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        if (in(skippedAll)) {
+            continue;
+        }
+        ++commands;
+        if (!in(skippedBare)) {
+            sweep("*" + name);
+        }
+        sweep("*" + name + "?");
+        sweep("*" + name + "=?");
+    }
+    TEST_ASSERT_GREATER_THAN(40, commands);
+    sweep("&V");
+    for (char digit = '0'; digit <= '7'; ++digit) {
+        sweep(std::string("I") + digit);
+    }
+    sweep("*EXPORT");
+    sweep("*STATUS");
+    sweep("*LOG=0,200");
+    sweep("*CALLLOG");
+    sweep("*SETTING?");
+    sweep("*ABOUT");
+    sweep("*REFERENCE");
+    // The sweep itself must not have changed the secrets it is looking for.
+    TEST_ASSERT_EQUAL_STRING(wifiCanary, r.net.settings().pass);
+    TEST_ASSERT_EQUAL_STRING(ota.c_str(), r.device.otaHash());
+    TEST_ASSERT_EQUAL_STRING(digest.c_str(), r.device.digestHash());
+
+    Services services(r.phonebook);
+    size_t visited = 0;
+    const std::string drawn = tourScreens(r, services, &visited);
+    TEST_ASSERT_GREATER_THAN(3, visited);
+    TEST_ASSERT_GREATER_THAN(2000, drawn.size());
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, drawn.find("bbs.example.com"));  // phonebook drawn
+    seen += drawn;
+    TEST_ASSERT_GREATER_THAN(3000, seen.size());
+    for (const auto &secret : secrets) {
+        const std::string lower = [&] {
+            std::string t = secret;
+            for (auto &c : t) {
+                c = char(tolower(static_cast<unsigned char>(c)));
+            }
+            return t;
+        }();
+        TEST_ASSERT_EQUAL_MESSAGE(std::string::npos, seen.find(secret), "stored secret in output");
+        TEST_ASSERT_EQUAL_MESSAGE(std::string::npos, seen.find(lower), "lower-case form in output");
+        TEST_ASSERT_EQUAL_MESSAGE(std::string::npos, seen.find(upper(secret)),
+                                  "upper-case form in output");
+    }
+}
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_menu_export_retains_complete_replayable_lines_across_pages);
@@ -455,5 +640,6 @@ int main() {
     RUN_TEST(test_local_service_f0_never_echoes_password_and_escape_wipes_prompt);
     RUN_TEST(test_menu_command_results_are_readable_with_nonstandard_at_format);
     RUN_TEST(test_outgoing_history_failure_and_same_burst_redial_are_recorded_once);
+    RUN_TEST(test_no_output_contains_either_password_or_its_stored_forms);
     return UNITY_END();
 }
