@@ -31,3 +31,17 @@ def test_missing_binding_fails_generation(tmp_path):
     path.write_text(json.dumps(bindings), encoding="utf-8")
     with pytest.raises(ValueError, match="production binding"):
         ui.generate(tmp_path)
+
+
+@pytest.mark.parametrize("key", ["AB", "", "0"])
+def test_hotkey_must_be_one_valid_character(tmp_path, key):
+    for relative in ("ui/menu-definition.json", "ui/theme-tokens.json", "lib/config/ui-bindings.json"):
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes((ROOT / relative).read_bytes())
+    path = tmp_path / "ui/menu-definition.json"
+    menu = json.loads(path.read_text(encoding="utf-8"))
+    menu["main_menu"][0]["key"] = key
+    path.write_text(json.dumps(menu), encoding="utf-8")
+    with pytest.raises(ValueError, match="hotkey"):
+        ui.generate(tmp_path)

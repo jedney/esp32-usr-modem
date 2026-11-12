@@ -14,6 +14,40 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.1] - 2026-11-12
+
+### Added
+
+- `USR_MODEM_PINS_OVERRIDDEN=1` setting: a `.env` that changes the pin map on purpose must
+  set it, or the pin-lock test fails.
+- Pin rules (`scripts/pin_rules.py`): GPIO 22-25, 26-37 and 19/20 are rejected, and the
+  volume pot must be on ADC1 (GPIO 1-10).
+- Script tests for pin rules, `.env` BOM/UTF-16, LF line endings from `bump_version.py`,
+  hotkeys and the download check.
+
+### Changed
+
+- CI and release actions are pinned to commit SHAs; `platformio` and `pytest` are pinned.
+- Release runs only from `main`, does not keep the checkout token and no longer restores
+  CI caches.
+- `uploadfsota` runs the unit tests first, like the other uploads.
+- The pin-lock test fails (instead of being skipped) when `.env` overrides the pins.
+- Secrets rule (CLAUDE.md): `AT*PASS` may show a generated device password once on the
+  requesting local serial port.
+- README and the volume setting help no longer mention a volume limit.
+- `REVIEW.md` is now `docs/history/v2-code-review.md`; review decisions are in the
+  decisions log; `/build/` is ignored.
+
+### Fixed
+
+- The CI version job now fails on a bad VERSION or change log.
+- CI cppcheck now also fails on "high" defects.
+- A bad download is no longer cached before its SHA-256 is checked, and a bad cached copy
+  is deleted.
+- A `.env` saved with a BOM works; a UTF-16 `.env` gives a clear error.
+- `bump_version.py` writes LF line endings on Windows.
+- The configuration-screen hotkey check compares whole keys.
+
 ## [2.0] - 2026-11-08
 
 ### Added

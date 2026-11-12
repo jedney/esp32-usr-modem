@@ -432,7 +432,7 @@
   "hardware-tests.test-volume": {
     "screen": "Hardware",
     "command": "*HWVOL=",
-    "help": "0-100|POT; cap always applies",
+    "help": "0-100|POT",
     "target": "Hardware",
     "input": true
   },

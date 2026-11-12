@@ -40,3 +40,19 @@ def test_password_passed_in_memory_and_exceptions_are_redacted(tmp_path, capsys)
         assert ota.upload(tmp_path / "espota.py", "modem.local", "fs.bin", password, True) == 1
         assert module.serve.call_args.args[6] == 100
     assert password not in capsys.readouterr().out
+
+
+def test_env_file_with_bom_is_read(tmp_path):
+    path = tmp_path / ".env"
+    path.write_bytes(b"\xef\xbb\xbfUSR_MODEM_PASSWORD=secret\r\nUSR_MODEM_PIN_RXD=1\r\n")
+    assert ota.read_env_file(path) == {"USR_MODEM_PASSWORD": "secret", "USR_MODEM_PIN_RXD": "1"}
+
+
+def test_utf16_env_file_gives_clear_error_without_content(tmp_path):
+    import pytest
+
+    path = tmp_path / ".env"
+    path.write_bytes("USR_MODEM_PASSWORD=hunter2\n".encode("utf-16"))
+    with pytest.raises(ValueError, match="UTF-16") as error:
+        ota.read_env_file(path)
+    assert "hunter2" not in str(error.value)

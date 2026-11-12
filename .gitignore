@@ -1,5 +1,6 @@
 # PlatformIO
 .pio/
+/build/
 /sdkconfig.s3*
 
 # VS Code files the PlatformIO extension regenerates per machine

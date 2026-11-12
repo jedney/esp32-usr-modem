@@ -28,7 +28,7 @@ Section numbers refer to the project brief.
 | Feature (brief §) | Unit | On-board | End-to-end |
 |---|---|---|---|
 | Board: 16 MB flash, 8 MB PSRAM, partitions (5.2) | — | `test_board` | — |
-| Pin map as confirmed by Electronics (Q89, rev B), no reserved or shared pins, pot on ADC1 (5.2); numbers come from `.env.example`, lock test skipped if `.env` overrides them | `test_pins` | — | `test_hwtest.py` |
+| Pin map as confirmed by Electronics (Q89, rev B), no reserved or shared pins, pot on ADC1 (5.2); numbers come from `.env.example`; the lock test fails if `.env` overrides them unless `USR_MODEM_PINS_OVERRIDDEN=1`; script rules reject absent, flash/PSRAM and USB GPIOs | `test_pins`; `test/scripts/test_pin_rules.py` | — | `test_hwtest.py` |
 | Dial strings: IP + port, host names, phonebook, special numbers, invalid → ERROR (6.3) | `test_dialstring` | `test_board` | `test_console.py` |
 | Version in banner and `AT*VER` (6.9) | — | — | `test_console.py` |
 | AT parser: several commands per line, `A/`, echo, S3/S5, S-registers, `&F &W &V &Z`, `Y`, `Z` (6.2, 6.6) | `test_atcmd` | — | `test_settings.py` |
@@ -55,15 +55,15 @@ Section numbers refer to the project brief.
 | Clock: NTP, time zones, daylight saving (6.8, Q59) | `test_netcfg` | `test_wifi` | `test_wifi.py` |
 | Wi-Fi password never shown or exported (6.6, 6.8) | `test_netcfg`, `test_config_services` | — | `test_wifi.py`, `test_config.py` |
 | Device password: first boot, first use, change, hashes only, masked input (6.6) | `test_devicecfg` | `test_device` | `test_device.py` |
-| OTA: password, ALWAYS/DEMAND, 10-minute window (6.6) | `test_devicecfg`, `scripts/test_ota_upload.py` | `test_device` | `test_device.py` |
+| OTA: password, ALWAYS/DEMAND, 10-minute window (6.6) | `test_devicecfg`, `scripts/test_ota_upload.py` (`.env` BOM, UTF-16) | `test_device` | `test_device.py` |
 | `AT*FACTORY`: Y/N, timeout, every namespace, interrupted reset (6.7) | `test_devicecfg` | `test_device` | `test_device.py --factory-reset` |
-| Configuration screen, styles, sizes, `AT*` parity, `AT*HELP`, no idle repaint (6.8) | `test_config`, `test_config_services`, `scripts/test_generate_ui.py`, `ui/tests` | `test_config` | `test_config.py` |
+| Configuration screen, styles, sizes, `AT*` parity, `AT*HELP`, no idle repaint (6.8) | `test_config`, `test_config_services`, `scripts/test_generate_ui.py` (single-key hotkeys), `ui/tests` | `test_config` | `test_config.py` |
 | Export and replay without secrets, logs, call history (6.8) | `test_config`, `test_config_services` | `test_config` | `test_config.py` |
 | About generated from the licensing record | `scripts/test_generate_credits.py` | — | `test_config.py` |
 | Web server: Digest login (stale nonce, wrong-password delay), Host/Origin, tickets, CSRF, WebSocket, upload (6.11) | `test_web`, `scripts/test_image_manifest.py`, `scripts/test_web_peer.py` | `test_web` | `test_web.py` |
 | Web page: status bar, reconnect, sizing, upload hashing, demo (6.11) | `web/test/` | — | — |
 | Client Tests: display, size, keys, transfers, cable, client settings per port incl. USB (6.13, v2.0) | `test_client` | `test_client` | `test_client.py`; `interop/serial_lrzsz.py` |
-| Build: network libraries and image identities | `scripts/test_network_dependencies.py`, `scripts/test_image_manifest.py` | — | — |
+| Build: network libraries (checked before cached) and image identities | `scripts/test_network_dependencies.py`, `scripts/test_image_manifest.py` | — | — |
 
 Checks that need a person (sound, LEDs, loopback plug, Amiga and Windows 9x clients)
 are listed in `docs/ROADMAP.md`.

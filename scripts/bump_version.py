@@ -47,8 +47,8 @@ def main(argv):
     if marker not in changes:
         raise SystemExit("CHANGES.md has no '## [Unreleased]' heading")
     entry = f"{marker}\n## [{new}] - {today}\n\n### {section}\n\n- {summary}\n"
-    CHANGES_FILE.write_text(changes.replace(marker, entry, 1), encoding="utf-8")
-    VERSION_FILE.write_text(new + "\n", encoding="utf-8")
+    CHANGES_FILE.write_text(changes.replace(marker, entry, 1), encoding="utf-8", newline="\n")
+    VERSION_FILE.write_text(new + "\n", encoding="utf-8", newline="\n")
     print(f"{old} -> {new}. Commit with a message starting 'v{new}: '.")
     return 0
 

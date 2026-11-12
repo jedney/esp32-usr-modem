@@ -10,9 +10,15 @@ CALLBACK_PORT = 32320
 def read_env_file(path):
     values = {}
     try:
-        text = path.read_text(encoding="utf-8")
+        raw_bytes = path.read_bytes()
     except OSError:
         return values
+    if raw_bytes[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        raise ValueError(f"{path.name} is saved as UTF-16. Save it as UTF-8 (no BOM needed).")
+    try:
+        text = raw_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise ValueError(f"{path.name} is not valid UTF-8. Save it as UTF-8.") from None
     for raw in text.splitlines():
         line = raw.strip()
         if not line or line.startswith("#") or "=" not in line:

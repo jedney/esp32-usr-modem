@@ -3,7 +3,9 @@
 Reads USR_MODEM_PIN_* from .env.example (the defaults, always present in the repo), then
 .env, then real environment variables, and defines each one as a compile-time macro for
 lib/hw/src/pins.h. Also defines USR_MODEM_PINS_DEFAULT=1 when the map equals
-.env.example, so the unit test can lock in the confirmed map only for that case.
+.env.example, so the unit test can lock in the confirmed map for that case. A changed map
+fails the pin test unless USR_MODEM_PINS_OVERRIDDEN=1 is set (USR_MODEM_PINS_OVERRIDE_OK).
+Pin numbers are checked by scripts/pin_rules.py.
 """
 
 import os
@@ -15,9 +17,10 @@ Import("env")  # noqa: F821  (provided by PlatformIO/SCons)
 root = pathlib.Path(env.subst("$PROJECT_DIR"))  # noqa: F821
 sys.path.insert(0, str(root / "scripts"))
 from ota_upload import read_env_file  # noqa: E402
+from pin_rules import check_pin  # noqa: E402
 
 PREFIX = "USR_MODEM_PIN_"
-MAX_GPIO = 48  # highest ESP32-S3 GPIO
+OVERRIDE_FLAG = "USR_MODEM_PINS_OVERRIDDEN"  # set to 1 when a changed map is on purpose
 
 
 def pin_values(source):
@@ -37,8 +40,10 @@ for name in defaults:
         number = int(pins[name], 10)
     except ValueError:
         raise SystemExit(f"{name} must be a GPIO number, found {pins[name]!r}")
-    if not 0 <= number <= MAX_GPIO:
-        raise SystemExit(f"{name}={number} is not an ESP32-S3 GPIO (0-{MAX_GPIO})")
+    try:
+        check_pin(name, number)
+    except ValueError as error:
+        raise SystemExit(str(error))
     pins[name] = number
 
 unknown = sorted(set(pins) - set(defaults))
@@ -53,6 +58,12 @@ for name, number in pins.items():
     used[name] = number
 
 env.Append(CPPDEFINES=[(name, number) for name, number in pins.items()])  # noqa: F821
+overridden = pins != {k: int(v) for k, v in defaults.items()}
+flag = os.environ.get(OVERRIDE_FLAG) or read_env_file(root / ".env").get(OVERRIDE_FLAG, "")
+env.Append(CPPDEFINES=[("USR_MODEM_PINS_OVERRIDE_OK", int(flag == "1"))])  # noqa: F821
+if overridden and flag != "1":
+    print(f"WARNING: the pin map differs from .env.example. Unit tests will fail until you "
+          f"set {OVERRIDE_FLAG}=1 (only if the change is on purpose).")
 env.Append(CPPDEFINES=[("USR_MODEM_PINS_DEFAULT", int(all(  # noqa: F821
     pins[k] == int(defaults[k]) for k in defaults)))])
 print("GPIO pin map from " + ("defaults (.env.example)" if all(

@@ -13,11 +13,17 @@ void setUp() {}
 void tearDown() {}
 
 // The confirmed map (Q89, rev B; replaces rev A, Q76). The numbers come from .env.example
-// (scripts/pin_config.py); this test runs when no .env override is in effect. If Electronics
-// changes the board, change .env.example and these numbers together.
+// (scripts/pin_config.py); a changed map fails this test unless USR_MODEM_PINS_OVERRIDDEN=1 says it
+// is on purpose. If Electronics changes the board, change .env.example and these numbers together.
 void test_pin_map_is_the_confirmed_one() {
 #if !USR_MODEM_PINS_DEFAULT
-    TEST_IGNORE_MESSAGE("pins are overridden by .env or the environment, not the .env.example map");
+#if USR_MODEM_PINS_OVERRIDE_OK
+    TEST_IGNORE_MESSAGE("pins overridden on purpose (USR_MODEM_PINS_OVERRIDDEN=1)");
+#else
+    TEST_FAIL_MESSAGE(
+        "pins differ from .env.example. If .env changed them on purpose, set "
+        "USR_MODEM_PINS_OVERRIDDEN=1 in .env");
+#endif
 #endif
     TEST_ASSERT_EQUAL_INT(1, pins::kRxd);
     TEST_ASSERT_EQUAL_INT(2, pins::kTxd);

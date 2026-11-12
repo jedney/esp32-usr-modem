@@ -27,3 +27,4 @@ def run_native_tests(source, target, env):  # noqa: ARG001
 
 env.AddPreAction("upload", run_native_tests)  # noqa: F821
 env.AddPreAction("uploadfs", run_native_tests)  # noqa: F821
+env.AddPreAction("uploadfsota", run_native_tests)  # noqa: F821
