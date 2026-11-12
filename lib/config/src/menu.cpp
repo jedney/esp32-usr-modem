@@ -87,6 +87,7 @@ bool Terminal::open() {
     escapeDiscard_ = false;
     swallowEnter_ = false;
     drawing_ = false;
+    shown_.valid = false;
     styled_ = false;
     stagePos_ = stageLen_ = 0;
     model_ = session_.port().modem().model();
@@ -157,6 +158,7 @@ bool Terminal::resize(unsigned columns, unsigned rows) {
         rows_ = rows;
         // Abort an old-size frame even when the last UART chunk ended inside a
         // CSI. CAN is a terminal parser cancellation, followed by a fresh frame.
+        shown_.valid = false;
         if (open_ && !exporting_) {
             drawing_ = false;
             stagePos_ = 0;
@@ -213,6 +215,7 @@ void Terminal::close() {
         session_.port().print("\x18\x1b[0m\x1b[?7h\x1b[?25h\r\n");
     styled_ = false;
     open_ = capturing_ = drawing_ = dirty_ = false;
+    shown_.valid = false;
     querySize_ = false;
     stageLen_ = stagePos_ = 0;
     escapeLen_ = 0;
@@ -233,6 +236,7 @@ void Terminal::escaped() {
         session_.port().print("\x18\x1b[0m\x1b[?7h\x1b[?25h\r\n");
     styled_ = false;
     drawing_ = false;
+    shown_.valid = false;
     stageLen_ = stagePos_ = 0;
     clearInput();
     clearOutput();
@@ -480,6 +484,22 @@ void Terminal::buildFrame() {
     grid_.text(2, rows_ - 3, message, Ink::Muted, cols_ - 4);
     grid_.text(2, rows_ - 2, focus_ == Focus::Confirm ? "Command > Y / N" : "Command >", Ink::Body,
                cols_ - 4);
+}
+// PERF-01: a full frame clears the screen and sends every row; otherwise only the changed
+// cells of each row are sent, and nothing at all when nothing changed.
+void Terminal::planFrame() {
+    frameWrites_ = session_.port().directWrites();
+    fullFrame_ = !shown_.valid || drawStyle_ == Style::Plain || shown_.style != drawStyle_ ||
+                 shown_.color != drawColor_ || shown_.modelRgb != drawModelRgb_ ||
+                 shownGrid_.cols() != grid_.cols() || shownGrid_.rows() != grid_.rows() ||
+                 shown_.directWrites != frameWrites_;
+    if (fullFrame_ || shown_.cursorRow != drawCursorRow_ || shown_.cursorCol != drawCursorCol_)
+        return;
+    unsigned from, end;
+    for (unsigned y = 0; y < grid_.rows(); ++y)
+        if (grid_.changed(shownGrid_, y, from, end))
+            return;
+    drawing_ = false;
 }
 void Terminal::drawMenu() {
     auto &location = locations_[static_cast<unsigned>(screen_)];
@@ -803,26 +823,36 @@ size_t Terminal::read(uint8_t *data, size_t cap) {
             if (!dirty_)
                 break;
             buildFrame();
+            planFrame();
+            if (!drawing_)
+                continue;  // nothing on the screen changed
         }
         if (drawRow_ == 0) {
             if (drawStyle_ != Style::Plain) {
                 styled_ = true;
                 const char *start = drawColor_ == Color::Rgb
-                                        ? "\x1b[?25l\x1b[?7l\x1b[0m\x1b[48;2;3;5;7m\x1b[2J"
-                                        : "\x1b[?25l\x1b[?7l\x1b[0m\x1b[40m\x1b[2J";
-                stageLen_ = strlen(start);
-                memcpy(staging_, start, stageLen_);
+                                        ? "\x1b[?25l\x1b[?7l\x1b[0m\x1b[48;2;3;5;7m"
+                                        : "\x1b[?25l\x1b[?7l\x1b[0m\x1b[40m";
+                stageLen_ = snprintf(staging_, sizeof staging_, "%s%s", start,
+                                     fullFrame_ ? "\x1b[2J" : "");
             }
         } else if (drawRow_ <= grid_.rows()) {
-            stageLen_ =
-                grid_.row(drawRow_ - 1, staging_, sizeof staging_, drawStyle_ == Style::Cp437,
-                          drawStyle_ == Style::Plain, drawColor_, drawModelRgb_);
+            unsigned y = drawRow_ - 1, from, end;
+            if (fullFrame_)
+                stageLen_ = grid_.row(y, staging_, sizeof staging_, drawStyle_ == Style::Cp437,
+                                      drawStyle_ == Style::Plain, drawColor_, drawModelRgb_);
+            else if (grid_.changed(shownGrid_, y, from, end))
+                stageLen_ = grid_.span(y, from, end, staging_, sizeof staging_,
+                                       drawStyle_ == Style::Cp437, drawColor_, drawModelRgb_);
         } else {
             if (drawStyle_ != Style::Plain)
                 stageLen_ =
                     snprintf(staging_, sizeof staging_, "\x1b[0m\x1b[%u;%uH\x1b[?7h\x1b[?25h",
                              drawCursorRow_, drawCursorCol_);
             drawing_ = false;
+            shownGrid_ = grid_;
+            shown_ = {true,           drawStyle_,     drawColor_,  drawModelRgb_,
+                      drawCursorRow_, drawCursorCol_, frameWrites_};
         }
         ++drawRow_;
     }
@@ -1025,6 +1055,7 @@ void Terminal::execute(const char *command) {
     exportPrompt_ = exportFinished_ = false;
     if (exporting_) {
         drawing_ = false;
+        shown_.valid = false;
         stagePos_ = 0;
         const char *prefix =
             style_ == Style::Plain ? "" : "\x18\x1b[0m\x1b[?7h\x1b[?25h\x1b[2J\x1b[H";
@@ -1259,6 +1290,10 @@ void Terminal::key(unsigned key) {
                 session_.port().feed(static_cast<char>(27));
             finishResponse();
         }
+        return;
+    }
+    if (key == 12) {  // Ctrl-L: draw the whole screen again
+        repaint();
         return;
     }
     if (key == kF1) {

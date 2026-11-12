@@ -94,6 +94,7 @@ public:
     void diagnostic(hostport::Connection &connection) {
         diagnostic_ = &connection;
         drawing_ = false;
+        shown_.valid = false;  // the test owns the terminal until it ends
         stagePos_ = stageLen_ = 0;
         if (!connection.binaryService() && style_ != Style::Plain) {
             const char prefix[] = "\x18\x1b[0m\x1b[?7h\x1b[?25h\x1b[2J\x1b[H";
@@ -126,9 +127,16 @@ public:
         render();
     }
     Color color() const { return color_; }
+    // Sends a full frame next instead of only the changes: Ctrl-L, or after something
+    // wrote to the terminal behind the screen (a hardware test on the console or browser).
+    void repaint() {
+        shown_.valid = false;
+        render();
+    }
 
 private:
     void render();
+    void planFrame();
     void line(const char *text);
     void append(const char *text);
     void input(char c);
@@ -187,6 +195,19 @@ private:
     bool dirty_ = false, drawing_ = false, querySize_ = false;
     bool styled_ = false;
     unsigned drawRow_ = 0;
+    // What the terminal shows (PERF-01). A frame sends only the cells that differ from it,
+    // unless it is a full frame: first frame, new size, style, colours or theme, Ctrl-L,
+    // or other output on the port since (Port::directWrites()). Plain text is always full.
+    struct Shown {
+        bool valid = false;
+        Style style = Style::Ansi;
+        Color color = Color::Ansi16;
+        unsigned modelRgb = 0, cursorRow = 0, cursorCol = 0;
+        uint32_t directWrites = 0;
+    } shown_;
+    CellGrid shownGrid_;
+    bool fullFrame_ = true;
+    uint32_t frameWrites_ = 0;
     char staging_[4096] = {};
     size_t stageLen_ = 0, stagePos_ = 0;
     enum class Focus : uint8_t { Menu, Form, Confirm, Details, Help };

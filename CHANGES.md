@@ -14,6 +14,12 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.15] - 2026-11-13
+
+### Changed
+
+- Configuration screen sends only what changed
+
 ## [2.14] - 2026-11-13
 
 ### Changed

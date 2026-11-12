@@ -119,16 +119,33 @@ unsigned CellGrid::modelRgb(unsigned speed) {
 }
 size_t CellGrid::row(unsigned y, char *out, size_t cap, bool cp437, bool plain, Color color,
                      unsigned modelRgb) const {
+    if (!plain)
+        return span(y, 0, cols_, out, cap, cp437, color, modelRgb);
     if (y >= rows_ || cap < 64)
         return 0;
     size_t n = 0;
-    if (!plain)
-        n = snprintf(out, cap, "\x1b[%u;1H", y + 1);
+    for (unsigned x = 0; x < cols_; ++x) {
+        if (n + 4 >= cap)
+            return 0;
+        out[n++] = ascii(cells_[y * kMaxCols + x].glyph);
+    }
+    if (y + 1 < rows_) {
+        out[n++] = '\r';
+        out[n++] = '\n';
+    }
+    return n;
+}
+size_t CellGrid::span(unsigned y, unsigned from, unsigned end, char *out, size_t cap, bool cp437,
+                      Color color, unsigned modelRgb) const {
+    end = std::min(end, cols_);
+    if (y >= rows_ || from >= end || cap < 64)
+        return 0;
+    size_t n = snprintf(out, cap, "\x1b[%u;%uH", y + 1, from + 1);
     Ink previous = Ink::Model;
     bool first = true;
-    for (unsigned x = 0; x < cols_; ++x) {
+    for (unsigned x = from; x < end; ++x) {
         const auto &cell = cells_[y * kMaxCols + x];
-        if (!plain && (first || previous != cell.ink)) {
+        if (first || previous != cell.ink) {
             unsigned value = rgb(cell.ink, modelRgb);
             unsigned r = value >> 16, g = (value >> 8) & 255, b = value & 255;
             char sgr[40];
@@ -150,12 +167,25 @@ size_t CellGrid::row(unsigned y, char *out, size_t cap, bool cp437, bool plain, 
         }
         if (n + 4 >= cap)
             return 0;
-        out[n++] = cp437 && !plain ? cell.glyph : ascii(cell.glyph);
-    }
-    if (plain && y + 1 < rows_) {
-        out[n++] = '\r';
-        out[n++] = '\n';
+        out[n++] = cp437 ? cell.glyph : ascii(cell.glyph);
     }
     return n;
+}
+bool CellGrid::changed(const CellGrid &before, unsigned y, unsigned &from, unsigned &end) const {
+    if (y >= rows_)
+        return false;
+    const Cell *now = cells_ + y * kMaxCols, *was = before.cells_ + y * kMaxCols;
+    auto same = [&](unsigned x) { return now[x].glyph == was[x].glyph && now[x].ink == was[x].ink; };
+    unsigned first = 0;
+    while (first < cols_ && same(first))
+        ++first;
+    if (first == cols_)
+        return false;
+    unsigned last = cols_ - 1;
+    while (last > first && same(last))
+        --last;
+    from = first;
+    end = last + 1;
+    return true;
 }
 }  // namespace config

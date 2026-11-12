@@ -32,6 +32,11 @@ public:
     // arbitrary UART chunks. Cursor addressing avoids CR/LF and delayed auto-wrap.
     size_t row(unsigned y, char *out, size_t cap, bool cp437, bool plain, Color color,
                unsigned modelRgb) const;
+    // Cells [from, end) of row y, cursor-addressed (not for plain text).
+    size_t span(unsigned y, unsigned from, unsigned end, char *out, size_t cap, bool cp437,
+                Color color, unsigned modelRgb) const;
+    // The cells [from, end) of row y that differ from `before` (same size), if any do.
+    bool changed(const CellGrid &before, unsigned y, unsigned &from, unsigned &end) const;
     unsigned cols() const { return cols_; }
     unsigned rows() const { return rows_; }
     static const char *modelLabel(unsigned speed);

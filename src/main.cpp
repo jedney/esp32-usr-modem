@@ -391,6 +391,7 @@ atcmd::Reply cmdHw(atcmd::Port &port, const char *args) {
     hardwareOwner = nullptr;
     if (capture) {
         port.redirect(&menuOf(port), true);
+        menuOf(port).repaint();  // the test wrote over the screen (PERF-01)
     }
     return atcmd::Reply::kDone;
 }
