@@ -156,22 +156,22 @@ void test_renderers_and_paging_work_with_one_byte_output() {
 void test_response_pagination_does_not_leak_next_page() {
     Rig r;
     r.terminal.open();
-    r.drain();
+    ScreenView view;  // one terminal for the whole test: later frames send only changes
+    view.accept(r.drain());
     for (unsigned i = 0; i < 60; ++i) {
         char row[24];
         snprintf(row, sizeof row, "row%02u\n", i);
         r.terminal.write(row, strlen(row));
     }
-    ScreenView first;
-    first.accept(r.drain());
-    TEST_ASSERT_TRUE(first.has("More:"));
-    TEST_ASSERT_FALSE(first.has("row15"));
+    view.accept(r.drain());
+    TEST_ASSERT_TRUE(view.has("More:"));
+    TEST_ASSERT_FALSE(view.has("row15"));
     TEST_ASSERT_TRUE(r.drain().empty());
     r.feed("\r");
-    ScreenView second;
-    second.accept(r.drain());
-    TEST_ASSERT_TRUE(second.has("row15"));
-    TEST_ASSERT_FALSE(second.has("row30"));
+    view.accept(r.drain());
+    TEST_ASSERT_TRUE(view.has("row15"));
+    TEST_ASSERT_FALSE(view.has("row30"));
+    TEST_ASSERT_FALSE(view.has("row14"));
 }
 void test_menu_secret_input_is_wiped_and_never_echoed() {
     Rig r;
@@ -343,6 +343,8 @@ void test_oversized_input_is_rejected_without_dispatching_prefix() {
     TEST_ASSERT_EQUAL(14400, r.modem.model());
     TEST_ASSERT_TRUE(r.terminal.isOpen());
 }
+#include "repaint_cases.h"
+#include "review_cases.h"
 #include "ui_cases.h"
 void test_browser_lists_serial_diagnostics_without_dispatch() {
     Rig r;
@@ -431,5 +433,12 @@ int main() {
     RUN_TEST(test_overlong_output_is_bounded_and_reported);
     RUN_TEST(test_rs232_menu_lists_and_blocks_takeover_actions);
     RUN_TEST(test_oversized_input_is_rejected_without_dispatching_prefix);
+    RUN_TEST(test_measure_one_arrow_key_at_80x25);
+    RUN_TEST(test_every_main_menu_move_sends_only_the_change);
+    RUN_TEST(test_resize_refresh_style_colour_and_port_output_send_a_full_frame);
+    RUN_TEST(test_changes_only_screen_matches_a_full_repaint);
+    RUN_TEST(test_output_pages_step_by_the_lines_shown);
+    RUN_TEST(test_alt_letter_neither_cancels_a_form_nor_runs_a_hotkey);
+    RUN_TEST(test_input_too_long_is_shown_at_once_and_kept_until_cleared);
     return UNITY_END();
 }

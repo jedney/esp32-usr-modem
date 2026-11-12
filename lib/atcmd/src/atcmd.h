@@ -151,6 +151,9 @@ public:
         redirected_ = sink;
         readable_ = sink && readable;
     }
+    // Counts writes that went to the port itself (not redirected). A configuration screen
+    // drawn by changes only repaints in full after anyone else wrote to its terminal.
+    uint32_t directWrites() const { return directWrites_; }
     void print(const char *text);
     void printf(const char *fmt, ...) __attribute__((format(printf, 2, 3)));
     void newline();               // S3 S4
@@ -204,6 +207,7 @@ private:
     Sink &out_;
     Sink *redirected_ = nullptr;
     bool readable_ = false;
+    uint32_t directWrites_ = 0;
     bool browser_ = false;
     uint8_t clientBackspace_ = 0;
     uint32_t baud_;

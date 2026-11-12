@@ -5,6 +5,8 @@
 #include <cstdio>
 #include <cstring>
 
+#include "hw.h"
+
 namespace hw {
 
 void OtaService::stop() {
@@ -41,6 +43,9 @@ void OtaService::poll(uint32_t now, bool wifiUp, bool idle, const char *hostname
                 Update.abort();
             }
         });
+        // ArduinoOTA receives the whole image inside handle(), in the loop task: feed the
+        // watchdog after every chunk (STA-06).
+        ota_->onProgress([](unsigned int, unsigned int) { hw::feedWatchdog(); });
         ota_->begin();
     }
     ota_->handle();

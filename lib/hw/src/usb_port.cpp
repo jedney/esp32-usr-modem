@@ -73,12 +73,16 @@ uint32_t usbBaud() {
     return coding.bit_rate;
 }
 
+// Read, available and flush only while a computer has configured the device. TinyUSB then
+// queues the next OUT transfer, and on an endpoint a bus reset has closed (nothing on the
+// rear USB-C, or a power-only lead) its ESP32-S3 driver divides by a packet size of 0 and
+// the modem crash-loops (found on the bench, v2.17).
 size_t usbAvailable() {
-    return started ? tud_cdc_n_available(kItf) : 0;
+    return usbMounted() ? tud_cdc_n_available(kItf) : 0;
 }
 
 size_t usbRead(uint8_t *data, size_t cap) {
-    if (!started || cap == 0) {
+    if (!usbMounted() || cap == 0) {
         return 0;
     }
     return tud_cdc_n_read(kItf, data, cap);
@@ -102,7 +106,7 @@ bool usbTxDrained() {
 }
 
 void usbDiscardInput() {
-    if (started) {
+    if (usbMounted()) {
         tud_cdc_n_read_flush(kItf);
     }
 }

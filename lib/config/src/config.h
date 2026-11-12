@@ -72,6 +72,18 @@ public:
 
 private:
     atcmd::Reply exportConfig(atcmd::Port &port);
+    atcmd::Reply setting(atcmd::Port &port, const char *args);
+    atcmd::Reply explicitRate(atcmd::Port &port, const char *args);
+    atcmd::Reply restoreEnd(atcmd::Port &port, const char *args);
+    atcmd::Reply profile(atcmd::Port &port, const char *args);
+    atcmd::Reply profileControl(atcmd::Port &port, const char *args);
+    atcmd::Reply bookClear(atcmd::Port &port, const char *args);
+    atcmd::Reply dial(atcmd::Port &port, const char *args);
+    atcmd::Reply reference(atcmd::Port &port, const char *args);
+    atcmd::Reply about(atcmd::Port &port, const char *args);
+    atcmd::Reply exportCommand(atcmd::Port &port, const char *args);
+    atcmd::Reply logCommand(atcmd::Port &port, const char *args);
+    atcmd::Reply callLog(atcmd::Port &port, const char *args);
     Log &log_;
     History &history_;
     calls::Phonebook &book_;
@@ -94,6 +106,7 @@ public:
     void diagnostic(hostport::Connection &connection) {
         diagnostic_ = &connection;
         drawing_ = false;
+        shown_.valid = false;  // the test owns the terminal until it ends
         stagePos_ = stageLen_ = 0;
         if (!connection.binaryService() && style_ != Style::Plain) {
             const char prefix[] = "\x18\x1b[0m\x1b[?7h\x1b[?25h\x1b[2J\x1b[H";
@@ -126,18 +139,44 @@ public:
         render();
     }
     Color color() const { return color_; }
+    // Sends a full frame next instead of only the changes: Ctrl-L, or after something
+    // wrote to the terminal behind the screen (a hardware test on the console or browser).
+    void repaint() {
+        shown_.valid = false;
+        render();
+    }
 
 private:
     void render();
+    void planFrame();
+    bool stageExport();
     void line(const char *text);
     void append(const char *text);
     void input(char c);
     void buildFrame();
+    void drawSmall();
+    void drawHeader(bool main);
+    void drawFooter(bool main);
+    const char *keyHints() const;
     void drawMenu();
+    void drawMainMenu();
     void drawPhonebook();
+    void drawPhonebookPanel(const calls::Entry *selected);
     void drawForm();
     void drawResponse();
     void key(unsigned key);
+    void capturedKey(unsigned key);
+    void pageKey(unsigned key);
+    void helpKey(unsigned key);
+    void formKey(unsigned key);
+    void typeCharacter(char c);
+    void confirmKey(unsigned key);
+    void responseKey(unsigned key);
+    void exportKey(unsigned key);
+    void menuKey(unsigned key);
+    bool moveKey(unsigned key);
+    void showEntryDetails();
+    void hotkey(unsigned key);
     void sequence();
     void activate(const Action &action);
     void submit();
@@ -153,6 +192,7 @@ private:
     const Action *item(size_t index) const;
     size_t itemCount() const;
     size_t visibleItems() const;
+    size_t responseRows() const;
     size_t phonebookPageSize() const;
     bool enabled(size_t index) const;
     void profileAction(size_t index);
@@ -187,6 +227,19 @@ private:
     bool dirty_ = false, drawing_ = false, querySize_ = false;
     bool styled_ = false;
     unsigned drawRow_ = 0;
+    // What the terminal shows (PERF-01). A frame sends only the cells that differ from it,
+    // unless it is a full frame: first frame, new size, style, colours or theme, Ctrl-L,
+    // or other output on the port since (Port::directWrites()). Plain text is always full.
+    struct Shown {
+        bool valid = false;
+        Style style = Style::Ansi;
+        Color color = Color::Ansi16;
+        unsigned modelRgb = 0, cursorRow = 0, cursorCol = 0;
+        uint32_t directWrites = 0;
+    } shown_;
+    CellGrid shownGrid_;
+    bool fullFrame_ = true;
+    uint32_t frameWrites_ = 0;
     char staging_[4096] = {};
     size_t stageLen_ = 0, stagePos_ = 0;
     enum class Focus : uint8_t { Menu, Form, Confirm, Details, Help };

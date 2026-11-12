@@ -40,10 +40,10 @@ whole window.
 | 11 | v2.11 | [Web page tests and flows](../history/wp-11-web-page.md) | Sonnet / medium | M | 06 |
 | 12 | v2.12 | [Network and storage follow-ups](../history/wp-12-network-storage.md) | Sonnet / high | M-L | 05 |
 | 13 | v2.13 | [Shared native test fixtures](../history/wp-13-test-fixtures.md) | Sonnet / medium | M | 09, 10 |
-| 14 | v2.14 | [`main.cpp` tidy-up](wp-14-main-tidy.md) | Opus / medium | M-L | 02, 03, 06 |
-| 15 | v2.15 | [Configuration screen repaint](wp-15-menu-repaint.md) | Opus / high | L | 07 |
-| 16 | v2.16 | [Configuration screen code tidy-up](wp-16-menu-tidy.md) | Sonnet / high | M | 15 |
-| 17 | v2.17 | [Watchdog and phonebook capacity](wp-17-watchdog-phonebook.md) | Opus / high | M | 02, 03, 14 |
+| 14 | v2.14 | [`main.cpp` tidy-up](../history/wp-14-main-tidy.md) | Opus / medium | M-L | 02, 03, 06 |
+| 15 | v2.15 | [Configuration screen repaint](../history/wp-15-menu-repaint.md) | Opus / high | L | 07 |
+| 16 | v2.16 | [Configuration screen code tidy-up](../history/wp-16-menu-tidy.md) | Sonnet / high | M | 15 |
+| 17 | v2.17 | [Watchdog and phonebook capacity](../history/wp-17-watchdog-phonebook.md) | Opus / high | M | 02, 03, 14 |
 | 18 | v3.0 | [Framework spike](wp-18-framework-spike.md) | Opus / high | L | 01-17 merged (the spike itself can run earlier) |
 | 19 | v3.0 | [Framework migration](wp-19-framework-migration.md) | Opus / high | 3-5 × L | 18 |
 
@@ -123,9 +123,9 @@ the package confirms each first.
 | STA-03 | Interactive hardware tests block for ever / during a call | 03 | done (v2.3) |
 | STA-04 | Failed browser Wi-Fi join undoes later browser changes | 05 | done (v2.5) |
 | STA-05 | `AT*FACTORY` without LittleFS never finishes | 05 | done (v2.5) |
-| STA-06 | No watchdog on the main loop | 17 | open |
+| STA-06 | No watchdog on the main loop | 17 | done (v2.17; on-board test and soak passed) |
 | STA-07 | Upload and unmount hand-shakes can leave stale state | 06 | done (v2.6) |
-| STA-08 | A full phonebook may not fit in NVS | 17 | open |
+| STA-08 | A full phonebook may not fit in NVS | 17 | not a bug (v2.17: on-board test passes on the bench, about 600 bytes to spare) |
 | STA-09a | S3/S4/S5 accept 0-255 (printable S3) | 07 | done (v2.7) |
 | STA-09b | `AT*BAUD` changes RS232 speed during an RS232 call | 03 | done (v2.3) |
 | STA-09c | `restoreBrowserResources()` cancels other ports' holds | 03 | done (v2.3) |
@@ -133,14 +133,14 @@ the package confirms each first.
 | STA-09e | Failed NVS read passed to `deserialize()` as a huge length | 07 | done (v2.7) |
 | STA-09f | Damaged phonebook replaced by the next edit | 07 | done (v2.7) |
 | STA-09g | `sizes_[8]` fits 7 sounds + 1 exactly | 07 | done (v2.7) |
-| PERF-01 | Configuration screen repainted in full on every key | 15 | open |
-| PERF-02 | Web status rebuilt every pass with no browser | 14 | open |
+| PERF-01 | Configuration screen repainted in full on every key | 15 | done (v2.15) |
+| PERF-02 | Web status rebuilt every pass with no browser | 14 | done (v2.14) |
 | PERF-03 | Browser output cap, PPP buffer wipe, page hashing | - | accepted (measure first; recorded in WP-01) |
 | MNT-01 | CI version job can never fail | 01 | done (v2.1) |
 | MNT-02 | `uploadfsota` not gated; cppcheck errors don't fail CI | 01 | done (v2.1) |
 | MNT-03 | Text still describes a volume limit | 01 | done (v2.1) |
-| MNT-04 | Long functions in `main.cpp`, `menu.cpp`, `commands.cpp` | 14, 16 | open |
-| MNT-05a | "Dialling on the RS232 host port" printed before the check | 14 | open |
+| MNT-04 | Long functions in `main.cpp`, `menu.cpp`, `commands.cpp` | 14, 16 | done (`main.cpp` v2.14; `menu.cpp`, `commands.cpp` v2.16) |
+| MNT-05a | "Dialling on the RS232 host port" printed before the check | 14 | done (v2.14) |
 | MNT-05b | `demo.js` box characters replaced by `?` | 11 | done (v2.11) |
 | MNT-05c | `build/` not in `.gitignore` | 01 | done (v2.1) |
 | MNT-05d | CLAUDE.md says `espressif32@^6.9.0` | 01 | done (v2.1) |
@@ -149,7 +149,7 @@ the package confirms each first.
 | MNT-05g | Hand-sized tables without `static_assert` | 07 | done (v2.7) |
 | MNT-05h | Web file list kept in three places | 11 | done (v2.11) |
 | MNT-05i | Stale comments (`hwconsole.h`, `connection.h`, `atcmd.cpp:764`) | 03, 07 | done (`hwconsole.h` v2.3; `connection.h`, `atcmd.cpp` v2.7) |
-| MNT-05j | cppcheck notes `hwconsole.cpp:895`, `menu.cpp:449` | 03, 15 | open (`hwconsole.cpp` done v2.3) |
+| MNT-05j | cppcheck notes `hwconsole.cpp:895`, `menu.cpp:449` | 03, 15 | done (`hwconsole.cpp` v2.3, `menu.cpp` v2.15) |
 | 5.5-01 | Radio stays on after `AT*WIFISCAN` with Wi-Fi off | 12 | done (v2.12) |
 | 5.5-02 | `volatile` link state; late event overwrites `leave()` | 12 | done (v2.12; bench check) |
 | 5.5-03 | Second scan ends the new scan early | 12 | done (v2.12; bench check) |
@@ -157,13 +157,13 @@ the package confirms each first.
 | 5.5-05 | Join, scan or IP change drops a call without warning | 12 | done (v2.12) |
 | 5.5-06 | `file_store.h` power loss between renames; no backup fallback | 12 | done (v2.12; the bad-CRC fallback already worked) |
 | 5.5-07 | DNS time counts against the 10 s ping limit | 12 | done (v2.12; bench check) |
-| 5.5-08 | Two 1.5 KB copies on the 6 KB lwIP stack | 17 | open |
+| 5.5-08 | Two 1.5 KB copies on the 6 KB lwIP stack | 17 | done (v2.17; lwIP 3,848 B free after the PPP tests; the loop task's 420 B fixed) |
 | 5.5-09 | IPCP Terminate-Request resets the 30 s time-out | 10 | done (v2.10) |
 | 5.5-10 | Transfer inactivity reset by any byte; missing "OO" | 10 | done (v2.10) |
 | 5.5-11 | Size probe looks only at the first `ESC[` | 10 | done (v2.10) |
 | 5.5-12 | S7 runs during the handshake sound | 04 | done (v2.4; confirmed by a test) |
 | 5.5-13 | `captureBegin()` failure ignored; `runs` unchecked | 02 | done (v2.2) |
-| 5.5-14 | Menu paging, Alt+letter after cancel, "too long" flag | 15 | open |
+| 5.5-14 | Menu paging, Alt+letter after cancel, "too long" flag | 15 | done (v2.15; paging and Alt+letter fixed; the flag is deliberate, now shown at once) |
 | 5.5-15 | `validPassword` rejects UTF-8; `validServer` accepts `a..b` | 12 | done (v2.12) |
 | 5.5-16 | Non-ASCII SSIDs shown as mojibake | 12 | done (v2.12) |
 | 5.5-17 | Upload double press, reconnect loop, no reload | 11 | done (v2.11; the page cannot see an upload in another tab, so it backs off on 503 instead) |

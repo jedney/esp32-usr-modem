@@ -381,6 +381,32 @@ void test_northern_zones_and_utc() {
     TEST_ASSERT_EQUAL(0, tz::offsetAt(r, utcOf(2026, 7, 1, 0, 0, 0)));
 }
 
+// PERF-02: the web status asks for the offset on every pass; the cache works it out again
+// only in a new minute or for a different rule, and still turns at the exact second.
+void test_offset_cache_recomputes_only_for_a_new_minute_or_rule() {
+    tz::Rule nz, london;
+    TEST_ASSERT_TRUE(tz::resolve("Pacific/Auckland", &nz, nullptr, 0));
+    TEST_ASSERT_TRUE(tz::resolve("Europe/London", &london, nullptr, 0));
+    tz::OffsetCache cache;
+    const int64_t start = utcOf(2026, 9, 26, 13, 59, 0);  // the last NZST minute
+    TEST_ASSERT_EQUAL(12 * 3600, cache.at(nz, start));
+    TEST_ASSERT_EQUAL(1u, cache.recomputes());
+    for (int s = 1; s < 60; ++s) {
+        TEST_ASSERT_EQUAL(12 * 3600, cache.at(nz, start + s));
+    }
+    TEST_ASSERT_EQUAL(1u, cache.recomputes());
+    TEST_ASSERT_EQUAL(13 * 3600, cache.at(nz, start + 60));  // NZDT at 14:00:00 UTC
+    TEST_ASSERT_EQUAL(2u, cache.recomputes());
+    TEST_ASSERT_EQUAL(12 * 3600, cache.at(nz, start - 1));  // the clock was set back
+    TEST_ASSERT_EQUAL(3u, cache.recomputes());
+    TEST_ASSERT_EQUAL(3600, cache.at(london, start - 1));  // AT*TZ changed the zone
+    TEST_ASSERT_EQUAL(4u, cache.recomputes());
+    tz::Rule chatham;
+    TEST_ASSERT_TRUE(tz::resolve("Pacific/Chatham", &chatham, nullptr, 0));
+    TEST_ASSERT_EQUAL(tz::offsetAt(chatham, start - 1), cache.at(chatham, start - 1));
+    TEST_ASSERT_EQUAL(5u, cache.recomputes());
+}
+
 void test_resolve_gives_the_stored_name() {
     tz::Rule r;
     char name[64];
@@ -1301,6 +1327,7 @@ int main(int, char **) {
     RUN_TEST(test_bad_rules_are_refused);
     RUN_TEST(test_nz_daylight_saving_changes);
     RUN_TEST(test_northern_zones_and_utc);
+    RUN_TEST(test_offset_cache_recomputes_only_for_a_new_minute_or_rule);
     RUN_TEST(test_resolve_gives_the_stored_name);
     RUN_TEST(test_format_local_time);
     RUN_TEST(test_nothing_saved_red_light_no_join);

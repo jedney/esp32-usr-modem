@@ -47,6 +47,21 @@ const char *zoneRule(size_t i);
 // Offset from UTC (seconds) and the zone abbreviation in force at `utc`.
 int32_t offsetAt(const Rule &r, int64_t utc, const char **abbrev = nullptr);
 
+// offsetAt() for a caller that asks on every loop pass (the web status, PERF-02): worked
+// out again only in a new minute (offsets change on whole minutes) or for another rule.
+class OffsetCache {
+public:
+    int32_t at(const Rule &r, int64_t utc);
+    unsigned recomputes() const { return recomputes_; }  // for the tests
+
+private:
+    Rule rule_{};
+    int64_t from_ = 0;  // the cached minute: [from_, from_ + 60)
+    int32_t offset_ = 0;
+    bool valid_ = false;
+    unsigned recomputes_ = 0;
+};
+
 // "2026-10-24 21:15:07 NZDT" for `utc` (seconds since 1970).
 void formatLocal(const Rule &r, int64_t utc, char *buf, size_t cap);
 // "+13:00", "-05:00", "+12:45"

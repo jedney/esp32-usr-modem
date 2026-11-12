@@ -229,6 +229,9 @@ Port::Port(Modem &modem, Sink &out, uint32_t baud) : modem_(modem), out_(out), b
 
 void Port::write(const char *data, size_t len) {
     Sink &sink = redirected_ ? *redirected_ : out_;
+    if (!redirected_ && len) {
+        ++directWrites_;
+    }
     if (unsolicited_) {
         sink.writeUnsolicited(data, len);
     } else {

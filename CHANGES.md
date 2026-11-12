@@ -14,6 +14,125 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.17] - 2026-11-13
+
+### Added
+
+- A watchdog restarts the modem when its main loop stops for 15 s (STA-06). The restart
+  writes a crash record; `AT*RESETINFO` then says "task watchdog". Hardware tests and
+  ArduinoOTA uploads, which run for longer inside one loop pass, keep it fed.
+- `AT*STATUS` shows the least free stack so far of the main loop, network and web server
+  tasks (5.5-08).
+- On-board tests: a full phonebook (64 of the longest entries) saved, changed and shrunk
+  in NVS beside the other settings (STA-08); a watched task kept fed past the watchdog
+  time-out. End-to-end: the network task's stack headroom after the PPP and SLIP tests.
+
+### Changed
+
+- The task watchdog no longer watches the CPU 1 idle task (Arduino's default), because
+  `loop()` runs there; the loop task itself is watched instead. The CPU 0 idle task is
+  still watched, and now also restarts the modem.
+
+### Fixed
+
+- With nothing on the rear USB-C socket the modem crash-looped every few seconds (a
+  divide by zero in TinyUSB, since v2.0). The USB modem port now reads only while a
+  computer has it configured. Found on the bench.
+- The PPP engine built its replies in 1,500-byte stack buffers, leaving the main loop
+  420 bytes of its 8 KB stack after the PPP tests; they are now part of the engine, and
+  4,756 bytes are left (5.5-08). The network task has 3,848 bytes left: no change needed.
+- An RS232 command sent while the modem was still starting (during the Wi-Fi wait, or
+  just after the boot banner) was lost without a reply: RS232 speed detection started
+  only on the first loop pass, which threw away what had already arrived. It now starts
+  with the port. Found by `e2e/test_internet.py` on the bench.
+- `lib/hwtest/src/hwtest.cpp` had a raw NUL byte where `'\0'` was meant (same behaviour;
+  it gave a compiler warning).
+
+### Bench results (13 Nov)
+
+- On-board `test_board` and `test_calls` pass. A full phonebook fits in NVS with about
+  600 bytes to spare (STA-08: no change needed).
+- Soak: a hardware test held 25 s without a key, a test call, `AT*CONFIG`, two
+  ArduinoOTA uploads, and `e2e/test_internet.py` (13 passed, 2 opt-in skipped): no
+  watchdog reset.
+- With the USB modem port connected to the PC: `e2e/test_usb.py` 7 passed (1 needs a
+  person at the cable), including auto-answer of incoming calls on USB and RS232.
+- A manual incoming call on RS232: RING, `ATA`, data both ways, `+++`, `ATH`, and the
+  caller sees the hang-up.
+- Web page: a firmware install through `/api/update` reboots into this version, and an
+  upload dropped part-way frees the modem without a reboot (`e2e/test_web.py
+  --browser-upload --upload-tests`).
+- An RS232 command sent 2-3 s into a restart is now answered once the modem is up, and
+  `test_internet_settings_survive_restart_and_export` passes (3 runs). The whole of
+  `e2e/test_internet.py`: 14 passed, 2 opt-in skipped.
+
+## [2.16] - 2026-11-13
+
+### Changed
+
+- Configuration screen code tidied (MNT-04), with no change in behaviour: one key handler
+  per screen mode (menu, form, confirmation, output, help, export, captured command)
+  behind a short `Terminal::key()`; the frame built from header, body and footer steps;
+  the main-menu layout, phonebook side panel and export step in their own functions;
+  one function per command in `commands.cpp`, found through a table. No function in
+  `menu.cpp` or `commands.cpp` is over 75 lines. The configuration screen tests pass
+  unchanged.
+
+## [2.15] - 2026-11-13
+
+### Added
+
+- **Ctrl-L** in the configuration screen draws the whole screen again.
+
+### Changed
+
+- The configuration screen sends only the cells that changed since the last frame
+  (PERF-01). An arrow key at 80x25 was 3.0 KB (5.1 KB in RGB colour), 12-21 s at
+  2400 bit/s; it is now 68 B (102 B), under half a second. A full frame is still sent
+  first, after a resize, a style, colour or theme change, Ctrl-L, and after anything else
+  wrote to the port (for example a hardware test run from the screen). Plain-text style
+  still sends the whole screen on every key.
+- "Input too long" shows as soon as a character is dropped, not only at Enter.
+- Tests that started a fresh terminal view part-way through now keep one view from the
+  start, as a real terminal does.
+
+### Fixed
+
+- Output and help pages on terminals taller or shorter than 25 rows repeated lines when
+  paging (5.5-14).
+- Alt+letter (Esc and a key together) cancelled a form or left the screen, then ran the
+  letter as a hotkey. It is now ignored (5.5-14).
+- A duplicate condition in the screen footer (cppcheck, MNT-05j).
+
+### Bench checks for Jon (optional)
+
+- PuTTY at 2400 bit/s on the RS232 port: `AT*CONFIG`, move around the menus, open a form,
+  press Ctrl-L. Also run `AT*HWLED` from Hardware Tests and check the screen is redrawn
+  in full when it ends.
+
+## [2.14] - 2026-11-13
+
+### Changed
+
+- The web page's status messages are built only while a browser is connected; a browser
+  that connects after none gets all of them at once. The clock's UTC offset is cached and
+  worked out again once a minute or when the time zone changes (PERF-02).
+- `src/main.cpp` tidied (MNT-04): one hardware-test terminal class for the RS232 and USB
+  ports, one helper for each repeated block, the firmware's `AT*` commands in a table,
+  and `pollBrowser`, the web status and `setup()` split into named steps. The Internet
+  dialer is polled once per loop pass instead of twice. No other behaviour change.
+
+### Fixed
+
+- A dial chosen in the browser's configuration screen said "Dialling on the RS232 host
+  port." and then did nothing when that port was busy. It now checks first and says the
+  port is busy (MNT-05a).
+
+### Bench checks for Jon (optional)
+
+- `ATI`, a call, `AT*CONFIG`, the web page (status, `E`, a dial from the phonebook) and
+  `AT*HWLED`.
+
 ## [2.13] - 2026-11-12
 
 ### Added

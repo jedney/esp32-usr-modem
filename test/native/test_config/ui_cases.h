@@ -20,18 +20,32 @@ void test_idle_menus_do_not_repaint_but_input_and_resize_do() {
         TEST_ASSERT_FALSE(r.drain().empty());
     }
 }
+// The screen sends only changes (PERF-01), so the refresh shows through a changed link.
+struct LinkServices : UiServices {
+    char link[16] = "Idle";
+    calls::Phonebook *phonebook() override { return nullptr; }
+    UiState state() const override {
+        UiState result;
+        snprintf(result.link, sizeof result.link, "%s", link);
+        return result;
+    }
+};
 void test_status_view_keeps_its_explicit_live_refresh() {
     Rig r;
+    LinkServices services;
+    r.terminal.services(&services);
     r.terminal.open();
     r.drain();
     r.feed("1\r");
     TEST_ASSERT_FALSE(r.drain().empty());
+    strcpy(services.link, "Ringing");
     r.terminal.poll(1000);
     TEST_ASSERT_TRUE(r.drain().empty());
     r.terminal.poll(2100);
-    TEST_ASSERT_FALSE(r.drain().empty());
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.drain().find("Ringing"));
     r.feed("q");
     r.drain();
+    strcpy(services.link, "Idle");
     r.terminal.poll(4200);
     TEST_ASSERT_TRUE(r.drain().empty());
 }
@@ -276,9 +290,9 @@ void test_phonebook_paging_details_selection_and_storage_failure() {
     r.terminal.setStyle("CP437");
     r.terminal.color(Color::Rgb);
     r.terminal.open();
-    r.drain();
+    ScreenView view;  // sees every byte: frames after the first send only changes
+    view.accept(r.drain());
     r.feed("2\r");
-    ScreenView view;
     view.accept(r.drain());
     TEST_ASSERT_TRUE(view.has("host00.example"));
     TEST_ASSERT_TRUE(view.has("host08.example"));
@@ -293,23 +307,23 @@ void test_phonebook_paging_details_selection_and_storage_failure() {
     TEST_ASSERT_TRUE(view.has("Host: host09.example"));
     r.feed("\x1b");
     r.terminal.poll(100);
-    r.drain();
+    view.accept(r.drain());
     r.feed("3\r");
     view.accept(r.drain());
     TEST_ASSERT_TRUE(view.has("Y confirms"));
     TEST_ASSERT_NOT_NULL(services.book.find("209"));
     r.feed("n\r");
-    r.drain();
+    view.accept(r.drain());
     services.store.failSave = services.store.failErase = true;
     r.feed("3\ry\r");
     view.accept(r.drain());
     TEST_ASSERT_TRUE(view.has("ERROR"));
     TEST_ASSERT_NOT_NULL(services.book.find("209"));
     r.feed("\r");
-    r.drain();
+    view.accept(r.drain());
     services.store.failSave = services.store.failErase = false;
     r.feed("3\ry\r");
-    r.drain();
+    view.accept(r.drain());
     TEST_ASSERT_NULL(services.book.find("209"));
     r.feed("\r");
     view.accept(r.drain());

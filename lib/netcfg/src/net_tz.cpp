@@ -259,6 +259,31 @@ int32_t offsetAt(const Rule &r, int64_t utc, const char **abbrev) {
     return dst ? r.dstOffset : r.stdOffset;
 }
 
+namespace {
+bool sameChange(const Change &a, const Change &b) {
+    return a.month == b.month && a.week == b.week && a.wday == b.wday && a.time == b.time;
+}
+bool sameRule(const Rule &a, const Rule &b) {  // field by field: padding may differ
+    return a.stdOffset == b.stdOffset && a.hasDst == b.hasDst && a.dstOffset == b.dstOffset &&
+           sameChange(a.start, b.start) && sameChange(a.end, b.end) &&
+           !strncmp(a.stdName, b.stdName, sizeof a.stdName) &&
+           !strncmp(a.dstName, b.dstName, sizeof a.dstName);
+}
+}  // namespace
+
+int32_t OffsetCache::at(const Rule &r, int64_t utc) {
+    if (valid_ && utc >= from_ && utc - from_ < 60 && sameRule(r, rule_)) {
+        return offset_;
+    }
+    int64_t into = utc % 60;
+    from_ = utc - (into < 0 ? into + 60 : into);
+    rule_ = r;
+    offset_ = offsetAt(r, utc);
+    valid_ = true;
+    ++recomputes_;
+    return offset_;
+}
+
 void formatLocal(const Rule &r, int64_t utc, char *buf, size_t cap) {
     const char *abbrev = "";
     const int64_t local = utc + offsetAt(r, utc, &abbrev);

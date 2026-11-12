@@ -157,7 +157,7 @@ void Engine::control(uint16_t protocol, uint8_t code, uint8_t id, const uint8_t 
         ++dropped_;
         return;
     }
-    uint8_t packet[kMtu];
+    uint8_t *packet = packet_;  // a member: the loop task's stack is small (v2.17)
     packet[0] = code;
     packet[1] = id;
     packet[2] = uint8_t((length + 4) >> 8);
@@ -192,7 +192,7 @@ void Engine::lcp(const uint8_t *p, size_t n) {
     const uint8_t *data = p + 4;
     const size_t length = n - 4;
     if (code == 1) {
-        uint8_t reject[kMtu], nak[32];
+        uint8_t *reject = reply_, nak[32];
         size_t rejected = 0, naks = 0;
         uint32_t accm = 0xffffffff;
         uint16_t mru = kMtu;
@@ -310,7 +310,7 @@ void Engine::lcp(const uint8_t *p, size_t n) {
         closeAt_ = now_;
         reason_ = Reason::Peer;
     } else if (code == 9 && lcpLocal_ && lcpPeer_ && length >= 4) {
-        uint8_t echo[kMtu];
+        uint8_t *echo = reply_;
         memcpy(echo, data, length);
         memset(echo, 0, 4);
         for (size_t i = 0; i < lcpLength_; i += lcpRequest_[i + 1])
@@ -329,7 +329,7 @@ void Engine::ipcp(const uint8_t *p, size_t n) {
     const uint8_t *data = p + 4;
     const size_t length = n - 4;
     if (p[0] == 1) {
-        uint8_t reject[kMtu], nak[kMtu];
+        uint8_t *reject = reply_, *nak = nak_;
         size_t rejected = 0, naks = 0;
         bool address = false;
         for (size_t i = 0; i < length;) {
@@ -353,7 +353,7 @@ void Engine::ipcp(const uint8_t *p, size_t n) {
             i += size;
         }
         if (!address) {
-            if (naks + 6 > sizeof nak)
+            if (naks + 6 > kMtu)
                 return;
             nak[naks++] = 3;
             nak[naks++] = 6;
@@ -461,7 +461,7 @@ void Engine::packet() {
         } else
             ++dropped_;
     } else if (lcpLocal_ && lcpPeer_ && protocol != kPap) {
-        uint8_t reject[kMtu];
+        uint8_t *reject = reply_;
         reject[0] = uint8_t(protocol >> 8);
         reject[1] = uint8_t(protocol);
         length = std::min(length, size_t(peerMru_ - 6));

@@ -87,6 +87,7 @@ bool Terminal::open() {
     escapeDiscard_ = false;
     swallowEnter_ = false;
     drawing_ = false;
+    shown_.valid = false;
     styled_ = false;
     stagePos_ = stageLen_ = 0;
     model_ = session_.port().modem().model();
@@ -144,7 +145,7 @@ void Terminal::write(const char *data, size_t len) {
         output_[length_++] = c;
     }
     if (capturing_ && !exporting_)
-        responseLine_ = responseLines_ >= visibleItems() ? responseLines_ - visibleItems() + 1 : 0;
+        responseLine_ = responseLines_ >= responseRows() ? responseLines_ - responseRows() + 1 : 0;
     if (!capturing_ && !response_)
         response_ = true;
     render();
@@ -157,6 +158,7 @@ bool Terminal::resize(unsigned columns, unsigned rows) {
         rows_ = rows;
         // Abort an old-size frame even when the last UART chunk ended inside a
         // CSI. CAN is a terminal parser cancellation, followed by a fresh frame.
+        shown_.valid = false;
         if (open_ && !exporting_) {
             drawing_ = false;
             stagePos_ = 0;
@@ -213,6 +215,7 @@ void Terminal::close() {
         session_.port().print("\x18\x1b[0m\x1b[?7h\x1b[?25h\r\n");
     styled_ = false;
     open_ = capturing_ = drawing_ = dirty_ = false;
+    shown_.valid = false;
     querySize_ = false;
     stageLen_ = stagePos_ = 0;
     escapeLen_ = 0;
@@ -233,6 +236,7 @@ void Terminal::escaped() {
         session_.port().print("\x18\x1b[0m\x1b[?7h\x1b[?25h\r\n");
     styled_ = false;
     drawing_ = false;
+    shown_.valid = false;
     stageLen_ = stagePos_ = 0;
     clearInput();
     clearOutput();
@@ -258,6 +262,14 @@ void Terminal::render() {
 }
 size_t Terminal::visibleItems() const {
     return std::min(15, std::max(1, int(rows_) - 10));
+}
+// Lines of text the output and help views show: their page step (5.5-14). The small
+// layout shows one line.
+size_t Terminal::responseRows() const {
+    if (cols_ < 20 || rows_ < 8)
+        return 1;
+    unsigned top = rows_ < 12 ? 3 : 5, bottom = rows_ >= 25 ? rows_ - 5 : rows_ - 3;
+    return bottom > top ? bottom - top : 1;
 }
 size_t Terminal::phonebookPageSize() const {
     return rows_ >= 25 ? 9 : std::min(9, std::max(1, int(rows_) - 12));
@@ -361,63 +373,13 @@ void Terminal::buildFrame() {
     drawCursorRow_ = rows_ - 1;
     drawCursorCol_ = std::min(13u, cols_ - 1);
     if (cols_ < 20 || rows_ < 8) {
-        // Even pathological viewports get bounded output. Keep the same router
-        // and keyboard actions; omit frames and multi-line chrome entirely.
-        drawCursorRow_ = rows_;
-        drawCursorCol_ = 1;
-        grid_.text(0, 0, "Small terminal", Ink::Warning, cols_);
-        unsigned y = rows_ > 1 ? 1 : 0;
-        if (focus_ == Focus::Form) {
-            if (prompt_ && prompt_->secret)
-                grid_.text(0, y, "Password input", Ink::Muted, cols_);
-            else
-                grid_.text(0, y, input_, Ink::Body, cols_);
-        } else if (focus_ == Focus::Confirm)
-            grid_.text(0, y, "Y confirm N cancel", Ink::Warning, cols_);
-        else if (response_ || focus_ == Focus::Help || focus_ == Focus::Details) {
-            const char *text = focus_ == Focus::Help ? "Esc/Q Back; keys open; Y confirm" : output_;
-            for (size_t line = 0; *text && line < responseLine_; ++text)
-                if (*text == '\n')
-                    ++line;
-            grid_.text(0, y, text, Ink::Body, cols_);
-            more_ = *text != 0;
-        } else if (screen_ == S::Phonebook) {
-            syncPhonebook();
-            const auto *e = entry();
-            grid_.text(0, y, e ? e->host : "No entries", Ink::Body, cols_);
-        } else {
-            auto *a = item(locations_[static_cast<unsigned>(screen_)].selected);
-            grid_.text(0, y, a ? a->label : screenName(screen_), Ink::Body, cols_);
-        }
-        if (rows_ > 2)
-            grid_.text(0, rows_ - 1, "Esc/Q Back", Ink::Function, cols_);
+        drawSmall();
         return;
     }
     grid_.box(0, 0, cols_, rows_);
     bool main =
         screen_ == S::Main && focus_ == Focus::Menu && !response_ && cols_ >= 80 && rows_ >= 25;
-    if (main) {
-        // The exact 59-cell five-row wordmark from the measured design.
-        for (unsigned y = 0; y < 5; ++y)
-            for (unsigned x = 0; kWordmark[y][x]; ++x)
-                grid_.put((cols_ - 59) / 2 + x, y + 1, kWordmark[y][x] == '#' ? 219 : ' ',
-                          Ink::Logo);
-        grid_.center(6, CellGrid::modelLabel(model_), Ink::Model);
-        unsigned modelX = (cols_ - strlen(CellGrid::modelLabel(model_))) / 2;
-        for (unsigned i = 0; i < 3; ++i) {
-            grid_.put(modelX - 4 + i, 6, 196, Ink::Model);
-            grid_.put(modelX + strlen(CellGrid::modelLabel(model_)) + 1 + i, 6, 196, Ink::Model);
-        }
-        grid_.rule(7, "[ MODEM CONFIGURATION - MAIN MENU ]");
-    } else {
-        grid_.text(3, 1, "USRobotics", Ink::Logo, cols_ - 5);
-        if (cols_ >= 50)
-            grid_.text(23, 1, CellGrid::modelLabel(model_), Ink::Model, cols_ - 25);
-        char title[112];
-        snprintf(title, sizeof title, "[ MAIN > %s ]",
-                 response_ ? resultTitle_ : screenName(screen_));
-        grid_.rule(2, title);
-    }
+    drawHeader(main);
     if (focus_ == Focus::Form || focus_ == Focus::Confirm)
         drawForm();
     else if (response_ || focus_ == Focus::Details || focus_ == Focus::Help)
@@ -426,7 +388,82 @@ void Terminal::buildFrame() {
         drawPhonebook();
     else
         drawMenu();
-
+    drawFooter(main);
+}
+// Even pathological viewports get bounded output. Keep the same router and keyboard
+// actions; omit frames and multi-line chrome entirely.
+void Terminal::drawSmall() {
+    drawCursorRow_ = rows_;
+    drawCursorCol_ = 1;
+    grid_.text(0, 0, "Small terminal", Ink::Warning, cols_);
+    unsigned y = rows_ > 1 ? 1 : 0;
+    if (focus_ == Focus::Form) {
+        if (prompt_ && prompt_->secret)
+            grid_.text(0, y, "Password input", Ink::Muted, cols_);
+        else
+            grid_.text(0, y, input_, Ink::Body, cols_);
+    } else if (focus_ == Focus::Confirm)
+        grid_.text(0, y, "Y confirm N cancel", Ink::Warning, cols_);
+    else if (response_ || focus_ == Focus::Help || focus_ == Focus::Details) {
+        const char *text = focus_ == Focus::Help ? "Esc/Q Back; keys open; Y confirm" : output_;
+        for (size_t line = 0; *text && line < responseLine_; ++text)
+            if (*text == '\n')
+                ++line;
+        grid_.text(0, y, text, Ink::Body, cols_);
+        more_ = *text != 0;
+    } else if (screen_ == S::Phonebook) {
+        syncPhonebook();
+        const auto *e = entry();
+        grid_.text(0, y, e ? e->host : "No entries", Ink::Body, cols_);
+    } else {
+        auto *a = item(locations_[static_cast<unsigned>(screen_)].selected);
+        grid_.text(0, y, a ? a->label : screenName(screen_), Ink::Body, cols_);
+    }
+    if (rows_ > 2)
+        grid_.text(0, rows_ - 1, "Esc/Q Back", Ink::Function, cols_);
+}
+// The main menu has the wordmark; other screens a one-line title with the path.
+void Terminal::drawHeader(bool main) {
+    if (!main) {
+        grid_.text(3, 1, "USRobotics", Ink::Logo, cols_ - 5);
+        if (cols_ >= 50)
+            grid_.text(23, 1, CellGrid::modelLabel(model_), Ink::Model, cols_ - 25);
+        char title[112];
+        snprintf(title, sizeof title, "[ MAIN > %s ]",
+                 response_ ? resultTitle_ : screenName(screen_));
+        grid_.rule(2, title);
+        return;
+    }
+    // The exact 59-cell five-row wordmark from the measured design.
+    for (unsigned y = 0; y < 5; ++y)
+        for (unsigned x = 0; kWordmark[y][x]; ++x)
+            grid_.put((cols_ - 59) / 2 + x, y + 1, kWordmark[y][x] == '#' ? 219 : ' ', Ink::Logo);
+    grid_.center(6, CellGrid::modelLabel(model_), Ink::Model);
+    unsigned modelX = (cols_ - strlen(CellGrid::modelLabel(model_))) / 2;
+    for (unsigned i = 0; i < 3; ++i) {
+        grid_.put(modelX - 4 + i, 6, 196, Ink::Model);
+        grid_.put(modelX + strlen(CellGrid::modelLabel(model_)) + 1 + i, 6, 196, Ink::Model);
+    }
+    grid_.rule(7, "[ MODEM CONFIGURATION - MAIN MENU ]");
+}
+// The keys that work in the current view, for the footer.
+const char *Terminal::keyHints() const {
+    if (capturing_)
+        return "Working / input requested - Esc cancel, Ctrl-C exit";
+    if (focus_ == Focus::Help)
+        return "PGUP/PGDN Pages  ENTER Continue  ESC/Q Back  F1 Close Help";
+    if (response_)
+        return "PGUP/PGDN Pages  ENTER Continue  ESC/Q Back  F1 Help";
+    if (focus_ == Focus::Form)
+        return "TAB Next  Arrows Edit  ENTER Review  ESC Cancel  F1 Help";
+    if (focus_ == Focus::Confirm)
+        return "Y Confirm  N/ESC Cancel";
+    if (screen_ == S::Phonebook)
+        return "UP/DOWN Select  PGUP/PGDN Pages  ENTER/I Details  ESC/Q Back";
+    return "ARROWS Select  ENTER Open  ESC/Q Back  F1 Help  F2 Main";
+}
+// Key hints and device status (25 rows or more), the message line and the prompt.
+void Terminal::drawFooter(bool main) {
     UiState state;
     if (services_)
         state = services_->state();
@@ -444,30 +481,12 @@ void Terminal::buildFrame() {
                  CellGrid::modelShort(model_), state.link, host, rate);
     }
     if (rows_ >= 25) {
-        if (main)
+        if (main) {
             grid_.rule(rows_ - 6, "[ HELP / DEVICE STATUS ]");
-        if (main)
             grid_.text(3, rows_ - 5, "F1 Help  F2 Status  F3 Phonebook  F4 Settings  F10 Exit",
                        Ink::Function, cols_ - 5);
-        else
-            grid_.text(
-                3, rows_ - 5,
-                capturing_
-                    ? "Working / input requested - Esc cancel, Ctrl-C exit"
-                    : (focus_ == Focus::Help
-                           ? "PGUP/PGDN Pages  ENTER Continue  ESC/Q Back  F1 Close Help"
-                           : (response_ ? "PGUP/PGDN Pages  ENTER Continue  ESC/Q Back  F1 Help"
-                                        : (focus_ == Focus::Form
-                                               ? "TAB Next  Arrows Edit  ENTER Review  ESC Cancel  "
-                                                 "F1 Help"
-                                               : (focus_ == Focus::Confirm
-                                                      ? "Y Confirm  N/ESC Cancel"
-                                                      : (screen_ == S::Phonebook
-                                                             ? "UP/DOWN Select  PGUP/PGDN Pages  "
-                                                               "ENTER/I Details  ESC/Q Back"
-                                                             : "ARROWS Select  ENTER Open  ESC/Q "
-                                                               "Back  F1 Help  F2 Main"))))),
-                Ink::Function, cols_ - 5);
+        } else
+            grid_.text(3, rows_ - 5, keyHints(), Ink::Function, cols_ - 5);
         grid_.text(3, rows_ - 4, status, Ink::Body, cols_ - 5);
     }
     const char *message = more_ && (response_ || focus_ == Focus::Help)
@@ -481,53 +500,71 @@ void Terminal::buildFrame() {
     grid_.text(2, rows_ - 2, focus_ == Focus::Confirm ? "Command > Y / N" : "Command >", Ink::Body,
                cols_ - 4);
 }
-void Terminal::drawMenu() {
+// PERF-01: a full frame clears the screen and sends every row; otherwise only the changed
+// cells of each row are sent, and nothing at all when nothing changed.
+void Terminal::planFrame() {
+    frameWrites_ = session_.port().directWrites();
+    fullFrame_ = !shown_.valid || drawStyle_ == Style::Plain || shown_.style != drawStyle_ ||
+                 shown_.color != drawColor_ || shown_.modelRgb != drawModelRgb_ ||
+                 shownGrid_.cols() != grid_.cols() || shownGrid_.rows() != grid_.rows() ||
+                 shown_.directWrites != frameWrites_;
+    if (fullFrame_ || shown_.cursorRow != drawCursorRow_ || shown_.cursorCol != drawCursorCol_)
+        return;
+    unsigned from, end;
+    for (unsigned y = 0; y < grid_.rows(); ++y)
+        if (grid_.changed(shownGrid_, y, from, end))
+            return;
+    drawing_ = false;
+}
+// The main menu at 80x25 or more: two columns; boxes with summaries from 120x45.
+void Terminal::drawMainMenu() {
     auto &location = locations_[static_cast<unsigned>(screen_)];
-    bool compactMain = screen_ == S::Main && cols_ >= 80 && rows_ >= 25;
-    bool wide = compactMain && cols_ >= 120 && rows_ >= 45;
-    if (compactMain) {
-        unsigned divider = cols_ / 2 - 1;
-        for (unsigned i = 0; i < 13; ++i) {
-            const auto *a = item(i);
-            unsigned x = i < 6 ? 3 : divider + 3, y = 8 + (i < 6 ? i : i - 6);
-            if (wide) {
-                y = 11 + 4 * (i < 6 ? i : i - 6);
-                grid_.box(i < 6 ? 2 : divider + 2, y, divider - 2, 4);
-                x += 2;
-                ++y;
-            }
-            char row[100];
-            snprintf(row, sizeof row, "%c [%c] %s%s", location.selected == i ? '>' : ' ', a->key,
-                     a->label,
-                     a->available ? ""
-                     : wide       ? " [X] UNAVAILABLE"
-                                  : " [X]");
-            grid_.text(x - 1, y, row, a->available ? Ink::Title : Ink::Disabled, divider - 3);
-            grid_.put(x + 2, y, a->key, a->available ? Ink::Key : Ink::Disabled);
-            if (wide)
-                grid_.text(x, y + 1, a->summary, a->available ? Ink::Body : Ink::Disabled,
-                           divider - 7);
+    bool wide = cols_ >= 120 && rows_ >= 45;
+    unsigned divider = cols_ / 2 - 1;
+    for (unsigned i = 0; i < 13; ++i) {
+        const auto *a = item(i);
+        unsigned x = i < 6 ? 3 : divider + 3, y = 8 + (i < 6 ? i : i - 6);
+        if (wide) {
+            y = 11 + 4 * (i < 6 ? i : i - 6);
+            grid_.box(i < 6 ? 2 : divider + 2, y, divider - 2, 4);
+            x += 2;
+            ++y;
         }
-        if (!wide) {
-            for (unsigned y = 8; y <= 14; ++y)
-                grid_.put(divider, y, 179, Ink::Frame);
-            grid_.rule(16);
-            grid_.text(3, 17, "ARROWS: navigate / switch column   ENTER: select   Q: quit",
-                       Ink::Body, cols_ - 5);
-            grid_.text(3, 18, "[C] Client Tests - serial client diagnostics", Ink::Muted,
-                       cols_ - 5);
-        } else {
-            grid_.text(3, 8, "   ______________", Ink::Title);
-            grid_.text(3, 9, "  / USRobotics /|", Ink::Title);
-            grid_.text(3, 10, " /___________/ |", Ink::Frame);
-            grid_.text(cols_ - 22, 8, "______________", Ink::Title);
-            grid_.text(cols_ - 22, 9, "| USRobotics \\", Ink::Title);
-            grid_.text(cols_ - 22, 10, "| \\___________\\", Ink::Frame);
-            grid_.text(3, 36, "ARROWS Navigate  ENTER Select  Q Quit", Ink::Body, divider - 4);
-            grid_.text(3, 37, "[C] Client Tests - serial only", Ink::Muted, divider - 4);
-        }
+        char row[100];
+        snprintf(row, sizeof row, "%c [%c] %s%s", location.selected == i ? '>' : ' ', a->key,
+                 a->label,
+                 a->available ? ""
+                 : wide       ? " [X] UNAVAILABLE"
+                              : " [X]");
+        grid_.text(x - 1, y, row, a->available ? Ink::Title : Ink::Disabled, divider - 3);
+        grid_.put(x + 2, y, a->key, a->available ? Ink::Key : Ink::Disabled);
+        if (wide)
+            grid_.text(x, y + 1, a->summary, a->available ? Ink::Body : Ink::Disabled, divider - 7);
+    }
+    if (!wide) {
+        for (unsigned y = 8; y <= 14; ++y)
+            grid_.put(divider, y, 179, Ink::Frame);
+        grid_.rule(16);
+        grid_.text(3, 17, "ARROWS: navigate / switch column   ENTER: select   Q: quit", Ink::Body,
+                   cols_ - 5);
+        grid_.text(3, 18, "[C] Client Tests - serial client diagnostics", Ink::Muted, cols_ - 5);
+    } else {
+        grid_.text(3, 8, "   ______________", Ink::Title);
+        grid_.text(3, 9, "  / USRobotics /|", Ink::Title);
+        grid_.text(3, 10, " /___________/ |", Ink::Frame);
+        grid_.text(cols_ - 22, 8, "______________", Ink::Title);
+        grid_.text(cols_ - 22, 9, "| USRobotics \\", Ink::Title);
+        grid_.text(cols_ - 22, 10, "| \\___________\\", Ink::Frame);
+        grid_.text(3, 36, "ARROWS Navigate  ENTER Select  Q Quit", Ink::Body, divider - 4);
+        grid_.text(3, 37, "[C] Client Tests - serial only", Ink::Muted, divider - 4);
+    }
+}
+void Terminal::drawMenu() {
+    if (screen_ == S::Main && cols_ >= 80 && rows_ >= 25) {
+        drawMainMenu();
         return;
     }
+    auto &location = locations_[static_cast<unsigned>(screen_)];
     size_t count = itemCount(), visible = visibleItems();
     if (location.selected >= count)
         location.selected = count ? count - 1 : 0;
@@ -571,6 +608,47 @@ void Terminal::drawMenu() {
         grid_.text(2, 4, page, Ink::Muted, cols_ - 4);
     }
 }
+// From 120x45: the phonebook commands and the selected entry beside the list.
+void Terminal::drawPhonebookPanel(const calls::Entry *selected) {
+    unsigned x = cols_ / 2 + 2, width = cols_ - x - 2;
+    grid_.text(x, 3, "PHONEBOOK COMMANDS", Ink::Title, width);
+    for (unsigned i = 0; i < 4; ++i) {
+        const auto *a = item(i);
+        bool enabled = i < 2 || selected;
+        unsigned y = 5 + i * 4;
+        grid_.box(x - 1, y, width + 2, 4);
+        char text[96];
+        snprintf(text, sizeof text, "[%c] %s%s", a->key, a->label,
+                 enabled ? "" : " [X] UNAVAILABLE");
+        grid_.text(x + 1, y + 1, text, enabled ? Ink::Key : Ink::Disabled, width - 2);
+        grid_.text(x + 1, y + 2,
+                   i == 0   ? "Select saved entries with arrows and page keys"
+                   : i == 1 ? "Add a number or edit the selected entry"
+                   : i == 2 ? "Confirm before deleting the selected entry"
+                            : "Confirm before dialling the selected entry",
+                   Ink::Body, width - 2);
+    }
+    grid_.box(x - 1, 22, width + 2, 14);
+    grid_.text(x + 1, 23, "SELECTED ENTRY DETAILS", Ink::Title, width - 2);
+    if (selected) {
+        grid_.text(x + 1, 25, "Host (NAME):", Ink::Muted, width - 2);
+        grid_.text(x + 1, 26, selected->host, Ink::Body, width - 2);
+        if (strlen(selected->host) > width - 2)
+            grid_.text(x + 1, 27, selected->host + width - 2, Ink::Body, width - 2);
+        char text[144];
+        snprintf(text, sizeof text, "Number: %s  Port: %u  %s", selected->number, selected->port,
+                 selected->raw ? "RAW" : "TELNET");
+        grid_.text(x + 1, 29, text, Ink::Body, width - 2);
+        if (selected->speed)
+            snprintf(text, sizeof text, "Configured speed: %lu",
+                     static_cast<unsigned long>(selected->speed));
+        else
+            strcpy(text, "Configured speed: Auto (no entry override)");
+        grid_.text(x + 1, 31, text, Ink::Body, width - 2);
+        grid_.text(x + 1, 33, "[I] Full details; configured rate is not live", Ink::Key, width - 2);
+    } else
+        grid_.text(x + 1, 26, "No selected entry", Ink::Muted, width - 2);
+}
 void Terminal::drawPhonebook() {
     syncPhonebook();
     auto *book = services_ ? services_->phonebook() : nullptr;
@@ -613,47 +691,9 @@ void Terminal::drawPhonebook() {
     const auto *selected = entry();
     if (rows_ < 25)
         grid_.text(2, rows_ - 4, "1L 2E 3X 4D I?", Ink::Key, cols_ - 4);
-    if (wide) {
-        unsigned x = cols_ / 2 + 2, width = cols_ - x - 2;
-        grid_.text(x, 3, "PHONEBOOK COMMANDS", Ink::Title, width);
-        for (unsigned i = 0; i < 4; ++i) {
-            const auto *a = item(i);
-            bool enabled = i < 2 || selected;
-            unsigned y = 5 + i * 4;
-            grid_.box(x - 1, y, width + 2, 4);
-            char text[96];
-            snprintf(text, sizeof text, "[%c] %s%s", a->key, a->label,
-                     enabled ? "" : " [X] UNAVAILABLE");
-            grid_.text(x + 1, y + 1, text, enabled ? Ink::Key : Ink::Disabled, width - 2);
-            grid_.text(x + 1, y + 2,
-                       i == 0   ? "Select saved entries with arrows and page keys"
-                       : i == 1 ? "Add a number or edit the selected entry"
-                       : i == 2 ? "Confirm before deleting the selected entry"
-                                : "Confirm before dialling the selected entry",
-                       Ink::Body, width - 2);
-        }
-        grid_.box(x - 1, 22, width + 2, 14);
-        grid_.text(x + 1, 23, "SELECTED ENTRY DETAILS", Ink::Title, width - 2);
-        if (selected) {
-            grid_.text(x + 1, 25, "Host (NAME):", Ink::Muted, width - 2);
-            grid_.text(x + 1, 26, selected->host, Ink::Body, width - 2);
-            if (strlen(selected->host) > width - 2)
-                grid_.text(x + 1, 27, selected->host + width - 2, Ink::Body, width - 2);
-            char text[144];
-            snprintf(text, sizeof text, "Number: %s  Port: %u  %s", selected->number,
-                     selected->port, selected->raw ? "RAW" : "TELNET");
-            grid_.text(x + 1, 29, text, Ink::Body, width - 2);
-            if (selected->speed)
-                snprintf(text, sizeof text, "Configured speed: %lu",
-                         static_cast<unsigned long>(selected->speed));
-            else
-                strcpy(text, "Configured speed: Auto (no entry override)");
-            grid_.text(x + 1, 31, text, Ink::Body, width - 2);
-            grid_.text(x + 1, 33, "[I] Full details; configured rate is not live", Ink::Key,
-                       width - 2);
-        } else
-            grid_.text(x + 1, 26, "No selected entry", Ink::Muted, width - 2);
-    } else if (rows_ >= 25) {
+    if (wide)
+        drawPhonebookPanel(selected);
+    else if (rows_ >= 25) {
         grid_.rule(15, "[ SELECTED ENTRY ]");
         char summary[144];
         snprintf(summary, sizeof summary, "Host: %.32s  Number: %s",
@@ -703,7 +743,8 @@ void Terminal::drawResponse() {
         "immediately.\nEsc or Q: Back; Q/F10 on Main: exit. Ctrl-C: exit.\nF1: contextual help. "
         "F2: Main in children.\nMain F2/F3/F4: Status/Phonebook/Settings.\nPhonebook: PgUp/PgDn "
         "pages; I/Enter details.\nForms: arrows/Home/End edit; Backspace/Delete erase.\nTab moves "
-        "through comma-separated fields; Ctrl-U clears.\nY confirms a reviewed change; N/Esc "
+        "through comma-separated fields; Ctrl-U clears.\nCtrl-L draws the whole screen again."
+        "\nY confirms a reviewed change; N/Esc "
         "cancels.\nRATE is a configured override, never a live measurement.\nNAME is the saved "
         "host; no separate names are stored.\nUse AT*SIZE=columns,rows outside the menu for serial "
         "sizing.\n";
@@ -716,7 +757,7 @@ void Terminal::drawResponse() {
     // Reflow the captured single-cell transcript at the current geometry. This
     // keeps a resize safe even when a service wrote at the previous width.
     unsigned col = 0, y = rows_ < 12 ? 3 : 5;
-    unsigned bottom = rows_ >= 25 ? rows_ - 5 : rows_ - 3;
+    unsigned bottom = y + responseRows();
     while (offset < len && y < bottom) {
         unsigned char c = text[offset++];
         if (c == '\r')
@@ -742,6 +783,37 @@ void Terminal::drawResponse() {
         grid_.text(2, rows_ - 3, "More: Enter / PgDn; PgUp previous; Esc/Q Back", Ink::Function,
                    cols_ - 4);
 }
+// Stages the next piece of an export (plain scrolling text, paged with a prompt).
+// False when there is nothing to send until a key.
+bool Terminal::stageExport() {
+    if (more_) {
+        if (exportPrompt_)
+            return false;
+        const char *hint = "\r\n[More: Enter; Esc/Q returns]\r\n";
+        stageLen_ = strlen(hint);
+        memcpy(staging_, hint, stageLen_);
+        exportPrompt_ = true;
+    } else if (pos_ < length_) {
+        char c = output_[pos_++];
+        if (c == '\n') {
+            staging_[0] = '\r';
+            staging_[1] = '\n';
+            stageLen_ = 2;
+            if (++lines_ >= unsigned(std::max(1, int(rows_) - 3)) && pos_ < length_)
+                more_ = true;
+        } else {
+            staging_[0] = c;
+            stageLen_ = 1;
+        }
+    } else if (!exportFinished_) {
+        const char *hint = "\r\nEnter returns to menu.\r\n";
+        stageLen_ = strlen(hint);
+        memcpy(staging_, hint, stageLen_);
+        exportFinished_ = true;
+    } else
+        return false;
+    return true;
+}
 size_t Terminal::read(uint8_t *data, size_t cap) {
     if (diagnostic_) {
         if (stagePos_ < stageLen_) {
@@ -763,31 +835,7 @@ size_t Terminal::read(uint8_t *data, size_t cap) {
         }
         stagePos_ = stageLen_ = 0;
         if (exporting_) {
-            if (more_) {
-                if (exportPrompt_)
-                    break;
-                const char *hint = "\r\n[More: Enter; Esc/Q returns]\r\n";
-                stageLen_ = strlen(hint);
-                memcpy(staging_, hint, stageLen_);
-                exportPrompt_ = true;
-            } else if (pos_ < length_) {
-                char c = output_[pos_++];
-                if (c == '\n') {
-                    staging_[0] = '\r';
-                    staging_[1] = '\n';
-                    stageLen_ = 2;
-                    if (++lines_ >= unsigned(std::max(1, int(rows_) - 3)) && pos_ < length_)
-                        more_ = true;
-                } else {
-                    staging_[0] = c;
-                    stageLen_ = 1;
-                }
-            } else if (!exportFinished_) {
-                const char *hint = "\r\nEnter returns to menu.\r\n";
-                stageLen_ = strlen(hint);
-                memcpy(staging_, hint, stageLen_);
-                exportFinished_ = true;
-            } else
+            if (!stageExport())
                 break;
             continue;
         }
@@ -803,26 +851,36 @@ size_t Terminal::read(uint8_t *data, size_t cap) {
             if (!dirty_)
                 break;
             buildFrame();
+            planFrame();
+            if (!drawing_)
+                continue;  // nothing on the screen changed
         }
         if (drawRow_ == 0) {
             if (drawStyle_ != Style::Plain) {
                 styled_ = true;
                 const char *start = drawColor_ == Color::Rgb
-                                        ? "\x1b[?25l\x1b[?7l\x1b[0m\x1b[48;2;3;5;7m\x1b[2J"
-                                        : "\x1b[?25l\x1b[?7l\x1b[0m\x1b[40m\x1b[2J";
-                stageLen_ = strlen(start);
-                memcpy(staging_, start, stageLen_);
+                                        ? "\x1b[?25l\x1b[?7l\x1b[0m\x1b[48;2;3;5;7m"
+                                        : "\x1b[?25l\x1b[?7l\x1b[0m\x1b[40m";
+                stageLen_ =
+                    snprintf(staging_, sizeof staging_, "%s%s", start, fullFrame_ ? "\x1b[2J" : "");
             }
         } else if (drawRow_ <= grid_.rows()) {
-            stageLen_ =
-                grid_.row(drawRow_ - 1, staging_, sizeof staging_, drawStyle_ == Style::Cp437,
-                          drawStyle_ == Style::Plain, drawColor_, drawModelRgb_);
+            unsigned y = drawRow_ - 1, from, end;
+            if (fullFrame_)
+                stageLen_ = grid_.row(y, staging_, sizeof staging_, drawStyle_ == Style::Cp437,
+                                      drawStyle_ == Style::Plain, drawColor_, drawModelRgb_);
+            else if (grid_.changed(shownGrid_, y, from, end))
+                stageLen_ = grid_.span(y, from, end, staging_, sizeof staging_,
+                                       drawStyle_ == Style::Cp437, drawColor_, drawModelRgb_);
         } else {
             if (drawStyle_ != Style::Plain)
                 stageLen_ =
                     snprintf(staging_, sizeof staging_, "\x1b[0m\x1b[%u;%uH\x1b[?7h\x1b[?25h",
                              drawCursorRow_, drawCursorCol_);
             drawing_ = false;
+            shownGrid_ = grid_;
+            shown_ = {true,           drawStyle_,     drawColor_,  drawModelRgb_,
+                      drawCursorRow_, drawCursorCol_, frameWrites_};
         }
         ++drawRow_;
     }
@@ -973,7 +1031,7 @@ void Terminal::submit() {
     if (!prompt_)
         return;
     if (inputOverflow_ || inputLen_ == 0) {
-        feedback(inputOverflow_ ? "Input too long; clear or cancel the form"
+        feedback(inputOverflow_ ? "Input too long; clear (Ctrl-U) or cancel (Esc) the form"
                                 : "A value is required");
         return;
     }
@@ -1025,6 +1083,7 @@ void Terminal::execute(const char *command) {
     exportPrompt_ = exportFinished_ = false;
     if (exporting_) {
         drawing_ = false;
+        shown_.valid = false;
         stagePos_ = 0;
         const char *prefix =
             style_ == Style::Plain ? "" : "\x18\x1b[0m\x1b[?7h\x1b[?25h\x1b[2J\x1b[H";
@@ -1203,6 +1262,10 @@ void Terminal::input(char c) {
         }
         if (escapeLen_ == 1 && c != '[' && c != 'O') {
             escapeLen_ = 0;
+            // Esc with a printable key at once is Alt+key, which the screen does not use:
+            // drop both, so it neither cancels (or exits) nor runs a hotkey (5.5-14).
+            if (c >= 32 && c <= 126)
+                return;
             key(27);
             if (open_)
                 input(c);
@@ -1250,124 +1313,150 @@ void Terminal::input(char c) {
         swallowEnter_ = false;
     key(static_cast<unsigned char>(c));
 }
+// One decoded key: Ctrl-L and F1 work everywhere; the rest go to the view in focus.
 void Terminal::key(unsigned key) {
     if (capturing_) {
-        if (key == 27) {
-            // A masked prompt is cancelled directly. A wait (scan, ping, DNS, play) gets the
-            // key, as a typed key on the command line does, so the command stops too.
-            if (!session_.port().cancelPrompt() && session_.port().busy())
-                session_.port().feed(static_cast<char>(27));
-            finishResponse();
-        }
+        capturedKey(key);
+        return;
+    }
+    if (key == 12) {  // Ctrl-L: draw the whole screen again
+        repaint();
         return;
     }
     if (key == kF1) {
         help();
         return;
     }
-    if (focus_ == Focus::Help) {
-        if (key == 27 || key == 'q' || key == 'Q') {
+    if (focus_ == Focus::Help)
+        helpKey(key);
+    else if (focus_ == Focus::Form)
+        formKey(key);
+    else if (focus_ == Focus::Confirm)
+        confirmKey(key);
+    else if (response_ || focus_ == Focus::Details)
+        responseKey(key);
+    else
+        menuKey(key);
+}
+// A command started from the screen is running: only Esc reaches the screen.
+void Terminal::capturedKey(unsigned key) {
+    if (key != 27)
+        return;
+    // A masked prompt is cancelled directly. A wait (scan, ping, DNS, play) gets the
+    // key, as a typed key on the command line does, so the command stops too.
+    if (!session_.port().cancelPrompt() && session_.port().busy())
+        session_.port().feed(static_cast<char>(27));
+    finishResponse();
+}
+// Moves a page through output or help text, or leaves it after the last page.
+void Terminal::pageKey(unsigned key) {
+    if (key == kPageDown || key == '\r' || key == '\n' || key == ' ') {
+        if (more_)
+            responseLine_ += responseRows();
+        else
             back();
-            return;
-        }
-        if (key == kPageDown || key == '\r' || key == '\n') {
-            if (more_)
-                responseLine_ += visibleItems();
-            else
-                back();
-        } else if (key == kPageUp)
-            responseLine_ = responseLine_ > visibleItems() ? responseLine_ - visibleItems() : 0;
-        render();
+    } else if (key == kPageUp)
+        responseLine_ = responseLine_ > responseRows() ? responseLine_ - responseRows() : 0;
+}
+void Terminal::helpKey(unsigned key) {
+    if (key == 27 || key == 'q' || key == 'Q') {
+        back();
         return;
     }
-    if (focus_ == Focus::Form) {
-        if (key == 27) {
-            clearInput();
-            focus_ = Focus::Menu;
-            feedback("Edit cancelled");
-            return;
+    if (key != ' ')  // Space does not page help
+        pageKey(key);
+    render();
+}
+void Terminal::formKey(unsigned key) {
+    if (key == 27) {
+        clearInput();
+        focus_ = Focus::Menu;
+        feedback("Edit cancelled");
+        return;
+    }
+    if (key == kLeft && cursor_)
+        --cursor_;
+    else if (key == kRight && cursor_ < inputLen_)
+        ++cursor_;
+    else if (key == kHome)
+        cursor_ = 0;
+    else if (key == kEnd)
+        cursor_ = inputLen_;
+    else if (key == 21) {
+        devicecfg::wipe(input_, sizeof input_);
+        inputLen_ = cursor_ = 0;
+        inputOverflow_ = false;
+    } else if (key == '\t') {
+        while (cursor_ < inputLen_ && input_[cursor_++] != ',') {
         }
-        if (key == kLeft && cursor_)
-            --cursor_;
-        else if (key == kRight && cursor_ < inputLen_)
-            ++cursor_;
-        else if (key == kHome)
+        if (cursor_ == inputLen_)
             cursor_ = 0;
-        else if (key == kEnd)
-            cursor_ = inputLen_;
-        else if (key == 21) {
-            devicecfg::wipe(input_, sizeof input_);
-            inputLen_ = cursor_ = 0;
-            inputOverflow_ = false;
-        } else if (key == '\t') {
-            while (cursor_ < inputLen_ && input_[cursor_++] != ',') {
-            }
-            if (cursor_ == inputLen_)
-                cursor_ = 0;
-        } else if (key == backspace_ && cursor_) {
-            memmove(input_ + cursor_ - 1, input_ + cursor_, inputLen_ - cursor_ + 1);
-            --cursor_;
-            --inputLen_;
-        } else if (key == kDelete && cursor_ < inputLen_) {
-            memmove(input_ + cursor_, input_ + cursor_ + 1, inputLen_ - cursor_);
-            --inputLen_;
-        } else if (key == '\r' || key == '\n') {
-            submit();
-            return;
-        } else if (key >= 32 && key < 127) {
-            if (inputLen_ + 1 >= sizeof input_)
-                inputOverflow_ = true;
-            else {
-                memmove(input_ + cursor_ + 1, input_ + cursor_, inputLen_ - cursor_ + 1);
-                input_[cursor_++] = key;
-                ++inputLen_;
-            }
-        }
-        render();
+    } else if (key == backspace_ && cursor_) {
+        memmove(input_ + cursor_ - 1, input_ + cursor_, inputLen_ - cursor_ + 1);
+        --cursor_;
+        --inputLen_;
+    } else if (key == kDelete && cursor_ < inputLen_) {
+        memmove(input_ + cursor_, input_ + cursor_ + 1, inputLen_ - cursor_);
+        --inputLen_;
+    } else if (key == '\r' || key == '\n') {
+        submit();
+        return;
+    } else if (key >= 32 && key < 127)
+        typeCharacter(static_cast<char>(key));
+    render();
+}
+void Terminal::typeCharacter(char c) {
+    if (inputLen_ + 1 >= sizeof input_) {
+        if (!inputOverflow_)
+            feedback("Input too long; clear (Ctrl-U) or cancel (Esc) the form");
+        inputOverflow_ = true;
         return;
     }
-    if (focus_ == Focus::Confirm) {
-        if (key == 'y' || key == 'Y') {
-            dispatchPending();
-            swallowEnter_ = true;
-        } else if (key == 'n' || key == 'N' || key == 27) {
-            clearInput();
-            focus_ = Focus::Menu;
-            feedback("Action cancelled");
-            swallowEnter_ = true;
-        }
+    memmove(input_ + cursor_ + 1, input_ + cursor_, inputLen_ - cursor_ + 1);
+    input_[cursor_++] = c;
+    ++inputLen_;
+}
+void Terminal::confirmKey(unsigned key) {
+    if (key == 'y' || key == 'Y') {
+        dispatchPending();
+        swallowEnter_ = true;
+    } else if (key == 'n' || key == 'N' || key == 27) {
+        clearInput();
+        focus_ = Focus::Menu;
+        feedback("Action cancelled");
+        swallowEnter_ = true;
+    }
+}
+// Command output or phonebook details. The export scrolls instead of paging.
+void Terminal::responseKey(unsigned key) {
+    if (exporting_) {
+        exportKey(key);
         return;
     }
-    if (response_ || focus_ == Focus::Details) {
-        if (exporting_) {
-            if (key == 27 || key == 'q' || key == 'Q')
-                back();
-            else if (key == '\r' || key == '\n' || key == ' ' || key == kPageDown) {
-                if (more_) {
-                    more_ = false;
-                    exportPrompt_ = false;
-                    lines_ = 0;
-                } else if (exportFinished_)
-                    back();
-            }
-            return;
-        }
-        if (key == 27 || key == 'q' || key == 'Q') {
+    if (key == 27 || key == 'q' || key == 'Q') {
+        back();
+        return;
+    }
+    if ((key == 'r' || key == 'R') && liveStatus_)
+        execute("*STATUS");
+    else
+        pageKey(key);
+    render();
+}
+void Terminal::exportKey(unsigned key) {
+    if (key == 27 || key == 'q' || key == 'Q')
+        back();
+    else if (key == '\r' || key == '\n' || key == ' ' || key == kPageDown) {
+        if (more_) {
+            more_ = false;
+            exportPrompt_ = false;
+            lines_ = 0;
+        } else if (exportFinished_)
             back();
-            return;
-        }
-        if (key == kPageDown || key == '\r' || key == '\n' || key == ' ') {
-            if (more_)
-                responseLine_ += visibleItems();
-            else
-                back();
-        } else if (key == kPageUp)
-            responseLine_ = responseLine_ > visibleItems() ? responseLine_ - visibleItems() : 0;
-        else if ((key == 'r' || key == 'R') && liveStatus_)
-            execute("*STATUS");
-        render();
-        return;
     }
+}
+// A menu or the phonebook list: leave, function keys, moves, then Enter and hotkeys.
+void Terminal::menuKey(unsigned key) {
     if (key == kF10 && screen_ == S::Main) {
         close();
         return;
@@ -1388,54 +1477,13 @@ void Terminal::key(unsigned key) {
         activate(*a);
         return;
     }
-    auto &location = locations_[static_cast<unsigned>(screen_)];
-    if (key == kUp || key == kDown) {
-        navigate(key == kUp ? -1 : 1);
+    if (moveKey(key))
         return;
-    }
-    if (screen_ == S::Main && cols_ >= 80 && rows_ >= 25 && (key == kLeft || key == kRight)) {
-        if (key == kRight && location.selected < 6)
-            location.selected += 6;
-        else if (key == kLeft && location.selected >= 6)
-            location.selected = std::min<size_t>(5, location.selected - 6);
-        render();
-        return;
-    }
-    if (key == kPageUp || key == kPageDown) {
-        if (screen_ == S::Phonebook)
-            navigate((key == kPageUp ? -1 : 1) * int(phonebookPageSize()));
-        else {
-            int offset = int(location.selected) + (key == kPageUp ? -1 : 1) * int(visibleItems());
-            location.selected = std::max(0, std::min(int(itemCount()) - 1, offset));
-            if (!enabled(location.selected))
-                navigate(key == kPageUp ? -1 : 1);
-            render();
-        }
-        return;
-    }
     if (screen_ == S::Phonebook && (key == 'i' || key == 'I' || key == '\r' || key == '\n')) {
-        const auto *e = entry();
-        if (!e) {
-            feedback("No selected entry");
-            return;
-        }
-        clearOutput();
-        char text[256];
-        snprintf(text, sizeof text, "Host: %s\nNumber: %s\nPort: %u\nProtocol: %s\n", e->host,
-                 e->number, e->port, e->raw ? "RAW" : "TELNET");
-        append(text);
-        if (e->speed) {
-            snprintf(text, sizeof text, "Configured speed: %lu\n",
-                     static_cast<unsigned long>(e->speed));
-            append(text);
-        } else
-            line("Configured speed: Auto (no entry override)");
-        line("NAME uses the saved host. Rate is not a live measurement.");
-        snprintf(resultTitle_, sizeof resultTitle_, "Phonebook / Details");
-        focus_ = Focus::Details;
-        render();
+        showEntryDetails();
         return;
     }
+    auto &location = locations_[static_cast<unsigned>(screen_)];
     if (key == '\r' || key == '\n') {
         if (screen_ == S::Profile)
             profileAction(location.selected);
@@ -1443,6 +1491,61 @@ void Terminal::key(unsigned key) {
             activate(*item(location.selected));
         return;
     }
+    hotkey(key);
+}
+// Arrows and pages move the selection. False if `key` is not a move.
+bool Terminal::moveKey(unsigned key) {
+    auto &location = locations_[static_cast<unsigned>(screen_)];
+    if (key == kUp || key == kDown) {
+        navigate(key == kUp ? -1 : 1);
+        return true;
+    }
+    if (screen_ == S::Main && cols_ >= 80 && rows_ >= 25 && (key == kLeft || key == kRight)) {
+        if (key == kRight && location.selected < 6)
+            location.selected += 6;
+        else if (key == kLeft && location.selected >= 6)
+            location.selected = std::min<size_t>(5, location.selected - 6);
+        render();
+        return true;
+    }
+    if (key != kPageUp && key != kPageDown)
+        return false;
+    if (screen_ == S::Phonebook)
+        navigate((key == kPageUp ? -1 : 1) * int(phonebookPageSize()));
+    else {
+        int offset = int(location.selected) + (key == kPageUp ? -1 : 1) * int(visibleItems());
+        location.selected = std::max(0, std::min(int(itemCount()) - 1, offset));
+        if (!enabled(location.selected))
+            navigate(key == kPageUp ? -1 : 1);
+        render();
+    }
+    return true;
+}
+void Terminal::showEntryDetails() {
+    const auto *e = entry();
+    if (!e) {
+        feedback("No selected entry");
+        return;
+    }
+    clearOutput();
+    char text[256];
+    snprintf(text, sizeof text, "Host: %s\nNumber: %s\nPort: %u\nProtocol: %s\n", e->host,
+             e->number, e->port, e->raw ? "RAW" : "TELNET");
+    append(text);
+    if (e->speed) {
+        snprintf(text, sizeof text, "Configured speed: %lu\n",
+                 static_cast<unsigned long>(e->speed));
+        append(text);
+    } else
+        line("Configured speed: Auto (no entry override)");
+    line("NAME uses the saved host. Rate is not a live measurement.");
+    snprintf(resultTitle_, sizeof resultTitle_, "Phonebook / Details");
+    focus_ = Focus::Details;
+    render();
+}
+// The letter or digit shown next to an item opens it at once.
+void Terminal::hotkey(unsigned key) {
+    auto &location = locations_[static_cast<unsigned>(screen_)];
     unsigned upper = key < 128 ? std::toupper(static_cast<unsigned char>(key)) : key;
     if (screen_ == S::Profile) {
         const char *found = upper < 128 ? strchr(kKeys, upper) : nullptr;

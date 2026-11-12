@@ -246,6 +246,12 @@ void begin(atcmd::Modem &modem, hostport::CallSlot &slot) {
     sess = new hostport::Session(modem, sink, modemcfg::kFactoryBaud, slot);
     sess->setBaudControl(&callBaud);
     startPort();
+    // Listen for the speed from now, not from the first poll(): that poll discards the
+    // UART's copy of what arrived before, so a command sent while setup() still ran (the
+    // Wi-Fi wait, the banner) was lost without a reply (found on the bench, v2.17).
+    if (capturing()) {
+        startCapture();
+    }
 }
 
 hostport::Session &session() {

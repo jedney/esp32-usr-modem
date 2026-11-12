@@ -62,6 +62,7 @@ bool fromBrowser() {
 void testDelay(uint32_t ms) {
     uint32_t start = millis();
     do {
+        hw::feedWatchdog();  // a test can run for minutes inside one loop pass (STA-06)
         term->service();
         ::delay(ms < 5 ? ms : 5);
     } while (millis() - start < ms);
@@ -77,6 +78,7 @@ void drainInput() {
 }
 
 int readKey() {
+    hw::feedWatchdog();  // every test loop reads keys, even while keys keep coming
     int c = term->read();
     if (c >= 0) {
         lastKeyMs = millis();
@@ -914,7 +916,7 @@ const char *resetReasonName(int reason) {
         case ESP_RST_INT_WDT:
             return "interrupt watchdog";
         case ESP_RST_TASK_WDT:
-            return "task watchdog";
+            return "task watchdog (the modem stopped for 15 s and restarted)";
         case ESP_RST_WDT:
             return "other watchdog";
         case ESP_RST_DEEPSLEEP:
