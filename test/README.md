@@ -66,7 +66,7 @@ Section numbers refer to the project brief.
 | Configuration screen, styles, sizes, `AT*` parity, `AT*HELP`, no idle repaint (6.8) | `test_config`, `test_config_services`, `scripts/test_generate_ui.py` (single-key hotkeys), `ui/tests` | `test_config` | `test_config.py` |
 | Export and replay without secrets, logs, call history (6.8) | `test_config`, `test_config_services` | `test_config` | `test_config.py` |
 | About generated from the licensing record | `scripts/test_generate_credits.py` | — | `test_config.py` |
-| Web server: Digest login (stale nonce, wrong-password delay), Host/Origin, tickets, CSRF, WebSocket, upload (6.11) | `test_web`, `scripts/test_image_manifest.py`, `scripts/test_web_peer.py` | `test_web` | `test_web.py` |
+| Web server: Digest login (stale nonce, wrong-password lock-out), Host/Origin, tickets, CSRF, WebSocket, upload and unmount hand-shakes (late answers), browsers start read-only (6.11) | `test_web`, `scripts/test_image_manifest.py`, `scripts/test_web_peer.py` | `test_web` | `test_web.py` |
 | Web page: status bar, reconnect, sizing, upload hashing, demo (6.11) | `web/test/` | — | — |
 | Client Tests: display, size, keys, transfers, cable, client settings per port incl. USB (6.13, v2.0) | `test_client` | `test_client` | `test_client.py`; `interop/serial_lrzsz.py` |
 | Build: network libraries (checked before cached) and image identities | `scripts/test_network_dependencies.py`, `scripts/test_image_manifest.py` | — | — |

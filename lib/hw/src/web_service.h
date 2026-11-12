@@ -6,6 +6,7 @@
 #include <freertos/semphr.h>
 #include <string>
 #include "devicecfg.h"
+#include "upload_handshake.h"
 #include "web_policy.h"
 
 namespace hw {
@@ -29,8 +30,10 @@ public:
     void text(uint32_t id, const std::string &message);
     void snapshot(unsigned type, const std::string &message, bool force = false);
     void pump();
+    // Upload hand-shake, modem loop side (see webinterface::UploadHandshake).
     bool takeUploadRequest(uint32_t &client);
-    void allowUpload(bool allow);
+    // False if the server stopped waiting first: the caller then undoes its claim.
+    bool allowUpload(bool allow);
     bool uploading();
     bool takeUploadDone(bool &ok, bool &filesystem);
     bool takeUnmountRequest();
@@ -81,9 +84,6 @@ private:
     uint32_t nextId_ = 1, nextPump_ = 0;
     std::string snapshots_[4];
     uint32_t revision_[4] = {};
-    uint32_t uploadClient_ = 0;
-    bool uploadRequest_ = false, uploadActive_ = false, uploadAnswered_ = false;
-    bool uploadAllowed_ = false, uploadDone_ = false, uploadOk_ = false, uploadFs_ = false;
-    bool unmountRequest_ = false, unmountAck_ = false;
+    webinterface::UploadHandshake upload_;  // under mutex_
 };
 }  // namespace hw

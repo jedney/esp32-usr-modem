@@ -117,9 +117,10 @@ incoming calls are turned away.
 ## Web interface
 
 Open `http://usr-modem.local` (or the modem's IP) and log in as **admin** with the device
-password. The page shows the front-panel lights, call state and clock, and a terminal
-with the same configuration screen. Other browsers get a read-only status view while
-the screen is in use; press **E** to take over when it's free. `AT*WEB=OFF` turns the web
+password. The page shows the front-panel lights, call state and clock, and a terminal.
+Every browser starts read-only, so an open tab never blocks a call; press **E** (or
+**Enter configuration**) to open the same configuration screen as `AT*CONFIG` when no
+call, test or other menu is using the modem. `AT*WEB=OFF` turns the web
 interface off.
 
 The page can install a `firmware.bin` or `littlefs.bin` from a release. The modem checks

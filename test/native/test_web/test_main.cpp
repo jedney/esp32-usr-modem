@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include "image_check.h"
+#include "upload_handshake.h"
 #include "web_policy.h"
 using namespace webinterface;
 void setUp() {}
@@ -83,7 +84,39 @@ void test_digest_reports_stale_nonce_and_wrong_password() {
                   "ffffffffffffffffffffffffffffffff");
     TEST_ASSERT_TRUE(Check::kWrong == auth.check(wrong, "GET", "/api/session", ha1, 5));
     TEST_ASSERT_TRUE(Check::kOk ==
-                     auth.check(digest(n, "00000003"), "GET", "/api/session", ha1, 6));
+                     auth.check(digest(n, "00000003"), "GET", "/api/session", ha1, 1005));
+}
+// SEC-02: after a wrong response the next second is answered at once, without
+// checking the password, instead of the server task sleeping for a second.
+void test_wrong_response_locks_out_for_one_second_without_blocking() {
+    FakeCrypto crypto;
+    Auth auth(crypto);
+    const char *ha1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    auto c = auth.challenge(0xfffffe00u);
+    auto n = c.substr(c.find("nonce=\"") + 7, 32);
+    std::string wrong = digest(n);
+    wrong.replace(wrong.find("0123456789abcdef0123456789abcdef"), 32,
+                  "ffffffffffffffffffffffffffffffff");
+    TEST_ASSERT_FALSE(auth.lockedOut(0xfffffe00u));
+    TEST_ASSERT_TRUE(Check::kWrong == auth.check(wrong, "GET", "/api/session", ha1, 0xffffff00u));
+    TEST_ASSERT_TRUE(auth.lockedOut(0xffffff00u));
+    // Inside the second (across the 2^32 ms wrap) even the right password is refused,
+    // and the password is not checked at all.
+    crypto.last.clear();
+    TEST_ASSERT_TRUE(Check::kWrong ==
+                     auth.check(digest(n, "00000002"), "GET", "/api/session", ha1, 0x000002e7u));
+    TEST_ASSERT_TRUE(crypto.last.empty());
+    // A refused attempt does not extend the lock-out, so nobody can hold it for ever.
+    TEST_ASSERT_TRUE(auth.lockedOut(0x000002e7u));
+    TEST_ASSERT_FALSE(auth.lockedOut(0x000002e8u));
+    TEST_ASSERT_TRUE(Check::kOk ==
+                     auth.check(digest(n, "00000003"), "GET", "/api/session", ha1, 0x000002e8u));
+    // No Authorization header is still just a challenge, locked out or not.
+    TEST_ASSERT_TRUE(Check::kWrong == auth.check(wrong, "GET", "/api/session", ha1, 0x1000));
+    TEST_ASSERT_TRUE(Check::kMissing == auth.check("", "GET", "/api/session", ha1, 0x1001));
+    // A password change (reset) clears the lock-out.
+    auth.reset();
+    TEST_ASSERT_FALSE(auth.lockedOut(0x1002));
 }
 void test_digest_rejects_duplicate_fields_and_non_digest_schemes() {
     FakeCrypto crypto;
@@ -271,6 +304,104 @@ void test_terminal_geometry_is_bounded_and_cannot_be_terminal_input() {
         TEST_ASSERT_EQUAL(50, rows);
     }
 }
+// STA-07: each side acts only while the other is still waiting.
+void test_upload_handshake_grant_and_refuse_on_time() {
+    UploadHandshake h;
+    uint32_t client = 0;
+    TEST_ASSERT_FALSE(h.takeRequest(client));
+    TEST_ASSERT_TRUE(h.ask(7));
+    TEST_ASSERT_FALSE(h.ask(8));  // one request at a time
+    TEST_ASSERT_FALSE(h.answered());
+    TEST_ASSERT_FALSE(h.allow(true));  // not taken yet
+    TEST_ASSERT_TRUE(h.takeRequest(client));
+    TEST_ASSERT_EQUAL_UINT32(7, client);
+    TEST_ASSERT_FALSE(h.takeRequest(client));  // taken once
+    TEST_ASSERT_FALSE(h.allow(false));
+    TEST_ASSERT_TRUE(h.answered());
+    TEST_ASSERT_FALSE(h.granted());
+    TEST_ASSERT_TRUE(h.idle());
+    TEST_ASSERT_FALSE(h.uploading());
+    TEST_ASSERT_TRUE(h.ask(7));
+    TEST_ASSERT_TRUE(h.takeRequest(client));
+    TEST_ASSERT_TRUE(h.allow(true));
+    TEST_ASSERT_TRUE(h.answered() && h.granted() && h.uploading());
+    TEST_ASSERT_FALSE(h.giveUp());  // answered: the server goes ahead
+    TEST_ASSERT_FALSE(h.ask(8));    // busy until the loop collects the result
+    bool ok = true, fs = false;
+    TEST_ASSERT_FALSE(h.takeDone(ok, fs));
+    h.finish(true, false);
+    TEST_ASSERT_TRUE(h.uploading());
+    TEST_ASSERT_TRUE(h.takeDone(ok, fs));
+    TEST_ASSERT_TRUE(ok);
+    TEST_ASSERT_FALSE(fs);
+    TEST_ASSERT_TRUE(h.idle());
+    TEST_ASSERT_FALSE(h.uploading());
+}
+void test_upload_handshake_late_answer_changes_nothing() {
+    UploadHandshake h;
+    uint32_t client = 0;
+    // The loop takes the request, the server times out, then the loop answers yes.
+    TEST_ASSERT_TRUE(h.ask(3));
+    TEST_ASSERT_TRUE(h.takeRequest(client));
+    TEST_ASSERT_TRUE(h.giveUp());
+    TEST_ASSERT_FALSE(h.allow(true));  // the loop must release its claim
+    TEST_ASSERT_FALSE(h.uploading());  // so loop() does not return early for ever
+    TEST_ASSERT_TRUE(h.idle());
+    // The server times out before the loop even sees the request.
+    TEST_ASSERT_TRUE(h.ask(4));
+    TEST_ASSERT_TRUE(h.giveUp());
+    TEST_ASSERT_FALSE(h.takeRequest(client));
+    TEST_ASSERT_FALSE(h.allow(true));
+    TEST_ASSERT_TRUE(h.idle());
+    // A late answer can't grant a newer request that the loop never checked.
+    TEST_ASSERT_TRUE(h.ask(5));
+    TEST_ASSERT_FALSE(h.allow(true));
+    TEST_ASSERT_FALSE(h.granted());
+}
+void test_upload_handshake_late_unmount_is_ignored() {
+    UploadHandshake h;
+    uint32_t client = 0;
+    bool ok = true, fs = false;
+    // On time: asked, taken, acknowledged.
+    TEST_ASSERT_FALSE(h.askUnmount());  // only while an upload is active
+    TEST_ASSERT_TRUE(h.ask(1) && h.takeRequest(client) && h.allow(true));
+    TEST_ASSERT_FALSE(h.takeUnmount());
+    TEST_ASSERT_TRUE(h.askUnmount());
+    TEST_ASSERT_TRUE(h.takeUnmount());
+    TEST_ASSERT_FALSE(h.takeUnmount());
+    TEST_ASSERT_FALSE(h.unmountReady());
+    TEST_ASSERT_TRUE(h.unmounted());
+    TEST_ASSERT_TRUE(h.unmountReady());
+    h.finish(true, true);
+    TEST_ASSERT_TRUE(h.takeDone(ok, fs));
+    // The server gives up before the loop takes the request: the failed upload finishes
+    // and the loop remounts; the old request must not unmount LittleFS again.
+    TEST_ASSERT_TRUE(h.ask(1) && h.takeRequest(client) && h.allow(true));
+    TEST_ASSERT_TRUE(h.askUnmount());
+    h.giveUpUnmount();
+    h.finish(false, true);
+    TEST_ASSERT_FALSE(h.takeUnmount());
+    TEST_ASSERT_TRUE(h.takeDone(ok, fs));
+    TEST_ASSERT_FALSE(ok);
+    TEST_ASSERT_TRUE(fs);  // the loop remounts LittleFS
+    TEST_ASSERT_FALSE(h.takeUnmount());
+    // Taken, then the server gives up before the acknowledgement: the late ack is refused
+    // and the result still says "LittleFS, failed", so the loop remounts after unmounting.
+    TEST_ASSERT_TRUE(h.ask(1) && h.takeRequest(client) && h.allow(true));
+    TEST_ASSERT_TRUE(h.askUnmount());
+    TEST_ASSERT_TRUE(h.takeUnmount());
+    h.giveUpUnmount();
+    TEST_ASSERT_FALSE(h.unmounted());
+    TEST_ASSERT_FALSE(h.unmountReady());
+    h.finish(false, true);
+    TEST_ASSERT_TRUE(h.takeDone(ok, fs));
+    TEST_ASSERT_TRUE(!ok && fs);
+    // An acknowledgement that won the race is kept by giveUpUnmount().
+    TEST_ASSERT_TRUE(h.ask(1) && h.takeRequest(client) && h.allow(true));
+    TEST_ASSERT_TRUE(h.askUnmount() && h.takeUnmount() && h.unmounted());
+    h.giveUpUnmount();
+    TEST_ASSERT_TRUE(h.unmountReady());
+}
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_terminal_geometry_is_bounded_and_cannot_be_terminal_input);
@@ -279,6 +410,10 @@ int main() {
     RUN_TEST(test_host_and_origin_do_not_accept_rebinding_authorities);
     RUN_TEST(test_digest_checks_exact_uri_method_replay_and_expiry);
     RUN_TEST(test_digest_reports_stale_nonce_and_wrong_password);
+    RUN_TEST(test_wrong_response_locks_out_for_one_second_without_blocking);
+    RUN_TEST(test_upload_handshake_grant_and_refuse_on_time);
+    RUN_TEST(test_upload_handshake_late_answer_changes_nothing);
+    RUN_TEST(test_upload_handshake_late_unmount_is_ignored);
     RUN_TEST(test_digest_rejects_duplicate_fields_and_non_digest_schemes);
     RUN_TEST(test_tickets_are_single_use_bounded_and_expire_across_rollover);
     RUN_TEST(test_settings_default_persist_failure_and_corruption_fail_closed);

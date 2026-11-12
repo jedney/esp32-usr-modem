@@ -55,8 +55,17 @@ All files require Digest (`qop=auth`, MD5 HA1 from the device store); no Basic
 fallback. Nonces expire after 60 seconds and nonce counts must increase. A correct
 response with an expired, replaced or replayed nonce gets a new challenge with
 `stale=true`, so the browser retries without asking for the password again. A wrong
-response is answered after a one-second delay to slow down password guessing. Successful
+response starts a one-second lock-out: every Digest attempt in that second is answered
+`401` at once without checking the password (even a correct one), so guessing is limited
+to one try a second and the server task never sleeps. Refused attempts don't extend the
+lock-out. A request header must arrive within 1 s of the previous part. Successful
 authentication removes the initial boot password; a storage failure refuses access.
+
+HTTP statuses: 200 OK; 400 bad request or rejected image; 401 login needed (or
+lock-out); 403 wrong host, origin or CSRF token; 404 unknown path or a file that is not
+a web asset; 409 modem busy or confirmation missing (uploads); 503 an update is in
+progress, the web files are missing (restore `littlefs.bin` over USB), or the first use
+could not be recorded.
 Password changes invalidate nonces, socket tickets and existing connections.
 
 Host accepts the current `<name>.local` or IPv4 address, optionally `:80`. Duplicate
@@ -81,7 +90,7 @@ files are not reachable. Responses set CSP, no-sniff, no-referrer and frame deni
 | `led` | `m`: bit mask, bit 0 AA, 1 CD, 2 RD, 3 SD, 4 TR, 5 CS, 6 ARQ/FAX | On connect, then whenever the physical LEDs change, at most 20 per second. RD/SD flashes are the same stretched flashes as the front panel |
 | `clock` | `epoch` (UTC seconds), `tzo` (UTC offset in minutes, e.g. 780 for NZDT) | On connect, every 60 s, and when NTP or the time zone changes. `epoch` 0 = clock not set |
 | `call` | `state`: `idle`, `dialling`, `ringing`, `connected`, `ppp`, `slip`, `config`, `test`; `mode`: `telnet`, `raw`, `ppp` or `slip`; `dir`: `out` or `in`; `number` (as dialled); `host`; `ip`; `port`; `speed` (emulated line speed); `since` (UTC seconds the call connected). Internet calls additionally carry `ready` (IP forwarding enabled), `local` and `peer` (private IPv4 addresses); `ip` is empty and `port` is omitted | On connect and on every change |
-| `wifi` | `state`: `up`, `connecting`, `down`; `ssid`; `rssi` (dBm); `ip` | On connect, on change, and every 10 s while up |
+| `wifi` | `state`: `up`, `connecting`, `down`; `ssid`; `rssi` (dBm); `ip` | On connect, on change, and every 10 s in every state |
 | `access` | `edit`: boolean | Interactive ownership changes; false means read-only |
 | `hardware` | `active`: boolean; `mode`: `lines` when applicable | Show/disable line controls and test-stop button |
 | `pong` | None | Reply to the browser's `{"t":"ping"}` text heartbeat |
@@ -117,8 +126,9 @@ Compact applies below 120x45, with the richer layout enabled only when both limi
 are met. Terminal output is streamed in bounded rows and redraws are coalesced;
 rendering a full wide frame never requires pushing it all into the socket queue.
 
-Browsers connected while busy display read-only status. `E` explicitly attempts
-menu entry; queued keys are discarded when ownership changes. A second browser
+Every browser starts read-only (status view and lights); opening the page claims
+nothing, so an idle tab never turns callers away or makes `ATD` give `BUSY`. `E`
+opens the configuration screen when the modem is free (no call, test or other menu); queued keys are discarded when ownership changes. A second browser
 cannot take over. Quit returns to read-only status. Browser phonebook dialing starts
 the call on the RS232 host port (which must be in idle command mode), so CONNECT
 and payload go to the attached computer. The browser continues to show status.
@@ -149,7 +159,8 @@ Identity is a project check, not a cryptographic publisher signature.
 - `X-Confirm-Filesystem`: that SHA-256 after confirming filesystem replacement.
 
 Only the browser owning the interactive menu may upload. Admission reserves the
-modem and closes its menu; calls, other menus, tests, joins/scans and ArduinoOTA
+modem and closes its menu (the modem loop has 2 s to answer; a late answer changes
+nothing and frees the modem again, so no upload is left half-started); calls, other menus, tests, joins/scans and ArduinoOTA
 cannot overlap the write. Uploads have finite length/time limits, verify the full
 image identity and hash on the modem, and select/reboot only after successful
 finalization. The UI displays bytes sent followed by verification; it waits for the
@@ -188,5 +199,5 @@ comes from the firmware.
 
 ## Tests
 
-`cd web && npm test` runs the status-bar unit tests (`web/test/`) with Node's built-in
-test runner. GitHub Actions runs them on every push.
+`cd web && npm test` runs the five unit-test suites in `web/test/` (`demo`, `geometry`,
+`link`, `status`, `upload`) with Node's built-in test runner. GitHub Actions runs them on every push.

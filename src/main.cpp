@@ -944,8 +944,8 @@ void browserAccess(uint32_t id, bool edit) {
 void browserWaiting(uint32_t id) {
     static const char message[] =
         "\x1b[2J\x1b[HUSR Modem live status\r\n"
-        "Read-only: a call or another menu may own the modem.\r\n"
-        "Press E to enter configuration when free.\r\n";
+        "Read-only. Press E to open the configuration screen.\r\n"
+        "(It opens only when no call, test or other menu is using the modem.)\r\n";
     webServer.write(id, reinterpret_cast<const uint8_t *>(message), sizeof message - 1);
     browserAccess(id, false);
 }
@@ -1078,7 +1078,13 @@ void pollBrowser() {
             callAudio.stop();
             ota.poll(millis(), net.up(), false, net.settings().host, net.link().ip);
         }
-        webServer.allowUpload(allow);
+        // The server may have stopped waiting (2 s) while we checked: then allowUpload()
+        // changes nothing and we release the claim, so no upload is left half-started
+        // (STA-07). ArduinoOTA resumes on the next ota.poll(); the browser keeps its
+        // read-only view and can press E again.
+        if (!webServer.allowUpload(allow) && allow) {
+            callSlot.release(&webServer);
+        }
     }
     if (webServer.uploading()) {
         return;
@@ -1106,15 +1112,8 @@ void pollBrowser() {
             continue;
         }
         uint8_t bytes[128];
-        if (fresh && !browserClient && !callSlot.busy() && !hardwareRunning) {
-            browserClient = id;
-            if (browserMenu->open() && browserSession->startLocal(*browserMenu)) {
-                browserAccess(id, true);
-            } else {
-                browserMenu->close();
-                browserClient = 0;
-            }
-        }
+        // Every browser starts read-only (STA-02): opening the page claims nothing, so a
+        // forgotten tab can't turn callers away. E takes the configuration screen when free.
         if (id != browserClient) {
             if (fresh) {
                 browserWaiting(id);

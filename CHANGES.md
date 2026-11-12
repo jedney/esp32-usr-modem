@@ -14,6 +14,32 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.6] - 2026-11-12
+
+### Changed
+
+- Every browser starts read-only (status view and lights). Opening the page no longer
+  takes the configuration screen, so a forgotten tab can't turn callers away or make
+  `ATD` give `BUSY`. Press `E` (or **Enter configuration**) to open it when the modem is
+  free.
+- A wrong web password no longer makes the web server sleep for a second. Instead, every
+  login attempt in the next second gets `401` at once without checking the password.
+  A request header must now arrive within 1 s (was 3 s).
+
+### Fixed
+
+- A browser upload answered by the modem just after the web server's 2-second wait no
+  longer leaves the modem stuck in "uploading" (the main loop stopped for good). A late
+  LittleFS unmount request after a failed upload no longer unmounts LittleFS again.
+- `web/PROTOCOL.md`: `wifi` is sent every 10 s in every state; `npm test` runs five
+  suites; HTTP statuses 404 and 503 are listed.
+
+### Added
+
+- `webinterface::UploadHandshake` and the Digest lock-out, with unit tests in `test_web`
+  for late answers on both sides. End-to-end tests (not run yet) for the read-only start
+  and the lock-out.
+
 ## [2.5] - 2026-11-12
 
 ### Fixed

@@ -302,6 +302,7 @@ void Auth::reset() {
     for (auto &n : nonce_) {
         n = {};
     }
+    wrong_ = false;
 }
 std::string Auth::challenge(uint32_t now, bool stale) {
     char value[33];
@@ -323,6 +324,9 @@ Check Auth::check(const std::string &header, const std::string &method, const st
         !hex(f["nonce"], 32)) {
         return Check::kMissing;
     }
+    if (lockedOut(now)) {
+        return Check::kWrong;
+    }
     uint32_t count = 0;
     for (char c : f["nc"]) {
         count = (count << 4) | unsigned(c <= '9' ? c - '0' : tolower(c) - 'a' + 10);
@@ -339,6 +343,8 @@ Check Auth::check(const std::string &header, const std::string &method, const st
     devicecfg::wipe(ha2, sizeof ha2);
     devicecfg::wipe(expected, sizeof expected);
     if (!correct) {
+        wrong_ = true;
+        wrongAt_ = now;
         return Check::kWrong;
     }
     for (auto &n : nonce_) {
