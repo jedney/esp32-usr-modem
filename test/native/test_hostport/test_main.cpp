@@ -884,8 +884,24 @@ void test_sink_gate_empty_write_is_free() {
     TEST_ASSERT_FALSE(gate.stalled());
 }
 
+void test_call_slot_says_who_holds_it() {
+    CallSlot slot;
+    int a = 0, b = 0;
+    TEST_ASSERT_FALSE(slot.heldBy(&a));
+    TEST_ASSERT_FALSE(slot.heldBy(nullptr));  // an idle slot is not held by "nobody"
+    TEST_ASSERT_TRUE(slot.claim(&a));
+    TEST_ASSERT_TRUE(slot.heldBy(&a));
+    TEST_ASSERT_FALSE(slot.heldBy(&b));
+    TEST_ASSERT_TRUE(slot.transfer(&a, &b));
+    TEST_ASSERT_FALSE(slot.heldBy(&a));
+    TEST_ASSERT_TRUE(slot.heldBy(&b));
+    slot.release(&b);
+    TEST_ASSERT_FALSE(slot.heldBy(&b));
+}
+
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_call_slot_says_who_holds_it);
     RUN_TEST(test_detects_at_every_rate_from_any_other);
     RUN_TEST(test_lower_case_at_is_detected);
     RUN_TEST(test_detection_allows_clock_error_and_jitter);

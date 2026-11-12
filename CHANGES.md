@@ -14,6 +14,30 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.3] - 2026-11-12
+
+### Changed
+
+- `AT*HWLED` with no argument, `=CHASE` and `=WALK` are refused during a call (`ERROR`).
+  Single LEDs, `ALL`, `OFF`, `NONE` and `AUTO` still work. The rule now lives in
+  `hwtest::allowedDuringCall()`, with native tests.
+- `AT*BAUD=` from the console, USB or browser is refused while a call is up on the RS232
+  port. From the RS232 port itself it works as before.
+
+### Fixed
+
+- A hardware test can no longer run for ever. Every test that waits for a key (LED
+  patterns, tones, DTMF, pulse, pot, lines, bridge, the guided test prompts) now stops
+  after 5 minutes with no key, and as soon as its terminal goes away: DTR drops on the
+  RS232 or USB port, or the browser closes. Before, `AT*HWTONE=DIAL` on a closed USB
+  terminal played until a key or a power cycle, and `AT*HWLED` on the console froze a call
+  on RS232.
+- When the browser leaves, it releases only the LED, amp and RS232-output holds it set
+  itself. Before, it also cancelled holds made from the console, USB or RS232.
+- Tidy-ups: the command-name check in `hwconsole.cpp` tests the length before reading the
+  character (cppcheck note); the `hwconsole.h` header comment describes the current
+  behaviour.
+
 ## [2.2] - 2026-11-12
 
 ### Fixed

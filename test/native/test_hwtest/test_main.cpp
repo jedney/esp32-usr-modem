@@ -330,6 +330,78 @@ void test_scale_rounds_and_clips() {
     TEST_ASSERT_EQUAL_INT16(0, volume::scale(12345, 0.0f));
 }
 
+void test_idle_timeout_is_five_minutes_and_survives_clock_wrap() {
+    TEST_ASSERT_EQUAL_UINT32(300000u, hwtest::kIdleTimeoutMs);
+    TEST_ASSERT_FALSE(hwtest::idleExpired(1000, 1000));
+    TEST_ASSERT_FALSE(hwtest::idleExpired(1000, 1000 + hwtest::kIdleTimeoutMs - 1));
+    TEST_ASSERT_TRUE(hwtest::idleExpired(1000, 1000 + hwtest::kIdleTimeoutMs));
+    // millis() wraps at 2^32: 10 s before the wrap to 10 s after is 20 s, not 49 days.
+    TEST_ASSERT_FALSE(hwtest::idleExpired(0xFFFFFFFFu - 9999u, 10000u));
+    TEST_ASSERT_TRUE(hwtest::idleExpired(0xFFFFFFFFu - 9999u, 10000u, 15000u));
+    TEST_ASSERT_TRUE(hwtest::idleExpired(0xFFFFFFFFu - 299999u, 1u));
+    TEST_ASSERT_TRUE(hwtest::idleExpired(0, 5000, 5000));
+}
+
+void test_only_single_led_forms_are_allowed_during_a_call() {
+    TEST_ASSERT_TRUE(hwtest::allowedDuringCall("LED=CD"));
+    TEST_ASSERT_TRUE(hwtest::allowedDuringCall("LED CD"));
+    TEST_ASSERT_TRUE(hwtest::allowedDuringCall("LED=FAX"));
+    TEST_ASSERT_TRUE(hwtest::allowedDuringCall("LED=ALL"));
+    TEST_ASSERT_TRUE(hwtest::allowedDuringCall("LED=OFF"));
+    TEST_ASSERT_TRUE(hwtest::allowedDuringCall("LED=NONE"));
+    TEST_ASSERT_TRUE(hwtest::allowedDuringCall("LED=AUTO"));
+    // The patterns run until a key, so they would freeze a call.
+    TEST_ASSERT_FALSE(hwtest::allowedDuringCall("LED"));
+    TEST_ASSERT_FALSE(hwtest::allowedDuringCall("LED="));
+    TEST_ASSERT_FALSE(hwtest::allowedDuringCall("LED=CHASE"));
+    TEST_ASSERT_FALSE(hwtest::allowedDuringCall("LED=WALK"));
+    TEST_ASSERT_FALSE(hwtest::allowedDuringCall("LED CHASE"));
+    TEST_ASSERT_FALSE(hwtest::allowedDuringCall("LEDS"));
+    TEST_ASSERT_FALSE(hwtest::allowedDuringCall("LED=BOGUS"));
+}
+
+void test_other_hardware_commands_during_a_call_are_unchanged() {
+    const char *const ok[] = {"POT?",      "PINS",  "INFO", "?",        "",       "SIG",
+                              "SIG=CD,ON", "LINES", "LOOP", "LOOP=ALL", "BRIDGE", "BRIDGE=9600"};
+    for (const char *c : ok) {
+        TEST_ASSERT_TRUE_MESSAGE(hwtest::allowedDuringCall(c), c);
+    }
+    const char *const no[] = {"TONE=DIAL", "DTMF=123", "PULSE=5", "AMP=ON", "VOL=50",
+                              "POT",       "POT=TONE", "TEST",    "FILES"};
+    for (const char *c : no) {
+        TEST_ASSERT_FALSE_MESSAGE(hwtest::allowedDuringCall(c), c);
+    }
+}
+
+void test_hold_is_released_only_by_its_owner() {
+    hwtest::Hold h;
+    TEST_ASSERT_FALSE(h.active());
+    TEST_ASSERT_FALSE(h.releaseForBrowser());  // nothing to release
+
+    h.take(true);  // set from the browser
+    TEST_ASSERT_TRUE(h.active());
+    TEST_ASSERT_TRUE(h.releaseForBrowser());
+    TEST_ASSERT_FALSE(h.active());
+
+    h.take(false);  // set from the console, USB or RS232
+    TEST_ASSERT_TRUE(h.active());
+    TEST_ASSERT_FALSE(h.releaseForBrowser());  // the browser leaving must not cancel it
+    TEST_ASSERT_TRUE(h.active());
+    h.release();
+    TEST_ASSERT_FALSE(h.active());
+}
+
+void test_hold_changes_owner_when_taken_again() {
+    hwtest::Hold h;
+    h.take(false);
+    h.take(true);
+    TEST_ASSERT_TRUE(h.releaseForBrowser());
+    h.take(true);
+    h.take(false);  // another port now holds it
+    TEST_ASSERT_FALSE(h.releaseForBrowser());
+    TEST_ASSERT_TRUE(h.active());
+}
+
 int main(int, char **) {
     UNITY_BEGIN();
     RUN_TEST(test_led_names_match_web_protocol_bits);
@@ -356,5 +428,10 @@ int main(int, char **) {
     RUN_TEST(test_level_curve_mute_monotonic_and_top);
     RUN_TEST(test_pot_level_dead_zones);
     RUN_TEST(test_scale_rounds_and_clips);
+    RUN_TEST(test_idle_timeout_is_five_minutes_and_survives_clock_wrap);
+    RUN_TEST(test_only_single_led_forms_are_allowed_during_a_call);
+    RUN_TEST(test_other_hardware_commands_during_a_call_are_unchanged);
+    RUN_TEST(test_hold_is_released_only_by_its_owner);
+    RUN_TEST(test_hold_changes_owner_when_taken_again);
     return UNITY_END();
 }

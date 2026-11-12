@@ -29,7 +29,7 @@ whole window.
 | --- | --- | --- | --- | --- | --- |
 | 01 | v2.1 | [Process gates, docs and decisions](../history/wp-01-process-gates.md) | Sonnet / medium | M | - |
 | 02 | v2.2 | [Serial output never blocks the loop](../history/wp-02-nonblocking-sinks.md) | Opus / high | M-L | 01 |
-| 03 | v2.3 | [Hardware tests cannot freeze the modem](wp-03-hwtest-bounds.md) | Sonnet / high | M | 02 |
+| 03 | v2.3 | [Hardware tests cannot freeze the modem](../history/wp-03-hwtest-bounds.md) | Sonnet / high | M | 02 |
 | 04 | v2.4 | [Incoming-call limits](wp-04-incoming-limits.md) | Sonnet / high | M | 01 |
 | 05 | v2.5 | [Wi-Fi join, factory reset, scan names](wp-05-wifi-reset-scan.md) | Sonnet / medium | S-M | 01 |
 | 06 | v2.6 | [Web server: read-only start, hand-shakes, lock-out](wp-06-web-server.md) | Opus / medium | M-L | 02 |
@@ -120,15 +120,15 @@ the package confirms each first.
 | STA-01 | Unread serial port freezes the loop 2 s per result (High) | 02 | done (v2.2) |
 | STA-02 | Browser opens the configuration screen and blocks calls | 06 | open |
 | STA-02b | Idle configuration screen holds the line (5-minute time-out) | 07 | open |
-| STA-03 | Interactive hardware tests block for ever / during a call | 03 | open |
+| STA-03 | Interactive hardware tests block for ever / during a call | 03 | done (v2.3) |
 | STA-04 | Failed browser Wi-Fi join undoes later browser changes | 05 | open |
 | STA-05 | `AT*FACTORY` without LittleFS never finishes | 05 | open |
 | STA-06 | No watchdog on the main loop | 17 | open |
 | STA-07 | Upload and unmount hand-shakes can leave stale state | 06 | open |
 | STA-08 | A full phonebook may not fit in NVS | 17 | open |
 | STA-09a | S3/S4/S5 accept 0-255 (printable S3) | 07 | open |
-| STA-09b | `AT*BAUD` changes RS232 speed during an RS232 call | 03 | open |
-| STA-09c | `restoreBrowserResources()` cancels other ports' holds | 03 | open |
+| STA-09b | `AT*BAUD` changes RS232 speed during an RS232 call | 03 | done (v2.3) |
+| STA-09c | `restoreBrowserResources()` cancels other ports' holds | 03 | done (v2.3) |
 | STA-09d | Esc during screen-started scan/ping/DNS/play doesn't cancel | 07 | open |
 | STA-09e | Failed NVS read passed to `deserialize()` as a huge length | 07 | open |
 | STA-09f | Damaged phonebook replaced by the next edit | 07 | open |
@@ -148,8 +148,8 @@ the package confirms each first.
 | MNT-05f | `web/PROTOCOL.md` three mismatches | 06 | open |
 | MNT-05g | Hand-sized tables without `static_assert` | 07 | open |
 | MNT-05h | Web file list kept in three places | 11 | open |
-| MNT-05i | Stale comments (`hwconsole.h`, `connection.h`, `atcmd.cpp:764`) | 03, 07 | open |
-| MNT-05j | cppcheck notes `hwconsole.cpp:895`, `menu.cpp:449` | 03, 15 | open |
+| MNT-05i | Stale comments (`hwconsole.h`, `connection.h`, `atcmd.cpp:764`) | 03, 07 | open (`hwconsole.h` done v2.3) |
+| MNT-05j | cppcheck notes `hwconsole.cpp:895`, `menu.cpp:449` | 03, 15 | open (`hwconsole.cpp` done v2.3) |
 | 5.5-01 | Radio stays on after `AT*WIFISCAN` with Wi-Fi off | 12 | open |
 | 5.5-02 | `volatile` link state; late event overwrites `leave()` | 12 | open |
 | 5.5-03 | Second scan ends the new scan early | 12 | open |

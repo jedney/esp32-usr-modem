@@ -43,11 +43,21 @@ bool testVolumeFromPot = false;
 Term *term = nullptr;  // the port running the current command
 PortControl control = {};
 bool portTaken = false;  // the RS232 session is suspended for a test
-bool sigHeld = false;    // AT*HWSIG keeps the port until AT*HWSIG=AUTO
-bool ledHold = false;    // AT*HWLED keeps the LEDs until AT*HWLED=AUTO
+// What a test leaves in place after it ends, and which kind of port set it (so a browser
+// that leaves cancels only its own).
+hwtest::Hold sigHold;  // AT*HWSIG keeps the port until AT*HWSIG=AUTO
+hwtest::Hold ledHold;  // AT*HWLED keeps the LEDs until AT*HWLED=AUTO
+hwtest::Hold ampHold;  // AT*HWAMP=ON/OFF keeps the amp mode until AT*HWAMP=AUTO
+
+uint32_t lastKeyMs = 0;  // last key seen by the running test
+bool timedOut = false;   // the running test hit hwtest::kIdleTimeoutMs
 
 Term &out() {
     return *term;
+}
+
+bool fromBrowser() {
+    return term->isBrowser();
 }
 void testDelay(uint32_t ms) {
     uint32_t start = millis();
@@ -67,11 +77,33 @@ void drainInput() {
 }
 
 int readKey() {
-    return term->read();
+    int c = term->read();
+    if (c >= 0) {
+        lastKeyMs = millis();
+    }
+    return c;
 }
 
+// True when the running test must end: the terminal has gone, or no key came for
+// hwtest::kIdleTimeoutMs. Every "any key" loop checks this (STA-03).
+bool mustStop() {
+    if (!term->connected()) {
+        return true;
+    }
+    if (!timedOut && hwtest::idleExpired(lastKeyMs, millis())) {
+        timedOut = true;
+        out().printf("\r\nStopped: no key for %u minutes\r\n",
+                     static_cast<unsigned>(hwtest::kIdleTimeoutMs / 60000u));
+    }
+    return timedOut;
+}
+
+// For loops that stop on any key (and so on a closed terminal or the idle time-out).
 bool keyPressed() {
-    if (term->read() < 0) {
+    if (mustStop()) {
+        return true;
+    }
+    if (readKey() < 0) {
         return false;
     }
     drainInput();
@@ -107,7 +139,7 @@ bool takePort(const char *what) {
 }
 
 void givePort() {
-    if (portTaken && !sigHeld && control.resume != nullptr) {
+    if (portTaken && !sigHold.active() && control.resume != nullptr) {
         control.resume();
         portTaken = false;
     }
@@ -116,6 +148,9 @@ void givePort() {
 int waitKey() {
     int c;
     while ((c = readKey()) < 0) {
+        if (mustStop()) {
+            return 'Q';
+        }
         testDelay(5);
     }
     if (!term->connected()) {
@@ -272,26 +307,26 @@ bool printFiles() {
 void ledChase() {
     out().print("Chase (any key stops)\r\n");
     drainInput();
-    ledHold = true;
+    ledHold.take(fromBrowser());
     for (uint32_t step = 0; !keyPressed(); ++step) {
         hw::ledsSet(hwtest::chaseMask(step));
         testDelay(120);
     }
     hw::ledsSet(0);
-    ledHold = false;  // back to the modem's own LED states
+    ledHold.release();  // back to the modem's own LED states
 }
 
 void ledWalk() {
     out().print("Each LED for 1 s, left to right (any key stops)\r\n");
     drainInput();
-    ledHold = true;
+    ledHold.take(fromBrowser());
     for (uint8_t i = 0;; i = static_cast<uint8_t>((i + 1) % hwtest::kLedCount)) {
         hw::ledsSet(static_cast<uint8_t>(1u << i));
         out().printf("  %-3s GPIO%d\r\n", hwtest::ledName(i), pins::kLeds[i]);
         for (int t = 0; t < 100; ++t) {
             if (keyPressed()) {
                 hw::ledsSet(0);
-                ledHold = false;
+                ledHold.release();
                 return;
             }
             testDelay(10);
@@ -302,19 +337,19 @@ void ledWalk() {
 bool cmdLed(const char *arg) {
     int led = hwtest::parseLed(arg);
     if (led >= 0) {
-        ledHold = true;
+        ledHold.take(fromBrowser());
         hw::ledsSet(static_cast<uint8_t>(1u << led));
         out().printf("%s lit (GPIO%d). AT*HWLED=AUTO gives the LEDs back to the modem.\r\n",
                      hwtest::ledName(static_cast<uint8_t>(led)), pins::kLeds[led]);
     } else if (wordIs(arg, "ALL")) {
-        ledHold = true;
+        ledHold.take(fromBrowser());
         hw::ledsSet(0x7F);
         out().print("All LEDs lit. AT*HWLED=AUTO gives the LEDs back to the modem.\r\n");
     } else if (wordIs(arg, "OFF") || wordIs(arg, "NONE")) {
-        ledHold = true;
+        ledHold.take(fromBrowser());
         hw::ledsSet(0);
     } else if (wordIs(arg, "AUTO")) {
-        ledHold = false;
+        ledHold.release();
         out().print("LEDs show the modem's state\r\n");
     } else if (wordIs(arg, "CHASE") || *arg == '\0') {
         ledChase();
@@ -331,10 +366,13 @@ bool cmdLed(const char *arg) {
 bool cmdAmp(const char *arg) {
     if (wordIs(arg, "ON")) {
         hw::ampSetMode(hw::AmpMode::kOn);
+        ampHold.take(fromBrowser());
     } else if (wordIs(arg, "OFF")) {
         hw::ampSetMode(hw::AmpMode::kOff);
+        ampHold.take(fromBrowser());
     } else if (wordIs(arg, "AUTO")) {
         hw::ampSetMode(hw::AmpMode::kAuto);
+        ampHold.release();
     } else if (*arg != '?' && *arg != '\0') {
         return false;
     }
@@ -487,6 +525,9 @@ void runLines() {
     uint32_t last = 0;
     for (;;) {
         int c = toupper(readKey());
+        if (c < 0 && mustStop()) {
+            break;
+        }
         if (c == 'D' || c == 'R' || c == 'C') {
             OutSignal s = c == 'D' ? OutSignal::kDCD : c == 'R' ? OutSignal::kRI : OutSignal::kCTS;
             hw::lineSet(s, !hw::lineIsAsserted(s));
@@ -632,7 +673,7 @@ void runBridge(uint32_t baud) {
     out().printf("[DTR %s, RTS %s]\r\n", yesNo(dtr), yesNo(rts));
     for (;;) {
         int c = readKey();
-        if (c == kCtrlX) {
+        if (c == kCtrlX || (c < 0 && mustStop())) {
             break;
         }
         if (c >= 0) {
@@ -641,6 +682,7 @@ void runBridge(uint32_t baud) {
         while (u.available() > 0) {
             char ch = static_cast<char>(u.read());
             out().write(&ch, 1);
+            lastKeyMs = millis();  // traffic from the RS232 side counts as activity too
         }
         if (hw::dtrAsserted() != dtr || hw::rtsAsserted() != rts) {
             dtr = hw::dtrAsserted();
@@ -678,7 +720,7 @@ Step askYesNo(const char *question) {
     out().printf("%s (Y/N/S): ", question);
     for (;;) {
         int c = waitKey();
-        if (!term->connected()) {
+        if (!term->connected() || timedOut) {
             return Step::kSkip;
         }
         if (c == 'Y' || c == 'N' || c == 'S') {
@@ -851,7 +893,7 @@ void setPortControl(const PortControl &pc) {
 }
 
 bool ledsHeld() {
-    return ledHold;
+    return ledHold.active();
 }
 
 void printHelp(Term &t) {
@@ -889,10 +931,12 @@ const char *resetReasonName(int reason) {
 
 void handle(Term &t, const char *rest) {
     term = &t;
+    timedOut = false;
+    lastKeyMs = millis();
     // Command word: letters after "AT*HW"
     char name[8] = {};
     size_t n = 0;
-    while (isalpha(static_cast<unsigned char>(rest[n])) && n < sizeof name - 1) {
+    while (n < sizeof name - 1 && isalpha(static_cast<unsigned char>(rest[n]))) {
         name[n] = static_cast<char>(toupper(static_cast<unsigned char>(rest[n])));
         ++n;
     }
@@ -941,20 +985,21 @@ void handle(Term &t, const char *rest) {
         good = takePort("AT*HWLINES");
         if (good) {
             runLines();  // sets the outputs back to off
-            sigHeld = false;
+            sigHold.release();
             givePort();
         }
     } else if (strcmp(name, "SIG") == 0) {
         if (wordIs(arg, "AUTO")) {
-            sigHeld = false;
+            sigHold.release();
             givePort();
             out().print("RS232 outputs back to the modem\r\n");
         } else if ((good = takePort("AT*HWSIG"))) {
             good = cmdSig(arg);
-            sigHeld = good;
             if (good) {
+                sigHold.take(fromBrowser());
                 out().print("The RS232 port is paused until AT*HWSIG=AUTO\r\n");
             } else {
+                sigHold.release();
                 givePort();
             }
         }
@@ -979,10 +1024,15 @@ void handle(Term &t, const char *rest) {
 }
 
 void restoreBrowserResources() {
-    sigHeld = false;
-    givePort();
-    ledHold = false;
-    hw::ampSetMode(hw::AmpMode::kAuto);
-    hw::ledsSet(0);
+    // Only what the browser set itself: a hold from the console, USB or RS232 stays.
+    if (sigHold.releaseForBrowser()) {
+        givePort();
+    }
+    if (ledHold.releaseForBrowser()) {
+        hw::ledsSet(0);
+    }
+    if (ampHold.releaseForBrowser()) {
+        hw::ampSetMode(hw::AmpMode::kAuto);
+    }
 }
 }  // namespace hwconsole

@@ -176,7 +176,7 @@ resets it. "This boot" means it lasts until the next restart.
 | `AT*RINGDELAY[?]` / `=?` / `=<0-60000>` | Ringing before an outgoing call connects, in ms (0 skips it). Saved; factory 1500 |
 | `AT*CONNECTDELAY[?]` / `=?` / `=<0-60000>` | Pause after the handshake sound, before CONNECT, in ms. Saved; factory 250 |
 | `AT*ANSWERPORT[?]` / `=?` / `=<RS232\|USB\|CONSOLE\|AUTO>` | Which port auto-answers (`S0`). AUTO uses the first port with DTR on, in the order RS232, USB, console (the console has no DTR, so it is the fallback). Not during a call. Saved; factory AUTO (RS232 before v2.0; a saved choice is kept) |
-| `AT*BAUD[?]` / `=AUTO` / `=<rate>` | RS232 speed: AUTO detects it from each "AT"; or fixed at 300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600 or 115200. Saved; factory AUTO (starting at 38400) |
+| `AT*BAUD[?]` / `=AUTO` / `=<rate>` | RS232 speed: AUTO detects it from each "AT"; or fixed at 300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600 or 115200. Saved; factory AUTO (starting at 38400). Setting it from the console, USB or browser is refused (`ERROR`) while a call is up on the RS232 port; change it from the RS232 port, or hang up first |
 | `AT*PHONEBOOK[?]` | List the phonebook (64 entries) |
 | `AT*PHONEBOOK=<number>,<host>,<port>,<TELNET\|RAW>[,<speed>]` | Add or replace an entry. Number 1-11 digits (leading zeros count, special numbers refused); host up to 63 characters; port 1-65535; speed 0 or omitted = no override |
 | `AT*PHONEDELETE=<number>` | Delete an entry |
@@ -305,5 +305,19 @@ modem idle.
 | `AT*HWSIG=<DCD\|RI\|CTS>,<ON\|OFF>` / `AT*HWSIG=AUTO` | Set one RS232 output / give them back |
 | `AT*HWLOOP[=<baud>\|ALL]` | Loopback test; needs a plug joining RXD-TXD, CTS-RTS, DCD-DTR (DB25 3-2, 5-4, 8-20) |
 | `AT*HWBRIDGE[=<baud>]` | Pass bytes between the console and RS232 (default 38400; Ctrl-X ends) |
+
+**Hardware tests cannot freeze the modem** (v2.3):
+
+- A test that waits for a key (`AT*HWLED` patterns, `AT*HWTONE`, `AT*HWDTMF`, `AT*HWPULSE`,
+  `AT*HWPOT`, `AT*HWLINES`, `AT*HWBRIDGE`, the `AT*HWTEST` prompts) stops by itself after
+  **5 minutes with no key**, printing `Stopped: no key for 5 minutes`.
+- It also stops when its terminal goes away: DTR drops on the RS232 or USB port, or the
+  browser closes or leaves. The console UART has no DTR, so only the time-out applies there.
+- During a call on another port, `AT*HWLED=CHASE`, `=WALK` and `AT*HWLED` with no argument
+  are refused (`ERROR`, "LED patterns are not available during a call."). Lighting one LED,
+  `ALL`, `OFF`, `NONE` and `AUTO` still work. Tones, volume and the other audio tests are
+  refused during a call, as before.
+- When the browser leaves, it gives back only the LEDs, amp mode and RS232 outputs it set
+  itself. Holds made from the console, USB or RS232 stay until `AUTO`.
 
 There is no volume cap: full volume is full scale, which the 2 W speaker can take.

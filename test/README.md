@@ -35,7 +35,7 @@ Section numbers refer to the project brief.
 | Result codes, X0-X4, verbal/numeric/quiet, Q2 when answering (6.5) | `test_atcmd`, `test_answer` | — | `test_settings.py`, `test_calls.py`, `test_answer.py` |
 | `ATI0`-`ATI7`, `+FCLASS` (6.6) | `test_atcmd` | — | `test_settings.py` |
 | Settings kept across a restart, `&F0`-`&F2`, damaged settings → factory, old layouts converted (6.7) | `test_modemcfg`, `test_atcmd` | `test_board` | `test_settings.py`, `test_session.py` |
-| RS232 speed from "AT" at 300-115200, fixed with `AT*BAUD` (6.2) | `test_hostport` | `test_rs232` | `test_rs232.py`, `test_session.py` |
+| RS232 speed from "AT" at 300-115200, fixed with `AT*BAUD` (6.2) | `test_hostport` (`CallSlot::heldBy` for the "refused during an RS232 call" rule, v2.3) | `test_rs232` | `test_rs232.py`, `test_session.py` |
 | RTS/CTS and XON/XOFF, DTR `&D` with S25, DCD `&C`, RI (6.2) | `test_hostport` | `test_rs232` | `test_rs232.py`, `test_answer.py` |
 | A port nobody reads never blocks the modem: `RING` dropped at once, a reply waits once then the port is stalled (STA-01, v2.2) | `test_hostport` (`test_sink_gate_*`), `test_answer` | — | `test_rs232.py`, `test_usb.py` (bench) |
 | `+++` guard time, `ATO`, `ATH`, `ATZ`, `F0`, `AT*TESTCALL` (6.2) | `test_hostport`, `test_atcmd` | — | `test_session.py`, `test_rs232.py` |
@@ -51,7 +51,7 @@ Section numbers refer to the project brief.
 | Handshake WAV playback per speed (6.4) | `test_calls`, `scripts/test_sound_catalog.py` | `test_calls` | `test_calls.py` |
 | Volume: pot, `ATL`, `ATM`, no cap (full volume = full scale) (5.3, 6.4) | `test_hwtest`, `test_calls` | `test_calls`, `test_hw` | `AT*HWPOT=TONE`, `AT*HWTEST` |
 | LEDs per table 5.4, `AT*HWLED=AUTO`; CD/TR/RD/SD follow RS232 or USB (v2.0) | `test_hostport` | `test_hw` | `test_session.py`, `AT*HWTEST` |
-| Hardware tests `AT*HW...`; line, loopback and bridge refused on RS232 (6.14, Q79) | `test_hwtest`, `test_config` | `test_hw` | `test_hwtest.py`, `test_config.py` |
+| Hardware tests `AT*HW...`; line, loopback and bridge refused on RS232 (6.14, Q79); 5-minute key time-out, LED patterns refused during a call, per-owner holds (v2.3) | `test_hwtest`, `test_config` | `test_hw` | `test_hwtest.py`, `test_config.py` |
 | Wi-Fi: scan, masked join, retry, static IP, mDNS, ARQ/RGB, banner (6.6, 6.7) | `test_netcfg`, `test_atcmd` | `test_wifi`, `test_rs232` | `test_wifi.py`, `test_calls.py`, `test_answer.py` |
 | Clock: NTP, time zones, daylight saving (6.8, Q59) | `test_netcfg` | `test_wifi` | `test_wifi.py` |
 | Wi-Fi password never shown or exported (6.6, 6.8) | `test_netcfg`, `test_config_services` | — | `test_wifi.py`, `test_config.py` |

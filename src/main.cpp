@@ -237,6 +237,7 @@ public:
     void write(const char *data, size_t len) override { port_.write(data, len); }
     int read() override { return rs232::readKey(); }
     bool isRs232() const override { return true; }
+    bool connected() const override { return hw::dtrAsserted(); }  // the host closed its port
 
 private:
     atcmd::Port &port_;
@@ -250,6 +251,7 @@ public:
     void write(const char *data, size_t len) override { port_.write(data, len); }
     int read() override { return usbport::readKey(); }
     bool isRs232() const override { return false; }
+    bool connected() const override { return usbport::dtrOn(); }  // the PC closed the port
 
 private:
     atcmd::Port &port_;
@@ -282,6 +284,7 @@ public:
         return !browserTestCancelled && webServer.connected(browserClient);
     }
     bool isRs232() const override { return false; }
+    bool isBrowser() const override { return true; }
 };
 BrowserTerm browserTerm;
 
@@ -351,12 +354,9 @@ atcmd::Reply cmdDialTest(atcmd::Port &port, const char *args) {
 }
 
 atcmd::Reply cmdHw(atcmd::Port &port, const char *args) {
-    if (callSlot.busy() && !ownsMenu(port) && strncmp(args, "LED", 3) != 0 &&
-        strcmp(args, "POT?") != 0 && strcmp(args, "PINS") != 0 && strcmp(args, "INFO") != 0 &&
-        strcmp(args, "?") != 0 && *args != 0 && strncmp(args, "SIG", 3) != 0 &&
-        strncmp(args, "LINES", 5) != 0 && strncmp(args, "LOOP", 4) != 0 &&
-        strncmp(args, "BRIDGE", 6) != 0) {
-        port.line("Audio tests are not available during a call.");
+    if (callSlot.busy() && !ownsMenu(port) && !hwtest::allowedDuringCall(args)) {
+        port.line(strncmp(args, "LED", 3) == 0 ? "LED patterns are not available during a call."
+                                               : "Audio tests are not available during a call.");
         return atcmd::Reply::kError;
     }
     // Interactive tests already service their own Term. They must write prompts
@@ -430,6 +430,10 @@ atcmd::Reply cmdBaud(atcmd::Port &port, const char *args) {
     }
     uint32_t baud = 0;
     if (!hwtest::wordIs(a, "AUTO") && !hwtest::parseUint(a, 300, 115200, &baud)) {
+        return atcmd::Reply::kError;
+    }
+    if (callSlot.heldBy(&rs232::session()) && !isRs232(port)) {
+        port.line("The RS232 port has a call: change its speed from the RS232 port.");
         return atcmd::Reply::kError;
     }
     if (!modem->setHostBaud(baud)) {

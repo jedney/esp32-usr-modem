@@ -25,6 +25,7 @@ enum class Mode : uint8_t { kCommand, kOnline, kOnlineCommand };
 class CallSlot {
 public:
     bool busy() const { return owner_ != nullptr; }
+    bool heldBy(const void *who) const { return who != nullptr && owner_ == who; }
     bool claim(const void *who);
     bool transfer(const void *from, const void *to);
     void release(const void *who);
