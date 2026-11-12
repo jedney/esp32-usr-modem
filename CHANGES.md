@@ -41,6 +41,12 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 - The PPP engine built its replies in 1,500-byte stack buffers, leaving the main loop
   420 bytes of its 8 KB stack after the PPP tests; they are now part of the engine, and
   4,756 bytes are left (5.5-08). The network task has 3,848 bytes left: no change needed.
+- An RS232 command sent while the modem was still starting (during the Wi-Fi wait, or
+  just after the boot banner) was lost without a reply: RS232 speed detection started
+  only on the first loop pass, which threw away what had already arrived. It now starts
+  with the port. Found by `e2e/test_internet.py` on the bench.
+- `lib/hwtest/src/hwtest.cpp` had a raw NUL byte where `'\0'` was meant (same behaviour;
+  it gave a compiler warning).
 
 ### Bench results (13 Nov)
 
@@ -48,10 +54,17 @@ Every change that is pushed bumps `VERSION` and adds an entry here
   600 bytes to spare (STA-08: no change needed).
 - Soak: a hardware test held 25 s without a key, a test call, `AT*CONFIG`, two
   ArduinoOTA uploads, and `e2e/test_internet.py` (13 passed, 2 opt-in skipped): no
-  watchdog reset. `test_internet_settings_survive_restart_and_export` fails as before
-  these changes: after a restart the first RS232 command sets the speed and gets no
-  reply.
-- Not run: a web image upload and an incoming call.
+  watchdog reset.
+- With the USB modem port connected to the PC: `e2e/test_usb.py` 7 passed (1 needs a
+  person at the cable), including auto-answer of incoming calls on USB and RS232.
+- A manual incoming call on RS232: RING, `ATA`, data both ways, `+++`, `ATH`, and the
+  caller sees the hang-up.
+- Web page: a firmware install through `/api/update` reboots into this version, and an
+  upload dropped part-way frees the modem without a reboot (`e2e/test_web.py
+  --browser-upload --upload-tests`).
+- An RS232 command sent 2-3 s into a restart is now answered once the modem is up.
+  `test_internet_settings_survive_restart_and_export` itself needs the console port to
+  reset the modem and was not rerun (the console was unplugged).
 
 ## [2.16] - 2026-11-13
 
