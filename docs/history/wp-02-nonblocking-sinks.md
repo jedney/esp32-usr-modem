@@ -85,3 +85,23 @@ run by Jon before release).
 No sink path sleeps for more than the single bounded reply wait; tests prove `RING` to a
 full port costs no time; finding map rows STA-01, SEC-07e, 5.5-13, TG-08 (STA-01 part)
 marked.
+
+## Outcome (v2.2, 12 Nov 2026)
+
+- STA-01: `hostport::SinkGate` (`lib/hostport/src/sink_gate.h`) holds the policy; the
+  RS232 and USB sinks use it. Output nobody asked for is marked by
+  `atcmd::Sink::writeUnsolicited()` / `Port::unsolicited()`; only `RING` uses it today.
+  A reply's single wait is 250 ms without room (any byte taken restarts it, so a slow
+  but reading computer still gets the whole reply); one write is still capped at 2 s.
+  Call data was already non-blocking (`Session::toHost()` is pulled only when there is
+  room), so it is unchanged. Tests: `test_hostport` `test_sink_gate_*`, `test_answer`
+  `test_ring_is_unsolicited_*` and `test_rings_to_an_unread_port_*`.
+- SEC-07e: RS232 command/online buffers, the used capture runs and the console read
+  buffer are wiped with `devicecfg::wipe`.
+- 5.5-13: confirmed. A failed `captureBegin()` or allocation now sets a flag; the port
+  reads the UART at its current speed and the console says so once.
+- Not changed (outside the sinks): `hw::hostDrain(2000)` when a call ends with `&B0`
+  following, and on `AT*BAUD`, can still wait up to 2 s for RTS. `AT*BAUD` during a call
+  is WP-03 (STA-09b).
+- Not run: on-board and end-to-end tests. Worth a bench run of `e2e/test_rs232.py` and
+  `test_usb.py`, and the optional 20-ring check above.

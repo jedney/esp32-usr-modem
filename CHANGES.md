@@ -14,6 +14,21 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.2] - 2026-11-12
+
+### Fixed
+
+- A serial port that nobody reads no longer freezes the modem. Before, every `RING` (and
+  every other result) waited up to 2 s for room on an RS232 port with RTS off, or a USB
+  port held open by a program that doesn't read. Now `RING` is dropped at once when the
+  port has no room; a reply waits up to 250 ms, then the port is marked stalled and later
+  output is dropped at once until the computer reads again (STA-01).
+- Read buffers on the RS232 port and the maintenance console, and the RS232 speed-detection
+  capture, are wiped after use, as they can hold a typed password (SEC-07e).
+- If RS232 speed detection can't start, the port now keeps its current speed and the
+  console says so, instead of ignoring everything typed; a failed buffer allocation is no
+  longer used (5.5-13).
+
 ## [2.1] - 2026-11-12
 
 ### Added

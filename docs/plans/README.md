@@ -28,7 +28,7 @@ whole window.
 | WP | Version | Plan | Model / effort | Size | Depends on |
 | --- | --- | --- | --- | --- | --- |
 | 01 | v2.1 | [Process gates, docs and decisions](../history/wp-01-process-gates.md) | Sonnet / medium | M | - |
-| 02 | v2.2 | [Serial output never blocks the loop](wp-02-nonblocking-sinks.md) | Opus / high | M-L | 01 |
+| 02 | v2.2 | [Serial output never blocks the loop](../history/wp-02-nonblocking-sinks.md) | Opus / high | M-L | 01 |
 | 03 | v2.3 | [Hardware tests cannot freeze the modem](wp-03-hwtest-bounds.md) | Sonnet / high | M | 02 |
 | 04 | v2.4 | [Incoming-call limits](wp-04-incoming-limits.md) | Sonnet / high | M | 01 |
 | 05 | v2.5 | [Wi-Fi join, factory reset, scan names](wp-05-wifi-reset-scan.md) | Sonnet / medium | S-M | 01 |
@@ -116,8 +116,8 @@ the package confirms each first.
 | SEC-07b | `pin_config.py` accepts absent, flash/PSRAM and USB GPIOs | 01 | done (v2.1) |
 | SEC-07c | Actions by tag, `pip install` unpinned, caches in release | 01 | done (v2.1) |
 | SEC-07d | Download cached before its SHA-256 is checked | 01 | done (v2.1) |
-| SEC-07e | Read buffers that can hold a password not wiped | 02 | open |
-| STA-01 | Unread serial port freezes the loop 2 s per result (High) | 02 | open |
+| SEC-07e | Read buffers that can hold a password not wiped | 02 | done (v2.2) |
+| STA-01 | Unread serial port freezes the loop 2 s per result (High) | 02 | done (v2.2) |
 | STA-02 | Browser opens the configuration screen and blocks calls | 06 | open |
 | STA-02b | Idle configuration screen holds the line (5-minute time-out) | 07 | open |
 | STA-03 | Interactive hardware tests block for ever / during a call | 03 | open |
@@ -162,7 +162,7 @@ the package confirms each first.
 | 5.5-10 | Transfer inactivity reset by any byte; missing "OO" | 10 | open |
 | 5.5-11 | Size probe looks only at the first `ESC[` | 10 | open |
 | 5.5-12 | S7 runs during the handshake sound | 04 | open |
-| 5.5-13 | `captureBegin()` failure ignored; `runs` unchecked | 02 | open |
+| 5.5-13 | `captureBegin()` failure ignored; `runs` unchecked | 02 | done (v2.2) |
 | 5.5-14 | Menu paging, Alt+letter after cancel, "too long" flag | 15 | open |
 | 5.5-15 | `validPassword` rejects UTF-8; `validServer` accepts `a..b` | 12 | open |
 | 5.5-16 | Non-ASCII SSIDs shown as mojibake | 12 | open |
@@ -176,7 +176,7 @@ the package confirms each first.
 | TG-05 | Digest parser guards, nonce cases, `ImageCheck(true, ...)` | 09 | open |
 | TG-06 | 2^32 ms wrap, throttle above 300 bps, S3/S5 edges | 09 | open |
 | TG-07 | Pin lock test skipped when `.env` overrides pins | 01 | done (v2.1) |
-| TG-08 | Tests behind STA-01, STA-04, STA-05, SEC-04, SEC-01 | 02, 04, 05 | open |
+| TG-08 | Tests behind STA-01, STA-04, STA-05, SEC-04, SEC-01 | 02, 04, 05 | open (STA-01 part done v2.2) |
 | TG-09 | e2e serial ports have no write time-out (runs hang) | 08 | open |
 | TG-10 | Asserts can print the Wi-Fi or device password | 08 | open |
 | TG-11 | `test_board` uses the production settings store | 08 | open |

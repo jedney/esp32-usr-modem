@@ -45,7 +45,7 @@ bool Incoming::eligible(hostport::Session &session) const {
 void Incoming::ringResult(hostport::Session &session) {
     if (session.mode() == hostport::Mode::kCommand && session.port().lineEmpty() &&
         modem_.active().get(modemcfg::kQ) != 2) {
-        session.port().result(atcmd::Result::kRing);
+        session.port().unsolicited(atcmd::Result::kRing);  // dropped if nobody reads
     }
 }
 void Incoming::ring(uint32_t now) {
