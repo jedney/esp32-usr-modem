@@ -373,63 +373,13 @@ void Terminal::buildFrame() {
     drawCursorRow_ = rows_ - 1;
     drawCursorCol_ = std::min(13u, cols_ - 1);
     if (cols_ < 20 || rows_ < 8) {
-        // Even pathological viewports get bounded output. Keep the same router
-        // and keyboard actions; omit frames and multi-line chrome entirely.
-        drawCursorRow_ = rows_;
-        drawCursorCol_ = 1;
-        grid_.text(0, 0, "Small terminal", Ink::Warning, cols_);
-        unsigned y = rows_ > 1 ? 1 : 0;
-        if (focus_ == Focus::Form) {
-            if (prompt_ && prompt_->secret)
-                grid_.text(0, y, "Password input", Ink::Muted, cols_);
-            else
-                grid_.text(0, y, input_, Ink::Body, cols_);
-        } else if (focus_ == Focus::Confirm)
-            grid_.text(0, y, "Y confirm N cancel", Ink::Warning, cols_);
-        else if (response_ || focus_ == Focus::Help || focus_ == Focus::Details) {
-            const char *text = focus_ == Focus::Help ? "Esc/Q Back; keys open; Y confirm" : output_;
-            for (size_t line = 0; *text && line < responseLine_; ++text)
-                if (*text == '\n')
-                    ++line;
-            grid_.text(0, y, text, Ink::Body, cols_);
-            more_ = *text != 0;
-        } else if (screen_ == S::Phonebook) {
-            syncPhonebook();
-            const auto *e = entry();
-            grid_.text(0, y, e ? e->host : "No entries", Ink::Body, cols_);
-        } else {
-            auto *a = item(locations_[static_cast<unsigned>(screen_)].selected);
-            grid_.text(0, y, a ? a->label : screenName(screen_), Ink::Body, cols_);
-        }
-        if (rows_ > 2)
-            grid_.text(0, rows_ - 1, "Esc/Q Back", Ink::Function, cols_);
+        drawSmall();
         return;
     }
     grid_.box(0, 0, cols_, rows_);
     bool main =
         screen_ == S::Main && focus_ == Focus::Menu && !response_ && cols_ >= 80 && rows_ >= 25;
-    if (main) {
-        // The exact 59-cell five-row wordmark from the measured design.
-        for (unsigned y = 0; y < 5; ++y)
-            for (unsigned x = 0; kWordmark[y][x]; ++x)
-                grid_.put((cols_ - 59) / 2 + x, y + 1, kWordmark[y][x] == '#' ? 219 : ' ',
-                          Ink::Logo);
-        grid_.center(6, CellGrid::modelLabel(model_), Ink::Model);
-        unsigned modelX = (cols_ - strlen(CellGrid::modelLabel(model_))) / 2;
-        for (unsigned i = 0; i < 3; ++i) {
-            grid_.put(modelX - 4 + i, 6, 196, Ink::Model);
-            grid_.put(modelX + strlen(CellGrid::modelLabel(model_)) + 1 + i, 6, 196, Ink::Model);
-        }
-        grid_.rule(7, "[ MODEM CONFIGURATION - MAIN MENU ]");
-    } else {
-        grid_.text(3, 1, "USRobotics", Ink::Logo, cols_ - 5);
-        if (cols_ >= 50)
-            grid_.text(23, 1, CellGrid::modelLabel(model_), Ink::Model, cols_ - 25);
-        char title[112];
-        snprintf(title, sizeof title, "[ MAIN > %s ]",
-                 response_ ? resultTitle_ : screenName(screen_));
-        grid_.rule(2, title);
-    }
+    drawHeader(main);
     if (focus_ == Focus::Form || focus_ == Focus::Confirm)
         drawForm();
     else if (response_ || focus_ == Focus::Details || focus_ == Focus::Help)
@@ -438,7 +388,82 @@ void Terminal::buildFrame() {
         drawPhonebook();
     else
         drawMenu();
-
+    drawFooter(main);
+}
+// Even pathological viewports get bounded output. Keep the same router and keyboard
+// actions; omit frames and multi-line chrome entirely.
+void Terminal::drawSmall() {
+    drawCursorRow_ = rows_;
+    drawCursorCol_ = 1;
+    grid_.text(0, 0, "Small terminal", Ink::Warning, cols_);
+    unsigned y = rows_ > 1 ? 1 : 0;
+    if (focus_ == Focus::Form) {
+        if (prompt_ && prompt_->secret)
+            grid_.text(0, y, "Password input", Ink::Muted, cols_);
+        else
+            grid_.text(0, y, input_, Ink::Body, cols_);
+    } else if (focus_ == Focus::Confirm)
+        grid_.text(0, y, "Y confirm N cancel", Ink::Warning, cols_);
+    else if (response_ || focus_ == Focus::Help || focus_ == Focus::Details) {
+        const char *text = focus_ == Focus::Help ? "Esc/Q Back; keys open; Y confirm" : output_;
+        for (size_t line = 0; *text && line < responseLine_; ++text)
+            if (*text == '\n')
+                ++line;
+        grid_.text(0, y, text, Ink::Body, cols_);
+        more_ = *text != 0;
+    } else if (screen_ == S::Phonebook) {
+        syncPhonebook();
+        const auto *e = entry();
+        grid_.text(0, y, e ? e->host : "No entries", Ink::Body, cols_);
+    } else {
+        auto *a = item(locations_[static_cast<unsigned>(screen_)].selected);
+        grid_.text(0, y, a ? a->label : screenName(screen_), Ink::Body, cols_);
+    }
+    if (rows_ > 2)
+        grid_.text(0, rows_ - 1, "Esc/Q Back", Ink::Function, cols_);
+}
+// The main menu has the wordmark; other screens a one-line title with the path.
+void Terminal::drawHeader(bool main) {
+    if (!main) {
+        grid_.text(3, 1, "USRobotics", Ink::Logo, cols_ - 5);
+        if (cols_ >= 50)
+            grid_.text(23, 1, CellGrid::modelLabel(model_), Ink::Model, cols_ - 25);
+        char title[112];
+        snprintf(title, sizeof title, "[ MAIN > %s ]",
+                 response_ ? resultTitle_ : screenName(screen_));
+        grid_.rule(2, title);
+        return;
+    }
+    // The exact 59-cell five-row wordmark from the measured design.
+    for (unsigned y = 0; y < 5; ++y)
+        for (unsigned x = 0; kWordmark[y][x]; ++x)
+            grid_.put((cols_ - 59) / 2 + x, y + 1, kWordmark[y][x] == '#' ? 219 : ' ', Ink::Logo);
+    grid_.center(6, CellGrid::modelLabel(model_), Ink::Model);
+    unsigned modelX = (cols_ - strlen(CellGrid::modelLabel(model_))) / 2;
+    for (unsigned i = 0; i < 3; ++i) {
+        grid_.put(modelX - 4 + i, 6, 196, Ink::Model);
+        grid_.put(modelX + strlen(CellGrid::modelLabel(model_)) + 1 + i, 6, 196, Ink::Model);
+    }
+    grid_.rule(7, "[ MODEM CONFIGURATION - MAIN MENU ]");
+}
+// The keys that work in the current view, for the footer.
+const char *Terminal::keyHints() const {
+    if (capturing_)
+        return "Working / input requested - Esc cancel, Ctrl-C exit";
+    if (focus_ == Focus::Help)
+        return "PGUP/PGDN Pages  ENTER Continue  ESC/Q Back  F1 Close Help";
+    if (response_)
+        return "PGUP/PGDN Pages  ENTER Continue  ESC/Q Back  F1 Help";
+    if (focus_ == Focus::Form)
+        return "TAB Next  Arrows Edit  ENTER Review  ESC Cancel  F1 Help";
+    if (focus_ == Focus::Confirm)
+        return "Y Confirm  N/ESC Cancel";
+    if (screen_ == S::Phonebook)
+        return "UP/DOWN Select  PGUP/PGDN Pages  ENTER/I Details  ESC/Q Back";
+    return "ARROWS Select  ENTER Open  ESC/Q Back  F1 Help  F2 Main";
+}
+// Key hints and device status (25 rows or more), the message line and the prompt.
+void Terminal::drawFooter(bool main) {
     UiState state;
     if (services_)
         state = services_->state();
@@ -461,24 +486,7 @@ void Terminal::buildFrame() {
             grid_.text(3, rows_ - 5, "F1 Help  F2 Status  F3 Phonebook  F4 Settings  F10 Exit",
                        Ink::Function, cols_ - 5);
         } else
-            grid_.text(
-                3, rows_ - 5,
-                capturing_
-                    ? "Working / input requested - Esc cancel, Ctrl-C exit"
-                    : (focus_ == Focus::Help
-                           ? "PGUP/PGDN Pages  ENTER Continue  ESC/Q Back  F1 Close Help"
-                           : (response_ ? "PGUP/PGDN Pages  ENTER Continue  ESC/Q Back  F1 Help"
-                                        : (focus_ == Focus::Form
-                                               ? "TAB Next  Arrows Edit  ENTER Review  ESC Cancel  "
-                                                 "F1 Help"
-                                               : (focus_ == Focus::Confirm
-                                                      ? "Y Confirm  N/ESC Cancel"
-                                                      : (screen_ == S::Phonebook
-                                                             ? "UP/DOWN Select  PGUP/PGDN Pages  "
-                                                               "ENTER/I Details  ESC/Q Back"
-                                                             : "ARROWS Select  ENTER Open  ESC/Q "
-                                                               "Back  F1 Help  F2 Main"))))),
-                Ink::Function, cols_ - 5);
+            grid_.text(3, rows_ - 5, keyHints(), Ink::Function, cols_ - 5);
         grid_.text(3, rows_ - 4, status, Ink::Body, cols_ - 5);
     }
     const char *message = more_ && (response_ || focus_ == Focus::Help)

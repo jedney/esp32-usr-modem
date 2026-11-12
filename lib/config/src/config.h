@@ -141,6 +141,10 @@ private:
     void append(const char *text);
     void input(char c);
     void buildFrame();
+    void drawSmall();
+    void drawHeader(bool main);
+    void drawFooter(bool main);
+    const char *keyHints() const;
     void drawMenu();
     void drawPhonebook();
     void drawForm();
