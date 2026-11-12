@@ -62,7 +62,7 @@ Section numbers refer to the project brief.
 | Unanswered call dropped after 8 rings for `S0` 0 and above 8; `S0` above 8 answers on ring 8; journal entry (SEC-01, v2.4) | `test_answer` | — | `test_answer.py` (bench) |
 | Telnet storm bounded, two ends settle, full send queue stops reading; `S7` doesn't cut the handshake (TG-04, 5.5-12, v2.4) | `test_calls` | — | `test_calls.py` |
 | TCP keepalive on call sockets (SEC-01, v2.4) | — (lwIP only; checked by the s3 build) | — | Bench: pull the caller's network cable, `NO CARRIER` in about 2 minutes |
-| PPP and SLIP, aliases, private /30, NAT, hang-up; table of malformed LCP/IPCP/PAP/IP frames (TG-03, v2.10); lwIP stack headroom at least 1 KB after the traffic (5.5-08, v2.17) (6.6) | `test_internet` | `test_internet` | `test_internet.py`; `interop/serial_pppd.py` |
+| PPP and SLIP, aliases, private /30, NAT, hang-up; table of malformed LCP/IPCP/PAP/IP frames (TG-03, v2.10); lwIP and loop task stack headroom at least 1 KB after the traffic; PPP replies built off the stack (5.5-08, v2.17) (6.6) | `test_internet` | `test_internet` | `test_internet.py`; `interop/serial_pppd.py` |
 | Tones: UK dial, busy, ring, DTMF, pulse (6.4) | `test_hwtest`, `test_answer` | `test_hw`, `test_answer` | `test_hwtest.py`, `test_calls.py` |
 | Handshake WAV playback per speed (6.4) | `test_calls`, `scripts/test_sound_catalog.py` | `test_calls` | `test_calls.py` |
 | Volume: pot, `ATL`, `ATM`, no cap (full volume = full scale) (5.3, 6.4) | `test_hwtest`, `test_calls` | `test_calls`, `test_hw` | `AT*HWPOT=TONE`, `AT*HWTEST` |

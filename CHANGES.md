@@ -33,14 +33,25 @@ Every change that is pushed bumps `VERSION` and adds an entry here
   `loop()` runs there; the loop task itself is watched instead. The CPU 0 idle task is
   still watched, and now also restarts the modem.
 
-### Bench checks for Jon (needed before release)
+### Fixed
 
-- On-board tests: `pio test -e s3 -f embedded/test_board -f embedded/test_calls` (USB;
-  re-upload the firmware after). Record the NVS figures the phonebook test prints.
-- A soak with the new firmware: calls in and out, the web page open, a PPP session, an
-  ArduinoOTA upload and a web image upload, `AT*HWTEST` steps left waiting for a key over
-  a minute, and `AT*CONFIG`. Afterwards `AT*RESETINFO` must not say "task watchdog".
-- `e2e/test_internet.py` to the end, and note the stack headroom it prints.
+- With nothing on the rear USB-C socket the modem crash-looped every few seconds (a
+  divide by zero in TinyUSB, since v2.0). The USB modem port now reads only while a
+  computer has it configured. Found on the bench.
+- The PPP engine built its replies in 1,500-byte stack buffers, leaving the main loop
+  420 bytes of its 8 KB stack after the PPP tests; they are now part of the engine, and
+  4,756 bytes are left (5.5-08). The network task has 3,848 bytes left: no change needed.
+
+### Bench results (13 Nov)
+
+- On-board `test_board` and `test_calls` pass. A full phonebook fits in NVS with about
+  600 bytes to spare (STA-08: no change needed).
+- Soak: a hardware test held 25 s without a key, a test call, `AT*CONFIG`, two
+  ArduinoOTA uploads, and `e2e/test_internet.py` (13 passed, 2 opt-in skipped): no
+  watchdog reset. `test_internet_settings_survive_restart_and_export` fails as before
+  these changes: after a restart the first RS232 command sets the speed and gets no
+  reply.
+- Not run: a web image upload and an incoming call.
 
 ## [2.16] - 2026-11-13
 
