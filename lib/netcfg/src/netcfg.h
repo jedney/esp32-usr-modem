@@ -155,6 +155,7 @@ private:
     void restoreAfterJoin();
     void notice(const char *fmt, ...) __attribute__((format(printf, 2, 3)));
     void finishScan(size_t n);
+    void radioOffIfDisabled();
     uint32_t retryDelay() const;
 
     modemcfg::Store &store_;

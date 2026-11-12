@@ -10,7 +10,7 @@
 
 import { Terminal } from './xterm.mjs';
 import * as S from './status.js';
-import {inspectImage, compareVersions} from './upload.js';
+import {createUploadFlow, xhrSender} from './upload_flow.js';
 import {createModemLink} from './link.js';
 import {terminalGeometry, sizeMessage} from './geometry.js';
 
@@ -51,6 +51,7 @@ const state = {
     wifi: null,
     cell: null, // measured { w, h } per px of font size
     csrf: null, version: null, edit: false, upload: false, sizeSupported: false,
+    reloadWhenOnline: false, // set after a successful update: reload once the modem is back
 };
 
 // ---------------------------------------------------------------- status bar
@@ -211,7 +212,12 @@ function connectModem() {
             const timer = setTimeout(() => controller.abort(), 5000);
             try {
                 const reply = await fetch('api/session', {cache: 'no-store', signal: controller.signal});
-                if (!reply.ok) throw new Error('Login unavailable');
+                if (!reply.ok) {
+                    // 503 while an update is written: other tabs wait longer before asking again.
+                    const error = new Error('Login unavailable');
+                    error.busy = reply.status === 503;
+                    throw error;
+                }
                 return (await reply.json()).token;
             } finally { clearTimeout(timer); }
         },
@@ -224,7 +230,12 @@ function connectModem() {
             if (typeof data === 'string') handleMessage(S.parseMessage(data));
             else term.write(new Uint8Array(data));
         },
-        status: status => { setLink(status); if (status === 'online') term.focus(); },
+        status: status => {
+            setLink(status);
+            if (status !== 'online') return;
+            if (state.reloadWhenOnline) location.reload(); // new firmware may bring new web files
+            term.focus();
+        },
         disconnect: () => {
             state.csrf = null;
             state.edit = false;
@@ -264,43 +275,20 @@ async function main() {
     $('cts').onclick = () => send(encoder.encode('c'));
     $('stop-test').onclick = () => send(new Uint8Array([0x18]));
     $('upload').onclick = () => $('image').click();
+    const uploadFlow = createUploadFlow({
+        state,
+        show: text => { $('operation').textContent = text; },
+        setBusy: busy => { $('upload').disabled = busy || !state.edit; },
+        confirm: text => window.confirm(text),
+        read: async file => new Uint8Array(await file.arrayBuffer()),
+        // Refresh expired Digest credentials with a small request before streaming a large
+        // body. This does not replace the current socket.
+        login: async () => (await fetch('api/session', {cache: 'no-store'})).ok,
+        send: xhrSender(),
+        installed: () => { state.reloadWhenOnline = true; reconnectModem(); },
+    });
     $('image').onchange = async () => {
-        const file = $('image').files[0];
-        if (!file || !state.edit || !state.csrf || state.upload) return;
-        const output = $('operation');
-        try {
-            if (file.size > 0x7e0000) throw new Error('Image too large');
-            output.textContent = 'Checking image…';
-            const bytes = new Uint8Array(await file.arrayBuffer());
-            const image = inspectImage(bytes);
-            const downgrade = compareVersions(image.version, state.version) < 0;
-            let prompt = `Install ${image.target} v${image.version}? The modem will reboot.`;
-            if (downgrade) prompt += '\nThis is a downgrade.';
-            if (image.target === 'littlefs') prompt += '\nThis replaces sounds, web files and call history. Keep USB available for recovery.';
-            if (!window.confirm(prompt)) { output.textContent = 'Upload cancelled'; return; }
-            // Refresh expired Digest credentials with a small request before
-            // streaming a large body. This does not replace the current socket.
-            const login = await fetch('api/session', {cache: 'no-store'});
-            if (!login.ok) throw new Error('Login expired; reconnect before uploading');
-            state.upload = true;
-            $('upload').disabled = true;
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', `/api/update?target=${image.target}&version=${image.version}`);
-            xhr.timeout = 190000;
-            xhr.setRequestHeader('Content-Type','application/octet-stream');
-            xhr.setRequestHeader('X-CSRF-Token',state.csrf);
-            xhr.setRequestHeader('X-Image-SHA256',image.sha256);
-            if (downgrade) xhr.setRequestHeader('X-Confirm-Downgrade',image.sha256);
-            if (image.target === 'littlefs') xhr.setRequestHeader('X-Confirm-Filesystem',image.sha256);
-            xhr.upload.onprogress = ev => {
-                output.textContent = ev.lengthComputable ? `Sending ${Math.round(100*ev.loaded/ev.total)}% — wait for verification` : 'Sending image…';
-            };
-            const done = () => { state.upload = false; $('upload').disabled = !state.edit; };
-            xhr.onload = () => { output.textContent = xhr.responseText; done(); if (xhr.status === 200) reconnectModem(); };
-            xhr.onerror = xhr.ontimeout = () => { output.textContent = 'Upload connection lost. Check the console before retrying.'; done(); };
-            xhr.send(bytes);
-        } catch (error) { output.textContent = error.message; state.upload = false; }
-        finally { $('image').value = ''; }
+        try { await uploadFlow($('image').files[0]); } finally { $('image').value = ''; }
     };
     buildLeds();
     showLeds(0);

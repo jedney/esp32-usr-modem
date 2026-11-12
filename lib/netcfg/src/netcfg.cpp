@@ -161,6 +161,7 @@ void Net::tick(uint32_t nowMs) {
             } else {
                 scan_ = ScanState::kFailed;
             }
+            radioOffIfDisabled();
             if (scanPaused_) {
                 scanPaused_ = false;
                 retryDue_ = true;  // carry on with the saved network at once
@@ -563,15 +564,25 @@ bool Net::scanStart(uint32_t nowMs) {
             retryAt_ = nowMs;
         }
         scan_ = ScanState::kFailed;
+        radioOffIfDisabled();
         return false;
     }
     scan_ = ScanState::kRunning;
     return true;
 }
 
+// A scan switches the radio on even with Wi-Fi off, and the radio still reports "off", so
+// tick() would never switch it back (5.5-01).
+void Net::radioOffIfDisabled() {
+    if (!s_.enabled) {
+        radio_.off();
+    }
+}
+
 void Net::cancelScan() {
     if (scan_ == ScanState::kRunning) {
         scan_ = ScanState::kIdle;  // results that still arrive are dropped by the radio
+        radioOffIfDisabled();
         if (scanPaused_) {
             scanPaused_ = false;
             retryDue_ = true;

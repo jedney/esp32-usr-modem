@@ -2,41 +2,17 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#define FAKES_STORE
+#define FAKES_SINK
+#include "../support/fakes.h"
 #include "config.h"
 #include "registry.h"
 #include "screen.h"
 using namespace config;
 void setUp() {}
 void tearDown() {}
-class Store : public modemcfg::Store {
-public:
-    std::vector<uint8_t> bytes;
-    bool fail = false;
-    size_t load(uint8_t *p, size_t n) override {
-        n = n < bytes.size() ? n : bytes.size();
-        memcpy(p, bytes.data(), n);
-        return n;
-    }
-    bool save(const uint8_t *p, size_t n) override {
-        if (fail) {
-            return false;
-        }
-        bytes.assign(p, p + n);
-        return true;
-    }
-    bool erase() override {
-        if (fail) {
-            return false;
-        }
-        bytes.clear();
-        return true;
-    }
-};
-class Sink : public atcmd::Sink {
-public:
-    std::string text;
-    void write(const char *p, size_t n) override { text.append(p, n); }
-};
+using Store = fakes::MemoryStore;
+using Sink = fakes::TextSink;
 unsigned stubCalls = 0;
 calls::Phonebook *activeBook = nullptr;
 bool stubAsync = false, stubWait = false, waitCancelled = false;
@@ -251,7 +227,7 @@ void test_history_eviction_reload_and_atomic_rollback() {
     History loaded(store);
     TEST_ASSERT_TRUE(loaded.begin());
     TEST_ASSERT_EQUAL(51, loaded.at(49).duration);
-    store.fail = true;
+    store.failSave = store.failErase = true;
     CallRecord record;
     record.duration = 999;
     TEST_ASSERT_FALSE(history.append(record));
@@ -259,7 +235,7 @@ void test_history_eviction_reload_and_atomic_rollback() {
     TEST_ASSERT_EQUAL(51, history.at(49).duration);
     TEST_ASSERT_FALSE(history.clear());
     TEST_ASSERT_EQUAL(50, history.size());
-    store.fail = false;
+    store.failSave = store.failErase = false;
     TEST_ASSERT_TRUE(history.clear());
     TEST_ASSERT_TRUE(store.bytes.empty());
 }

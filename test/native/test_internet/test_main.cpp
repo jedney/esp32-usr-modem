@@ -3,6 +3,10 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#define FAKES_STORE
+#define FAKES_SINK
+#define FAKES_SOUND
+#include "../support/fakes.h"
 #include "input_buffer.h"
 #include "internet.h"
 #include "internet_dialer.h"
@@ -11,26 +15,7 @@
 using Bytes = std::vector<uint8_t>;
 void setUp() {}
 void tearDown() {}
-class Memory : public modemcfg::Store {
-public:
-    Bytes data;
-    bool fail = false;
-    size_t load(uint8_t *out, size_t cap) override {
-        size_t n = std::min(data.size(), cap);
-        std::copy_n(data.begin(), n, out);
-        return n;
-    }
-    bool save(const uint8_t *in, size_t n) override {
-        if (fail)
-            return false;
-        data.assign(in, in + n);
-        return true;
-    }
-    bool erase() override {
-        data.clear();
-        return true;
-    }
-};
+using Memory = fakes::MemoryStore;
 class Network : public dialup::Network {
 public:
     bool live = false, fail = false;
@@ -62,9 +47,7 @@ public:
     }
 };
 // Test peer wire encoder; always uses full address/control and escapes controls.
-Bytes wire(uint16_t protocol, const Bytes &payload) {
-    Bytes body{255, 3, uint8_t(protocol >> 8), uint8_t(protocol)};
-    body.insert(body.end(), payload.begin(), payload.end());
+Bytes wireBody(Bytes body) {
     uint16_t crc = 0xffff;
     for (auto byte : body) {
         for (unsigned bit = 0; bit < 8; ++bit) {
@@ -88,6 +71,11 @@ Bytes wire(uint16_t protocol, const Bytes &payload) {
     }
     result.push_back(0x7e);
     return result;
+}
+Bytes wire(uint16_t protocol, const Bytes &payload) {
+    Bytes body{255, 3, uint8_t(protocol >> 8), uint8_t(protocol)};
+    body.insert(body.end(), payload.begin(), payload.end());
+    return wireBody(body);
 }
 std::vector<Bytes> drain(dialup::Engine &engine) {
     uint8_t out[16384];
@@ -193,11 +181,11 @@ void test_settings_crc_defaults_and_rollback() {
     dialup::Settings restored(memory);
     TEST_ASSERT_TRUE(restored.begin());
     TEST_ASSERT_EQUAL_HEX32(options.peer, restored.get().peer);
-    memory.fail = true;
+    memory.failSave = true;
     options.dns = 0x08080808;
     TEST_ASSERT_FALSE(restored.save(options));
     TEST_ASSERT_EQUAL_HEX32(0x01010101, restored.get().dns);
-    memory.data[8] ^= 1;
+    memory.bytes[8] ^= 1;
     TEST_ASSERT_FALSE(restored.begin());
     TEST_ASSERT_EQUAL_HEX32(0x0a404001, restored.get().local);
 }
@@ -349,11 +337,7 @@ void test_slip_binary_and_bad_escape_resynchronization() {
     TEST_ASSERT_FALSE(f.engine.isOpen());
     TEST_ASSERT_EQUAL(dialup::Reason::Network, f.engine.reason());
 }
-class Sink : public atcmd::Sink {
-public:
-    std::string text;
-    void write(const char *p, size_t n) override { text.append(p, n); }
-};
+using Sink = fakes::TextSink;
 void test_binary_call_suppresses_echo_escape_and_software_flow() {
     Memory memory;
     atcmd::Modem modem(memory, nullptr, 0);
@@ -390,16 +374,7 @@ public:
     int64_t lastSync() override { return 0; }
     void mac(uint8_t out[6]) override { memset(out, 0, 6); }
 };
-class Sound : public calls::CallSound {
-public:
-    bool start(calls::SoundStage, const char *, bool, uint32_t,
-               const modemcfg::Profile &) override {
-        return true;
-    }
-    bool running() const override { return false; }
-    void stop() override {}
-    void poll(uint32_t, const modemcfg::Profile &) override {}
-};
+using Sound = fakes::RecordingSound;
 class Fallback : public hostport::Session::Dialer {
 public:
     unsigned starts = 0;
@@ -559,6 +534,208 @@ void test_uart_input_buffer_retains_ppp_tail_until_reply_queue_drains() {
     session.hangUp();
 }
 
+// --- TG-03: malformed PPP control packets, table driven ---------------------------------------
+// Each case is fed to an engine at one stage of the negotiation. Afterwards the engine must
+// still be open, have answered as the table says (and nothing else), and still be able to
+// finish negotiating and carry an IP packet.
+enum class Stage { kStart, kLcpOpen, kReady };
+struct PppCase {
+    const char *name;
+    Stage stage;
+    Bytes frame;          // exactly the bytes put on the wire
+    int replyCode;        // -1: no reply; else the code of the one reply expected
+    uint16_t replyProto;  // protocol of that reply
+    unsigned dropped;     // increase of dropped()
+};
+// Frame bytes whose FCS is wrong (the last data byte before the FCS is changed).
+Bytes badFcs(Bytes frame) {
+    frame[frame.size() - 3] ^= 0x01;
+    return frame;
+}
+Bytes rawControl(uint8_t code, uint8_t id, uint16_t length, Bytes data) {
+    Bytes body{code, id, uint8_t(length >> 8), uint8_t(length)};
+    body.insert(body.end(), data.begin(), data.end());
+    return body;
+}
+// Finds the first frame of `protocol` with `code`; empty if none.
+Bytes findFrame(const std::vector<Bytes> &frames, uint16_t protocol, uint8_t code) {
+    for (const auto &f : frames)
+        if (f.size() >= 5 && f[2] == uint8_t(protocol >> 8) && f[3] == uint8_t(protocol) &&
+            f[4] == code)
+            return f;
+    return {};
+}
+Bytes ackOf(const Bytes &request) {
+    Bytes ack = request;
+    ack.erase(ack.begin(), ack.begin() + 4);
+    ack[0] = 2;
+    return ack;
+}
+void runPppCase(const PppCase &c) {
+    Fixture f;
+    f.ppp();
+    auto first = drain(f.engine);  // our LCP request
+    TEST_ASSERT_EQUAL_MESSAGE(1, first.size(), c.name);
+    std::vector<Bytes> opening;  // our IPCP request, once LCP is open
+    if (c.stage != Stage::kStart) {
+        feed(f.engine, 0xc021, ackOf(first[0]));
+        feed(f.engine, 0xc021, control(1, 44, {}));
+        opening = drain(f.engine);
+        TEST_ASSERT_FALSE_MESSAGE(findFrame(opening, 0x8021, 1).empty(), c.name);
+    }
+    if (c.stage == Stage::kReady) {
+        feed(f.engine, 0x8021, ackOf(findFrame(opening, 0x8021, 1)));
+        feed(f.engine, 0x8021, control(1, 45, {3, 6, 10, 64, 64, 2, 129, 6, 8, 8, 8, 8}));
+        TEST_ASSERT_TRUE_MESSAGE(f.engine.ready(), c.name);
+        drain(f.engine);
+    }
+    const uint32_t droppedBefore = f.engine.dropped();
+    for (auto byte : c.frame)
+        TEST_ASSERT_EQUAL_MESSAGE(1, f.engine.write(&byte, 1), c.name);
+    auto replies = drain(f.engine);
+    TEST_ASSERT_EQUAL_MESSAGE(c.dropped, f.engine.dropped() - droppedBefore, c.name);
+    TEST_ASSERT_EQUAL_MESSAGE(c.replyCode < 0 ? 0 : 1, replies.size(), c.name);
+    if (c.replyCode >= 0) {
+        TEST_ASSERT_EQUAL_MESSAGE(uint8_t(c.replyProto >> 8), replies[0][2], c.name);
+        TEST_ASSERT_EQUAL_MESSAGE(uint8_t(c.replyProto), replies[0][3], c.name);
+        TEST_ASSERT_EQUAL_MESSAGE(c.replyCode, replies[0][4], c.name);
+    }
+    TEST_ASSERT_TRUE_MESSAGE(f.engine.isOpen(), c.name);
+    TEST_ASSERT_EQUAL_MESSAGE(c.stage == Stage::kReady, f.engine.ready(), c.name);
+    // A good exchange still works afterwards.
+    if (c.stage == Stage::kStart)
+        feed(f.engine, 0xc021, ackOf(first[0]));
+    if (c.stage != Stage::kReady) {
+        feed(f.engine, 0xc021, control(1, 60, {}));  // a good LCP request from the peer
+        for (auto &frame : drain(f.engine))
+            opening.push_back(frame);
+        auto request = findFrame(opening, 0x8021, 1);
+        TEST_ASSERT_FALSE_MESSAGE(request.empty(), c.name);
+        feed(f.engine, 0x8021, ackOf(request));
+        feed(f.engine, 0x8021, control(1, 46, {3, 6, 10, 64, 64, 2, 129, 6, 8, 8, 8, 8}));
+        drain(f.engine);
+    }
+    TEST_ASSERT_TRUE_MESSAGE(f.engine.ready(), c.name);
+    const size_t sent = f.network.sent.size();
+    feed(f.engine, 0x0021, ipv4());
+    TEST_ASSERT_EQUAL_MESSAGE(sent + 1, f.network.sent.size(), c.name);
+}
+void test_ppp_malformed_control_packets_are_dropped_rejected_or_ignored() {
+    constexpr uint16_t kLcp = 0xc021, kIpcp = 0x8021, kPap = 0xc023;
+    const Bytes tooBig(1700, 0x40);
+    std::vector<PppCase> cases = {
+        // --- before LCP is open ---
+        {"LCP length below the 4-byte header", Stage::kStart,
+         wire(kLcp, rawControl(1, 7, 3, {})), -1, 0, 1},
+        {"LCP length longer than the frame", Stage::kStart, wire(kLcp, rawControl(1, 7, 200, {})),
+         -1, 0, 1},
+        {"LCP length zero", Stage::kStart, wire(kLcp, rawControl(1, 7, 0, {})), -1, 0, 1},
+        {"LCP option length 0", Stage::kStart, wire(kLcp, rawControl(1, 7, 6, {1, 0})), -1, 0, 0},
+        {"LCP option length 1", Stage::kStart, wire(kLcp, rawControl(1, 7, 5, {1})), -1, 0, 0},
+        {"LCP option runs past the end", Stage::kStart,
+         wire(kLcp, rawControl(1, 7, 8, {1, 9, 0, 0})), -1, 0, 0},
+        {"LCP unknown code", Stage::kStart, wire(kLcp, rawControl(42, 7, 4, {})), 7, kLcp, 0},
+        {"LCP MRU option of the wrong size is rejected", Stage::kStart,
+         wire(kLcp, rawControl(1, 7, 7, {1, 3, 5})), 4, kLcp, 0},
+        {"LCP MRU below 128 is a Nak", Stage::kStart, wire(kLcp, rawControl(1, 7, 8, {1, 4, 0, 10})),
+         3, kLcp, 0},
+        {"LCP Nak with option length 0", Stage::kStart, wire(kLcp, rawControl(3, 1, 6, {1, 0})), -1,
+         0, 0},
+        {"LCP Ack for a request we never made", Stage::kStart,
+         wire(kLcp, rawControl(2, 9, 8, {1, 4, 5, 220})), -1, 0, 0},
+        {"bad FCS", Stage::kStart, badFcs(wire(kLcp, control(1, 7, {}))), -1, 0, 1},
+        {"frame too short for a protocol field", Stage::kStart, wireBody({255, 3}), -1, 0, 0},
+        {"frame without address and control, no ACFC agreed", Stage::kStart,
+         wireBody({0xc0, 0x21, 1, 7, 0, 4}), -1, 0, 1},
+        {"empty frame", Stage::kStart, Bytes{0x7e, 0x7e}, -1, 0, 0},
+        {"escape cut off by the frame flag", Stage::kStart, Bytes{0x7d, 0x7e}, -1, 0, 1},
+        {"frame longer than the MTU", Stage::kStart, [&] {
+             Bytes b = tooBig;
+             b.push_back(0x7e);
+             return b;
+         }(), -1, 0, 1},
+        {"unknown protocol while LCP is closed", Stage::kStart, wire(0x1234, control(1, 7, {})), -1,
+         0, 0},
+        {"PAP request while LCP is closed", Stage::kStart,
+         wire(kPap, control(1, 3, {3, 'a', 'b', 'c', 3, 'x', 'y', 'z'})), -1, 0, 0},
+        {"IP packet before PPP is up", Stage::kStart, wire(0x0021, ipv4()), -1, 0, 1},
+        // --- LCP open, IPCP not yet ---
+        {"IPCP length below the header", Stage::kLcpOpen, wire(kIpcp, rawControl(1, 9, 3, {})), -1,
+         0, 1},
+        {"IPCP option length 0", Stage::kLcpOpen, wire(kIpcp, rawControl(1, 9, 6, {3, 0})), -1, 0,
+         0},
+        {"IPCP option length 1", Stage::kLcpOpen, wire(kIpcp, rawControl(1, 9, 5, {3})), -1, 0, 0},
+        {"IPCP option runs past the end", Stage::kLcpOpen,
+         wire(kIpcp, rawControl(1, 9, 8, {3, 9, 0, 0})), -1, 0, 0},
+        {"IPCP address option of the wrong size is rejected", Stage::kLcpOpen,
+         wire(kIpcp, rawControl(1, 9, 7, {3, 3, 1})), 4, kIpcp, 0},
+        {"IPCP unknown option is rejected", Stage::kLcpOpen,
+         wire(kIpcp, rawControl(1, 9, 10, {99, 6, 1, 2, 3, 4})), 4, kIpcp, 0},
+        {"IPCP unknown code is ignored", Stage::kLcpOpen, wire(kIpcp, rawControl(42, 9, 4, {})),
+         -1, 0, 0},
+        {"IPCP Ack with the wrong id", Stage::kLcpOpen,
+         wire(kIpcp, rawControl(2, 99, 10, {3, 6, 10, 64, 64, 1})), -1, 0, 0},
+        {"unknown protocol after LCP is open gets a Protocol-Reject", Stage::kLcpOpen,
+         wire(0x1234, control(1, 7, {})), 8, kLcp, 0},
+        {"PAP request with a name longer than the packet", Stage::kLcpOpen,
+         wire(kPap, rawControl(1, 3, 6, {200, 'a'})), -1, 0, 1},
+        {"PAP request too short for two lengths", Stage::kLcpOpen,
+         wire(kPap, rawControl(1, 3, 5, {1})), -1, 0, 1},
+        {"PAP packet that is not a request is ignored", Stage::kLcpOpen,
+         wire(kPap, rawControl(2, 3, 5, {0})), -1, 0, 0},
+        {"LCP Echo-Request shorter than its magic number", Stage::kLcpOpen,
+         wire(kLcp, rawControl(9, 5, 7, {1, 2, 3})), 7, kLcp, 0},
+        {"LCP ACCM option of the wrong size is rejected", Stage::kLcpOpen,
+         wire(kLcp, rawControl(1, 8, 7, {2, 3, 0})), 4, kLcp, 0},
+        // --- PPP up ---
+        {"IP packet shorter than its header", Stage::kReady, wire(0x0021, Bytes(10, 0x45)), -1, 0,
+         1},
+        {"IP packet from the wrong address", Stage::kReady, [] {
+             auto packet = ipv4();
+             packet[15] = 3;
+             return wire(0x0021, packet);
+         }(), -1, 0, 1},
+        {"IP packet with the wrong total length", Stage::kReady, [] {
+             auto packet = ipv4();
+             packet[3] ^= 1;
+             return wire(0x0021, packet);
+         }(), -1, 0, 1},
+        {"IP packet with a bad header checksum", Stage::kReady, [] {
+             auto packet = ipv4();
+             packet[10] ^= 1;
+             return wire(0x0021, packet);
+         }(), -1, 0, 1},
+        {"IP packet longer than the MTU", Stage::kReady, wire(0x0021, Bytes(1501, 0x45)), -1, 0,
+         1},
+        {"IPCP length longer than the frame while up", Stage::kReady,
+         wire(kIpcp, rawControl(1, 9, 200, {})), -1, 0, 1},
+        {"LCP unknown code while up", Stage::kReady, wire(kLcp, rawControl(42, 7, 4, {})), 7, kLcp,
+         0},
+    };
+    for (const auto &c : cases)
+        runPppCase(c);
+}
+// 5.5-09: a peer cannot keep an unfinished negotiation alive with Terminate-Requests.
+void test_ipcp_terminate_request_does_not_extend_the_negotiation_deadline() {
+    Fixture f;
+    f.ppp(0);
+    f.lcp();
+    drain(f.engine);
+    f.engine.poll(29000);
+    feed(f.engine, 0x8021, control(5, 50, {}));
+    f.engine.poll(30000);
+    TEST_ASSERT_FALSE(f.engine.isOpen());
+    TEST_ASSERT_EQUAL(dialup::Reason::Timeout, f.engine.reason());
+    // Once PPP has been up, a Terminate-Request still starts a fresh 30 s (renegotiation).
+    Fixture g;
+    g.ready();
+    g.engine.poll(60000);
+    feed(g.engine, 0x8021, control(5, 51, {}));
+    g.engine.poll(89999);
+    TEST_ASSERT_TRUE(g.engine.isOpen());
+    g.engine.poll(90000);
+    TEST_ASSERT_FALSE(g.engine.isOpen());
+}
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_ppp_renegotiation_gets_a_fresh_deadline_and_can_reconnect);
@@ -573,6 +750,8 @@ int main() {
     RUN_TEST(test_any_pap_credentials_and_malformed_fields);
     RUN_TEST(test_lcp_echo_termination_drain_and_redial);
     RUN_TEST(test_bad_crc_oversize_and_timeout_wrap);
+    RUN_TEST(test_ppp_malformed_control_packets_are_dropped_rejected_or_ignored);
+    RUN_TEST(test_ipcp_terminate_request_does_not_extend_the_negotiation_deadline);
     RUN_TEST(test_call_start_after_loop_timestamp_does_not_timeout);
     RUN_TEST(test_slip_binary_and_bad_escape_resynchronization);
     RUN_TEST(test_binary_call_suppresses_echo_escape_and_software_flow);

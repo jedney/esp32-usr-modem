@@ -91,10 +91,16 @@ void NetProbe::poll(uint32_t now, bool network) {
     if (!active_) {
         return;
     }
-    if (!network || now - since_ >= 10000 || dns_.load() == 2) {
+    // The 10 s limit is for the lookup. Once the ping has started it has its own 6 s (three
+    // probes take about 3.5 s), so a slow lookup cannot cut the ping short (5.5-07), and
+    // replies that did arrive count as a success even if the last probe was still out.
+    const bool pinging = ping_ != nullptr;
+    if (!network || dns_.load() == 2 || (!pinging && dns_.load() == 0 && now - since_ >= 10000) ||
+        (pinging && now - pingSince_ >= 6000)) {
+        const bool replied = network && pinging && replies_.load() > 0;
         cancel();
         done_ = true;
-        ok_ = false;
+        ok_ = replied;
         return;
     }
     if (dns_.load() == 1 && !ping_) {
@@ -103,6 +109,7 @@ void NetProbe::poll(uint32_t now, bool network) {
             done_ = ok_ = true;
             return;
         }
+        pingSince_ = now;
         esp_ping_config_t cfg = ESP_PING_DEFAULT_CONFIG();
         cfg.count = 3;
         cfg.interval_ms = 400;

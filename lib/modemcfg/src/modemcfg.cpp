@@ -3,6 +3,7 @@
 
 #include <cctype>
 #include <cstring>
+#include <initializer_list>
 
 namespace modemcfg {
 
@@ -244,6 +245,30 @@ uint32_t crc32(const uint8_t *data, size_t len) {
         }
     }
     return ~crc;
+}
+
+bool crcSealed(const uint8_t *data, size_t len) {
+    if (len < 5) {
+        return false;
+    }
+    uint32_t stored = 0;
+    for (unsigned i = 0; i < 4; ++i) {
+        stored |= uint32_t(data[len - 4 + i]) << (8 * i);
+    }
+    return crc32(data, len - 4) == stored;
+}
+
+size_t recoverBlob(SlotReader readFn, void *context, uint8_t *out, size_t cap, Slot *used) {
+    for (Slot slot : {Slot::kFile, Slot::kTemporary, Slot::kBackup}) {
+        const size_t n = readFn(context, slot, out, cap);
+        if (n != 0) {
+            if (used != nullptr) {
+                *used = slot;
+            }
+            return n;
+        }
+    }
+    return 0;
 }
 
 void serialize(const Nvram &n, uint8_t *out) {

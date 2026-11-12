@@ -1,4 +1,20 @@
-// Incremental X/Y/ZMODEM adaptation; provenance and original notices in credits/zimodem.
+/*
+   Copyright 2018-2026 Bo Zimmerman
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+// Changed for USR Modem: incremental X/Y/ZMODEM adaptation of Zimodem (Apache-2.0); provenance
+// and original notices in credits/zimodem.
 #pragma once
 #include "byte_queue.h"
 
@@ -23,6 +39,7 @@ uint32_t crc32(const uint8_t *data, size_t len, uint32_t crc = 0xffffffffu);
 class Transfer {
 public:
     static constexpr uint32_t kLimit = 16 * 1024 * 1024;
+    static constexpr uint32_t kFinWaitMs = 2000;  // ZFIN sent, "OO" not received
     bool start(Protocol protocol, bool sending, Source *source, uint32_t now);
     void poll(uint32_t now);
     size_t write(const uint8_t *data, size_t len);
@@ -34,6 +51,7 @@ public:
     void cancel(Outcome reason = Outcome::Cancelled);
 
 private:
+    void alive();
     void byte(uint8_t b);
     void pump();
     void finish(Outcome outcome);
@@ -74,5 +92,6 @@ private:
     uint32_t zposition_ = 0;
     uint32_t highwater_ = 0;
     uint32_t lastEof_ = 0;
+    uint32_t finAt_ = 0;
 };
 }  // namespace clienttest

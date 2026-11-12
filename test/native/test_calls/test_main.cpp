@@ -4,6 +4,9 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#define FAKES_STORE
+#define FAKES_SOUND
+#include "../support/fakes.h"
 #include "outgoing.h"
 #include "wav.h"
 
@@ -22,29 +25,7 @@ void setUp() {
 }
 void tearDown() {}
 
-class Memory : public modemcfg::Store {
-public:
-    std::vector<uint8_t> bytes;
-    bool fail = false;
-    size_t load(uint8_t *out, size_t cap) override {
-        size_t n = std::min(bytes.size(), cap);
-        if (n) {
-            memcpy(out, bytes.data(), n);
-        }
-        return n;
-    }
-    bool save(const uint8_t *in, size_t n) override {
-        if (fail) {
-            return false;
-        }
-        bytes.assign(in, in + n);
-        return true;
-    }
-    bool erase() override {
-        bytes.clear();
-        return true;
-    }
-};
+using Memory = fakes::MemoryStore;
 class Output : public atcmd::Sink {
 public:
     std::string text;
@@ -96,23 +77,7 @@ public:
     }
     void close() override { status = SocketState::kClosed; }
 };
-class FakeSound : public CallSound {
-public:
-    std::vector<SoundStage> stages;
-    std::string digits;
-    bool active = false, fail = false, pulse = false;
-    bool start(SoundStage stage, const char *d, bool p, uint32_t,
-               const modemcfg::Profile &) override {
-        stages.push_back(stage);
-        digits = d;
-        pulse = p;
-        active = !fail;
-        return !fail;
-    }
-    bool running() const override { return active; }
-    void stop() override { active = false; }
-    void poll(uint32_t, const modemcfg::Profile &) override {}
-};
+using FakeSound = fakes::RecordingSound;
 const atcmd::StarCommand commands[] = {
     {"MODEL", "AT*MODEL", "model", atcmd::cmdModel, false},
     {"THROTTLE", "AT*THROTTLE", "throttle", atcmd::cmdThrottle, false},
@@ -182,12 +147,12 @@ void test_phonebook_defaults_exact_keys_validation_and_atomic_save() {
     e.speed = 12345;
     TEST_ASSERT_FALSE(book.put(e));
     e.speed = 2400;
-    store.fail = true;
+    store.failSave = true;
     TEST_ASSERT_FALSE(book.put(e));
     TEST_ASSERT_EQUAL_UINT32(56000, book.find("01")->speed);
     TEST_ASSERT_FALSE(book.remove("01"));
     TEST_ASSERT_NOT_NULL(book.find("01"));
-    store.fail = false;
+    store.failSave = false;
     TEST_ASSERT_TRUE(book.remove("01"));
     Phonebook removed(store);
     TEST_ASSERT_TRUE(removed.begin());
@@ -610,7 +575,7 @@ void test_call_delay_commands_persist_validate_and_roll_back() {
         r.send(bad);
         TEST_ASSERT_NOT_NULL(strstr(r.output.take().c_str(), "ERROR"));
     }
-    r.store.fail = true;
+    r.store.failSave = true;
     TEST_ASSERT_FALSE(r.modem.setCallDelay(true, 200));
     TEST_ASSERT_FALSE(r.modem.setCallDelay(false, 300));
     TEST_ASSERT_EQUAL_UINT32(0, r.modem.ringDelayMs());
@@ -858,7 +823,7 @@ void test_model_default_explicit_override_and_current_call_snapshot() {
 
 void test_model_and_throttle_failed_save_roll_back() {
     Rig r;
-    r.store.fail = true;
+    r.store.failSave = true;
     TEST_ASSERT_FALSE(r.modem.setModel(56000));
     TEST_ASSERT_EQUAL_UINT32(14400, r.modem.model());
     TEST_ASSERT_FALSE(r.modem.setThrottle(true));
@@ -1016,6 +981,57 @@ void test_wav_validation_upsampling_and_handshake_mapping() {
     TEST_ASSERT_EQUAL_UINT32(56000, sounds::handshakeSpeed(56000));
 }
 
+// TG-16: the sound fake could never refuse, so none of these paths was run. A sound that
+// cannot start, or one that breaks while playing, ends the call with NO CARRIER and frees the
+// line at every stage, and the next call works.
+void test_sound_that_cannot_start_ends_the_call_at_every_stage() {
+    const char *stageName[] = {"dial tone", "digits", "handshake"};
+    for (int failAt = 0; failAt < 3; ++failAt) {
+        Rig r;
+        r.modem.active().v[modemcfg::kM] = 1;  // sounds on
+        r.send("AT*RINGDELAY=0\r");
+        r.output.take();
+        r.sound.fail = failAt == 0;
+        r.send("ATDT1\r");
+        if (failAt >= 1) {
+            r.sound.active = false;  // the dial tone is over
+            r.sound.fail = failAt == 1;
+            r.poll();  // the digits
+        }
+        if (failAt == 2) {
+            r.sound.active = false;  // the digits are over; no ring (delay 0): connecting
+            r.poll();
+            r.sound.fail = true;
+            r.socket.status = SocketState::kOpen;
+            r.poll();  // the handshake
+        }
+        r.poll();
+        TEST_ASSERT_NOT_NULL_MESSAGE(strstr(r.output.take().c_str(), "NO CARRIER"),
+                                     stageName[failAt]);
+        TEST_ASSERT_FALSE_MESSAGE(r.session.callUp(), stageName[failAt]);
+        TEST_ASSERT_FALSE_MESSAGE(r.slot.busy(), stageName[failAt]);
+        TEST_ASSERT_EQUAL_MESSAGE(int(CallStage::kIdle), int(r.call.stage()), stageName[failAt]);
+        // The next call is not held back by the failure.
+        r.sound.fail = false;
+        r.send("ATDT1\r");
+        r.poll();
+        TEST_ASSERT_TRUE_MESSAGE(r.slot.busy(), stageName[failAt]);
+        TEST_ASSERT_NULL_MESSAGE(strstr(r.output.take().c_str(), "NO CARRIER"), stageName[failAt]);
+    }
+}
+void test_sound_that_breaks_while_playing_ends_the_call() {
+    Rig r;
+    r.modem.active().v[modemcfg::kM] = 1;
+    r.send("ATDT1\r");
+    TEST_ASSERT_TRUE(r.sound.active);
+    r.output.take();
+    r.sound.broken = true;  // the speaker driver failed mid-tone
+    r.poll();
+    TEST_ASSERT_NOT_NULL(strstr(r.output.take().c_str(), "NO CARRIER"));
+    TEST_ASSERT_FALSE(r.slot.busy());
+    TEST_ASSERT_GREATER_OR_EQUAL(1, r.sound.stops);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_call_delay_commands_persist_validate_and_roll_back);
@@ -1045,6 +1061,8 @@ int main() {
     RUN_TEST(test_other_port_cannot_replace_dial_target);
     RUN_TEST(test_model_default_explicit_override_and_current_call_snapshot);
     RUN_TEST(test_model_and_throttle_failed_save_roll_back);
+    RUN_TEST(test_sound_that_cannot_start_ends_the_call_at_every_stage);
+    RUN_TEST(test_sound_that_breaks_while_playing_ends_the_call);
     RUN_TEST(test_baud_control_uses_operational_rate_and_failed_switch_closes_call);
     RUN_TEST(test_network_bytes_never_execute_commands_remote_drop_and_wifi_loss);
     RUN_TEST(test_dtr_cancels_pending_call_and_timer_rollover);

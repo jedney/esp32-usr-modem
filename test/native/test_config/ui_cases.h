@@ -206,7 +206,7 @@ void test_four_themes_unknown_live_refresh_and_failed_save() {
         view.accept(r.drain());
         TEST_ASSERT_TRUE(view.has(CellGrid::modelLabel(speeds[(i + 1) % 4])));
         TEST_ASSERT_TRUE(view.has("> [7]"));
-        r.store.fail = true;
+        r.store.failSave = r.store.failErase = true;
         TEST_ASSERT_FALSE(r.modem.setModel(speeds[i]));
         r.terminal.poll(4200);
         view.accept(r.drain());
@@ -300,14 +300,14 @@ void test_phonebook_paging_details_selection_and_storage_failure() {
     TEST_ASSERT_NOT_NULL(services.book.find("209"));
     r.feed("n\r");
     r.drain();
-    services.store.fail = true;
+    services.store.failSave = services.store.failErase = true;
     r.feed("3\ry\r");
     view.accept(r.drain());
     TEST_ASSERT_TRUE(view.has("ERROR"));
     TEST_ASSERT_NOT_NULL(services.book.find("209"));
     r.feed("\r");
     r.drain();
-    services.store.fail = false;
+    services.store.failSave = services.store.failErase = false;
     r.feed("3\ry\r");
     r.drain();
     TEST_ASSERT_NULL(services.book.find("209"));

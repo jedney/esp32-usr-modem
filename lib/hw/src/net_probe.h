@@ -25,6 +25,6 @@ private:
     portMUX_TYPE lock_ = portMUX_INITIALIZER_UNLOCKED;
     esp_ping_handle_t ping_ = nullptr;
     bool active_ = false, doPing_ = false, done_ = false, ok_ = false;
-    uint32_t since_ = 0;
+    uint32_t since_ = 0, pingSince_ = 0;  // since_: the lookup began; pingSince_: the ping began
 };
 }  // namespace hw

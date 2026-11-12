@@ -12,6 +12,18 @@ test('main menu A-D shortcuts open the requested screens', () => {
     }
 });
 
+test('demo draws the double-line frame the firmware draws, not question marks', () => {
+    let output = '';
+    startDemoModem({message: () => {}, write: text => { output = text; }});
+    // Corners, the rule joints and the sides of the main menu frame.
+    for (const char of ['╔', '╗', '╚', '╝', '╠', '╣', '═', '║']) {
+        assert.ok(output.includes(char), `missing U+${char.codePointAt(0).toString(16)}`);
+    }
+    // The model name sits between three thin lines on each side.
+    assert.match(output, /─{3} Sportster [^─]*─{3}/);
+    // Only the cursor and wrap escapes (ESC [ ? n h or l) contain a question mark.
+    assert.equal(output.replace(/\x1b\[\?\d+[hl]/g, '').includes('?'), false);
+});
 test('demo uses the full catalogue and C cannot place even a simulated call', () => {
     let output = '';
     const messages = [];

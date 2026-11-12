@@ -227,6 +227,15 @@ void test_ssid_and_password_checks() {
     std::string notHex64(64, 'g');
     TEST_ASSERT_FALSE(validPassword(notHex64.c_str()));
     TEST_ASSERT_FALSE(validPassword("password\x01"));
+    TEST_ASSERT_FALSE(validPassword("password\x7f"));
+    // WPA2 passphrases are bytes: UTF-8 text is allowed, counted in bytes (5.5-15).
+    TEST_ASSERT_TRUE(validPassword("caf\xc3\xa9 au lait"));
+    TEST_ASSERT_TRUE(validPassword("\xe2\x9c\x93\xe2\x9c\x93\xe2\x9c\x93"));  // 9 bytes
+    TEST_ASSERT_FALSE(validPassword("\xc3\xa9\xc3\xa9\xc3"));                 // 5 bytes: too short
+    std::string utf63 = std::string(61, 'x') + "\xc3\xa9";                    // 63 bytes
+    std::string utf64 = std::string(62, 'x') + "\xc3\xa9";                    // 64 bytes, not hex
+    TEST_ASSERT_TRUE(validPassword(utf63.c_str()));
+    TEST_ASSERT_FALSE(validPassword(utf64.c_str()));
 }
 
 void test_hostname_rules() {
@@ -247,6 +256,11 @@ void test_hostname_rules() {
     TEST_ASSERT_FALSE(validServer(""));
     TEST_ASSERT_FALSE(validServer("pool ntp"));
     TEST_ASSERT_FALSE(validServer(".pool"));
+    TEST_ASSERT_FALSE(validServer("a..b"));  // an empty label (5.5-15)
+    TEST_ASSERT_FALSE(validServer("pool..ntp.org"));
+    TEST_ASSERT_FALSE(validServer("pool.ntp.org."));
+    TEST_ASSERT_TRUE(validServer("a.b"));
+    TEST_ASSERT_TRUE(validServer("pool"));
 }
 
 void test_ip_parse_and_format() {
@@ -677,6 +691,44 @@ void test_scan_sorts_and_merges() {
     TEST_ASSERT_EQUAL_STRING("Cafe", r.net.scanEntry(1).ssid);
     TEST_ASSERT_EQUAL_STRING("Weak", r.net.scanEntry(2).ssid);
     TEST_ASSERT_EQUAL(2, r.radio.connects);  // back to joining the saved network
+}
+
+// 5.5-01: a scan turns the radio on. With Wi-Fi switched off, the radio goes off again when
+// the scan ends, however it ends. The radio itself reports "off" all the while, so netcfg
+// must not wait for a link state change to notice.
+void test_radio_goes_off_again_after_a_scan_with_wifi_off() {
+    Settings s = saved("HomeNet", "password1");
+    s.enabled = false;
+    for (int how = 0; how < 4; ++how) {  // done, failed, cancelled, could not start
+        NetRig r(&s);
+        r.net.begin(0);
+        r.net.tick(10);
+        r.radio.found = {entry("Cafe", -70, 3, Security::kOpen)};
+        r.radio.scanOk = how != 3;
+        r.radio.scanFail = how == 1;
+        const int offsBefore = r.radio.offs;
+        r.net.scanStart(100);
+        if (how == 2) {
+            r.net.cancelScan();
+        } else {
+            r.radio.scanDone = true;
+        }
+        r.net.tick(200);
+        TEST_ASSERT_EQUAL_MESSAGE(offsBefore + 1, r.radio.offs, "radio left on after the scan");
+        TEST_ASSERT_EQUAL(0, r.radio.connects);
+    }
+    // With Wi-Fi on, a scan does not turn the radio off.
+    Settings on = saved("HomeNet", "password1");
+    NetRig r(&on);
+    r.net.begin(0);
+    r.radio.up();
+    r.net.tick(10);
+    const int offs = r.radio.offs;
+    r.net.scanStart(100);
+    r.radio.found = {entry("Cafe", -70, 3, Security::kOpen)};
+    r.radio.scanDone = true;
+    r.net.tick(200);
+    TEST_ASSERT_EQUAL(offs, r.radio.offs);
 }
 
 // --- AT* commands -----------------------------------------------------------------------
@@ -1265,6 +1317,7 @@ int main(int, char **) {
     RUN_TEST(test_join_retries_a_missing_network_then_gives_up);
     RUN_TEST(test_join_with_no_answer_times_out);
     RUN_TEST(test_scan_sorts_and_merges);
+    RUN_TEST(test_radio_goes_off_again_after_a_scan_with_wifi_off);
     RUN_TEST(test_wifi_status_shows_password_set_not_the_password);
     RUN_TEST(test_wifi_on_off);
     RUN_TEST(test_scan_command_lists_later);

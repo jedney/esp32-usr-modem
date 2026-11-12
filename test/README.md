@@ -11,6 +11,14 @@ Every modem feature has tests, at these levels:
 | **End-to-end** (`test/e2e/`) | PC driving the modem's serial ports and Wi-Fi | `python -m pytest test/e2e --console-port COMx [--rs232-port COMy] [--usb-port COMz]` | Before each release |
 | **Interoperability** (`test/interop/`) | PC with lrzsz / pppd | see `test/interop/README.md` | Before releases that touch transfers or PPP |
 
+Shared fakes for the unit tests live in `test/native/support/fakes.h`: `fakes::MemoryStore`
+(`failSave`, `failLoad`, `failErase`, `failNextSaves`, counters), `fakes::TextSink` and
+`fakes::RecordingSound` (`fail`, `broken`). A suite includes it as `"../support/fakes.h"`
+after `#define FAKES_STORE`, `FAKES_SINK` and/or `FAKES_SOUND`. Suites still on their own
+copies: the `MemStore` in `test_atcmd`, `test_hostport`, `test_netcfg` and `test_modemcfg`,
+the `Memory` in `test_devicecfg`, the `Store` in `test_web`, the radios in `test_netcfg`,
+`test_config_services` and `test_internet`, and the sockets in `test_answer` and `test_calls`.
+
 Feature logic lives in `lib/` with no hardware calls, so most of it is unit-tested on
 the PC. On-board tests cover the hardware layer (`lib/hw`); end-to-end tests cover
 behaviour as a user sees it. Running the on-board tests replaces the firmware with a
@@ -40,8 +48,8 @@ Section numbers refer to the project brief.
 | RS232 speed from "AT" at 300-115200, fixed with `AT*BAUD` (6.2) | `test_hostport` (`CallSlot::heldBy` for the "refused during an RS232 call" rule, v2.3) | `test_rs232` | `test_rs232.py`, `test_session.py` |
 | RTS/CTS and XON/XOFF, DTR `&D` with S25, DCD `&C`, RI (6.2) | `test_hostport` | `test_rs232` | `test_rs232.py`, `test_answer.py` |
 | A port nobody reads never blocks the modem: `RING` dropped at once, a reply waits once then the port is stalled (STA-01, v2.2) | `test_hostport` (`test_sink_gate_*`), `test_answer` | — | `test_rs232.py`, `test_usb.py` (bench) |
-| `+++` guard time, `ATO`, `ATH`, `ATZ`, `F0`, `AT*TESTCALL` (6.2) | `test_hostport`, `test_atcmd` | — | `test_session.py`, `test_rs232.py` |
-| `&N` line speed, `AT*MODEL`, throttling, CONNECT text (6.2) | `test_calls`, `test_hostport`, `test_atcmd` | `test_calls` | `test_session.py`, `test_calls.py` |
+| `+++` guard time, DTR hold and throttle credit across the 2^32 ms clock wrap, S3/S5 at 0 and 127, `ATO`, `ATH`, `ATZ`, `F0`, `AT*TESTCALL` (6.2, TG-06, v2.9) | `test_hostport`, `test_atcmd` | — | `test_session.py`, `test_rs232.py` |
+| `&N` line speed, `AT*MODEL`, throttling at 300, 2400 and 115200 bps, CONNECT text; a sound that cannot start or breaks ends the call at every stage (6.2, TG-16, v2.13) | `test_calls`, `test_hostport`, `test_atcmd` | `test_calls` | `test_session.py`, `test_calls.py` |
 | Phonebook; damaged book refuses edits until `AT*BOOKCLEAR` (6.3, STA-09f, v2.7) | `test_calls` | `test_calls` | `test_calls.py` |
 | Outgoing calls: Telnet negotiation, 0xFF escaping, raw mode, ringing and connect delays, host-name digits (6.6) | `test_calls` | `test_calls` | `test_calls.py` |
 | Call errors: BUSY, NO ANSWER, NO DIAL TONE, NO CARRIER (6.5) | `test_calls` | — | `test_calls.py` |
@@ -52,25 +60,29 @@ Section numbers refer to the project brief.
 | Unanswered call dropped after 8 rings for `S0` 0 and above 8; `S0` above 8 answers on ring 8; journal entry (SEC-01, v2.4) | `test_answer` | — | `test_answer.py` (bench) |
 | Telnet storm bounded, two ends settle, full send queue stops reading; `S7` doesn't cut the handshake (TG-04, 5.5-12, v2.4) | `test_calls` | — | `test_calls.py` |
 | TCP keepalive on call sockets (SEC-01, v2.4) | — (lwIP only; checked by the s3 build) | — | Bench: pull the caller's network cable, `NO CARRIER` in about 2 minutes |
-| PPP and SLIP, aliases, private /30, NAT, hang-up (6.6) | `test_internet` | `test_internet` | `test_internet.py`; `interop/serial_pppd.py` |
+| PPP and SLIP, aliases, private /30, NAT, hang-up; table of malformed LCP/IPCP/PAP/IP frames (TG-03, v2.10) (6.6) | `test_internet` | `test_internet` | `test_internet.py`; `interop/serial_pppd.py` |
 | Tones: UK dial, busy, ring, DTMF, pulse (6.4) | `test_hwtest`, `test_answer` | `test_hw`, `test_answer` | `test_hwtest.py`, `test_calls.py` |
 | Handshake WAV playback per speed (6.4) | `test_calls`, `scripts/test_sound_catalog.py` | `test_calls` | `test_calls.py` |
 | Volume: pot, `ATL`, `ATM`, no cap (full volume = full scale) (5.3, 6.4) | `test_hwtest`, `test_calls` | `test_calls`, `test_hw` | `AT*HWPOT=TONE`, `AT*HWTEST` |
 | LEDs per table 5.4, `AT*HWLED=AUTO`; CD/TR/RD/SD follow RS232 or USB (v2.0) | `test_hostport` | `test_hw` | `test_session.py`, `AT*HWTEST` |
 | Hardware tests `AT*HW...`; line, loopback and bridge refused on RS232 (6.14, Q79); 5-minute key time-out, LED patterns refused during a call, per-owner holds (v2.3) | `test_hwtest`, `test_config` | `test_hw` | `test_hwtest.py`, `test_config.py` |
-| Wi-Fi: scan, masked join, retry, static IP, mDNS, ARQ/RGB, banner (6.6, 6.7) | `test_netcfg`, `test_atcmd` | `test_wifi`, `test_rs232` | `test_wifi.py`, `test_calls.py`, `test_answer.py` |
-| Clock: NTP, time zones, daylight saving (6.8, Q59) | `test_netcfg` | `test_wifi` | `test_wifi.py` |
+| Wi-Fi: scan, masked join (UTF-8 passphrases), retry, static IP, mDNS, ARQ/RGB, radio off after a scan with Wi-Fi off, join/scan/IP refused during a call, banner (6.6, 6.7, v2.12) | `test_netcfg`, `test_config_services`, `test_atcmd` | `test_wifi`, `test_rs232` | `test_wifi.py`, `test_calls.py`, `test_answer.py` |
+| Clock: NTP (no empty labels), time zones, daylight saving (6.8, Q59) | `test_netcfg` | `test_wifi` | `test_wifi.py` |
 | Browser Wi-Fi changes: 60 s check, failed join, `AT*WIFI=OFF`/`FORGET` in the window; scan names without control bytes | `test_netcfg` | — | — |
-| Wi-Fi password never shown or exported (6.6, 6.8) | `test_netcfg`, `test_config_services` | — | `test_wifi.py`, `test_config.py` |
+| Wi-Fi and device password, OTA hash and Digest hash never in any output: canary sweep over every `AT*` command, `AT&V`, `ATI`, export, logs and every configuration screen (6.6, 6.8, TG-02, v2.9) | `test_netcfg`, `test_config_services` (`test_no_output_contains_either_password_or_its_stored_forms`) | — | `test_wifi.py`, `test_config.py` |
 | Device password: first boot, first use, change, hashes only, masked input (6.6) | `test_devicecfg` | `test_device` | `test_device.py` |
 | OTA: password, ALWAYS/DEMAND, 10-minute window (6.6) | `test_devicecfg`, `scripts/test_ota_upload.py` (`.env` BOM, UTF-16) | `test_device` | `test_device.py` |
 | `AT*FACTORY`: Y/N, timeout, every namespace, interrupted reset, no filesystem (6.7) | `test_devicecfg` | `test_device` | `test_device.py --factory-reset` |
 | Configuration screen, styles, sizes, `AT*` parity, `AT*HELP`, no idle repaint, closes after 5 minutes idle, Esc cancels a waiting command, `AT*SETTING=` takes one command (6.8, STA-02b/09d, SEC-07a, v2.7) | `test_config`, `test_config_services`, `scripts/test_generate_ui.py` (single-key hotkeys), `ui/tests` | `test_config` | `test_config.py` |
-| Export and replay without secrets, logs, call history (6.8) | `test_config`, `test_config_services` | `test_config` | `test_config.py` |
+| Export and replay without secrets, logs, call history; refused store writes leave the live setting alone (6.8, TG-16, v2.13) | `test_config`, `test_config_services` | `test_config` | `test_config.py` |
 | About generated from the licensing record | `scripts/test_generate_credits.py` | — | `test_config.py` |
-| Web server: Digest login (stale nonce, wrong-password lock-out), Host/Origin, tickets, CSRF, WebSocket, upload and unmount hand-shakes (late answers), browsers start read-only (6.11) | `test_web`, `scripts/test_image_manifest.py`, `scripts/test_web_peer.py` | `test_web` | `test_web.py` |
-| Web page: status bar, reconnect, sizing, upload hashing, demo (6.11) | `web/test/` | — | — |
-| Client Tests: display, size, keys, transfers, cable, client settings per port incl. USB (6.13, v2.0) | `test_client` | `test_client` | `test_client.py`; `interop/serial_lrzsz.py` |
+| Web server: Digest login (stale nonce, wrong-password lock-out, parameter/size limits, nonce table, real MD5, falling count), filesystem image check, Host/Origin, tickets, CSRF, WebSocket, upload and unmount hand-shakes (late answers), browsers start read-only (6.11) | `test_web`, `scripts/test_image_manifest.py`, `scripts/test_web_peer.py` | `test_web` | `test_web.py` |
+| Network names as UTF-8 in the web page's JSON (5.5-16, v2.12) | `test_web` | — | — |
+| History file recovery order: file, temporary file, backup, each CRC-sealed (5.5-06, v2.12) | `test_modemcfg` | — | — |
+| Web page: status bar, reconnect and 30 s back-off while an update is written, sizing, upload hashing, the whole upload flow (preflight, conflicting identity, confirmation, login refresh, lost connection, refusal, double press), demo with the firmware's frame (6.11, TG-14, v2.11) | `web/test/` | — | `test_web.py` |
+| The web file list agrees in `build_web.py`, `web_service.cpp`, the page imports, the preview and the e2e check (MNT-05h, v2.11) | `scripts/test_web_file_lists.py` | — | — |
+| Browser limit (3), idle connection floods on ports 23 and 80, an interrupted upload, USB unplug during a call (TG-15, v2.11; opt-in) | — | — | `test_web.py --flood-tests`, `--upload-tests`; `test_usb.py --usb-unplug` |
+| Client Tests: display, size (echoed query), keys, transfers (block numbers wrap past 255), hostile X/Y/ZMODEM blocks and headers, noise and slow-link timing, ZFIN without "OO", cable, client settings per port incl. USB (6.13, TG-03, v2.0, v2.10) | `test_client` | `test_client` | `test_client.py`; `interop/serial_lrzsz.py` |
 | Build: network libraries (checked before cached) and image identities | `scripts/test_network_dependencies.py`, `scripts/test_image_manifest.py` | — | — |
 
 Checks that need a person (sound, LEDs, loopback plug, Amiga and Windows 9x clients)

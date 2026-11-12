@@ -3,6 +3,9 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#define FAKES_STORE
+#define FAKES_SOUND
+#include "../support/fakes.h"
 #include "incoming.h"
 
 using namespace calls;
@@ -19,27 +22,7 @@ void setUp() {
     wifi = true;
 }
 void tearDown() {}
-class Memory : public modemcfg::Store {
-public:
-    std::vector<uint8_t> bytes;
-    bool fail = false;
-    size_t load(uint8_t *out, size_t cap) override {
-        size_t n = std::min(bytes.size(), cap);
-        if (n)
-            memcpy(out, bytes.data(), n);
-        return n;
-    }
-    bool save(const uint8_t *in, size_t n) override {
-        if (fail)
-            return false;
-        bytes.assign(in, in + n);
-        return true;
-    }
-    bool erase() override {
-        bytes.clear();
-        return true;
-    }
-};
+using Memory = fakes::MemoryStore;
 class Output : public atcmd::Sink {
 public:
     std::string text;
@@ -110,20 +93,7 @@ public:
     }
     void stop() override { pending = 0; }
 };
-class FakeSound : public CallSound {
-public:
-    std::vector<SoundStage> stages;
-    bool active = false, fail = false, broken = false;
-    bool start(SoundStage stage, const char *, bool, uint32_t, const modemcfg::Profile &) override {
-        stages.push_back(stage);
-        active = !fail;
-        return !fail;
-    }
-    bool running() const override { return active; }
-    bool failed() const override { return broken; }
-    void stop() override { active = false; }
-    void poll(uint32_t, const modemcfg::Profile &) override {}
-};
+using FakeSound = fakes::RecordingSound;
 unsigned dispatched;
 atcmd::Reply spy(atcmd::Port &, const char *) {
     ++dispatched;
@@ -579,10 +549,10 @@ void test_answerport_persistence_reset_rollback_and_busy_rejection() {
     TEST_ASSERT_EQUAL(int(modemcfg::AnswerPort::kConsole), int(again.answerPort()));
     r.modem.reset(4);
     TEST_ASSERT_EQUAL(int(modemcfg::AnswerPort::kConsole), int(r.modem.answerPort()));
-    r.store.fail = true;
+    r.store.failSave = true;
     TEST_ASSERT_EQUAL(int(atcmd::Reply::kError), int(r.call.command(r.console.port(), "=RS232")));
     TEST_ASSERT_EQUAL(int(modemcfg::AnswerPort::kConsole), int(r.modem.answerPort()));
-    r.store.fail = false;
+    r.store.failSave = false;
     r.ring();
     TEST_ASSERT_EQUAL(int(atcmd::Reply::kError), int(r.call.command(r.console.port(), "=RS232")));
     r.output.take();

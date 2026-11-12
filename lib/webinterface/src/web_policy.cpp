@@ -259,12 +259,56 @@ bool allowedHost(const std::string &value, const std::string &name, const std::s
 bool allowedOrigin(const std::string &value, const std::string &name, const std::string &ip) {
     return value.compare(0, 7, "http://") == 0 && allowedHost(value.substr(7), name, ip);
 }
+namespace {
+// Length of the well-formed UTF-8 sequence at p (2-4), or 0. Overlong forms, surrogates,
+// code points above U+10FFFF and the C1 controls (U+0080-U+009F) are not accepted.
+size_t utf8Length(const unsigned char *p) {
+    const auto cont = [](unsigned char c) { return (c & 0xC0) == 0x80; };
+    if (p[0] >= 0xC2 && p[0] <= 0xDF && cont(p[1])) {
+        return p[0] == 0xC2 && p[1] < 0xA0 ? 0 : 2;
+    }
+    if (p[0] >= 0xE0 && p[0] <= 0xEF && cont(p[1]) && cont(p[2])) {
+        const unsigned lead = p[0], second = p[1];
+        if ((lead == 0xE0 && second < 0xA0) || (lead == 0xED && second >= 0xA0)) {
+            return 0;
+        }
+        return 3;
+    }
+    if (p[0] >= 0xF0 && p[0] <= 0xF4 && cont(p[1]) && cont(p[2]) && cont(p[3])) {
+        const unsigned lead = p[0], second = p[1];
+        if ((lead == 0xF0 && second < 0x90) || (lead == 0xF4 && second >= 0x90)) {
+            return 0;
+        }
+        return 4;
+    }
+    return 0;
+}
+}  // namespace
 std::string jsonString(const char *value) {
     std::string result = "\"";
     for (const auto *p = reinterpret_cast<const unsigned char *>(value); *p; ++p) {
         if (*p == '"' || *p == '\\') {
             result += '\\';
             result += static_cast<char>(*p);
+        } else if (*p >= 0xC2) {
+            // Valid UTF-8 passes through, so a network named "Café" is readable (5.5-16).
+            // utf8Length() reads at most three bytes ahead; a NUL ends the string safely
+            // because it is never a continuation byte.
+            const size_t n = utf8Length(p);
+            if (p[0] == 0xC2 && (p[1] & 0xE0) == 0x80) {
+                // A C1 control character (U+0080-U+009F): valid UTF-8, but escaped.
+                char escaped[7];
+                snprintf(escaped, sizeof escaped, "\\u%04x", unsigned(p[1]));
+                result += escaped;
+                ++p;
+            } else if (n) {
+                result.append(reinterpret_cast<const char *>(p), n);
+                p += n - 1;
+            } else {
+                char escaped[7];
+                snprintf(escaped, sizeof escaped, "\\u%04x", unsigned(*p));
+                result += escaped;
+            }
         } else if (*p < 32 || *p >= 127) {
             // Escaping bytes as U+00xx keeps malformed SSID bytes out of JSON syntax.
             char escaped[7];

@@ -14,6 +14,142 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.13] - 2026-11-12
+
+### Added
+
+- `test/native/support/fakes.h`: one in-memory settings store, one text sink and one call
+  sound for the PC unit tests, each able to fail on demand (TG-16).
+- Tests the drifted copies were hiding: a sound that cannot start, or breaks while playing,
+  ends a call with NO CARRIER at the dial tone, digits and handshake stages and frees the
+  line (`test_calls`); a refused store write for the phonebook, the network name, the modem
+  profile (`&W`) and the device password reports an error and changes nothing
+  (`test_config_services`).
+
+### Changed
+
+- `test_answer`, `test_calls`, `test_client`, `test_config`, `test_config_services` and
+  `test_internet` use the shared fakes instead of their own copies (tests only; no firmware
+  change). Suites still on their own copies are listed in `test/README.md`.
+
+## [2.12] - 2026-11-12
+
+### Added
+
+- Tests for each fix below (native: `test_netcfg`, `test_web`, `test_config_services`,
+  `test_modemcfg`).
+
+### Changed
+
+- `AT*WIFISCAN`, `AT*WIFIJOIN` and `AT*WIFIIP` give `ERROR` with "A call is in progress;
+  hang up first" while a call is up on any port, instead of dropping the call without a word
+  (5.5-05).
+- Wi-Fi passphrases may contain UTF-8 text (8-63 bytes; control bytes still refused)
+  (5.5-15).
+- Network names with accents or symbols reach the web page as the letters, not as mojibake;
+  bytes that are not valid UTF-8 are still escaped (5.5-16).
+
+### Fixed
+
+- `AT*NTP` refused nothing but a leading or trailing dot; `a..b` is now refused (5.5-15).
+- After `AT*WIFISCAN` with Wi-Fi off, the radio is switched off again when the scan ends,
+  fails or is cancelled (5.5-01).
+- `AT*PING`: the 10 s limit no longer includes the DNS lookup, and replies that arrived
+  count as a success even if a probe was still out at the limit (5.5-07).
+- Wi-Fi link state: state and reason change together under a lock, and a late "got IP"
+  event after `leave()` or `off()` cannot bring the link back up (5.5-02).
+- A second `AT*WIFISCAN` after a cancelled one joins the scan still running instead of
+  stopping it, so a late "scan done" event cannot end the new scan with a short list (5.5-03).
+- `AT*FACTORY` also clears the Wi-Fi driver's own saved network and password
+  (`nvs.net80211`), which firmware before v0.6 left there (5.5-19).
+- The call history file: after power loss between the two renames of a save, the newest
+  complete blob (the temporary file) is recovered, not the older backup (5.5-06).
+
+### Bench checks for Jon (hardware code that cannot run on the PC)
+
+- Join a network, `AT*WIFISCAN` with Wi-Fi off: the RGB Wi-Fi LED stays off and the list appears.
+- Start `AT*WIFISCAN`, press a key to cancel, run it again at once: the full list appears.
+- `AT*PING` a host name that resolves slowly: three replies, `OK`.
+- `AT*FACTORY` on a board that ran firmware before v0.6: no saved network afterwards.
+- Pull power during a call-history save (hard to time): the history is the newest or the
+  previous one, never empty.
+
+## [2.11] - 2026-11-12
+
+### Added
+
+- `web/src/upload_flow.js`: the browser upload flow (preflight, confirmation, login refresh,
+  sending, result) with every browser call passed in, so Node tests it (TG-14).
+  `web/test/upload_flow.test.mjs` covers each step and each failure, including a real
+  conflicting-identity image. The web file list now includes it in `build_web.py`,
+  `web_service.cpp` and the preview (firmware build needed to serve it).
+- `test/scripts/test_web_file_lists.py`: the build list, the served list, what the page
+  loads, the preview and the end-to-end asset check must name the same files (MNT-05h).
+- Opt-in end-to-end cases (collected only; not run here): `--flood-tests` (fourth browser
+  refused, idle floods on ports 23 and 80), `--upload-tests` (a cut-off upload frees the
+  modem), `--usb-unplug` (USB unplugged during a call) (TG-15).
+
+### Changed
+
+- The upload button is disabled from the first press until the result, so a second press
+  during the image check no longer starts a second upload (5.5-17).
+- After a successful update the page reloads once the modem answers again, so new web
+  files are used (5.5-17).
+- A browser that gets 503 (update in progress) from the login request asks again every
+  30 seconds, not every few seconds (5.5-17).
+- A connection dropped while the person reads the upload prompt now stops the upload with
+  a message instead of sending an empty CSRF token.
+
+### Fixed
+
+- The demo page drew `?????` for frames and rules; it now draws the same double-line frame
+  as the firmware (restored as Unicode escapes) (MNT-05b).
+
+## [2.10] - 2026-11-12
+
+### Added
+
+- Tests: a table of malformed PPP frames (LCP, IPCP, PAP and IP lengths, options that run
+  past the end, unknown codes, bad FCS, oversize frames) at each stage of the negotiation,
+  each checked for the right drop, reject or silence and for a good negotiation after it
+  (TG-03). A table of bad XMODEM/YMODEM blocks (repeat, skip, complement, CRC, block 0
+  names and sizes, the 16-file batch limit, cancel sequences) and of bad ZMODEM headers
+  and subpackets (CRC, format, type, cancel, wrong positions, ZFILE metadata). The X-1K
+  "wrap" test now sends more than 256 blocks, so the block number really wraps.
+
+### Changed
+
+- ZMODEM: a receiver that gets ZFIN but no "OO" ends as a success after 2 s, not as a
+  time-out after about 55 s (5.5-10).
+
+### Fixed
+
+- PPP: an IPCP Terminate-Request no longer starts a fresh 30 s negotiation time-out
+  before the link has been up, so a peer cannot keep a half-open link for ever (5.5-09).
+- X/Y/ZMODEM: stray bytes from the peer no longer postpone the retry and time-out
+  counts; only bytes that belong to a block, header or expected answer do (5.5-10).
+- Client Tests size probe: the reply is found even when the terminal echoes the query
+  back first (5.5-11).
+- `transfer.h` carries the Apache-2.0 notice and the "changed for USR Modem" mark like
+  `transfer.cpp` (MNT-05e).
+
+## [2.9] - 2026-11-12
+
+### Added
+
+- Test (no firmware change): a canary sweep stores a Wi-Fi password and a device password,
+  then runs every `AT*` command (read forms), `AT&V`, `ATI0`-`ATI7`, `AT*EXPORT`,
+  `AT*STATUS`, the logs and every configuration screen, and fails if either password,
+  its OTA hash or its Digest hash appears in any output, in plain, lower or upper case.
+  New commands are covered because the sweep walks the command table (TG-02).
+- Tests for the web login guards: an unterminated quote, the 12-parameter and 900-byte
+  limits, the 8-nonce table (the ninth evicts the oldest), a falling nonce count, a real
+  MD5 (RFC 1321 and RFC 2617 vectors) with a Digest login end to end, and filesystem
+  image checks (exact size, marker, version) (TG-05).
+- Tests for the host port: the `+++` guard time, the DTR hold and the throttle credit
+  across the 2^32 ms clock wrap, the throttle at 300, 2400 and 115200 bps, and S3/S5 at 0
+  and 127 (TG-06).
+
 ## [2.8] - 2026-11-12
 
 ### Changed

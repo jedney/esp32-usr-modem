@@ -167,7 +167,7 @@ def web(request, console):
 
 
 def test_assets_require_digest_and_have_correct_gzip_mime(web):
-    for path in ("/", "/app.js", "/upload.js", "/link.js", "/geometry.js", "/ui-data.js", "/api/session"):
+    for path in ("/", "/app.js", "/upload.js", "/upload_flow.js", "/link.js", "/geometry.js", "/ui-data.js", "/api/session"):
         code, _, _ = web.request(path, auth=False)
         require(code == 401, "Unauthenticated resource exposed")
     code, headers, body = web.request("/app.js")
@@ -462,3 +462,120 @@ def test_application_heartbeat_does_not_reach_terminal_input(web):
         text, messages = peer.collect(0.3)
         require(any(m.get("t") == "pong" for m in messages), "No application heartbeat reply")
         require(b"ping" not in text, "Heartbeat reached terminal input")
+
+
+# --- TG-15: limits and abuse. Opt-in: --flood-tests, --upload-tests ---------------------------
+
+
+def flood_only(request):
+    if not request.config.getoption("--flood-tests"):
+        pytest.skip("--flood-tests not enabled")
+
+
+def open_idle_sockets(host, port, count):
+    """Connections that say nothing. Refusals are fine; the point is to hold slots."""
+    sockets = []
+    for _ in range(count):
+        try:
+            sockets.append(socket.create_connection((host, port), timeout=2))
+        except OSError:
+            pass
+    return sockets
+
+
+def test_fourth_browser_is_refused_and_the_slot_returns(web, request):
+    flood_only(request)
+    with contextlib.ExitStack() as stack:
+        peers = [stack.enter_context(web.ws()) for _ in range(3)]
+        require(all(peer.accepted for peer in peers), "Three browsers must be accepted")
+        try:
+            fourth = stack.enter_context(web.ws())
+            refused = not fourth.accepted
+        except (OSError, EOFError):
+            refused = True
+        require(refused, "A fourth browser was accepted")
+        peers[0].close()
+        time.sleep(1.5)
+        with web.ws() as again:
+            require(again.accepted, "The slot of a closed browser was not freed")
+
+
+def test_idle_connection_flood_on_port_80_leaves_the_web_server_and_console_working(
+        web, console, request):
+    flood_only(request)
+    held = open_idle_sockets(web.host, 80, 40)
+    try:
+        time.sleep(3)
+        require(console.command("AT")[-1] == "OK", "The console stopped answering during a flood")
+    finally:
+        for sock in held:
+            sock.close()
+    # The server drops idle connections itself; allow it a few seconds, then it must serve.
+    deadline = time.monotonic() + 15
+    code = None
+    while time.monotonic() < deadline and code != 200:
+        try:
+            code = web.request("/api/session", timeout=4)[0]
+        except OSError:
+            time.sleep(1)
+    require(code == 200, "The web server did not recover after a connection flood")
+
+
+def test_idle_connection_flood_on_port_23_leaves_the_console_working_and_no_call_behind(
+        web, console, request):
+    flood_only(request)
+    held = open_idle_sockets(web.host, 23, 20)
+    try:
+        time.sleep(3)
+        require(console.command("AT")[-1] == "OK", "The console stopped answering during a flood")
+    finally:
+        for sock in held:
+            sock.close()
+    time.sleep(2)
+    console.command("ATH")
+    require(console.command("AT")[-1] == "OK", "The console stopped answering after a flood")
+    # A caller can still get through afterwards.
+    with socket.create_connection((web.host, 23), timeout=4):
+        time.sleep(1)
+    time.sleep(1)
+    require(console.command("AT")[-1] == "OK", "A caller after the flood left the modem stuck")
+
+
+def test_interrupted_upload_frees_the_modem(web, console, request):
+    if not request.config.getoption("--upload-tests"):
+        pytest.skip("--upload-tests not enabled")
+    version = (Path(__file__).resolve().parents[2] / "VERSION").read_text(encoding="utf-8").strip()
+    with web.ws() as owner:
+        require(owner.accepted, "Browser refused")
+        text, messages = owner.collect(0.5)
+        owner.send(b"e")
+        more, later = owner.collect(0.5)
+        hello = next((m for m in messages + later if m.get("t") == "hello"), None)
+        require(hello is not None and hello.get("csrf"), "No CSRF token in the page snapshot")
+        length = 600000
+        sock = socket.create_connection((web.host, 80), timeout=5)
+        # The request is sent in full but its body stops after 64 KiB, then the link drops.
+        # It holds no firmware identity, so nothing could be installed even if it finished.
+        head = (f"POST /api/update?target=firmware&version={version} HTTP/1.1\r\n"
+                f"Host: {web.host}\r\nOrigin: http://{web.host}\r\n"
+                f"Content-Type: application/octet-stream\r\nContent-Length: {length}\r\n"
+                f"X-CSRF-Token: {hello['csrf']}\r\nX-Image-SHA256: {'0' * 64}\r\n\r\n")
+        sock.sendall(head.encode())
+        try:
+            sock.sendall(bytes(65536))
+        except OSError:
+            pass
+        sock.close()
+    # A dropped upload must give the modem back without a reboot.
+    deadline = time.monotonic() + 20
+    ok = False
+    while time.monotonic() < deadline and not ok:
+        time.sleep(1)
+        try:
+            ok = (web.request("/api/session", timeout=4)[0] == 200
+                  and console.command("AT")[-1] == "OK")
+        except OSError:
+            pass
+    require(ok, "The modem stayed busy after an interrupted upload")
+    require(b"MODEM CONFIGURATION" in console.raw(b"AT*CONFIG\r"), "Menu unavailable after upload")
+    console.raw(b"\x03", wait=0.2)

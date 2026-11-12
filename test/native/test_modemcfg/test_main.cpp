@@ -4,6 +4,7 @@
 
 #include <cstring>
 #include <initializer_list>
+#include <vector>
 
 #include "modemcfg.h"
 
@@ -483,6 +484,86 @@ void test_layout_4_migrates_with_default_delays_and_validates_new_values() {
     }
 }
 
+// --- 5.5-06: recovering a blob saved through file, temporary file and backup -----------------
+
+// A blob ending in its CRC-32, `size` bytes long in all.
+std::vector<uint8_t> sealed(uint8_t fill, size_t size = 20) {
+    std::vector<uint8_t> blob(size, fill);
+    const uint32_t crc = crc32(blob.data(), size - 4);
+    for (unsigned i = 0; i < 4; ++i)
+        blob[size - 4 + i] = uint8_t(crc >> (8 * i));
+    return blob;
+}
+struct Files {
+    std::vector<uint8_t> file, temporary, backup;
+};
+size_t readSlot(void *context, Slot slot, uint8_t *out, size_t cap) {
+    const Files &f = *static_cast<Files *>(context);
+    const auto &blob = slot == Slot::kFile        ? f.file
+                       : slot == Slot::kTemporary ? f.temporary
+                                                  : f.backup;
+    // The reader does what hw::FileStore does: only a complete, CRC-sealed file counts.
+    if (blob.size() > cap || !crcSealed(blob.data(), blob.size()))
+        return 0;
+    memcpy(out, blob.data(), blob.size());
+    return blob.size();
+}
+void test_crc_sealed_checks_the_trailing_crc() {
+    auto blob = sealed(7);
+    TEST_ASSERT_TRUE(crcSealed(blob.data(), blob.size()));
+    blob[3] ^= 1;
+    TEST_ASSERT_FALSE(crcSealed(blob.data(), blob.size()));
+    blob = sealed(7);
+    blob[blob.size() - 1] ^= 1;
+    TEST_ASSERT_FALSE(crcSealed(blob.data(), blob.size()));
+    TEST_ASSERT_FALSE(crcSealed(blob.data(), 4));  // no room for data and a CRC
+    TEST_ASSERT_FALSE(crcSealed(blob.data(), 0));
+}
+void test_recovery_prefers_file_then_temporary_then_backup() {
+    uint8_t out[64];
+    Slot used = Slot::kBackup;
+    Files f{sealed(1), sealed(2), sealed(3)};
+    TEST_ASSERT_EQUAL(20, recoverBlob(readSlot, &f, out, sizeof out, &used));
+    TEST_ASSERT_EQUAL(int(Slot::kFile), int(used));
+    TEST_ASSERT_EQUAL(1, out[0]);
+    // Power lost between the two renames: no file, the newest blob is the temporary file.
+    f.file.clear();
+    TEST_ASSERT_EQUAL(20, recoverBlob(readSlot, &f, out, sizeof out, &used));
+    TEST_ASSERT_EQUAL(int(Slot::kTemporary), int(used));
+    TEST_ASSERT_EQUAL(2, out[0]);
+    // The file is there but damaged inside: the temporary file, then the backup, are tried.
+    f.file = sealed(1);
+    f.file[5] ^= 0x40;
+    TEST_ASSERT_EQUAL(20, recoverBlob(readSlot, &f, out, sizeof out, &used));
+    TEST_ASSERT_EQUAL(int(Slot::kTemporary), int(used));
+    // Power lost while the temporary file was written: part of it is no blob. The backup
+    // is the old blob when there is no file, and nothing newer was ever complete.
+    f.file.clear();
+    f.temporary = sealed(2);
+    f.temporary.resize(11);
+    TEST_ASSERT_EQUAL(20, recoverBlob(readSlot, &f, out, sizeof out, &used));
+    TEST_ASSERT_EQUAL(int(Slot::kBackup), int(used));
+    TEST_ASSERT_EQUAL(3, out[0]);
+    // A good file wins over a half-written temporary file.
+    f.file = sealed(1);
+    TEST_ASSERT_EQUAL(20, recoverBlob(readSlot, &f, out, sizeof out, &used));
+    TEST_ASSERT_EQUAL(int(Slot::kFile), int(used));
+}
+void test_recovery_returns_nothing_when_no_slot_has_a_good_blob() {
+    uint8_t out[64];
+    Slot used = Slot::kFile;
+    Files none;
+    TEST_ASSERT_EQUAL(0, recoverBlob(readSlot, &none, out, sizeof out, &used));
+    Files bad{sealed(1), sealed(2), sealed(3)};
+    bad.file[0] ^= 1;
+    bad.temporary[0] ^= 1;
+    bad.backup[0] ^= 1;
+    TEST_ASSERT_EQUAL(0, recoverBlob(readSlot, &bad, out, sizeof out, nullptr));
+    uint8_t tiny[8];  // a blob too big for the buffer does not count
+    Files big{sealed(1), {}, {}};
+    TEST_ASSERT_EQUAL(0, recoverBlob(readSlot, &big, tiny, sizeof tiny));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_layout_4_migrates_with_default_delays_and_validates_new_values);
@@ -508,6 +589,9 @@ int main() {
     RUN_TEST(test_crc32_known_value);
     RUN_TEST(test_store_round_trip_is_the_restart_case);
     RUN_TEST(test_load_result_texts);
+    RUN_TEST(test_crc_sealed_checks_the_trailing_crc);
+    RUN_TEST(test_recovery_prefers_file_then_temporary_then_backup);
+    RUN_TEST(test_recovery_returns_nothing_when_no_slot_has_a_good_blob);
     RUN_TEST(test_extended_speed_profiles_survive_restart_and_keep_old_auto);
     return UNITY_END();
 }

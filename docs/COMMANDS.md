@@ -206,14 +206,14 @@ resets it. "This boot" means it lasts until the next restart.
 |---|---|
 | `AT*WIFI[?]` | Wi-Fi state, network, signal, address. The password shows only as "set" or "not set" |
 | `AT*WIFI=<ON\|OFF>` | Switch Wi-Fi on or off. Saved |
-| `AT*WIFISCAN` | List networks in range |
-| `AT*WIFIJOIN=<n\|"name">` | Join network `n` from the scan, or by name. Asks for the password at a masked prompt; saved only once connected |
+| `AT*WIFISCAN` | List networks in range. `ERROR` ("A call is in progress; hang up first") while a call is up on any port. With Wi-Fi off, the radio goes off again when the scan ends |
+| `AT*WIFIJOIN=<n\|"name">` | Join network `n` from the scan, or by name. Asks for the password at a masked prompt (8-63 characters, UTF-8 allowed, or 64 hex digits); saved only once connected. `ERROR` while a call is up on any port |
 | `AT*WIFIFORGET` | Forget the network and its password |
-| `AT*WIFIIP=DHCP` / `=<ip>,<mask>,<gateway>[,<dns>]` | Automatic or static address. Saved |
+| `AT*WIFIIP=DHCP` / `=<ip>,<mask>,<gateway>[,<dns>]` | Automatic or static address. Saved. `ERROR` while a call is up on any port (the change would drop it) |
 | `AT*HOSTNAME=<name>` | Network name, reached as `<name>.local`. Saved; factory `usr-modem` |
 | `AT*TIME` | Date and time (from NTP) |
 | `AT*TZ=<zone\|POSIX rule>` / `AT*TZ=?` | Time zone; `?` lists the named zones. Saved; factory Pacific/Auckland |
-| `AT*NTP=<server>` | Time server. Saved; factory `pool.ntp.org` |
+| `AT*NTP=<server>` | Time server (letters, digits, `-` and `.`; no empty labels such as `a..b`). Saved; factory `pool.ntp.org` |
 
 ### Device, web and updates
 

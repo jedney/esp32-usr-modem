@@ -28,6 +28,7 @@ def web_files(root: pathlib.Path) -> dict:
         "status.js": src / "status.js",
         "demo.js": src / "demo.js",
         "upload.js": src / "upload.js",
+        "upload_flow.js": src / "upload_flow.js",
         "link.js": src / "link.js",
         "geometry.js": src / "geometry.js",
         "ui-data.js": src / "ui-data.js",

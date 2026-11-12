@@ -17,6 +17,7 @@ namespace {
 
 Net *net = nullptr;
 uint32_t (*clockMs)() = nullptr;
+bool (*callUp)() = nullptr;
 
 // The one join or scan waiting for its result (any port).
 enum class Op : uint8_t { kNone, kPassword, kJoin, kScan };
@@ -30,6 +31,16 @@ bool confirmationForget = false;
 
 uint32_t now() {
     return clockMs != nullptr ? clockMs() : 0;
+}
+// A join, scan or address change would drop a call in progress without a word (5.5-05).
+bool refusedDuringCall(Port &port) {
+    if (callUp == nullptr || !callUp()) {
+        return false;
+    }
+    port.beginInfo();
+    port.print("A call is in progress; hang up first");
+    port.newline();
+    return true;
 }
 void releasePassword() {
     if (pendingOp != Op::kPassword || !pendingPort)
@@ -218,9 +229,10 @@ Reply onPassword(Port &port, const char *text, void *) {
 
 }  // namespace
 
-void attachCommands(Net &n, uint32_t (*millisFn)()) {
+void attachCommands(Net &n, uint32_t (*millisFn)(), bool (*callUpFn)()) {
     net = &n;
     clockMs = millisFn;
+    callUp = callUpFn;
     pendingOp = Op::kNone;
     pendingPort = nullptr;
     confirmationPort = nullptr;
@@ -320,7 +332,7 @@ Reply cmdWifi(Port &port, const char *args) {
 
 Reply cmdWifiScan(Port &port, const char *args) {
     releasePassword();
-    if (*argStart(args) != '\0' || pendingOp != Op::kNone) {
+    if (*argStart(args) != '\0' || pendingOp != Op::kNone || refusedDuringCall(port)) {
         return Reply::kError;
     }
     if (!net->scanStart(now())) {
@@ -334,7 +346,7 @@ Reply cmdWifiScan(Port &port, const char *args) {
 
 Reply cmdWifiJoin(Port &port, const char *args) {
     releasePassword();
-    if (pendingOp != Op::kNone) {
+    if (pendingOp != Op::kNone || refusedDuringCall(port)) {
         return Reply::kError;
     }
     char arg[atcmd::kLineMax + 1];
@@ -407,6 +419,9 @@ Reply cmdWifiIp(Port &port, const char *args) {
         return Reply::kOk;
     }
     const char *a = argStart(args);
+    if (refusedDuringCall(port)) {
+        return Reply::kError;
+    }
     if (wordIs(a, "DHCP")) {
         if (port.browser()) {
             net->guardBrowserChange(now());

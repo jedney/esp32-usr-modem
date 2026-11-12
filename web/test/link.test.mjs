@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createModemLink} from '../src/link.js';
+import {createModemLink, BUSY_DELAY} from '../src/link.js';
 class Socket {
     readyState = 0;
     sent = [];
@@ -30,6 +30,23 @@ test('heartbeat proves liveness without sending terminal input', async () => {
     ws.onmessage({data:'{"t":"pong"}'});
     r.setTime(19000); r.link.poll();
     assert.equal(r.timers.length,0); assert.equal(r.link.send('key'),true);
+});
+test('a busy modem (update in progress) is asked again only every 30 seconds', async () => {
+    const busy = Object.assign(new Error('Login unavailable'), {busy: true});
+    let calls = 0;
+    const r = rig(async () => { calls++; if (calls < 3) throw busy; return 'ticket'; });
+    await r.link.start();
+    assert.equal(r.timers[0].ms, BUSY_DELAY);
+    await r.retry();
+    assert.equal(r.timers[0].ms, BUSY_DELAY);
+    await r.retry();
+    assert.equal(r.sockets.length, 1);
+    // Any other failure keeps the normal back-off: 1 s, 2 s, 5 s, then 10 s.
+    const plain = rig(async () => { throw new Error('Login unavailable'); });
+    await plain.link.start();
+    assert.equal(plain.timers[0].ms, 1000);
+    await plain.retry();
+    assert.equal(plain.timers[0].ms, 2000);
 });
 test('half-open reset reconnects without a socket close event', async () => {
     const r = rig(); await r.link.start(); const old = r.sockets[0]; old.open();
