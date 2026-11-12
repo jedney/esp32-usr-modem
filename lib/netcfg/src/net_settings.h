@@ -64,7 +64,7 @@ const char *loadResultText(LoadResult r);
 
 // --- Checks -------------------------------------------------------------------------------
 bool validSsid(const char *s);      // 1-32 bytes, no control characters
-bool validPassword(const char *s);  // "" (open), 8-63 printable ASCII, or 64 hex digits
+bool validPassword(const char *s);  // "" (open), 8-63 bytes without control bytes, or 64 hex digits
 // mDNS name: 1-32 of a-z 0-9 -, not starting or ending with '-'. Upper case is accepted
 // and lowered by normalizeHost(), which also drops a trailing ".local".
 bool normalizeHost(const char *in, char *out, size_t cap);

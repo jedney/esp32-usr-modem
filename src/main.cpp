@@ -149,8 +149,12 @@ config::CallJournal journal(history, debugLog, msNow, utcNow);
 char fallbackLog[4096];
 uint8_t ledMask = 0xFF;
 atcmd::Port *hardwareOwner = nullptr;
-modemcfg::Store *resetStores[] = {&store,      &netStore, &bookStore,   &historyStore,
-                                  &resetStore, &webStore, &clientStore, &internetStore};
+// The Wi-Fi driver's own saved network and password (firmware before v0.6 let it keep them;
+// WiFi.persistent(false) stops that now). A factory reset clears them too (5.5-19).
+hw::NvsStore wifiDriverStore("nvs.net80211", "unused");
+modemcfg::Store *resetStores[] = {&store,        &netStore,      &bookStore,
+                                  &historyStore, &resetStore,    &webStore,
+                                  &clientStore,  &internetStore, &wifiDriverStore};
 bool restarting = false;
 uint32_t restartAt = 0;
 
@@ -1270,7 +1274,9 @@ void setup() {
     usbport::session().setAnswerer(incoming);
     hwconsole::setPortControl(hwconsole::PortControl{modemIdle, rs232::suspend, rs232::resume});
     netcfg::LoadResult netLoaded = net.begin(millis());
-    netcfg::attachCommands(net, msNow);
+    netcfg::attachCommands(net, msNow, [] {
+        return console->callUp() || rs232::session().callUp() || usbport::session().callUp();
+    });
     // With a saved network, give it a few seconds so the banner can show the address.
     const netcfg::Settings &s = net.settings();
     const uint32_t start = millis();

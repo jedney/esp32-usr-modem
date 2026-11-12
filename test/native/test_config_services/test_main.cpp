@@ -87,6 +87,7 @@ public:
     void restart() override {}
 };
 uint32_t clockMs = 0;
+bool callIsUp = false;  // what the Wi-Fi commands are told about calls
 uint32_t now() {
     return clockMs;
 }
@@ -138,7 +139,7 @@ struct Rig {
         log.begin(logData, sizeof logData);
         Commands::attach(commands);
         activeBook = &phonebook;
-        netcfg::attachCommands(net, now);
+        netcfg::attachCommands(net, now, [] { return callIsUp; });
         devicecfg::attachCommands(deviceCommands);
     }
     std::string run(const char *s) {
@@ -458,6 +459,32 @@ void test_menu_export_retains_complete_replayable_lines_across_pages() {
     feed("\r");
     TEST_ASSERT_NOT_EQUAL(std::string::npos, drain().find("Configuration"));
 }
+// 5.5-05: a join, a scan or an address change would drop the call, so each is refused.
+void test_wifi_join_scan_and_address_change_are_refused_during_a_call() {
+    Rig r;
+    callIsUp = true;
+    const std::string before = r.net.settings().host;
+    for (const char *line : {"*WIFISCAN", "*WIFIJOIN=\"Home\"", "*WIFIIP=DHCP",
+                             "*WIFIIP=10.0.0.5,255.255.255.0,10.0.0.1"}) {
+        const std::string out = r.run(line);
+        TEST_ASSERT_NOT_EQUAL_MESSAGE(std::string::npos, out.find("A call is in progress"), line);
+        TEST_ASSERT_NOT_EQUAL_MESSAGE(std::string::npos, out.find("ERROR"), line);
+        TEST_ASSERT_FALSE_MESSAGE(r.session.port().busy(), line);  // no password prompt left open
+    }
+    TEST_ASSERT_TRUE(r.net.settings().dhcp);
+    TEST_ASSERT_EQUAL_STRING(before.c_str(), r.net.settings().host);
+    // Showing the settings is still allowed during a call.
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.run("*WIFIIP?").find("DHCP"));
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.run("*WIFI?").find("OK"));
+    // Once the call is over the same commands work again.
+    callIsUp = false;
+    TEST_ASSERT_NOT_EQUAL(std::string::npos,
+                          r.run("*WIFIIP=10.0.0.5,255.255.255.0,10.0.0.1").find("OK"));
+    TEST_ASSERT_FALSE(r.net.settings().dhcp);
+    TEST_ASSERT_EQUAL(std::string::npos, r.run("*WIFIJOIN=\"Home\"").find("A call is in progress"));
+    r.session.port().cancelPrompt();
+}
+
 // --- TG-02: neither password nor any stored form of it appears in any output ---------------
 struct Services : config::UiServices {
     calls::Phonebook *book;
@@ -640,6 +667,7 @@ int main() {
     RUN_TEST(test_local_service_f0_never_echoes_password_and_escape_wipes_prompt);
     RUN_TEST(test_menu_command_results_are_readable_with_nonstandard_at_format);
     RUN_TEST(test_outgoing_history_failure_and_same_burst_redial_are_recorded_once);
+    RUN_TEST(test_wifi_join_scan_and_address_change_are_refused_during_a_call);
     RUN_TEST(test_no_output_contains_either_password_or_its_stored_forms);
     return UNITY_END();
 }

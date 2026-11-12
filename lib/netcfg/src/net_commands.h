@@ -17,8 +17,9 @@
 namespace netcfg {
 
 // Connects the commands to the controller and a millisecond clock. Call once, before
-// any command runs.
-void attachCommands(Net &net, uint32_t (*millisFn)());
+// any command runs. callUpFn says whether any port has a call connected: joining, scanning
+// or changing the address would drop it, so those commands are refused until it ends.
+void attachCommands(Net &net, uint32_t (*millisFn)(), bool (*callUpFn)() = nullptr);
 
 // Call every loop, after Net::tick(): sends the result of a join or scan that finished.
 void pollCommands();

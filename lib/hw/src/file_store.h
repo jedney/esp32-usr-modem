@@ -19,12 +19,16 @@ public:
     FileStore(const char *path, const char *temporary, const char *backup)
         : path_(path), temporary_(temporary), backup_(backup) {}
     size_t load(uint8_t *out, size_t cap) override {
-        size_t n = read(path_, out, cap);
-        primaryGood_ = n != 0;
-        if (n) {
-            return n;
+        // The file, then the temporary file (the newest blob if power was lost between the two
+        // renames of save()), then the backup. Each must be complete and CRC-valid (5.5-06).
+        modemcfg::Slot used = modemcfg::Slot::kFile;
+        size_t n = modemcfg::recoverBlob(readSlot, this, out, cap, &used);
+        primaryGood_ = n != 0 && used == modemcfg::Slot::kFile;
+        if (n && used == modemcfg::Slot::kTemporary) {
+            // Make the recovered blob the file again, so the next save() cannot overwrite the
+            // only complete copy of it before its own commit.
+            primaryGood_ = LittleFS.rename(temporary_, path_);
         }
-        n = read(backup_, out, cap);
         if (n) {
             return n;
         }
@@ -68,6 +72,13 @@ public:
     }
 
 private:
+    static size_t readSlot(void *context, modemcfg::Slot slot, uint8_t *out, size_t cap) {
+        auto *self = static_cast<FileStore *>(context);
+        return self->read(slot == modemcfg::Slot::kFile        ? self->path_
+                          : slot == modemcfg::Slot::kTemporary ? self->temporary_
+                                                               : self->backup_,
+                          out, cap);
+    }
     size_t read(const char *path, uint8_t *out, size_t cap) {
         if (!fileExists(path)) {
             return 0;
@@ -80,11 +91,7 @@ private:
         if (n < 4 || n > cap || file.read(out, n) != n) {
             return 0;
         }
-        uint32_t expected = 0;
-        for (unsigned i = 0; i < 4; ++i) {
-            expected |= uint32_t(out[n - 4 + i]) << (8 * i);
-        }
-        return modemcfg::crc32(out, n - 4) == expected ? n : 0;
+        return modemcfg::crcSealed(out, n) ? n : 0;
     }
     const char *path_, *temporary_, *backup_;
     bool primaryGood_ = false;

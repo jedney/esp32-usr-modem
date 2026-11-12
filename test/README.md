@@ -58,8 +58,8 @@ Section numbers refer to the project brief.
 | Volume: pot, `ATL`, `ATM`, no cap (full volume = full scale) (5.3, 6.4) | `test_hwtest`, `test_calls` | `test_calls`, `test_hw` | `AT*HWPOT=TONE`, `AT*HWTEST` |
 | LEDs per table 5.4, `AT*HWLED=AUTO`; CD/TR/RD/SD follow RS232 or USB (v2.0) | `test_hostport` | `test_hw` | `test_session.py`, `AT*HWTEST` |
 | Hardware tests `AT*HW...`; line, loopback and bridge refused on RS232 (6.14, Q79); 5-minute key time-out, LED patterns refused during a call, per-owner holds (v2.3) | `test_hwtest`, `test_config` | `test_hw` | `test_hwtest.py`, `test_config.py` |
-| Wi-Fi: scan, masked join, retry, static IP, mDNS, ARQ/RGB, banner (6.6, 6.7) | `test_netcfg`, `test_atcmd` | `test_wifi`, `test_rs232` | `test_wifi.py`, `test_calls.py`, `test_answer.py` |
-| Clock: NTP, time zones, daylight saving (6.8, Q59) | `test_netcfg` | `test_wifi` | `test_wifi.py` |
+| Wi-Fi: scan, masked join (UTF-8 passphrases), retry, static IP, mDNS, ARQ/RGB, radio off after a scan with Wi-Fi off, join/scan/IP refused during a call, banner (6.6, 6.7, v2.12) | `test_netcfg`, `test_config_services`, `test_atcmd` | `test_wifi`, `test_rs232` | `test_wifi.py`, `test_calls.py`, `test_answer.py` |
+| Clock: NTP (no empty labels), time zones, daylight saving (6.8, Q59) | `test_netcfg` | `test_wifi` | `test_wifi.py` |
 | Browser Wi-Fi changes: 60 s check, failed join, `AT*WIFI=OFF`/`FORGET` in the window; scan names without control bytes | `test_netcfg` | — | — |
 | Wi-Fi and device password, OTA hash and Digest hash never in any output: canary sweep over every `AT*` command, `AT&V`, `ATI`, export, logs and every configuration screen (6.6, 6.8, TG-02, v2.9) | `test_netcfg`, `test_config_services` (`test_no_output_contains_either_password_or_its_stored_forms`) | — | `test_wifi.py`, `test_config.py` |
 | Device password: first boot, first use, change, hashes only, masked input (6.6) | `test_devicecfg` | `test_device` | `test_device.py` |
@@ -69,6 +69,8 @@ Section numbers refer to the project brief.
 | Export and replay without secrets, logs, call history (6.8) | `test_config`, `test_config_services` | `test_config` | `test_config.py` |
 | About generated from the licensing record | `scripts/test_generate_credits.py` | — | `test_config.py` |
 | Web server: Digest login (stale nonce, wrong-password lock-out, parameter/size limits, nonce table, real MD5, falling count), filesystem image check, Host/Origin, tickets, CSRF, WebSocket, upload and unmount hand-shakes (late answers), browsers start read-only (6.11) | `test_web`, `scripts/test_image_manifest.py`, `scripts/test_web_peer.py` | `test_web` | `test_web.py` |
+| Network names as UTF-8 in the web page's JSON (5.5-16, v2.12) | `test_web` | — | — |
+| History file recovery order: file, temporary file, backup, each CRC-sealed (5.5-06, v2.12) | `test_modemcfg` | — | — |
 | Web page: status bar, reconnect and 30 s back-off while an update is written, sizing, upload hashing, the whole upload flow (preflight, conflicting identity, confirmation, login refresh, lost connection, refusal, double press), demo with the firmware's frame (6.11, TG-14, v2.11) | `web/test/` | — | `test_web.py` |
 | The web file list agrees in `build_web.py`, `web_service.cpp`, the page imports, the preview and the e2e check (MNT-05h, v2.11) | `scripts/test_web_file_lists.py` | — | — |
 | Browser limit (3), idle connection floods on ports 23 and 80, an interrupted upload, USB unplug during a call (TG-15, v2.11; opt-in) | — | — | `test_web.py --flood-tests`, `--upload-tests`; `test_usb.py --usb-unplug` |

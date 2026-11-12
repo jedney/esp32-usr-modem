@@ -14,6 +14,48 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.12] - 2026-11-12
+
+### Added
+
+- Tests for each fix below (native: `test_netcfg`, `test_web`, `test_config_services`,
+  `test_modemcfg`).
+
+### Changed
+
+- `AT*WIFISCAN`, `AT*WIFIJOIN` and `AT*WIFIIP` give `ERROR` with "A call is in progress;
+  hang up first" while a call is up on any port, instead of dropping the call without a word
+  (5.5-05).
+- Wi-Fi passphrases may contain UTF-8 text (8-63 bytes; control bytes still refused)
+  (5.5-15).
+- Network names with accents or symbols reach the web page as the letters, not as mojibake;
+  bytes that are not valid UTF-8 are still escaped (5.5-16).
+
+### Fixed
+
+- `AT*NTP` refused nothing but a leading or trailing dot; `a..b` is now refused (5.5-15).
+- After `AT*WIFISCAN` with Wi-Fi off, the radio is switched off again when the scan ends,
+  fails or is cancelled (5.5-01).
+- `AT*PING`: the 10 s limit no longer includes the DNS lookup, and replies that arrived
+  count as a success even if a probe was still out at the limit (5.5-07).
+- Wi-Fi link state: state and reason change together under a lock, and a late "got IP"
+  event after `leave()` or `off()` cannot bring the link back up (5.5-02).
+- A second `AT*WIFISCAN` after a cancelled one joins the scan still running instead of
+  stopping it, so a late "scan done" event cannot end the new scan with a short list (5.5-03).
+- `AT*FACTORY` also clears the Wi-Fi driver's own saved network and password
+  (`nvs.net80211`), which firmware before v0.6 left there (5.5-19).
+- The call history file: after power loss between the two renames of a save, the newest
+  complete blob (the temporary file) is recovered, not the older backup (5.5-06).
+
+### Bench checks for Jon (hardware code that cannot run on the PC)
+
+- Join a network, `AT*WIFISCAN` with Wi-Fi off: the RGB Wi-Fi LED stays off and the list appears.
+- Start `AT*WIFISCAN`, press a key to cancel, run it again at once: the full list appears.
+- `AT*PING` a host name that resolves slowly: three replies, `OK`.
+- `AT*FACTORY` on a board that ran firmware before v0.6: no saved network afterwards.
+- Pull power during a call-history save (hard to time): the history is the newest or the
+  previous one, never empty.
+
 ## [2.11] - 2026-11-12
 
 ### Added

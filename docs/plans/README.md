@@ -38,7 +38,7 @@ whole window.
 | 09 | v2.9 | [Security regression tests](../history/wp-09-security-tests.md) | Sonnet / high | M | 07 |
 | 10 | v2.10 | [Hostile-input tests: PPP, X/Y/ZMODEM](../history/wp-10-hostile-input.md) | Sonnet / high | M-L | 01 |
 | 11 | v2.11 | [Web page tests and flows](../history/wp-11-web-page.md) | Sonnet / medium | M | 06 |
-| 12 | v2.12 | [Network and storage follow-ups](wp-12-network-storage.md) | Sonnet / high | M-L | 05 |
+| 12 | v2.12 | [Network and storage follow-ups](../history/wp-12-network-storage.md) | Sonnet / high | M-L | 05 |
 | 13 | v2.13 | [Shared native test fixtures](wp-13-test-fixtures.md) | Sonnet / medium | M | 09, 10 |
 | 14 | v2.14 | [`main.cpp` tidy-up](wp-14-main-tidy.md) | Opus / medium | M-L | 02, 03, 06 |
 | 15 | v2.15 | [Configuration screen repaint](wp-15-menu-repaint.md) | Opus / high | L | 07 |
@@ -150,13 +150,13 @@ the package confirms each first.
 | MNT-05h | Web file list kept in three places | 11 | done (v2.11) |
 | MNT-05i | Stale comments (`hwconsole.h`, `connection.h`, `atcmd.cpp:764`) | 03, 07 | done (`hwconsole.h` v2.3; `connection.h`, `atcmd.cpp` v2.7) |
 | MNT-05j | cppcheck notes `hwconsole.cpp:895`, `menu.cpp:449` | 03, 15 | open (`hwconsole.cpp` done v2.3) |
-| 5.5-01 | Radio stays on after `AT*WIFISCAN` with Wi-Fi off | 12 | open |
-| 5.5-02 | `volatile` link state; late event overwrites `leave()` | 12 | open |
-| 5.5-03 | Second scan ends the new scan early | 12 | open |
+| 5.5-01 | Radio stays on after `AT*WIFISCAN` with Wi-Fi off | 12 | done (v2.12) |
+| 5.5-02 | `volatile` link state; late event overwrites `leave()` | 12 | done (v2.12; bench check) |
+| 5.5-03 | Second scan ends the new scan early | 12 | done (v2.12; bench check) |
 | 5.5-04 | `AT*WIFI=OFF`/`WIFIFORGET` in the 60 s window saves the change | 05 | done (v2.5) |
-| 5.5-05 | Join, scan or IP change drops a call without warning | 12 | open |
-| 5.5-06 | `file_store.h` power loss between renames; no backup fallback | 12 | open |
-| 5.5-07 | DNS time counts against the 10 s ping limit | 12 | open |
+| 5.5-05 | Join, scan or IP change drops a call without warning | 12 | done (v2.12) |
+| 5.5-06 | `file_store.h` power loss between renames; no backup fallback | 12 | done (v2.12; the bad-CRC fallback already worked) |
+| 5.5-07 | DNS time counts against the 10 s ping limit | 12 | done (v2.12; bench check) |
 | 5.5-08 | Two 1.5 KB copies on the 6 KB lwIP stack | 17 | open |
 | 5.5-09 | IPCP Terminate-Request resets the 30 s time-out | 10 | done (v2.10) |
 | 5.5-10 | Transfer inactivity reset by any byte; missing "OO" | 10 | done (v2.10) |
@@ -164,11 +164,11 @@ the package confirms each first.
 | 5.5-12 | S7 runs during the handshake sound | 04 | done (v2.4; confirmed by a test) |
 | 5.5-13 | `captureBegin()` failure ignored; `runs` unchecked | 02 | done (v2.2) |
 | 5.5-14 | Menu paging, Alt+letter after cancel, "too long" flag | 15 | open |
-| 5.5-15 | `validPassword` rejects UTF-8; `validServer` accepts `a..b` | 12 | open |
-| 5.5-16 | Non-ASCII SSIDs shown as mojibake | 12 | open |
+| 5.5-15 | `validPassword` rejects UTF-8; `validServer` accepts `a..b` | 12 | done (v2.12) |
+| 5.5-16 | Non-ASCII SSIDs shown as mojibake | 12 | done (v2.12) |
 | 5.5-17 | Upload double press, reconnect loop, no reload | 11 | done (v2.11; the page cannot see an upload in another tab, so it backs off on 503 instead) |
 | 5.5-18 | `.env` BOM/UTF-16, `bump_version` CRLF, hotkey substring | 01 | done (v2.1) |
-| 5.5-19 | `AT*FACTORY` leaves driver-stored Wi-Fi credentials | 12 | open |
+| 5.5-19 | `AT*FACTORY` leaves driver-stored Wi-Fi credentials | 12 | done (v2.12; bench check) |
 | TG-01 | Remote `+++` test has no guard times | 04 | done (v2.4) |
 | TG-02 | No canary sweep for both passwords and the Digest hash | 09 | done (v2.9) |
 | TG-03 | No hostile PPP or X/Y/ZMODEM input tests | 10 | done (v2.10) |

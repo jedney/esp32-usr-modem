@@ -184,6 +184,21 @@ const char *loadResultText(LoadResult r);
 
 uint32_t crc32(const uint8_t *data, size_t len);
 
+// A blob that ends in the little-endian CRC-32 of everything before it.
+bool crcSealed(const uint8_t *data, size_t len);
+
+// The three files a safely written blob can be in (hw::FileStore). A save writes the
+// temporary file, renames the file to the backup, then renames the temporary file into
+// place. Power lost between the two renames leaves no file, the old blob as the backup
+// and the newest, complete blob as the temporary file.
+enum class Slot : uint8_t { kFile, kTemporary, kBackup };
+// readFn copies a complete (crcSealed) blob from `slot` and returns its length, or 0.
+using SlotReader = size_t (*)(void *context, Slot slot, uint8_t *out, size_t cap);
+// Returns the blob from the first slot that has one, in the order file, temporary file,
+// backup; 0 if none. *used (if given) says which.
+size_t recoverBlob(SlotReader readFn, void *context, uint8_t *out, size_t cap,
+                   Slot *used = nullptr);
+
 // Where the blob lives. The board uses NVS (hw::NvsStore); tests use memory.
 constexpr size_t kLoadError = static_cast<size_t>(-1);
 class Store {

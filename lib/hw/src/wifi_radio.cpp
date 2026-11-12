@@ -20,11 +20,22 @@ using netcfg::Reason;
 
 namespace {
 
-// Written by the Wi-Fi event task (core 0), read by loop() (core 1).
-volatile LinkState linkState = LinkState::kOff;
-volatile Reason linkReason = Reason::kNone;
+// Written by the Wi-Fi event task (core 0) and by loop() (core 1). The state and its reason
+// change together under linkLock, and the event handler only makes the moves that make sense
+// from the state loop() left (5.5-02): a late "got IP" from a connection that leave() or
+// off() has already ended can no longer bring the link back up.
+portMUX_TYPE linkLock = portMUX_INITIALIZER_UNLOCKED;
+LinkState linkState = LinkState::kOff;  // guarded by linkLock
+Reason linkReason = Reason::kNone;      // guarded by linkLock
 volatile int64_t syncedAt = 0;
 volatile bool scanFinished = false;
+
+void setLink(LinkState state, Reason reason) {
+    portENTER_CRITICAL(&linkLock);
+    linkState = state;
+    linkReason = reason;
+    portEXIT_CRITICAL(&linkLock);
+}
 
 // Our own scan limit. The core's scanNetworks() gives up after 20 x the channel time (6 s),
 // which the first scan after the radio starts can take longer than; its results then
@@ -58,25 +69,32 @@ Reason mapReason(uint8_t r, bool wasUp) {
 void onWifiEvent(arduino_event_id_t event, arduino_event_info_t info) {
     switch (event) {
         case ARDUINO_EVENT_WIFI_STA_GOT_IP:
-            linkReason = Reason::kNone;
-            linkState = LinkState::kUp;
+            portENTER_CRITICAL(&linkLock);
+            if (linkState == LinkState::kConnecting || linkState == LinkState::kUp) {
+                linkReason = Reason::kNone;
+                linkState = LinkState::kUp;
+            }
+            portEXIT_CRITICAL(&linkLock);
             break;
         case ARDUINO_EVENT_WIFI_STA_LOST_IP:
+            portENTER_CRITICAL(&linkLock);
             if (linkState == LinkState::kUp) {
                 linkReason = Reason::kLost;
                 linkState = LinkState::kDown;
             }
+            portEXIT_CRITICAL(&linkLock);
             break;
         case ARDUINO_EVENT_WIFI_STA_DISCONNECTED: {
             const uint8_t r = info.wifi_sta_disconnected.reason;
             if (r == WIFI_REASON_ASSOC_LEAVE) {
                 break;  // our own leave() or a new connect()
             }
-            const LinkState s = linkState;
-            if (s == LinkState::kConnecting || s == LinkState::kUp) {
-                linkReason = mapReason(r, s == LinkState::kUp);
+            portENTER_CRITICAL(&linkLock);
+            if (linkState == LinkState::kConnecting || linkState == LinkState::kUp) {
+                linkReason = mapReason(r, linkState == LinkState::kUp);
                 linkState = LinkState::kDown;
             }
+            portEXIT_CRITICAL(&linkLock);
             break;
         }
         case ARDUINO_EVENT_WIFI_SCAN_DONE:
@@ -161,16 +179,14 @@ void EspRadio::connect(const netcfg::Settings &s) {
         WiFi.config(toIp(s.ip), toIp(s.gateway), toIp(s.mask), toIp(s.dns));
     }
     WiFi.setMinSecurity(s.pass[0] != '\0' ? WIFI_AUTH_WPA_PSK : WIFI_AUTH_OPEN);
-    linkReason = Reason::kNone;
-    linkState = LinkState::kConnecting;
+    setLink(LinkState::kConnecting, Reason::kNone);
     WiFi.begin(s.ssid, s.pass[0] != '\0' ? s.pass : nullptr);
 }
 
 void EspRadio::leave() {
     start();
     mdnsStop();
-    linkReason = Reason::kNone;
-    linkState = LinkState::kDown;
+    setLink(LinkState::kDown, Reason::kNone);
     if (WiFi.getMode() != WIFI_OFF) {
         WiFi.disconnect(false, false);
     }
@@ -179,16 +195,17 @@ void EspRadio::leave() {
 void EspRadio::off() {
     start();
     mdnsStop();
-    linkReason = Reason::kNone;
-    linkState = LinkState::kOff;
+    setLink(LinkState::kOff, Reason::kNone);
     WiFi.disconnect(true, false);
     WiFi.mode(WIFI_OFF);
 }
 
 netcfg::LinkInfo EspRadio::link() {
     netcfg::LinkInfo l = {};
+    portENTER_CRITICAL(&linkLock);
     l.state = linkState;
     l.reason = linkReason;
+    portEXIT_CRITICAL(&linkLock);
     if (l.state == LinkState::kUp) {
         l.rssi = static_cast<int8_t>(WiFi.RSSI());
         l.channel = static_cast<uint8_t>(WiFi.channel());
@@ -206,7 +223,11 @@ bool EspRadio::scanStart() {
         WiFi.mode(WIFI_STA);  // netcfg::Net turns it off again after the scan
     }
     if (scanning) {
-        esp_wifi_scan_stop();  // an earlier scan that ran out of time
+        // A scan the caller gave up on (a cancelled AT*WIFISCAN) is still running: join it
+        // rather than stop it. Stopping posts a "scan done" event which could arrive after
+        // the new scan began and end it at once with a short list (5.5-03).
+        scanStartedAt = millis();
+        return true;
     }
     WiFi.scanDelete();
     // Started here rather than with WiFi.scanNetworks() (see kScanLimitMs). The core

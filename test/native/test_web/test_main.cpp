@@ -244,6 +244,34 @@ void test_image_identity_header_length_and_chunk_boundaries() {
 void test_json_escapes_untrusted_strings() {
     TEST_ASSERT_EQUAL_STRING("\"a\\\"\\\\\\u001b\\u000a\"", jsonString("a\"\\\x1b\n").c_str());
 }
+// 5.5-16: a network named "Caf\u00e9" reaches the page as the letters, not as mojibake. Bytes
+// that are not valid UTF-8 are still escaped one by one so they cannot break the JSON.
+void test_json_passes_valid_utf8_and_escapes_invalid_bytes() {
+    TEST_ASSERT_EQUAL_STRING("\"caf\xc3\xa9\"", jsonString("caf\xc3\xa9").c_str());    // 2 bytes
+    TEST_ASSERT_EQUAL_STRING("\"\xe2\x9c\x93\"", jsonString("\xe2\x9c\x93").c_str());  // 3 bytes
+    TEST_ASSERT_EQUAL_STRING("\"\xf0\x9f\x93\xb6\"",
+                             jsonString("\xf0\x9f\x93\xb6").c_str());  // 4 bytes
+    // A lone lead byte, a lone continuation byte, a truncated sequence at the end.
+    TEST_ASSERT_EQUAL_STRING("\"a\\u00c3b\"", jsonString("a\xc3"
+                                                         "b")
+                                                  .c_str());
+    TEST_ASSERT_EQUAL_STRING("\"a\\u00a9b\"", jsonString("a\xa9"
+                                                         "b")
+                                                  .c_str());
+    TEST_ASSERT_EQUAL_STRING("\"a\\u00e2\\u009c\"", jsonString("a\xe2\x9c").c_str());
+    // Overlong forms, surrogates, and code points above U+10FFFF are not valid.
+    TEST_ASSERT_EQUAL_STRING("\"\\u00c0\\u0080\"", jsonString("\xc0\x80").c_str());
+    TEST_ASSERT_EQUAL_STRING("\"\\u00e0\\u0080\\u0080\"", jsonString("\xe0\x80\x80").c_str());
+    TEST_ASSERT_EQUAL_STRING("\"\\u00ed\\u00a0\\u0080\"", jsonString("\xed\xa0\x80").c_str());
+    TEST_ASSERT_EQUAL_STRING("\"\\u00f4\\u0090\\u0080\\u0080\"",
+                             jsonString("\xf4\x90\x80\x80").c_str());
+    TEST_ASSERT_EQUAL_STRING("\"\\u00ff\"", jsonString("\xff").c_str());
+    // Control bytes and DEL are still escaped, quotes and backslashes still escaped.
+    TEST_ASSERT_EQUAL_STRING("\"\\u007f\\u0001\\\"\"", jsonString("\x7f\x01\"").c_str());
+    // C1 control characters (U+0080-U+009F) are valid UTF-8 but are controls: escaped.
+    TEST_ASSERT_EQUAL_STRING("\"\\u0085\"", jsonString("\xc2\x85").c_str());
+    TEST_ASSERT_EQUAL_STRING("\"\xc2\xa0\"", jsonString("\xc2\xa0").c_str());  // U+00A0 passes
+}
 void test_browser_cp437_is_utf8_and_serial_source_bytes_are_unchanged() {
     const uint8_t bytes[] = {0xda, 0xc4, 0xbf, '\r', '\n'};
     TEST_ASSERT_EQUAL_STRING("\xe2\x94\x8c\xe2\x94\x80\xe2\x94\x90\r\n",
@@ -683,6 +711,7 @@ int main() {
     RUN_TEST(test_version_order_is_numeric_and_invalid_is_distinct);
     RUN_TEST(test_image_identity_header_length_and_chunk_boundaries);
     RUN_TEST(test_json_escapes_untrusted_strings);
+    RUN_TEST(test_json_passes_valid_utf8_and_escapes_invalid_bytes);
     RUN_TEST(test_authorization_parser_refuses_unterminated_quote_and_too_many_parameters);
     RUN_TEST(test_authorization_header_is_limited_to_900_bytes);
     RUN_TEST(test_ninth_challenge_evicts_the_oldest_nonce_and_a_falling_count_is_stale);
