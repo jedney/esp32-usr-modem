@@ -1113,68 +1113,162 @@ void publishWebStatus() {
     publishWifi(now, force);
     publishCall(now, force);
 }
+// --- Browser terminal ---------------------------------------------------------------------
+
+// A finished image upload restarts the modem; a failed file-system upload mounts it again.
+void finishUpload() {
+    bool ok, fs;
+    if (!webServer.takeUploadDone(ok, fs)) {
+        return;
+    }
+    webServer.discardInput(browserClient);
+    callSlot.release(&webServer);
+    if (ok) {
+        deviceControl.restart();
+    } else if (fs) {
+        LittleFS.begin(false);
+    }
+}
+
+// Only the browser with the configuration screen may upload, and only while no port has a
+// half-typed command and no Wi-Fi join or scan runs. The upload holds the call slot.
+void answerUploadRequest() {
+    uint32_t uploadClient;
+    if (!webServer.takeUploadRequest(uploadClient)) {
+        return;
+    }
+    bool allow = !hardwareRunning && browserClient == uploadClient && browserMenu->isOpen() &&
+                 console->port().lineEmpty() && rs232::session().port().lineEmpty() &&
+                 usbport::session().port().lineEmpty() &&
+                 net.joinResult() != netcfg::JoinResult::kRunning &&
+                 net.scanState() != netcfg::ScanState::kRunning;
+    if (allow) {
+        webServer.discardInput(browserClient);
+        browserSession->hangUp();
+        hwconsole::restoreBrowserResources();
+        browserAccess(browserClient, false);
+    }
+    allow = allow && callSlot.claim(&webServer);
+    if (allow) {
+        callAudio.stop();
+        ota.poll(millis(), net.up(), false, net.settings().host, net.link().ip);
+    }
+    // The server may have stopped waiting (2 s) while we checked: then allowUpload()
+    // changes nothing and we release the claim, so no upload is left half-started
+    // (STA-07). ArduinoOTA resumes on the next ota.poll(); the browser keeps its
+    // read-only view and can press E again.
+    if (!webServer.allowUpload(allow) && allow) {
+        callSlot.release(&webServer);
+    }
+}
+
+// The browser with the configuration screen closed it or went away: back to read-only.
+void releaseConfigBrowser() {
+    if (!browserClient || (webServer.connected(browserClient) &&
+                           (browserSession->localOpen() || browserSession->port().busy()))) {
+        return;
+    }
+    if (!webServer.connected(browserClient)) {
+        netcfg::detachCommands(browserSession->port());
+    }
+    webServer.discardInput(browserClient);
+    browserSession->port().cancelPrompt();
+    browserSession->hangUp();
+    hwconsole::restoreBrowserResources();
+    if (webServer.connected(browserClient)) {
+        browserWaiting(browserClient);
+    }
+    browserClient = 0;
+}
+
+// Every browser starts read-only (STA-02): opening the page claims nothing, so a
+// forgotten tab can't turn callers away. E takes the configuration screen when free;
+// other keys are dropped.
+void serveReadOnlyBrowser(uint32_t id, bool fresh) {
+    uint8_t bytes[128];
+    if (fresh) {
+        browserWaiting(id);
+    }
+    size_t n = webServer.read(id, bytes, sizeof bytes);
+    bool enter = n && (bytes[0] == 'e' || bytes[0] == 'E');
+    while (webServer.read(id, bytes, sizeof bytes)) {
+    }
+    if (enter && !browserClient && !callSlot.busy() && !hardwareRunning) {
+        browserClient = id;
+        if (browserMenu->open() && browserSession->startLocal(*browserMenu)) {
+            browserAccess(id, true);
+        } else {
+            browserMenu->close();
+            browserClient = 0;
+        }
+    }
+    devicecfg::wipe(bytes, sizeof bytes);
+}
+
+// A menu action the browser leaves the screen for. The browser has no data line, so a
+// dial goes to the RS232 host port when that port can take it (MNT-05a: check first).
+void runBrowserDeparture() {
+    char departure[atcmd::kLineMax + 1];
+    if (browserMenu->takeDeparture(departure, sizeof departure)) {
+        browserSession->tick(millis(), true);
+        hwconsole::restoreBrowserResources();
+        if (!strncmp(departure, "*DIAL=", 6)) {
+            auto &host = rs232::session();
+            if (host.mode() == hostport::Mode::kCommand && !host.localOpen() &&
+                host.port().lineEmpty()) {
+                browserSession->port().line("Dialling on the RS232 host port.");
+                host.port().execute(departure);
+            } else {
+                browserSession->port().line("The RS232 host port is busy: not dialled.");
+            }
+        } else {
+            browserSession->port().execute(departure);
+        }
+    }
+    devicecfg::wipe(departure, sizeof departure);
+}
+
+// The browser with the configuration screen: one key in, as much output as fits.
+void serveConfigBrowser(uint32_t id) {
+    uint8_t bytes[128];
+    // Read at most one key: an action may enter an interactive hardware test,
+    // whose adapter must retain the following queued keys for that test.
+    unsigned columns, rows;
+    if (webServer.takeSize(id, columns, rows))
+        browserMenu->resize(columns, rows);
+    if (webServer.read(id, bytes, 1)) {
+        browserSession->fromHost(bytes, 1, millis());
+    }
+    browserSession->tick(millis(), true);
+    // CP437 can expand to three UTF-8 bytes. Pull only what the transport
+    // can retain, leaving the shared terminal's response cursor in place.
+    size_t room = webServer.space(id) / 3;
+    size_t n = browserSession->toHost(bytes, room < sizeof bytes ? room : sizeof bytes);
+    if (n) {
+        // Menu CP437 is converted at this transport only; serial stays CP437.
+        std::string output =
+            webinterface::terminalUtf8(bytes, n, browserMenu->style() == config::Style::Cp437);
+        webServer.write(id, reinterpret_cast<const uint8_t *>(output.data()), output.size());
+    }
+    runBrowserDeparture();
+    devicecfg::wipe(bytes, sizeof bytes);
+}
+
 void pollBrowser() {
     char ip[16];
     netcfg::formatIp(net.link().ip, ip, sizeof ip);
-    bool ok, fs;
-    if (webServer.takeUploadDone(ok, fs)) {
-        webServer.discardInput(browserClient);
-        callSlot.release(&webServer);
-        if (ok) {
-            deviceControl.restart();
-        } else if (fs) {
-            LittleFS.begin(false);
-        }
-    }
+    finishUpload();
     webServer.poll(webSettings.enabled(), net.up(), net.settings().host, ip);
     if (webServer.takeUnmountRequest()) {
         callAudio.stop();
         LittleFS.end();
         webServer.unmounted();
     }
-    uint32_t uploadClient;
-    if (webServer.takeUploadRequest(uploadClient)) {
-        bool owner = browserClient == uploadClient && browserMenu->isOpen();
-        bool allow = !hardwareRunning && owner && console->port().lineEmpty() &&
-                     rs232::session().port().lineEmpty() && usbport::session().port().lineEmpty() &&
-                     net.joinResult() != netcfg::JoinResult::kRunning &&
-                     net.scanState() != netcfg::ScanState::kRunning;
-        if (allow) {  // only the browser with the configuration screen may upload
-            webServer.discardInput(browserClient);
-            browserSession->hangUp();
-            hwconsole::restoreBrowserResources();
-            browserAccess(browserClient, false);
-        }
-        allow = allow && callSlot.claim(&webServer);
-        if (allow) {
-            callAudio.stop();
-            ota.poll(millis(), net.up(), false, net.settings().host, net.link().ip);
-        }
-        // The server may have stopped waiting (2 s) while we checked: then allowUpload()
-        // changes nothing and we release the claim, so no upload is left half-started
-        // (STA-07). ArduinoOTA resumes on the next ota.poll(); the browser keeps its
-        // read-only view and can press E again.
-        if (!webServer.allowUpload(allow) && allow) {
-            callSlot.release(&webServer);
-        }
-    }
+    answerUploadRequest();
     if (webServer.uploading()) {
         return;
     }
-    if (browserClient && (!webServer.connected(browserClient) ||
-                          (!browserSession->localOpen() && !browserSession->port().busy()))) {
-        if (!webServer.connected(browserClient)) {
-            netcfg::detachCommands(browserSession->port());
-        }
-        webServer.discardInput(browserClient);
-        browserSession->port().cancelPrompt();
-        browserSession->hangUp();
-        hwconsole::restoreBrowserResources();
-        if (webServer.connected(browserClient)) {
-            browserWaiting(browserClient);
-        }
-        browserClient = 0;
-    }
+    releaseConfigBrowser();
     static uint32_t seen[hw::WebService::kClients] = {};
     for (unsigned i = 0; i < hw::WebService::kClients; ++i) {
         uint32_t id = webServer.clientId(i);
@@ -1183,71 +1277,100 @@ void pollBrowser() {
         if (!id) {
             continue;
         }
-        uint8_t bytes[128];
-        // Every browser starts read-only (STA-02): opening the page claims nothing, so a
-        // forgotten tab can't turn callers away. E takes the configuration screen when free.
-        if (id != browserClient) {
-            if (fresh) {
-                browserWaiting(id);
-            }
-            size_t n = webServer.read(id, bytes, sizeof bytes);
-            bool enter = n && (bytes[0] == 'e' || bytes[0] == 'E');
-            while (webServer.read(id, bytes, sizeof bytes)) {
-            }
-            if (enter && !browserClient && !callSlot.busy() && !hardwareRunning) {
-                browserClient = id;
-                if (browserMenu->open() && browserSession->startLocal(*browserMenu)) {
-                    browserAccess(id, true);
-                } else {
-                    browserMenu->close();
-                    browserClient = 0;
-                }
-            }
-            devicecfg::wipe(bytes, sizeof bytes);
-            continue;
+        if (id == browserClient) {
+            serveConfigBrowser(id);
+        } else {
+            serveReadOnlyBrowser(id, fresh);
         }
-        // Read at most one key: an action may enter an interactive hardware test,
-        // whose adapter must retain the following queued keys for that test.
-        unsigned columns, rows;
-        if (webServer.takeSize(id, columns, rows))
-            browserMenu->resize(columns, rows);
-        if (webServer.read(id, bytes, 1)) {
-            browserSession->fromHost(bytes, 1, millis());
-        }
-        browserSession->tick(millis(), true);
-        // CP437 can expand to three UTF-8 bytes. Pull only what the transport
-        // can retain, leaving the shared terminal's response cursor in place.
-        size_t room = webServer.space(id) / 3;
-        size_t n = browserSession->toHost(bytes, room < sizeof bytes ? room : sizeof bytes);
-        if (n) {
-            // Menu CP437 is converted at this transport only; serial stays CP437.
-            std::string output =
-                webinterface::terminalUtf8(bytes, n, browserMenu->style() == config::Style::Cp437);
-            webServer.write(id, reinterpret_cast<const uint8_t *>(output.data()), output.size());
-        }
-        char departure[atcmd::kLineMax + 1];
-        if (browserMenu->takeDeparture(departure, sizeof departure)) {
-            browserSession->tick(millis(), true);
-            hwconsole::restoreBrowserResources();
-            if (!strncmp(departure, "*DIAL=", 6)) {
-                // Check first that the RS232 port can take the dial (MNT-05a).
-                auto &host = rs232::session();
-                if (host.mode() == hostport::Mode::kCommand && !host.localOpen() &&
-                    host.port().lineEmpty()) {
-                    browserSession->port().line("Dialling on the RS232 host port.");
-                    host.port().execute(departure);
-                } else {
-                    browserSession->port().line("The RS232 host port is busy: not dialled.");
-                }
-            } else {
-                browserSession->port().execute(departure);
-            }
-        }
-        devicecfg::wipe(departure, sizeof departure);
-        devicecfg::wipe(bytes, sizeof bytes);
     }
     publishWebStatus();
     webServer.pump();
+}
+
+// --- Start-up steps ---------------------------------------------------------------------
+
+// The four local sessions and their configuration screens (in PSRAM when there is room).
+void createPorts() {
+    console = new hostport::Session(*modem, consoleSink, kConsoleBaud, callSlot);
+    rs232::begin(*modem, callSlot);
+    usbport::begin(*modem, callSlot);
+    auto makeMenu = [](hostport::Session &session, bool rs232Port) {
+        void *memory = ps_malloc(sizeof(config::Terminal));
+        return memory ? new (memory) config::Terminal(session, rs232Port)
+                      : new config::Terminal(session, rs232Port);
+    };
+    consoleMenu = makeMenu(*console, false);
+    hostMenu = makeMenu(rs232::session(), true);
+    usbMenu = makeMenu(usbport::session(), false);
+    browserSession = new hostport::Session(*modem, browserSink, kConsoleBaud, callSlot);
+    browserSession->port().setBrowser(true);
+    browserMenu = makeMenu(*browserSession, false);
+    consoleMenu->services(&configHardware);
+    hostMenu->services(&configHardware);
+    usbMenu->services(&configHardware);
+    browserMenu->services(&configHardware);
+    browserMenu->setStyle("CP437");
+    browserMenu->color(config::Color::Rgb);
+    consoleClient =
+        new clienttest::Service(clientSettings, clienttest::kConsolePort, consoleClientPlatform);
+    hostClient =
+        new clienttest::Service(clientSettings, clienttest::kRs232Port, hostClientPlatform);
+    usbClient = new clienttest::Service(clientSettings, clienttest::kUsbPort, usbClientPlatform);
+    for (unsigned i = 0; i < kSerialPorts; ++i) {
+        applyClientSettings(i);
+    }
+}
+
+// The debug log, the call history and this boot's reset reason (AT*RESETINFO).
+void startDiagnostics() {
+    char *logStorage = static_cast<char *>(ps_malloc(256 * 1024));
+    debugLog.begin(logStorage ? logStorage : fallbackLog,
+                   logStorage ? 256 * 1024 : sizeof fallbackLog);
+    debugLog.event(millis(), config::Event::Boot);
+    if (!history.begin()) {
+        debugLog.event(millis(), config::Event::StorageError);
+    }
+    uint8_t previous[4] = {}, record[3] = {1, static_cast<uint8_t>(esp_reset_reason()), 0};
+    if (resetStore.load(previous, sizeof previous) == 3 && previous[0] == 1) {
+        record[2] = previous[1];
+    }
+    resetStore.save(record, sizeof record);
+}
+
+// Outgoing, Internet dial-up and incoming calls, connected to every serial session.
+void createCallServices() {
+    outgoing =
+        new calls::Outgoing(*modem, phonebook, callSlot, tcpSocket, callAudio, msNow, networkUp);
+    outgoing->setObserver(&journal);
+    configDialer = new config::Dialer(*console, *consoleMenu, *hostMenu, *outgoing, callSlot,
+                                      callAudio, msNow);
+    configDialer->setUsb(&usbport::session(), usbMenu);
+    internetDialer = new dialup::Dialer(*modem, internetSettings, net, callSlot, internetNetwork,
+                                        callAudio, msNow, *configDialer);
+    internetDialer->setObserver(&journal);
+    console->setDialer(internetDialer);
+    rs232::session().setDialer(internetDialer);
+    usbport::session().setDialer(internetDialer);
+    incoming = new calls::Incoming(*modem, callSlot, incomingListener, incomingSocket, callAudio,
+                                   *console, rs232::session(), msNow, networkUp);
+    console->setAnswerer(incoming);
+    incoming->setObserver(&journal);
+    rs232::session().setAnswerer(incoming);
+    incoming->setUsb(&usbport::session());
+    usbport::session().setAnswerer(incoming);
+}
+
+// With a saved network, give it a few seconds so the banner can show the address.
+void waitForNetwork() {
+    const netcfg::Settings &s = net.settings();
+    const uint32_t start = millis();
+    while (s.enabled && s.hasNetwork() && !net.up() && millis() - start < kBannerWaitMs) {
+        const uint32_t now = millis();
+        net.tick(now);
+        pollLeds(now);
+        delay(10);
+    }
+    net.tick(millis());
 }
 
 }  // namespace
@@ -1278,81 +1401,16 @@ void setup() {
     if (!phonebook.begin()) {
         Serial.print("Phonebook unavailable/damaged; factory entry used.\r\n");
     }
-    console = new hostport::Session(*modem, consoleSink, kConsoleBaud, callSlot);
-    rs232::begin(*modem, callSlot);
-    usbport::begin(*modem, callSlot);
-    auto makeMenu = [](hostport::Session &session, bool rs232Port) {
-        void *memory = ps_malloc(sizeof(config::Terminal));
-        return memory ? new (memory) config::Terminal(session, rs232Port)
-                      : new config::Terminal(session, rs232Port);
-    };
-    consoleMenu = makeMenu(*console, false);
-    hostMenu = makeMenu(rs232::session(), true);
-    usbMenu = makeMenu(usbport::session(), false);
-    browserSession = new hostport::Session(*modem, browserSink, kConsoleBaud, callSlot);
-    browserSession->port().setBrowser(true);
-    browserMenu = makeMenu(*browserSession, false);
-    consoleMenu->services(&configHardware);
-    hostMenu->services(&configHardware);
-    usbMenu->services(&configHardware);
-    browserMenu->services(&configHardware);
-    browserMenu->setStyle("CP437");
-    browserMenu->color(config::Color::Rgb);
-    consoleClient =
-        new clienttest::Service(clientSettings, clienttest::kConsolePort, consoleClientPlatform);
-    hostClient =
-        new clienttest::Service(clientSettings, clienttest::kRs232Port, hostClientPlatform);
-    usbClient = new clienttest::Service(clientSettings, clienttest::kUsbPort, usbClientPlatform);
-    for (unsigned i = 0; i < kSerialPorts; ++i) {
-        applyClientSettings(i);
-    }
-    char *logStorage = static_cast<char *>(ps_malloc(256 * 1024));
-    debugLog.begin(logStorage ? logStorage : fallbackLog,
-                   logStorage ? 256 * 1024 : sizeof fallbackLog);
-    debugLog.event(millis(), config::Event::Boot);
-    if (!history.begin()) {
-        debugLog.event(millis(), config::Event::StorageError);
-    }
-    uint8_t previous[4] = {}, record[3] = {1, static_cast<uint8_t>(esp_reset_reason()), 0};
-    if (resetStore.load(previous, sizeof previous) == 3 && previous[0] == 1) {
-        record[2] = previous[1];
-    }
-    resetStore.save(record, sizeof record);
+    createPorts();
+    startDiagnostics();
     config::Commands::attach(configCommands);
-    outgoing =
-        new calls::Outgoing(*modem, phonebook, callSlot, tcpSocket, callAudio, msNow, networkUp);
-    outgoing->setObserver(&journal);
-    configDialer = new config::Dialer(*console, *consoleMenu, *hostMenu, *outgoing, callSlot,
-                                      callAudio, msNow);
-    configDialer->setUsb(&usbport::session(), usbMenu);
-    internetDialer = new dialup::Dialer(*modem, internetSettings, net, callSlot, internetNetwork,
-                                        callAudio, msNow, *configDialer);
-    internetDialer->setObserver(&journal);
-    console->setDialer(internetDialer);
-    rs232::session().setDialer(internetDialer);
-    usbport::session().setDialer(internetDialer);
-    incoming = new calls::Incoming(*modem, callSlot, incomingListener, incomingSocket, callAudio,
-                                   *console, rs232::session(), msNow, networkUp);
-    console->setAnswerer(incoming);
-    incoming->setObserver(&journal);
-    rs232::session().setAnswerer(incoming);
-    incoming->setUsb(&usbport::session());
-    usbport::session().setAnswerer(incoming);
+    createCallServices();
     hwconsole::setPortControl(hwconsole::PortControl{modemIdle, rs232::suspend, rs232::resume});
     netcfg::LoadResult netLoaded = net.begin(millis());
     netcfg::attachCommands(net, msNow, [] {
         return console->callUp() || rs232::session().callUp() || usbport::session().callUp();
     });
-    // With a saved network, give it a few seconds so the banner can show the address.
-    const netcfg::Settings &s = net.settings();
-    const uint32_t start = millis();
-    while (s.enabled && s.hasNetwork() && !net.up() && millis() - start < kBannerWaitMs) {
-        const uint32_t now = millis();
-        net.tick(now);
-        pollLeds(now);
-        delay(10);
-    }
-    net.tick(millis());
+    waitForNetwork();
     ota.poll(millis(), net.up(), true, net.settings().host, net.link().ip);
     printBanner(loaded, netLoaded);
     char skip[netcfg::Net::kNoticeMax];
