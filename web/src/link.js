@@ -1,13 +1,17 @@
 // A device reset can leave TCP half-open. Keep transport lifecycle outside the DOM.
 import {reconnectDelay} from './status.js';
+export const BUSY_DELAY = 30000;
 export function createModemLink({session, socket, receive, status, disconnect,
     now = () => performance.now(), schedule = setTimeout, cancel = clearTimeout}) {
     let current = null, timer = null, attempt = 0, generation = 0, seen = 0, stopped = false;
     const active = ws => ws === current && !stopped;
-    const retry = () => {
+    // busy: the modem answered "update in progress" (HTTP 503). Another tab is writing an
+    // image, so ask rarely instead of looping every few seconds.
+    const retry = (busy = false) => {
         if (stopped || timer !== null) return;
         status('offline');
-        timer = schedule(() => { timer = null; open(); }, reconnectDelay(attempt++));
+        const delay = reconnectDelay(attempt++);
+        timer = schedule(() => { timer = null; open(); }, busy ? Math.max(delay, BUSY_DELAY) : delay);
     };
     const reset = () => {
         generation++;
@@ -42,8 +46,8 @@ export function createModemLink({session, socket, receive, status, disconnect,
                 disconnect();
                 retry();
             };
-        } catch {
-            if (!stopped && tokenGeneration === generation) retry();
+        } catch (error) {
+            if (!stopped && tokenGeneration === generation) retry(error?.busy === true);
         }
     };
     return {

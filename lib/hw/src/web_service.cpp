@@ -378,6 +378,7 @@ esp_err_t WebService::serve(httpd_req_t *req) {
                                    {"/status.js", "text/javascript"},
                                    {"/demo.js", "text/javascript"},
                                    {"/upload.js", "text/javascript"},
+                                   {"/upload_flow.js", "text/javascript"},
                                    {"/link.js", "text/javascript"},
                                    {"/geometry.js", "text/javascript"},
                                    {"/ui-data.js", "text/javascript"},

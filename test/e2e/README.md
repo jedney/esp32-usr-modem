@@ -26,6 +26,9 @@ monitor and any terminal (PuTTY) first: only one program can open a COM port.
 | `--live-internet` | Tests that need the Internet (the DNS lookup in the NAT test) |
 | `--web-tests --web-host usr-modem.local` | HTTP/WebSocket tests (device password from `.env`; `--web-host` may be an IP) |
 | `--browser-upload` | Install the tested firmware through the web interface (with `--web-tests`) |
+| `--flood-tests` | Fourth browser refused, idle connection floods on ports 23 and 80 (with `--web-tests`) |
+| `--upload-tests` | A web upload cut off half way must free the modem (with `--web-tests`; writes nothing that can be installed) |
+| `--usb-unplug` | Pull the rear USB cable during a call when asked (needs a person; with `--usb-port`) |
 | `--udp-tests` | Two optional PPP/SLIP UDP echo cases (PC UDP port 32322 must be reachable) |
 | `--device-tests` | Device password changes |
 | `--factory-reset` | `AT*FACTORY` (with `--device-tests`); rejoins the Wi-Fi in `.env` |

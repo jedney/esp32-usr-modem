@@ -14,6 +14,37 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [2.11] - 2026-11-12
+
+### Added
+
+- `web/src/upload_flow.js`: the browser upload flow (preflight, confirmation, login refresh,
+  sending, result) with every browser call passed in, so Node tests it (TG-14).
+  `web/test/upload_flow.test.mjs` covers each step and each failure, including a real
+  conflicting-identity image. The web file list now includes it in `build_web.py`,
+  `web_service.cpp` and the preview (firmware build needed to serve it).
+- `test/scripts/test_web_file_lists.py`: the build list, the served list, what the page
+  loads, the preview and the end-to-end asset check must name the same files (MNT-05h).
+- Opt-in end-to-end cases (collected only; not run here): `--flood-tests` (fourth browser
+  refused, idle floods on ports 23 and 80), `--upload-tests` (a cut-off upload frees the
+  modem), `--usb-unplug` (USB unplugged during a call) (TG-15).
+
+### Changed
+
+- The upload button is disabled from the first press until the result, so a second press
+  during the image check no longer starts a second upload (5.5-17).
+- After a successful update the page reloads once the modem answers again, so new web
+  files are used (5.5-17).
+- A browser that gets 503 (update in progress) from the login request asks again every
+  30 seconds, not every few seconds (5.5-17).
+- A connection dropped while the person reads the upload prompt now stops the upload with
+  a message instead of sending an empty CSRF token.
+
+### Fixed
+
+- The demo page drew `?????` for frames and rules; it now draws the same double-line frame
+  as the firmware (restored as Unicode escapes) (MNT-05b).
+
 ## [2.10] - 2026-11-12
 
 ### Added

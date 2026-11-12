@@ -69,7 +69,9 @@ Section numbers refer to the project brief.
 | Export and replay without secrets, logs, call history (6.8) | `test_config`, `test_config_services` | `test_config` | `test_config.py` |
 | About generated from the licensing record | `scripts/test_generate_credits.py` | — | `test_config.py` |
 | Web server: Digest login (stale nonce, wrong-password lock-out, parameter/size limits, nonce table, real MD5, falling count), filesystem image check, Host/Origin, tickets, CSRF, WebSocket, upload and unmount hand-shakes (late answers), browsers start read-only (6.11) | `test_web`, `scripts/test_image_manifest.py`, `scripts/test_web_peer.py` | `test_web` | `test_web.py` |
-| Web page: status bar, reconnect, sizing, upload hashing, demo (6.11) | `web/test/` | — | — |
+| Web page: status bar, reconnect and 30 s back-off while an update is written, sizing, upload hashing, the whole upload flow (preflight, conflicting identity, confirmation, login refresh, lost connection, refusal, double press), demo with the firmware's frame (6.11, TG-14, v2.11) | `web/test/` | — | `test_web.py` |
+| The web file list agrees in `build_web.py`, `web_service.cpp`, the page imports, the preview and the e2e check (MNT-05h, v2.11) | `scripts/test_web_file_lists.py` | — | — |
+| Browser limit (3), idle connection floods on ports 23 and 80, an interrupted upload, USB unplug during a call (TG-15, v2.11; opt-in) | — | — | `test_web.py --flood-tests`, `--upload-tests`; `test_usb.py --usb-unplug` |
 | Client Tests: display, size (echoed query), keys, transfers (block numbers wrap past 255), hostile X/Y/ZMODEM blocks and headers, noise and slow-link timing, ZFIN without "OO", cable, client settings per port incl. USB (6.13, TG-03, v2.0, v2.10) | `test_client` | `test_client` | `test_client.py`; `interop/serial_lrzsz.py` |
 | Build: network libraries (checked before cached) and image identities | `scripts/test_network_dependencies.py`, `scripts/test_image_manifest.py` | — | — |
 

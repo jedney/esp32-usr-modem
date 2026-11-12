@@ -45,13 +45,14 @@ def main(out: pathlib.Path) -> None:
         "usr-ui-data": (SRC / "ui-data.js").read_text(encoding="utf-8"),
         "usr-demo": (SRC / "demo.js").read_text(encoding="utf-8").replace("'./ui-data.js'", "'usr-ui-data'"),
         "usr-upload": (SRC / "upload.js").read_text(encoding="utf-8"),
+        "usr-upload-flow": (SRC / "upload_flow.js").read_text(encoding="utf-8").replace("'./upload.js'", "'usr-upload'"),
         "usr-geometry": (SRC / "geometry.js").read_text(encoding="utf-8"),
         "usr-link": (SRC / "link.js").read_text(encoding="utf-8").replace("'./status.js'", "'usr-status'"),
     }
     app = (SRC / "app.js").read_text(encoding="utf-8")
     app = app.replace("'./xterm.mjs'", "'usr-xterm'").replace("'./status.js'", "'usr-status'")
     app = app.replace("'./demo.js'", "'usr-demo'")
-    app = app.replace("'./upload.js'", "'usr-upload'")
+    app = app.replace("'./upload_flow.js'", "'usr-upload-flow'")
     app = app.replace("'./link.js'", "'usr-link'")
     app = app.replace("'./geometry.js'", "'usr-geometry'")
     import_map = {"imports": {k: data_url("text/javascript", v.encode()) for k, v in modules.items()}}

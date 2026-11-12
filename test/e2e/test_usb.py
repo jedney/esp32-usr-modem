@@ -182,3 +182,40 @@ def test_auto_answer_prefers_rs232_when_both_have_dtr(usb_idle, rs232):
         finally:
             connection.close()
         wait_for(rs232, b"NO CARRIER")
+
+
+def test_usb_unplug_during_a_call_frees_the_modem(usb_idle, request):
+    """Manual: pull the rear USB-C cable when asked, then plug it back in (--usb-unplug)."""
+    if not request.config.getoption("--usb-unplug"):
+        pytest.skip("--usb-unplug not enabled (needs a person at the cable)")
+    from serial.tools import list_ports
+
+    def present(name):
+        return any(p.device == name for p in list_ports.comports())
+
+    usb = usb_idle
+    name = usb.ser.port
+    usb.ser.write(b"AT*TESTCALL\r")
+    wait_for(usb, b"CONNECT")
+    print("\n*** Unplug the USB cable (rear socket) within 30 s, then plug it back in. ***")
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline and present(name):
+        time.sleep(0.5)
+    require(not present(name), "The USB cable was not unplugged in time")
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline and not present(name):
+        time.sleep(0.5)
+    require(present(name), "The USB cable was not plugged back in in time")
+    time.sleep(3)
+    usb.ser.close()
+    usb.ser.open()
+    usb.ser.dtr = True
+    time.sleep(0.5)
+    hang_up(usb)
+    # The call must be gone: a new one connects, which needs the line to be free.
+    usb.ser.write(b"AT*TESTCALL\r")
+    wait_for(usb, b"CONNECT")
+    time.sleep(1.2)
+    usb.ser.write(b"+++")
+    wait_for(usb, b"OK", timeout=4)
+    assert usb.command("ATH")[-1] == "OK"

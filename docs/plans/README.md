@@ -37,7 +37,7 @@ whole window.
 | 08 | v2.8 | [Bench harness safety](../history/wp-08-bench-harness.md) | Sonnet / medium | M | 01 |
 | 09 | v2.9 | [Security regression tests](../history/wp-09-security-tests.md) | Sonnet / high | M | 07 |
 | 10 | v2.10 | [Hostile-input tests: PPP, X/Y/ZMODEM](../history/wp-10-hostile-input.md) | Sonnet / high | M-L | 01 |
-| 11 | v2.11 | [Web page tests and flows](wp-11-web-page.md) | Sonnet / medium | M | 06 |
+| 11 | v2.11 | [Web page tests and flows](../history/wp-11-web-page.md) | Sonnet / medium | M | 06 |
 | 12 | v2.12 | [Network and storage follow-ups](wp-12-network-storage.md) | Sonnet / high | M-L | 05 |
 | 13 | v2.13 | [Shared native test fixtures](wp-13-test-fixtures.md) | Sonnet / medium | M | 09, 10 |
 | 14 | v2.14 | [`main.cpp` tidy-up](wp-14-main-tidy.md) | Opus / medium | M-L | 02, 03, 06 |
@@ -141,13 +141,13 @@ the package confirms each first.
 | MNT-03 | Text still describes a volume limit | 01 | done (v2.1) |
 | MNT-04 | Long functions in `main.cpp`, `menu.cpp`, `commands.cpp` | 14, 16 | open |
 | MNT-05a | "Dialling on the RS232 host port" printed before the check | 14 | open |
-| MNT-05b | `demo.js` box characters replaced by `?` | 11 | open |
+| MNT-05b | `demo.js` box characters replaced by `?` | 11 | done (v2.11) |
 | MNT-05c | `build/` not in `.gitignore` | 01 | done (v2.1) |
 | MNT-05d | CLAUDE.md says `espressif32@^6.9.0` | 01 | done (v2.1) |
 | MNT-05e | `transfer.h` has no licence / changed mark | 10 | done (v2.10) |
 | MNT-05f | `web/PROTOCOL.md` three mismatches | 06 | done (v2.6) |
 | MNT-05g | Hand-sized tables without `static_assert` | 07 | done (v2.7) |
-| MNT-05h | Web file list kept in three places | 11 | open |
+| MNT-05h | Web file list kept in three places | 11 | done (v2.11) |
 | MNT-05i | Stale comments (`hwconsole.h`, `connection.h`, `atcmd.cpp:764`) | 03, 07 | done (`hwconsole.h` v2.3; `connection.h`, `atcmd.cpp` v2.7) |
 | MNT-05j | cppcheck notes `hwconsole.cpp:895`, `menu.cpp:449` | 03, 15 | open (`hwconsole.cpp` done v2.3) |
 | 5.5-01 | Radio stays on after `AT*WIFISCAN` with Wi-Fi off | 12 | open |
@@ -166,7 +166,7 @@ the package confirms each first.
 | 5.5-14 | Menu paging, Alt+letter after cancel, "too long" flag | 15 | open |
 | 5.5-15 | `validPassword` rejects UTF-8; `validServer` accepts `a..b` | 12 | open |
 | 5.5-16 | Non-ASCII SSIDs shown as mojibake | 12 | open |
-| 5.5-17 | Upload double press, reconnect loop, no reload | 11 | open |
+| 5.5-17 | Upload double press, reconnect loop, no reload | 11 | done (v2.11; the page cannot see an upload in another tab, so it backs off on 503 instead) |
 | 5.5-18 | `.env` BOM/UTF-16, `bump_version` CRLF, hotkey substring | 01 | done (v2.1) |
 | 5.5-19 | `AT*FACTORY` leaves driver-stored Wi-Fi credentials | 12 | open |
 | TG-01 | Remote `+++` test has no guard times | 04 | done (v2.4) |
@@ -182,8 +182,8 @@ the package confirms each first.
 | TG-11 | `test_board` uses the production settings store | 08 | done (v2.8) |
 | TG-12 | e2e state left behind on failure | 08 | done (v2.8) |
 | TG-13 | Default run dials a real BBS; `NO DIALTONE` string | 08 | done (v2.8) |
-| TG-14 | `app.js` untested; "conflicting identity" test has no conflict | 11 | open |
-| TG-15 | No tests for browser limit, floods, interrupted upload, etc. | 11 | open |
+| TG-14 | `app.js` untested; "conflicting identity" test has no conflict | 11 | done (v2.11) |
+| TG-15 | No tests for browser limit, floods, interrupted upload, etc. | 11 | done (v2.11; cases written, run on the bench with --flood-tests, --upload-tests, --usb-unplug) |
 | TG-16 | Fakes copied between suites and drifted | 13 | open |
 | TG-17 | Two assertions cannot fail; RS232 on-board tests ignored | 08 | done (v2.8) |
 | Leave alone | Digest MD5 and OTA MD5, unsalted hashes, no image signature, no secure boot, nonce table of 8, PPP idle/host limit/CR-NUL, 410 cppcheck style notes, vendored xterm.js | - | accepted (review section 8) |

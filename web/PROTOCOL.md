@@ -102,7 +102,12 @@ read-only. Serial protocol bytes never enter WebSocket output.
 
 The browser sends `{"t":"ping"}` every five seconds and reconnects after 15 seconds
 without a frame, covering half-open TCP connections after a power cycle. The
-watchdog pauses during its own upload; success explicitly starts a new connection.
+watchdog pauses during its own upload; success explicitly starts a new connection and,
+once the modem answers again, reloads the page (new firmware may bring new web files).
+While the modem answers the login request with 503 (an update is being written) a
+browser asks again only every 30 seconds instead of every few seconds. The upload
+button stays disabled from the first press until the result, and the upload code
+lives in `upload_flow.js` (browser calls passed in, tested in Node).
 Old socket callbacks and ticket fetches cannot replace the new session. Heartbeats
 are handled in the transport and never enter terminal input or light RD/SD.
 
