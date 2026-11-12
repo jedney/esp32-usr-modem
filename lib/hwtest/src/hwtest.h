@@ -44,6 +44,39 @@ bool parseUint(const char *s, uint32_t lo, uint32_t hi, uint32_t *out, const cha
 // ON/OFF, 1/0.
 bool parseOnOff(const char *s, bool *on);
 
+// --- Time-out and call rules -------------------------------------------------------------
+
+// An interactive test ("any key stops", prompts, bridge) ends after this long with no key,
+// so a closed terminal or a forgotten test can't hold the modem for ever (WP-03, STA-03).
+constexpr uint32_t kIdleTimeoutMs = 5u * 60u * 1000u;
+
+// True when `timeoutMs` or more has passed since `lastMs`. Safe when millis() wraps.
+bool idleExpired(uint32_t lastMs, uint32_t nowMs, uint32_t timeoutMs = kIdleTimeoutMs);
+
+// Whether `args` (the text after "AT*HW", upper case) may run while a call is up on another
+// port. The LED patterns run until a key, so only the single-LED forms are allowed.
+bool allowedDuringCall(const char *args);
+
+// A setting a test leaves in place (LEDs, amp mode, RS232 outputs) and the kind of port
+// that set it. When the browser leaves it releases only the holds it made itself.
+class Hold {
+public:
+    bool active() const { return owner_ != kNone; }
+    void take(bool byBrowser) { owner_ = byBrowser ? kBrowser : kOther; }
+    void release() { owner_ = kNone; }
+    bool releaseForBrowser() {
+        if (owner_ != kBrowser) {
+            return false;
+        }
+        owner_ = kNone;
+        return true;
+    }
+
+private:
+    enum Owner : uint8_t { kNone, kBrowser, kOther };
+    Owner owner_ = kNone;
+};
+
 // --- RS232 loopback ---------------------------------------------------------------------
 
 // Test byte `i` of the loopback pattern. Any 256 consecutive bytes contain every value

@@ -14,6 +14,7 @@
 #include "linectl.h"
 #include "panel.h"
 #include "session.h"
+#include "sink_gate.h"
 
 using autobaud::Run;
 using modemcfg::Profile;
@@ -739,8 +740,168 @@ void test_panel_ring_and_wifi() {
     TEST_ASSERT_EQUAL_HEX8(mask(hwtest::kARQ), p.update(in, Panel::kWifiBlinkMs));
 }
 
+// --- Sink gate (STA-01): a port nobody reads never stops the modem ------------------------
+// A fake port with a fake clock. pause() is the only thing that moves time; the computer
+// frees one byte of room every `drainEveryMs` (0 = never reads).
+
+struct FakeDevice : SinkGate::Device {
+    uint32_t t = 0;
+    size_t free = 0;
+    uint32_t drainEveryMs = 0;
+    unsigned pauses = 0;
+    std::string sent;
+    size_t room() override { return free; }
+    size_t put(const uint8_t *data, size_t len) override {
+        size_t n = len < free ? len : free;
+        sent.append(reinterpret_cast<const char *>(data), n);
+        free -= n;
+        return n;
+    }
+    uint32_t now() override { return t; }
+    void pause() override {
+        ++pauses;
+        ++t;
+        if (drainEveryMs && t % drainEveryMs == 0) {
+            ++free;
+        }
+    }
+};
+
+void test_sink_gate_drops_unsolicited_at_once_when_full() {
+    SinkGate gate;
+    FakeDevice dev;
+    TEST_ASSERT_EQUAL(0, gate.write(dev, "\r\nRING\r\n", 8, true));
+    TEST_ASSERT_EQUAL(0, dev.t);  // no time passes in the drop path
+    TEST_ASSERT_EQUAL(0, dev.pauses);
+    // Some room but not enough: dropped whole, never half a result.
+    dev.free = 5;
+    TEST_ASSERT_EQUAL(0, gate.write(dev, "\r\nRING\r\n", 8, true));
+    TEST_ASSERT_EQUAL(0, dev.t);
+    TEST_ASSERT_TRUE(dev.sent.empty());
+    TEST_ASSERT_FALSE(gate.stalled());  // only a reply marks the port stalled
+    // Room for all of it: written.
+    dev.free = 8;
+    TEST_ASSERT_EQUAL(8, gate.write(dev, "\r\nRING\r\n", 8, true));
+    TEST_ASSERT_EQUAL_STRING("\r\nRING\r\n", dev.sent.c_str());
+}
+
+void test_sink_gate_twenty_rings_to_a_full_port_cost_no_time() {
+    SinkGate gate;
+    FakeDevice dev;
+    for (int i = 0; i < 20; ++i) {
+        gate.write(dev, "\r\nRING\r\n", 8, true);
+    }
+    TEST_ASSERT_EQUAL(0, dev.t);
+    TEST_ASSERT_EQUAL(0, dev.pauses);
+}
+
+void test_sink_gate_reply_waits_once_then_port_is_stalled() {
+    SinkGate gate;
+    FakeDevice dev;
+    TEST_ASSERT_EQUAL(0, gate.write(dev, "\r\nOK\r\n", 6, false));
+    TEST_ASSERT_EQUAL(SinkGate::kStallMs, dev.t);  // one bounded wait
+    TEST_ASSERT_TRUE(gate.stalled());
+    // From now on every write returns at once.
+    const uint32_t before = dev.t;
+    TEST_ASSERT_EQUAL(0, gate.write(dev, "\r\nOK\r\n", 6, false));
+    TEST_ASSERT_EQUAL(0, gate.write(dev, "\r\nERROR\r\n", 9, false));
+    TEST_ASSERT_EQUAL(0, gate.write(dev, "\r\nRING\r\n", 8, true));
+    TEST_ASSERT_EQUAL(before, dev.t);
+    TEST_ASSERT_TRUE(gate.stalled());
+}
+
+void test_sink_gate_room_clears_the_stall() {
+    SinkGate gate;
+    FakeDevice dev;
+    gate.write(dev, "\r\nOK\r\n", 6, false);
+    TEST_ASSERT_TRUE(gate.stalled());
+    dev.free = 64;  // the computer reads again
+    TEST_ASSERT_EQUAL(6, gate.write(dev, "\r\nOK\r\n", 6, false));
+    TEST_ASSERT_FALSE(gate.stalled());
+    TEST_ASSERT_EQUAL_STRING("\r\nOK\r\n", dev.sent.c_str());
+}
+
+void test_sink_gate_unsolicited_with_room_clears_the_stall() {
+    SinkGate gate;
+    FakeDevice dev;
+    gate.write(dev, "\r\nOK\r\n", 6, false);
+    dev.free = 64;
+    TEST_ASSERT_EQUAL(8, gate.write(dev, "\r\nRING\r\n", 8, true));
+    TEST_ASSERT_FALSE(gate.stalled());
+}
+
+void test_sink_gate_partial_reply_then_stall() {
+    SinkGate gate;
+    FakeDevice dev;
+    dev.free = 4;
+    TEST_ASSERT_EQUAL(4, gate.write(dev, "HELLO WORLD", 11, false));
+    TEST_ASSERT_EQUAL_STRING("HELL", dev.sent.c_str());
+    TEST_ASSERT_EQUAL(SinkGate::kStallMs, dev.t);
+    TEST_ASSERT_TRUE(gate.stalled());
+}
+
+void test_sink_gate_slow_reader_gets_the_whole_reply() {
+    // A computer that reads slowly (one byte per 100 ms, slower than 110 bps) is not a
+    // stalled port: each new byte of room restarts the stall wait.
+    SinkGate gate;
+    FakeDevice dev;
+    dev.drainEveryMs = 100;
+    TEST_ASSERT_EQUAL(10, gate.write(dev, "0123456789", 10, false));
+    TEST_ASSERT_EQUAL_STRING("0123456789", dev.sent.c_str());
+    TEST_ASSERT_FALSE(gate.stalled());
+    TEST_ASSERT_EQUAL(1000, dev.t);
+}
+
+void test_sink_gate_one_write_never_takes_longer_than_the_cap() {
+    SinkGate gate;
+    FakeDevice dev;
+    dev.drainEveryMs = 100;
+    char text[64];
+    memset(text, 'x', sizeof text);
+    size_t n = gate.write(dev, text, sizeof text, false);
+    TEST_ASSERT_EQUAL(SinkGate::kWriteMs / 100, n);
+    TEST_ASSERT_EQUAL(SinkGate::kWriteMs, dev.t);
+    TEST_ASSERT_FALSE(gate.stalled());  // it was still reading: not stalled
+}
+
+void test_sink_gate_port_that_takes_nothing_does_not_spin() {
+    // room() says yes but put() takes nothing: treated as no room, with pauses.
+    struct Liar : FakeDevice {
+        size_t room() override { return 16; }
+        size_t put(const uint8_t *, size_t) override { return 0; }
+    } dev;
+    SinkGate gate;
+    TEST_ASSERT_EQUAL(0, gate.write(dev, "OK", 2, false));
+    TEST_ASSERT_EQUAL(SinkGate::kStallMs, dev.t);
+    TEST_ASSERT_TRUE(gate.stalled());
+}
+
+void test_sink_gate_empty_write_is_free() {
+    SinkGate gate;
+    FakeDevice dev;
+    TEST_ASSERT_EQUAL(0, gate.write(dev, "", 0, false));
+    TEST_ASSERT_EQUAL(0, dev.t);
+    TEST_ASSERT_FALSE(gate.stalled());
+}
+
+void test_call_slot_says_who_holds_it() {
+    CallSlot slot;
+    int a = 0, b = 0;
+    TEST_ASSERT_FALSE(slot.heldBy(&a));
+    TEST_ASSERT_FALSE(slot.heldBy(nullptr));  // an idle slot is not held by "nobody"
+    TEST_ASSERT_TRUE(slot.claim(&a));
+    TEST_ASSERT_TRUE(slot.heldBy(&a));
+    TEST_ASSERT_FALSE(slot.heldBy(&b));
+    TEST_ASSERT_TRUE(slot.transfer(&a, &b));
+    TEST_ASSERT_FALSE(slot.heldBy(&a));
+    TEST_ASSERT_TRUE(slot.heldBy(&b));
+    slot.release(&b);
+    TEST_ASSERT_FALSE(slot.heldBy(&b));
+}
+
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_call_slot_says_who_holds_it);
     RUN_TEST(test_detects_at_every_rate_from_any_other);
     RUN_TEST(test_lower_case_at_is_detected);
     RUN_TEST(test_detection_allows_clock_error_and_jitter);
@@ -783,5 +944,15 @@ int main() {
     RUN_TEST(test_panel_stretches_rd_and_sd);
     RUN_TEST(test_panel_ring_and_wifi);
     RUN_TEST(test_panel_follows_either_host_port);
+    RUN_TEST(test_sink_gate_drops_unsolicited_at_once_when_full);
+    RUN_TEST(test_sink_gate_twenty_rings_to_a_full_port_cost_no_time);
+    RUN_TEST(test_sink_gate_reply_waits_once_then_port_is_stalled);
+    RUN_TEST(test_sink_gate_room_clears_the_stall);
+    RUN_TEST(test_sink_gate_unsolicited_with_room_clears_the_stall);
+    RUN_TEST(test_sink_gate_partial_reply_then_stall);
+    RUN_TEST(test_sink_gate_slow_reader_gets_the_whole_reply);
+    RUN_TEST(test_sink_gate_one_write_never_takes_longer_than_the_cap);
+    RUN_TEST(test_sink_gate_port_that_takes_nothing_does_not_spin);
+    RUN_TEST(test_sink_gate_empty_write_is_free);
     return UNITY_END();
 }

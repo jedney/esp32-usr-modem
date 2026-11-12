@@ -43,7 +43,15 @@ public:
 class Output : public atcmd::Sink {
 public:
     std::string text;
+    std::string unsolicited;  // what came through writeUnsolicited()
+    bool full = false;        // a port nobody reads: unsolicited output is dropped
     void write(const char *s, size_t n) override { text.append(s, n); }
+    void writeUnsolicited(const char *s, size_t n) override {
+        if (!full) {
+            unsolicited.append(s, n);
+            text.append(s, n);
+        }
+    }
     std::string take() {
         std::string result = text;
         text.clear();
@@ -502,6 +510,34 @@ void test_numeric_and_quiet_results() {
     TEST_ASSERT_FALSE(r.slot.busy());
     TEST_ASSERT_TRUE(r.output.text.empty());
 }
+void test_ring_is_unsolicited_and_replies_are_not() {
+    // STA-01: RING is output nobody asked for, so the port's sink may drop it when the
+    // computer is not reading. Command replies (ATA's CONNECT) are not.
+    Rig r;
+    r.usbDtr = true;
+    r.poll();
+    r.ring();
+    TEST_ASSERT_EQUAL_STRING("\r\nRING\r\n", r.output.unsolicited.c_str());
+    TEST_ASSERT_EQUAL_STRING("\r\nRING\r\n", r.hostOutput.unsolicited.c_str());
+    TEST_ASSERT_EQUAL_STRING("\r\nRING\r\n", r.usbOutput.unsolicited.c_str());
+    r.send("ATA\r");
+    TEST_ASSERT_TRUE(r.console.callUp());
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.output.text.find("CONNECT"));
+    TEST_ASSERT_EQUAL_STRING("\r\nRING\r\n", r.output.unsolicited.c_str());
+}
+void test_rings_to_an_unread_port_are_dropped_and_the_call_still_answers() {
+    Rig r;
+    r.hostOutput.full = true;
+    r.modem.active().s[0] = 3;
+    r.ring();
+    for (int i = 0; i < 20 && r.call.ringing(); ++i) {
+        r.poll(3000);
+    }
+    TEST_ASSERT_EQUAL(std::string::npos, r.hostOutput.text.find("RING"));
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.output.text.find("RING"));
+    TEST_ASSERT_TRUE(r.host.callUp());  // answered on the selected port all the same
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.hostOutput.text.find("CONNECT"));
+}
 void test_listen_failure_retries_and_resource_takeover_closes() {
     Rig r;
     r.listener.fail = true;
@@ -687,6 +723,8 @@ int main() {
     RUN_TEST(test_auto_answer_follows_dtr_rs232_then_usb_then_console);
     RUN_TEST(test_auto_answer_on_usb_rings_every_port_and_drops_with_usb_dtr);
     RUN_TEST(test_numeric_and_quiet_results);
+    RUN_TEST(test_ring_is_unsolicited_and_replies_are_not);
+    RUN_TEST(test_rings_to_an_unread_port_are_dropped_and_the_call_still_answers);
     RUN_TEST(test_listen_failure_retries_and_resource_takeover_closes);
     RUN_TEST(test_live_s1_not_saved_and_new_call_resets_count);
     RUN_TEST(test_auto_answer_does_not_interrupt_local_input_or_secret_prompt);
