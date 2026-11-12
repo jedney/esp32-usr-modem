@@ -46,6 +46,10 @@ Section numbers refer to the project brief.
 | Answer mode: port 23, RI, ring, `ATA`, `S0`, `AT*ANSWERPORT` incl. USB and AUTO by DTR (6.6, v2.0) | `test_answer`, `test_modemcfg` | `test_answer` | `test_answer.py`, `test_usb.py` |
 | USB modem port (Q25, v2.0): TinyUSB serial session, flow control, DTR, no reboot on 1200 baud, one call across ports; pinned TinyUSB download | `test_answer`, `test_hostport`; `test/scripts/test_network_dependencies.py` | — | `test_usb.py` |
 | Remote callers can't reach command mode (6.6, Q44) | `test_answer` | — | `test_answer.py` |
+| Remote `+++` with guard times stays data on every answer port; Telnet commands from a caller before and after `ATA` (TG-01, TG-04, v2.4) | `test_answer` | — | `test_answer.py` (bench) |
+| Unanswered call dropped after 8 rings for `S0` 0 and above 8; `S0` above 8 answers on ring 8; journal entry (SEC-01, v2.4) | `test_answer` | — | `test_answer.py` (bench) |
+| Telnet storm bounded, two ends settle, full send queue stops reading; `S7` doesn't cut the handshake (TG-04, 5.5-12, v2.4) | `test_calls` | — | `test_calls.py` |
+| TCP keepalive on call sockets (SEC-01, v2.4) | — (lwIP only; checked by the s3 build) | — | Bench: pull the caller's network cable, `NO CARRIER` in about 2 minutes |
 | PPP and SLIP, aliases, private /30, NAT, hang-up (6.6) | `test_internet` | `test_internet` | `test_internet.py`; `interop/serial_pppd.py` |
 | Tones: UK dial, busy, ring, DTMF, pulse (6.4) | `test_hwtest`, `test_answer` | `test_hw`, `test_answer` | `test_hwtest.py`, `test_calls.py` |
 | Handshake WAV playback per speed (6.4) | `test_calls`, `scripts/test_sound_catalog.py` | `test_calls` | `test_calls.py` |

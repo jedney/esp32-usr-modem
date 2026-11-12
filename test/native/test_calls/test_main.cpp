@@ -63,6 +63,7 @@ public:
     unsigned begins = 0;
     std::vector<uint8_t> input, output;
     size_t chunk = 256;
+    bool stuck = false;  // the network takes no output at all
     void begin(const char *h, uint16_t p) override {
         host = h;
         port = p;
@@ -81,7 +82,7 @@ public:
     void poll() override {}
     SocketState state() const override { return status; }
     size_t write(const uint8_t *data, size_t n) override {
-        n = std::min(n, chunk);
+        n = stuck ? 0 : std::min(n, chunk);
         output.insert(output.end(), data, data + n);
         return n;
     }
@@ -283,6 +284,120 @@ void test_telnet_refusals_no_loops_and_oversized_subnegotiation() {
     uint8_t byte;
     TEST_ASSERT_EQUAL(1, t.rx.read(&byte, 1));
     TEST_ASSERT_EQUAL('x', byte);
+}
+// TG-04: option negotiation can't loop, and a full send queue stops reading.
+void test_telnet_mixed_storm_is_bounded_and_two_ends_settle() {
+    Telnet t;
+    t.begin();
+    t.tx.clear();
+    size_t in = 0, out = 0;
+    for (unsigned round = 0; round < 3; ++round) {
+        for (unsigned option = 0; option < 256; ++option) {
+            for (uint8_t cmd : {253, 251, 254, 252, 253, 254, 251}) {  // DO WILL DONT WONT ...
+                for (uint8_t b : {uint8_t(255), cmd, uint8_t(option)}) {
+                    t.feed(b);
+                }
+                in += 3;
+            }
+            uint8_t drain[64];
+            size_t n;
+            while ((n = t.tx.read(drain, sizeof drain)) != 0) {
+                out += n;
+            }
+        }
+    }
+    uint8_t byte;
+    TEST_ASSERT_EQUAL(0, t.rx.read(&byte, 1));  // no negotiation byte reaches the data
+    TEST_ASSERT_TRUE(out <= 4 * in);            // at most a short reply per command
+
+    // Two ends answering each other must go quiet.
+    Telnet a, b;
+    a.begin();
+    b.begin();
+    bool quiet = false;
+    for (unsigned round = 0; round < 20 && !quiet; ++round) {
+        uint8_t buf[512];
+        size_t fromA = a.tx.read(buf, sizeof buf);
+        for (size_t i = 0; i < fromA; ++i) {
+            b.feed(buf[i]);
+        }
+        uint8_t other[512];
+        size_t fromB = b.tx.read(other, sizeof other);
+        for (size_t i = 0; i < fromB; ++i) {
+            a.feed(other[i]);
+        }
+        quiet = fromA == 0 && fromB == 0;
+    }
+    TEST_ASSERT_TRUE(quiet);
+}
+void test_telnet_full_send_queue_stops_reading_the_socket() {
+    FakeSocket socket;
+    socket.status = SocketState::kOpen;
+    socket.stuck = true;
+    TcpConnection conn(socket);
+    conn.begin(false);
+    // DO 99 then DONT 99 over and over: each pair makes a reply, so the queue fills.
+    const uint8_t pair[] = {255, 253, 99, 255, 254, 99};
+    for (unsigned i = 0; i < 10000; ++i) {
+        socket.input.insert(socket.input.end(), pair, pair + sizeof pair);
+    }
+    const size_t total = socket.input.size();
+    for (unsigned i = 0; i < 1000; ++i) {
+        conn.poll(i);
+    }
+    TEST_ASSERT_TRUE(!socket.input.empty());        // reading stopped, not everything taken
+    TEST_ASSERT_TRUE(socket.input.size() < total);  // but it did read while there was room
+    TEST_ASSERT_EQUAL(0, conn.space());             // the queue is full
+    // Once the network takes output again, reading resumes and the input drains.
+    socket.stuck = false;
+    for (unsigned i = 0; i < 100000 && !socket.input.empty(); ++i) {
+        conn.poll(i);
+    }
+    TEST_ASSERT_TRUE(socket.input.empty());
+}
+// 5.5-12: S7 limits the wait for the network connection. Once the TCP connection is open
+// it must not drop the call while the handshake sound plays.
+void test_s7_does_not_cut_a_connected_call_during_the_handshake_sound() {
+    Rig r;
+    r.modem.active().v[modemcfg::kM] = 1;
+    r.modem.active().s[7] = 2;
+    r.send("AT*RINGDELAY=0\r");
+    r.send("AT*CONNECTDELAY=0\r");
+    r.send("ATDT1\r");
+    r.sound.active = false;  // dial tone done
+    r.poll();
+    r.sound.active = false;  // digits done: connects now (no ringback)
+    r.poll();
+    TEST_ASSERT_EQUAL(int(CallStage::kConnecting), int(r.call.stage()));
+    r.socket.status = SocketState::kOpen;
+    r.poll();
+    TEST_ASSERT_EQUAL(int(CallStage::kHandshake), int(r.call.stage()));
+    r.output.take();
+    r.poll(10000);  // five times S7, handshake sound still playing
+    TEST_ASSERT_EQUAL(int(CallStage::kHandshake), int(r.call.stage()));
+    TEST_ASSERT_EQUAL(std::string::npos, r.output.text.find("NO ANSWER"));
+    r.sound.active = false;
+    r.poll();
+    TEST_ASSERT_TRUE(r.session.callUp());
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.output.text.find("CONNECT"));
+}
+void test_s7_still_ends_a_connection_that_never_opens() {
+    Rig r;
+    r.modem.active().v[modemcfg::kM] = 1;
+    r.modem.active().s[7] = 2;
+    r.send("AT*RINGDELAY=0\r");
+    r.send("ATDT1\r");
+    r.sound.active = false;
+    r.poll();
+    r.sound.active = false;
+    r.poll();
+    TEST_ASSERT_EQUAL(int(CallStage::kConnecting), int(r.call.stage()));
+    r.output.take();
+    r.poll(1999);
+    TEST_ASSERT_EQUAL(int(CallStage::kConnecting), int(r.call.stage()));
+    r.poll(1);
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.output.text.find("NO ANSWER"));
+    TEST_ASSERT_EQUAL(int(CallStage::kIdle), int(r.call.stage()));
 }
 void test_tcp_raw_all_bytes_and_partial_socket_writes() {
     FakeSocket socket;
@@ -902,6 +1017,10 @@ int main() {
     RUN_TEST(test_phonebook_command_roundtrip_and_strict_arguments);
     RUN_TEST(test_telnet_fragmented_negotiation_ansi_naws_and_escaped_ff);
     RUN_TEST(test_telnet_refusals_no_loops_and_oversized_subnegotiation);
+    RUN_TEST(test_telnet_mixed_storm_is_bounded_and_two_ends_settle);
+    RUN_TEST(test_telnet_full_send_queue_stops_reading_the_socket);
+    RUN_TEST(test_s7_does_not_cut_a_connected_call_during_the_handshake_sound);
+    RUN_TEST(test_s7_still_ends_a_connection_that_never_opens);
     RUN_TEST(test_tcp_raw_all_bytes_and_partial_socket_writes);
     RUN_TEST(test_pending_connect_reset_and_refusal_are_busy_but_other_errors_are_not);
     RUN_TEST(test_invalid_reserved_and_missing_entries_never_start_socket_or_sound);

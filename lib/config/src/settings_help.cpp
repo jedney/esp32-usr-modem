@@ -34,7 +34,8 @@ const char *settingHelp(modemcfg::Setting setting) {
 const char *registerHelp(unsigned reg) {
     switch (reg) {
         case 0:
-            return "Auto-answer threshold: 0 manual only; otherwise number of rings.";
+            return "Auto-answer threshold: 0 manual only; otherwise number of rings. An unanswered "
+                   "call is dropped after 8 rings, so more than 8 counts as 8.";
         case 1:
             return "Live ring count; read only in this screen and never saved.";
         case 2:

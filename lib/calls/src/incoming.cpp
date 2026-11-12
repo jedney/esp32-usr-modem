@@ -50,7 +50,7 @@ void Incoming::ringResult(hostport::Session &session) {
 }
 void Incoming::ring(uint32_t now) {
     ringAt_ = now;
-    if (rings_ < 255) {
+    if (rings_ < kMaxRings) {
         ++rings_;
     }
     // The Sportster documents S1 counting when S0 is enabled. Manual rings are
@@ -62,12 +62,14 @@ void Incoming::ring(uint32_t now) {
         ringResult(*usb_);
     }
     hostport::Session &target = autoAnswerTarget();
-    if (modem_.active().s[0] && rings_ >= modem_.active().s[0] && eligible(target)) {
+    // S0 above kMaxRings answers on the last ring: the call is dropped after it.
+    const uint8_t s0 = modem_.active().s[0];
+    if (s0 && rings_ >= (s0 < kMaxRings ? s0 : kMaxRings) && eligible(target)) {
         answer(target);
     }
 }
 bool Incoming::ri() const {
-    uint32_t elapsed = (clock_() - ringAt_) % 3000;
+    uint32_t elapsed = (clock_() - ringAt_) % kRingPeriodMs;
     return ringing() && (elapsed < 400 || (elapsed >= 600 && elapsed < 1000));
 }
 void Incoming::cancelWait(void *self) {
@@ -203,8 +205,12 @@ void Incoming::poll(bool available) {
             if (modem_.active().get(modemcfg::kM) == 0) {
                 sound_.stop();
             }
-            if (now - ringAt_ >= 3000) {
-                ring(now);  // no catch-up burst after a delayed poll
+            if (now - ringAt_ >= kRingPeriodMs) {
+                if (rings_ >= kMaxRings) {
+                    clear(true);  // SEC-01: nobody answered. End it like a caller who hung up.
+                } else {
+                    ring(now);  // no catch-up burst after a delayed poll
+                }
             }
         } else if (session_ && modem_.active().get(modemcfg::kAmpD) != 0 && !session_->dtrOn()) {
             clear(true);

@@ -90,7 +90,7 @@
   "settings.auto-answer-rings": {
     "screen": "Settings",
     "command": "*SETTING=S0=",
-    "help": "0 disables auto-answer; 1-255 rings; &W saves",
+    "help": "0 disables auto-answer; 1-8 rings (more counts as 8); &W saves",
     "target": "Settings",
     "input": true
   },
