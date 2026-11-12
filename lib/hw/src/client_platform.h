@@ -1,6 +1,7 @@
 #pragma once
 #include <LittleFS.h>
 #include <driver/uart.h>
+#include "catalog.h"
 #include "client_service.h"
 #include "diagnostics.h"
 #include "hw.h"
@@ -63,6 +64,6 @@ private:
     unsigned count_ = 0, selected_ = 0;
     char *snapshot_ = nullptr;
     size_t snapshotSize_ = 0;
-    uint32_t sizes_[8] = {};
+    uint32_t sizes_[sounds::kAssetCount + 1] = {};  // log + one per sound (ALL)
 };
 }  // namespace hw

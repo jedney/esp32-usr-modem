@@ -375,6 +375,48 @@ void test_resize_mid_escape_and_secret_confirmation_timeout() {
     out = r.drain();
     TEST_ASSERT_EQUAL(std::string::npos, out.find("TimeoutCanary"));
 }
+void test_esc_cancels_a_waiting_command_started_from_the_screen() {
+    Rig r;
+    r.terminal.setSize("80,25");
+    r.terminal.open();
+    r.drain();
+    stubWait = true;
+    waitCancelled = false;
+    r.feed("b\r2\r");
+    TEST_ASSERT_TRUE(r.terminal.capturing());
+    TEST_ASSERT_TRUE(r.session.port().busy());
+    r.feed("\x1b");
+    r.terminal.poll(100);  // a lone Esc is recognised after a short pause
+    TEST_ASSERT_TRUE(waitCancelled);
+    TEST_ASSERT_FALSE(r.session.port().busy());
+    TEST_ASSERT_FALSE(r.terminal.capturing());
+}
+void test_idle_screen_closes_after_five_minutes_and_a_key_resets_it() {
+    Rig r;
+    r.terminal.poll(0);
+    r.terminal.open();
+    r.terminal.poll(299999);
+    TEST_ASSERT_TRUE(r.terminal.isOpen());
+    r.feed("x");  // a key at 4:59.999 starts the five minutes again
+    r.terminal.poll(599998);
+    TEST_ASSERT_TRUE(r.terminal.isOpen());
+    r.drain();
+    r.terminal.poll(599999);
+    TEST_ASSERT_FALSE(r.terminal.isOpen());
+    TEST_ASSERT_NOT_EQUAL(std::string::npos,
+                          r.sink.text.find("Screen closed after 5 minutes idle."));
+}
+void test_idle_timeout_survives_the_clock_wrap() {
+    Rig r;
+    r.terminal.poll(0xFFFFFF00u);
+    r.terminal.open();
+    r.terminal.poll(4352);  // 4352 ms after open, across the 2^32 wrap
+    TEST_ASSERT_TRUE(r.terminal.isOpen());
+    r.terminal.poll(299743u);
+    TEST_ASSERT_TRUE(r.terminal.isOpen());
+    r.terminal.poll(299744u);
+    TEST_ASSERT_FALSE(r.terminal.isOpen());
+}
 void test_cell_text_has_fixed_width_and_cannot_inject_controls() {
     {
         Rig r;

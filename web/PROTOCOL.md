@@ -129,7 +129,8 @@ rendering a full wide frame never requires pushing it all into the socket queue.
 Every browser starts read-only (status view and lights); opening the page claims
 nothing, so an idle tab never turns callers away or makes `ATD` give `BUSY`. `E`
 opens the configuration screen when the modem is free (no call, test or other menu); queued keys are discarded when ownership changes. A second browser
-cannot take over. Quit returns to read-only status. Browser phonebook dialing starts
+cannot take over. Quit returns to read-only status, and so does 5 minutes without a key
+(the firmware closes the screen and releases the modem). Browser phonebook dialing starts
 the call on the RS232 host port (which must be in idle command mode), so CONNECT
 and payload go to the attached computer. The browser continues to show status.
 

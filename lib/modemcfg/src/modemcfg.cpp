@@ -16,7 +16,7 @@ constexpr uint64_t bit(unsigned n) {
 }
 
 // Values each setting accepts (Sportster technical reference; reserved values refused).
-const SettingInfo kInfo[kSettingCount] = {
+const SettingInfo kInfo[] = {
     {"B", range(0, 1)},
     {"E", range(0, 1)},
     {"F", range(0, 1)},
@@ -43,6 +43,7 @@ const SettingInfo kInfo[kSettingCount] = {
     {"&U", range(0, kMaxLineSpeedIndex)},
     {"&Y", range(0, 3)},
 };
+static_assert(sizeof kInfo / sizeof kInfo[0] == kSettingCount, "kInfo needs one row per setting");
 
 // Factory S-register values (Sportster 33600; S25 and S36 as a real 33600 reports them).
 void factorySRegs(uint8_t *s) {
@@ -319,6 +320,9 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
         p += kSettingCount;
         memcpy(t.s, p, kSRegCount);
         t.s[1] = 0;  // S1 is a live ring counter, never restored from a profile
+        if (!lineEndRegistersAllowed(t.s[3], t.s[4], t.s[5])) {
+            return LoadResult::kBadValue;
+        }
         p += kSRegCount;
         t.baud = getU32(p);
         p += 4;
@@ -402,6 +406,11 @@ const char *loadResultText(LoadResult r) {
 LoadResult loadNvram(Store &store, Nvram *out) {
     uint8_t buf[kBlobSize + 1];
     size_t len = store.load(buf, sizeof buf);
+    if (len == kLoadError || len > sizeof buf) {
+        // An unreadable store is handled like a damaged blob. The stored data is not touched.
+        *out = factoryNvram();
+        return LoadResult::kBadSize;
+    }
     return deserialize(buf, len, out);
 }
 

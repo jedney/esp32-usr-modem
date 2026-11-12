@@ -90,9 +90,9 @@ are stored for compatibility only.
 | S0 | Auto-answer after this many rings; 0 manual (`ATA`) only. A call nobody answers is dropped after 8 rings (about 24 s), so a value above 8 answers on ring 8 | 0 |
 | S1 | Ring count of the current call (read only, never saved) | 0 |
 | S2 | Escape character; above 127 disables `+++` | 43 (`+`) |
-| S3 | Command terminator | 13 (CR) |
-| S4 | Line feed character for results | 10 (LF) |
-| S5 | Backspace character (DEL also works) | 8 |
+| S3 | Command terminator; 0-127, and never a printable character (32-126), so `ATS3=49` gives `ERROR` | 13 (CR) |
+| S4 | Line feed character for results; 0-127 | 10 (LF) |
+| S5 | Backspace character (DEL also works); 0-127 | 8 |
 | S6 | Dial tone length, seconds | 2 |
 | S7 | Time limit for an outgoing call (name lookup and connect), seconds | 60 |
 | S8 | Comma pause (compatibility) | 2 |
@@ -191,7 +191,7 @@ resets it. "This boot" means it lasts until the next restart.
 | `AT*PHONEBOOK[?]` | List the phonebook (64 entries) |
 | `AT*PHONEBOOK=<number>,<host>,<port>,<TELNET\|RAW>[,<speed>]` | Add or replace an entry. Number 1-11 digits (leading zeros count, special numbers refused); host up to 63 characters; port 1-65535; speed 0 or omitted = no override |
 | `AT*PHONEDELETE=<number>` | Delete an entry |
-| `AT*BOOKCLEAR` | Empty the phonebook (used by export restore) |
+| `AT*BOOKCLEAR` | Empty the phonebook (used by export restore). If the stored phonebook is damaged, `AT*PHONEBOOK=` and `AT*PHONEDELETE=` give `ERROR` and change nothing; this command is the way out |
 | `AT*DIAL=<number\|host:port>` | Dial like `ATDT`; from the browser the call goes to the RS232 port |
 | `AT*DIALTEST <string>` | Show how a dial string is understood, without dialling |
 | `AT*TESTCALL[=<seconds>]` | Test call to a built-in echo, to try `+++`, `ATO`, `ATH`, DTR, DCD and flow control. With seconds (1-3600), the far end hangs up after that long |
@@ -237,11 +237,11 @@ or changed.
 
 | Command | What it does |
 |---|---|
-| `AT*CONFIG` | Open the configuration screen now (`ATDT123` opens it after dial sounds) |
+| `AT*CONFIG` | Open the configuration screen now (`ATDT123` opens it after dial sounds). A screen with no key for 5 minutes closes itself ("Screen closed after 5 minutes idle."), drops unsaved edits and frees the line. A running test or command is not cut off; the 5 minutes start again when it ends |
 | `AT*STYLE[?]` / `=<ANSI\|CP437\|PLAIN>` | Screen style for this port. This boot |
 | `AT*SIZE[?]` / `=<cols>,<rows>` | Screen size for this port, 1-132 by 1-50. This boot |
 | `AT*STATUS` | Model, front panel, ports, call and Wi-Fi |
-| `AT*SETTING[?]` / `=<modem command>` | Show the profiles, or change a setting through the normal checks (`AT*SETTING=S0=2`) |
+| `AT*SETTING[?]` / `=<modem command>` | Show the profiles, or change a setting through the normal checks (`AT*SETTING=S0=2`). Exactly one setting command is accepted (`E0`, `&N8`, `S7=45`, `S7.1=1`, `&Z2=host`); anything after it, such as `E0DT555`, gives `ERROR` |
 | `AT*HELP` / `AT*?` | List project commands and hardware tests |
 | `AT*REFERENCE` | All AT and AT* commands |
 | `AT*ABOUT` | Version, credits and licences |

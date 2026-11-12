@@ -45,9 +45,9 @@ survives Backspace. Confirm each with a `test_config` test; fix the real ones.
 
 Duplicate condition: tidy it.
 
-### STA-09d if WP-07 cut it
+### STA-09d
 
-Esc during a screen-started scan, ping, DNS or play: see `wp-07-small-guards.md`.
+Done in WP-07 (v2.7); nothing to do here.
 
 ## Steps
 

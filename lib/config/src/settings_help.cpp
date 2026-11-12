@@ -28,6 +28,8 @@ const char *settingHelp(modemcfg::Setting setting) {
         "Minimum line-speed index: 0 disabled, 1-38 USR table.",
         "Break handling preference (compatibility setting).",
     };
+    static_assert(sizeof descriptions / sizeof descriptions[0] == modemcfg::kSettingCount,
+                  "settings_help needs one description per setting");
     unsigned index = static_cast<unsigned>(setting);
     return index < modemcfg::kSettingCount ? descriptions[index] : "Unknown setting.";
 }
@@ -41,7 +43,8 @@ const char *registerHelp(unsigned reg) {
         case 2:
             return "Escape character code; values above 127 disable guarded escape.";
         case 3:
-            return "AT command terminator character code (normally 13 / CR).";
+            return "AT command terminator character code (normally 13 / CR). 0-127, never "
+                   "printable.";
         case 4:
             return "Response line-feed character code (normally 10 / LF).";
         case 5:

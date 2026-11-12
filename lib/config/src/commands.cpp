@@ -16,6 +16,43 @@ Commands *attached = nullptr;
 bool query(const char *s) {
     return !*s || !strcmp(s, "?");
 }
+bool digits(const char *&s) {  // consumes one or more digits
+    if (!isdigit(static_cast<unsigned char>(*s)))
+        return false;
+    while (isdigit(static_cast<unsigned char>(*s)))
+        ++s;
+    return true;
+}
+// True for exactly one setting command: Xn, Xn?, &Xn, Sr=n, Sr?, Sr.b=n or &Zn=host (X a
+// letter, n digits). Anything after it, such as the D of "E0DT555", makes it false.
+bool oneSetting(const char *s) {
+    const bool amp = *s == '&';
+    const char letter = s[amp ? 1 : 0];
+    if (!isupper(static_cast<unsigned char>(letter)))
+        return false;
+    s += amp ? 2 : 1;
+    if (!amp && letter == 'S') {
+        if (!digits(s))
+            return false;
+        if (!*s || !strcmp(s, "?"))
+            return true;
+        if (*s == '.' && (++s, !digits(s) || *s != '='))
+            return false;
+        return *s == '=' && (++s, digits(s)) && !*s;
+    }
+    if (amp && letter == 'Z' && isdigit(static_cast<unsigned char>(*s))) {
+        digits(s);
+        if (*s != '=')
+            return !*s || !strcmp(s, "?");
+        for (++s; *s; ++s)
+            if (!(isalnum(static_cast<unsigned char>(*s)) || strchr(".:-_/,", *s)))
+                return false;
+        return true;
+    }
+    while (isdigit(static_cast<unsigned char>(*s)))
+        ++s;
+    return !*s || !strcmp(s, "?");
+}
 void profileExport(atcmd::Port &p, const modemcfg::Profile &a) {
     // Keep response formatting stable until the final restore commands.
     for (unsigned i = 0; i < modemcfg::kSettingCount; ++i) {
@@ -66,10 +103,8 @@ atcmd::Reply Commands::command(atcmd::Port &p, const char *name, const char *arg
         if (!strchr(allowed, *args) || (*args == '&' && !strchr("ABCDGHIKMNPRSTUYWZF", args[1]))) {
             return Reply::kError;
         }
-        for (const char *c = args; *c; ++c) {
-            if (!(isalnum(static_cast<unsigned char>(*c)) || strchr("&=?.:,-_ /", *c))) {
-                return Reply::kError;
-            }
+        if (!oneSetting(args)) {  // one command only: "E0DT555" must not dial
+            return Reply::kError;
         }
         if (!strcmp(args, "T0") || !strcmp(args, "T1")) {
             p.execute(args[1] == '1' ? "T" : "P");

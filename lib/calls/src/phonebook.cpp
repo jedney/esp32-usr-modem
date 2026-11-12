@@ -143,7 +143,7 @@ bool Phonebook::save() {
     return store_.save(blob_, used + 4);
 }
 bool Phonebook::put(const Entry &entry) {
-    if (!valid(entry)) {
+    if (!healthy_ || !valid(entry)) {  // a damaged phonebook is never saved over
         return false;
     }
     Entry *slot = nullptr;
@@ -173,6 +173,9 @@ bool Phonebook::put(const Entry &entry) {
     return false;
 }
 bool Phonebook::remove(const char *number) {
+    if (!healthy_) {
+        return false;
+    }
     for (auto &e : entries_) {
         if (*e.number && strcmp(e.number, number) == 0) {
             Entry before = e;
@@ -195,6 +198,7 @@ bool Phonebook::clear() {
     for (auto &e : entries_) {
         e = Entry{};
     }
+    healthy_ = true;
     return true;
 }
 atcmd::Reply Phonebook::command(atcmd::Port &port, const char *args, bool deleting) {
@@ -211,6 +215,12 @@ atcmd::Reply Phonebook::command(atcmd::Port &port, const char *args, bool deleti
         return Reply::kOk;
     }
     if (*args++ != '=') {
+        return Reply::kError;
+    }
+    if (!healthy_) {
+        port.beginInfo();
+        port.printf("Phonebook is damaged and is not changed. AT*BOOKCLEAR erases it.");
+        port.newline();
         return Reply::kError;
     }
     if (deleting) {

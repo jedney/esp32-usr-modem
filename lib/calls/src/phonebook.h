@@ -23,7 +23,9 @@ public:
     static constexpr size_t kRecordSize = 12 + 64 + 2 + 1 + 4;
     static constexpr size_t kSize = 5 + kPhonebookCount * kRecordSize + 4;
     explicit Phonebook(modemcfg::Store &store) : store_(store) {}
-    bool begin();  // false: damaged record; factory entry used, not saved over it
+    // false: damaged record; factory entry shown, the stored data is not saved over.
+    // put() and remove() are refused until clear() (AT*BOOKCLEAR).
+    bool begin();
     bool loaded() const { return loaded_; }
     bool healthy() const { return healthy_; }
     const Entry *find(const char *number) const;

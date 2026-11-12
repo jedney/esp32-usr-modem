@@ -103,7 +103,8 @@ compression, and `AT*PING` is unavailable during the call.
 
 `AT*CONFIG` opens it at once; `ATDT123` plays dial sounds first. It works on the USB
 console, the RS232 port and in the browser, but only one at a time. While it is open,
-incoming calls are turned away.
+incoming calls are turned away. A screen with no key for 5 minutes closes itself, so a
+forgotten one does not hold the line.
 
 - Arrow keys and Enter, or press the hotkey shown. **F1** is help, **Esc/Q** goes back,
   **Q/F10** leaves from the main menu, **Ctrl-C** leaves a form.
