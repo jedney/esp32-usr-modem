@@ -4,6 +4,7 @@
 #include <Arduino.h>
 
 #include "input_buffer.h"
+#include "sink_gate.h"
 #include "usb_port.h"
 
 namespace usbport {
@@ -13,29 +14,26 @@ namespace {
 constexpr uint32_t kDefaultBaud = 115200;  // reported until the PC sets a speed
 
 // Direct writes (results the Session sends straight to the sink). Like the RS232 port,
-// wait at most 2 s for room, then drop the rest: a program that has the port open but
-// stops reading must not stop the modem. Nothing is sent while the port is closed.
-class UsbSink : public atcmd::Sink {
+// SinkGate decides how long to wait: a program that has the port open but stops reading
+// must not stop the modem (STA-01). Nothing is sent while the port is closed.
+class UsbSink : public atcmd::Sink, private hostport::SinkGate::Device {
 public:
-    void write(const char *data, size_t len) override {
-        size_t done = 0;
-        const uint32_t start = millis();
-        while (done < len && hw::usbDtr()) {
-            if (millis() - start > 2000) {
-                return;
-            }
-            size_t room = hw::usbWriteSpace();
-            if (room > 0) {
-                size_t n = len - done < room ? len - done : room;
-                size_t written = hw::usbWrite(reinterpret_cast<const uint8_t *>(data + done), n);
-                done += written;
-                toComputer += written;
-            } else {
-                delay(1);
-            }
+    void write(const char *data, size_t len) override { send(data, len, false); }
+    void writeUnsolicited(const char *data, size_t len) override { send(data, len, true); }
+    uint32_t toComputer = 0;
+
+private:
+    void send(const char *data, size_t len, bool unsolicited) {
+        if (hw::usbDtr()) {
+            toComputer += gate_.write(*this, data, len, unsolicited);
         }
     }
-    uint32_t toComputer = 0;
+    size_t room() override { return hw::usbDtr() ? hw::usbWriteSpace() : 0; }
+    size_t put(const uint8_t *data, size_t len) override { return hw::usbWrite(data, len); }
+    uint32_t now() override { return millis(); }
+    void pause() override { delay(1); }
+
+    hostport::SinkGate gate_;
 };
 
 UsbSink sink;

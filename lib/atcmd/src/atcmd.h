@@ -29,6 +29,9 @@ class Sink {
 public:
     virtual ~Sink() = default;
     virtual void write(const char *data, size_t len) = 0;
+    // Output nobody on this port asked for (RING). A serial port drops it at once when it
+    // has no room (STA-01); by default it is written like any other output.
+    virtual void writeUnsolicited(const char *data, size_t len) { write(data, len); }
 };
 
 class Port;
@@ -154,6 +157,7 @@ public:
     void line(const char *text);  // text, then S3 S4
     void beginInfo();             // starts an information response (S3 S4 in verbal mode)
     void result(Result r);        // applies V, Q and X
+    void unsolicited(Result r);   // result() for output nobody asked for (RING)
 
     // --- Prompts and late results, for AT* handlers (return Reply::kPending after) -------
     // Prints `prompt` and reads one line as a secret: each character echoes as '*' (only
@@ -204,7 +208,8 @@ private:
     uint8_t clientBackspace_ = 0;
     uint32_t baud_;
     Link *link_ = nullptr;
-    bool resultSent_ = false;  // a command (ATO) sent the line's final result itself
+    bool resultSent_ = false;   // a command (ATO) sent the line's final result itself
+    bool unsolicited_ = false;  // write() is sending an unsolicited result
     State state_ = State::kIdle;
     char aCase_ = 'A';
     char line_[kLineMax + 1] = {};

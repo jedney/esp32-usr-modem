@@ -868,6 +868,7 @@ void pollConsole(uint32_t now) {
     if (n > 0) {
         consoleInput.append(buf, n);
         consoleInput.poll(*console, now);
+        devicecfg::wipe(buf, n);  // input can contain passwords (SEC-07e)
     }
     int space = Serial.availableForWrite();
     if (space > 0) {

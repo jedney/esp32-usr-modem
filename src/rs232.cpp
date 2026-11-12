@@ -9,9 +9,11 @@
 #include <Arduino.h>
 
 #include "autobaud.h"
+#include "devicecfg.h"
 #include "hw.h"
 #include "input_buffer.h"
 #include "linectl.h"
+#include "sink_gate.h"
 
 namespace rs232 {
 
@@ -19,34 +21,36 @@ namespace {
 
 using hostport::Mode;
 
-class UartSink : public atcmd::Sink {
+// Results and echo for the computer. The UART has only its 128-byte FIFO (kHostTxBuffer),
+// and with &R2 it stops sending while the computer holds RTS off. SinkGate decides how
+// long to wait: never for RING, once (bounded) for a reply, then not at all until the
+// computer reads again (STA-01).
+class UartSink : public atcmd::Sink, private hostport::SinkGate::Device {
 public:
-    void write(const char *data, size_t len) override {
-        if (!hw::hostActive()) {
-            return;
-        }
-        size_t done = 0;
-        const uint32_t start = millis();
-        while (done < len) {
-            if (millis() - start > 2000) {
-                return;  // the computer has held RTS off for 2 s: drop the rest
-            }
-            int room = hw::hostWriteSpace();
-            if (room > 0) {
-                size_t n = len - done < static_cast<size_t>(room) ? len - done : room;
-                size_t written = hw::hostWrite(reinterpret_cast<const uint8_t *>(data + done), n);
-                done += written;
-                toComputer += written;
-            } else {
-                delay(1);
-            }
+    void write(const char *data, size_t len) override { send(data, len, false); }
+    void writeUnsolicited(const char *data, size_t len) override { send(data, len, true); }
+    uint32_t toComputer = 0;
+
+private:
+    void send(const char *data, size_t len, bool unsolicited) {
+        if (hw::hostActive()) {
+            toComputer += gate_.write(*this, data, len, unsolicited);
         }
     }
-    uint32_t toComputer = 0;
+    size_t room() override {
+        int room = hw::hostWriteSpace();
+        return room > 0 ? static_cast<size_t>(room) : 0;
+    }
+    size_t put(const uint8_t *data, size_t len) override { return hw::hostWrite(data, len); }
+    uint32_t now() override { return millis(); }
+    void pause() override { delay(1); }
+
+    hostport::SinkGate gate_;
 };
 
 constexpr size_t kMaxRuns = 2048;  // a full command line at 10 edges per character
 autobaud::Run *runs = nullptr;     // in PSRAM
+bool captureFailed = false;        // speed detection couldn't start: fixed speed (5.5-13)
 
 atcmd::Modem *modemPtr = nullptr;
 UartSink sink;
@@ -68,6 +72,23 @@ size_t keyCount = 0;
 
 const modemcfg::Profile &profile() {
     return modemPtr->active();
+}
+
+// Speed from "AT" through the RMT capture. False if the capture couldn't start: the port
+// then reads the UART at its current speed, as with a fixed AT*BAUD speed.
+bool capturing() {
+    return detecting() && !captureFailed;
+}
+
+void startCapture() {
+    if (runs != nullptr && hw::captureBegin()) {
+        return;
+    }
+    captureFailed = true;
+    Serial.printf(
+        "RS232: speed detection could not start. The port stays at %lu bps; "
+        "AT*BAUD sets another speed.\r\n",
+        static_cast<unsigned long>(currentBaud));
 }
 
 void setBaud(uint32_t b) {
@@ -113,9 +134,9 @@ public:
         }
         // Be ready for a new AT before Session drops DCD. Waiting for the next
         // poll can lose an immediately redialing host's first character.
-        if (detecting() && !hw::captureActive()) {
+        if (capturing() && !hw::captureActive()) {
             flushUart();
-            hw::captureBegin();
+            startCapture();
         }
     }
 
@@ -153,16 +174,20 @@ void readCommandInput(uint32_t nowMs) {
     input.poll(*sess, nowMs);
     if (input.size())
         return;
+    // Typed passwords pass through these buffers (and the capture's edge times): wipe
+    // what was used (SEC-07e).
     uint8_t buf[512];
-    if (detecting()) {
+    if (capturing()) {
         flushUart();  // the capture has the same bytes, decoded at the right speed
         size_t n = 0;
         while ((n = hw::captureRead(runs, kMaxRuns)) > 0) {
             autobaud::Burst b = autobaud::decodeBurst(runs, n, currentBaud, buf, sizeof buf);
+            devicecfg::wipe(runs, n * sizeof *runs);
             if (b.changed) {
                 setBaud(b.baud);
             }
             feed(buf, b.len, nowMs);
+            devicecfg::wipe(buf, b.len);
             if (sess->mode() == Mode::kOnline || input.size()) {
                 break;  // the rest arrives through the UART
             }
@@ -175,6 +200,7 @@ void readCommandInput(uint32_t nowMs) {
         buf[n++] = static_cast<uint8_t>(u.read());
     }
     feed(buf, n, nowMs);
+    devicecfg::wipe(buf, n);
 }
 
 void readOnlineInput(uint32_t nowMs) {
@@ -192,6 +218,7 @@ void readOnlineInput(uint32_t nowMs) {
         fromComputer += n;
         input.append(buf, n);
         input.poll(*sess, nowMs);
+        devicecfg::wipe(buf, n);  // input can contain passwords (SEC-07e)
     }
 }
 
@@ -254,9 +281,9 @@ void poll(uint32_t nowMs) {
         flowKnown = true;
     }
 
-    const bool wantCapture = detecting() && sess->mode() != Mode::kOnline && !sess->localOpen();
+    const bool wantCapture = capturing() && sess->mode() != Mode::kOnline && !sess->localOpen();
     if (wantCapture && !hw::captureActive()) {
-        hw::captureBegin();
+        startCapture();
     } else if (!wantCapture && hw::captureActive()) {
         hw::captureEnd();
         flushUart();  // the UART's copy of the command that went online
@@ -312,7 +339,7 @@ bool suspended() {
 
 int readKey() {
     if (keyCount == 0 && !isSuspended) {
-        if (hw::captureActive()) {
+        if (hw::captureActive() && runs != nullptr) {
             flushUart();
             size_t n = hw::captureRead(runs, kMaxRuns);
             if (n > 0) {

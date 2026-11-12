@@ -37,6 +37,7 @@ Section numbers refer to the project brief.
 | Settings kept across a restart, `&F0`-`&F2`, damaged settings → factory, old layouts converted (6.7) | `test_modemcfg`, `test_atcmd` | `test_board` | `test_settings.py`, `test_session.py` |
 | RS232 speed from "AT" at 300-115200, fixed with `AT*BAUD` (6.2) | `test_hostport` | `test_rs232` | `test_rs232.py`, `test_session.py` |
 | RTS/CTS and XON/XOFF, DTR `&D` with S25, DCD `&C`, RI (6.2) | `test_hostport` | `test_rs232` | `test_rs232.py`, `test_answer.py` |
+| A port nobody reads never blocks the modem: `RING` dropped at once, a reply waits once then the port is stalled (STA-01, v2.2) | `test_hostport` (`test_sink_gate_*`), `test_answer` | — | `test_rs232.py`, `test_usb.py` (bench) |
 | `+++` guard time, `ATO`, `ATH`, `ATZ`, `F0`, `AT*TESTCALL` (6.2) | `test_hostport`, `test_atcmd` | — | `test_session.py`, `test_rs232.py` |
 | `&N` line speed, `AT*MODEL`, throttling, CONNECT text (6.2) | `test_calls`, `test_hostport`, `test_atcmd` | `test_calls` | `test_session.py`, `test_calls.py` |
 | Phonebook (6.3) | `test_calls` | `test_calls` | `test_calls.py` |

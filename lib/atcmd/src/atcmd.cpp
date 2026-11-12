@@ -228,7 +228,18 @@ const StarCommand *Modem::findStar(const char *text, const char **args) const {
 Port::Port(Modem &modem, Sink &out, uint32_t baud) : modem_(modem), out_(out), baud_(baud) {}
 
 void Port::write(const char *data, size_t len) {
-    (redirected_ ? *redirected_ : out_).write(data, len);
+    Sink &sink = redirected_ ? *redirected_ : out_;
+    if (unsolicited_) {
+        sink.writeUnsolicited(data, len);
+    } else {
+        sink.write(data, len);
+    }
+}
+
+void Port::unsolicited(Result r) {
+    unsolicited_ = true;
+    result(r);
+    unsolicited_ = false;
 }
 
 void Port::print(const char *text) {
