@@ -68,6 +68,27 @@ def unpack(data, destination, folder=""):
                 raise ValueError("Dependency archive contains a non-regular entry")
 
 
+def fetch(archive, repository, revision, checksum, name):
+    """Return the archive bytes, checked against checksum before anything is kept.
+
+    A download is checked in memory and written to the cache only when it is good. A
+    cached file that no longer matches is deleted, so the next build downloads it again.
+    """
+    if archive.exists():
+        data = archive.read_bytes()
+        if hashlib.sha256(data).hexdigest() != checksum:
+            archive.unlink()
+            raise ValueError(f"SHA-256 mismatch for {name} (cached copy deleted)")
+        return data
+    with urlopen(f"https://codeload.github.com/{repository}/tar.gz/{revision}",
+                 timeout=60) as response:
+        data = response.read()
+    if hashlib.sha256(data).hexdigest() != checksum:
+        raise ValueError(f"SHA-256 mismatch for {name}")
+    archive.write_bytes(data)
+    return data
+
+
 def prepare(root):
     cache = root / ".pio/network-archives"
     cache.mkdir(parents=True, exist_ok=True)
@@ -77,14 +98,7 @@ def prepare(root):
         marker = destination / ".usr-source-sha256"
         if marker.exists() and marker.read_text().strip() == checksum:
             continue
-        archive = cache / (name + ".tar.gz")
-        if not archive.exists():
-            with urlopen(f"https://codeload.github.com/{repository}/tar.gz/{revision}",
-                         timeout=60) as response:
-                archive.write_bytes(response.read())
-        data = archive.read_bytes()
-        if hashlib.sha256(data).hexdigest() != checksum:
-            raise ValueError(f"SHA-256 mismatch for {name}")
+        data = fetch(cache / (name + ".tar.gz"), repository, revision, checksum, name)
         unpack(data, destination, folder)
         marker.write_text(checksum + "\n")
     # The project's own build file for the TinyUSB component (see its comments).

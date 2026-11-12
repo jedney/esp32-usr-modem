@@ -14,7 +14,7 @@ retro computer to Telnet BBSes and the Internet over Wi-Fi.
 - Internet dial-up: PPP (`ATDT666`) and SLIP (`ATDT667`) with NAT.
 - A configuration screen on either serial port or in a web browser.
 - Client Tests and X/Y/ZMODEM transfers to check a terminal and its cable.
-- Front-panel LEDs, a volume knob and a speaker with a hard volume limit.
+- Front-panel LEDs, a volume knob and a 2 W speaker.
 - Choice of Sportster model: 14.4k, 28.8k, 33.6k or 56k.
 
 Every command is listed in **[docs/COMMANDS.md](docs/COMMANDS.md)**.
@@ -168,7 +168,7 @@ without storing it.
 
 ## Hardware tests
 
-`AT*HWTEST` walks through the electronics (LEDs, speaker, volume limit, knob, RS232
+`AT*HWTEST` walks through the electronics (LEDs, speaker, volume, knob, RS232
 lines, loopback) and prints a summary; `AT*HW?` lists the single tests. The GPIO map is
 in `lib/hw/src/pins.h` (confirmed by Electronics, rev B) and `AT*HWPINS`
 prints it. Loopback plug for `AT*HWLOOP`: join RXD-TXD, CTS-RTS and DCD-DTR (DB25 pins

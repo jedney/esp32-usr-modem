@@ -19,6 +19,32 @@ def test_corrupt_cached_source_fails_before_extraction(tmp_path):
     with pytest.raises(ValueError, match='SHA-256'):
         dependencies.prepare(tmp_path)
     assert not (tmp_path / '.pio/network-deps/esp_littlefs/CMakeLists.txt').exists()
+    assert not (cache / 'esp_littlefs.tar.gz').exists()  # bad cached copy is removed
+
+
+class _Response(io.BytesIO):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
+def test_bad_download_is_not_cached(tmp_path, monkeypatch):
+    monkeypatch.setattr(dependencies, 'urlopen', lambda *a, **k: _Response(b'wrong body'))
+    archive = tmp_path / 'dep.tar.gz'
+    with pytest.raises(ValueError, match='SHA-256'):
+        dependencies.fetch(archive, 'owner/repo', 'rev', '0' * 64, 'dep')
+    assert not archive.exists()
+
+
+def test_good_download_is_cached_after_check(tmp_path, monkeypatch):
+    body = b'good body'
+    monkeypatch.setattr(dependencies, 'urlopen', lambda *a, **k: _Response(body))
+    archive = tmp_path / 'dep.tar.gz'
+    digest = dependencies.hashlib.sha256(body).hexdigest()
+    assert dependencies.fetch(archive, 'owner/repo', 'rev', digest, 'dep') == body
+    assert archive.read_bytes() == body
 
 
 def test_folder_extracts_only_that_folder(tmp_path):

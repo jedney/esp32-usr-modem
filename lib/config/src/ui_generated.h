@@ -69,7 +69,7 @@ constexpr Action kActions[] = {
     {Screen::Hardware, "Files", "*HWFILES", "LittleFS files", Screen::Hardware, false, false, false, false, "hardware-tests.files", '4', true, "LittleFS files"},
     {Screen::Hardware, "LEDs", "*HWLED=", "AA|CD|RD|SD|TR|CS|ARQ|ALL|OFF|AUTO|CHASE|WALK", Screen::Hardware, true, false, false, false, "hardware-tests.leds", '5', true, "AA|CD|RD|SD|TR|CS|ARQ|ALL|OFF|AUTO|CHASE|WALK"},
     {Screen::Hardware, "Amplifier", "*HWAMP=", "AUTO|ON|OFF", Screen::Hardware, true, false, false, false, "hardware-tests.amplifier", '6', true, "AUTO|ON|OFF"},
-    {Screen::Hardware, "Test volume", "*HWVOL=", "0-100|POT; cap always applies", Screen::Hardware, true, false, false, false, "hardware-tests.test-volume", '7', true, "0-100|POT; cap always applies"},
+    {Screen::Hardware, "Test volume", "*HWVOL=", "0-100|POT", Screen::Hardware, true, false, false, false, "hardware-tests.test-volume", '7', true, "0-100|POT"},
     {Screen::Hardware, "Tone / sweep", "*HWTONE=", "Hz[,ms]|DIAL|BUSY|RING|SWEEP", Screen::Hardware, true, false, false, false, "hardware-tests.tone-sweep", '8', true, "Hz[,ms]|DIAL|BUSY|RING|SWEEP"},
     {Screen::Hardware, "DTMF", "*HWDTMF=", "digits", Screen::Hardware, true, false, false, false, "hardware-tests.dtmf", '9', true, "digits"},
     {Screen::Hardware, "Pulse", "*HWPULSE=", "digits", Screen::Hardware, true, false, false, false, "hardware-tests.pulse", 'A', true, "digits"},
