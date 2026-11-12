@@ -42,7 +42,7 @@ whole window.
 | 13 | v2.13 | [Shared native test fixtures](../history/wp-13-test-fixtures.md) | Sonnet / medium | M | 09, 10 |
 | 14 | v2.14 | [`main.cpp` tidy-up](../history/wp-14-main-tidy.md) | Opus / medium | M-L | 02, 03, 06 |
 | 15 | v2.15 | [Configuration screen repaint](../history/wp-15-menu-repaint.md) | Opus / high | L | 07 |
-| 16 | v2.16 | [Configuration screen code tidy-up](wp-16-menu-tidy.md) | Sonnet / high | M | 15 |
+| 16 | v2.16 | [Configuration screen code tidy-up](../history/wp-16-menu-tidy.md) | Sonnet / high | M | 15 |
 | 17 | v2.17 | [Watchdog and phonebook capacity](wp-17-watchdog-phonebook.md) | Opus / high | M | 02, 03, 14 |
 | 18 | v3.0 | [Framework spike](wp-18-framework-spike.md) | Opus / high | L | 01-17 merged (the spike itself can run earlier) |
 | 19 | v3.0 | [Framework migration](wp-19-framework-migration.md) | Opus / high | 3-5 × L | 18 |
@@ -139,7 +139,7 @@ the package confirms each first.
 | MNT-01 | CI version job can never fail | 01 | done (v2.1) |
 | MNT-02 | `uploadfsota` not gated; cppcheck errors don't fail CI | 01 | done (v2.1) |
 | MNT-03 | Text still describes a volume limit | 01 | done (v2.1) |
-| MNT-04 | Long functions in `main.cpp`, `menu.cpp`, `commands.cpp` | 14, 16 | open (`main.cpp` done v2.14) |
+| MNT-04 | Long functions in `main.cpp`, `menu.cpp`, `commands.cpp` | 14, 16 | done (`main.cpp` v2.14; `menu.cpp`, `commands.cpp` v2.16) |
 | MNT-05a | "Dialling on the RS232 host port" printed before the check | 14 | done (v2.14) |
 | MNT-05b | `demo.js` box characters replaced by `?` | 11 | done (v2.11) |
 | MNT-05c | `build/` not in `.gitignore` | 01 | done (v2.1) |

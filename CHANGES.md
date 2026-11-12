@@ -18,7 +18,13 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ### Changed
 
-- Tidy the configuration screen code
+- Configuration screen code tidied (MNT-04), with no change in behaviour: one key handler
+  per screen mode (menu, form, confirmation, output, help, export, captured command)
+  behind a short `Terminal::key()`; the frame built from header, body and footer steps;
+  the main-menu layout, phonebook side panel and export step in their own functions;
+  one function per command in `commands.cpp`, found through a table. No function in
+  `menu.cpp` or `commands.cpp` is over 75 lines. The configuration screen tests pass
+  unchanged.
 
 ## [2.15] - 2026-11-13
 
