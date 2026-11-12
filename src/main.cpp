@@ -209,6 +209,17 @@ unsigned serialIndex(atcmd::Port &port) {  // not for the browser
                          : clienttest::kConsolePort;
 }
 
+// A serial port's configuration screen and Backspace follow its Client Tests record.
+void applyClientSettings(unsigned i) {
+    const auto &s = clientSettings.get(i);
+    auto *menu = serialMenu(i);
+    menu->setStyle(s.charset == clienttest::Charset::Latin1 ? "ANSI"
+                                                            : clienttest::charsetName(s.charset));
+    menu->resize(std::min<unsigned>(s.columns, 132), std::min<unsigned>(s.rows, 50));
+    menu->backspace(s.backspace);
+    serialSession(i).port().clientBackspace(s.backspace);
+}
+
 config::Terminal &menuOf(atcmd::Port &port) {
     if (browserSession && &port == &browserSession->port()) {
         return *browserMenu;
@@ -230,30 +241,20 @@ public:
     bool isRs232() const override { return false; }
 };
 
-class Rs232Term : public hwconsole::Term {
-public:
-    explicit Rs232Term(atcmd::Port &port) : port_(port) {}
-    void write(const char *data, size_t len) override { port_.write(data, len); }
-    int read() override { return rs232::readKey(); }
-    bool isRs232() const override { return true; }
-    bool connected() const override { return hw::dtrAsserted(); }  // the host closed its port
-
-private:
-    atcmd::Port &port_;
-};
-
 ConsoleTerm consoleTerm;
 
-class UsbTerm : public hwconsole::Term {
+// The RS232 or USB modem port. Without DTR the computer has closed its port.
+class HostTerm : public hwconsole::Term {
 public:
-    explicit UsbTerm(atcmd::Port &port) : port_(port) {}
+    HostTerm(atcmd::Port &port, bool rs232) : port_(port), rs232_(rs232) {}
     void write(const char *data, size_t len) override { port_.write(data, len); }
-    int read() override { return usbport::readKey(); }
-    bool isRs232() const override { return false; }
-    bool connected() const override { return usbport::dtrOn(); }  // the PC closed the port
+    int read() override { return rs232_ ? rs232::readKey() : usbport::readKey(); }
+    bool isRs232() const override { return rs232_; }
+    bool connected() const override { return rs232_ ? hw::dtrAsserted() : usbport::dtrOn(); }
 
 private:
     atcmd::Port &port_;
+    bool rs232_;
 };
 
 class BrowserTerm : public hwconsole::Term {
@@ -287,6 +288,19 @@ public:
 };
 BrowserTerm browserTerm;
 
+// Runs `use` with the hardware-test terminal of the port a command was typed on.
+template <typename Use>
+void withTerm(atcmd::Port &port, Use use) {
+    if (port.browser()) {
+        use(browserTerm);
+    } else if (isRs232(port) || isUsb(port)) {
+        HostTerm t(port, isRs232(port));
+        use(t);
+    } else {
+        use(consoleTerm);
+    }
+}
+
 bool modemIdle() {
     return !callSlot.busy() ||
            (hardwareOwner && ownsMenu(*hardwareOwner) && !isRs232(*hardwareOwner) &&
@@ -315,17 +329,7 @@ atcmd::Reply cmdHelp(atcmd::Port &port, const char *args) {
         return atcmd::Reply::kError;
     }
     atcmd::showStarHelp(port);
-    if (port.browser()) {
-        hwconsole::printHelp(browserTerm);
-    } else if (isRs232(port)) {
-        Rs232Term t(port);
-        hwconsole::printHelp(t);
-    } else if (isUsb(port)) {
-        UsbTerm t(port);
-        hwconsole::printHelp(t);
-    } else {
-        hwconsole::printHelp(consoleTerm);
-    }
+    withTerm(port, [](hwconsole::Term &t) { hwconsole::printHelp(t); });
     return atcmd::Reply::kOk;
 }
 
@@ -373,16 +377,9 @@ atcmd::Reply cmdHw(atcmd::Port &port, const char *args) {
                        !strcmp(args, "LINES")
                            ? "{\"t\":\"hardware\",\"active\":true,\"mode\":\"lines\"}"
                            : "{\"t\":\"hardware\",\"active\":true}");
-        hwconsole::handle(browserTerm, args);
-    } else if (isRs232(port)) {
-        Rs232Term t(port);
-        hwconsole::handle(t, args);  // prints its own OK / ERROR
-    } else if (isUsb(port)) {
-        UsbTerm t(port);
-        hwconsole::handle(t, args);
-    } else {
-        hwconsole::handle(consoleTerm, args);
     }
+    // Prints its own OK / ERROR.
+    withTerm(port, [args](hwconsole::Term &t) { hwconsole::handle(t, args); });
     hardwareRunning = false;
     if (port.browser() && browserTestCancelled) {
         hwconsole::restoreBrowserResources();
@@ -1269,13 +1266,7 @@ void setup() {
         new clienttest::Service(clientSettings, clienttest::kRs232Port, hostClientPlatform);
     usbClient = new clienttest::Service(clientSettings, clienttest::kUsbPort, usbClientPlatform);
     for (unsigned i = 0; i < kSerialPorts; ++i) {
-        const auto &s = clientSettings.get(i);
-        auto *menu = serialMenu(i);
-        menu->setStyle(
-            s.charset == clienttest::Charset::Latin1 ? "ANSI" : clienttest::charsetName(s.charset));
-        menu->resize(std::min<unsigned>(s.columns, 132), std::min<unsigned>(s.rows, 50));
-        menu->backspace(s.backspace);
-        serialSession(i).port().clientBackspace(s.backspace);
+        applyClientSettings(i);
     }
     char *logStorage = static_cast<char *>(ps_malloc(256 * 1024));
     debugLog.begin(logStorage ? logStorage : fallbackLog,
@@ -1380,29 +1371,17 @@ void loop() {
     internetDialer->poll();
     configHardware.poll();
     for (unsigned i = 0; i < kSerialPorts; ++i) {
-        auto *service = serialClient(i);
-        if (service->changed()) {
-            const auto &s = clientSettings.get(i);
-            auto *menu = serialMenu(i);
-            menu->setStyle(s.charset == clienttest::Charset::Latin1
-                               ? "ANSI"
-                               : clienttest::charsetName(s.charset));
-            menu->resize(std::min<unsigned>(s.columns, 132), std::min<unsigned>(s.rows, 50));
-            menu->backspace(s.backspace);
-            serialSession(i).port().clientBackspace(s.backspace);
+        if (serialClient(i)->changed()) {
+            applyClientSettings(i);
         }
     }
     // Departures are dispatched after Session has closed the local service. No
     // listener poll occurs between releasing its slot and starting the action.
     char departure[atcmd::kLineMax + 1];
-    if (consoleMenu->takeDeparture(departure, sizeof departure)) {
-        console->port().execute(departure);
-    }
-    if (hostMenu->takeDeparture(departure, sizeof departure)) {
-        rs232::session().port().execute(departure);
-    }
-    if (usbMenu->takeDeparture(departure, sizeof departure)) {
-        usbport::session().port().execute(departure);
+    for (unsigned i = 0; i < kSerialPorts; ++i) {  // console, RS232, USB, as before
+        if (serialMenu(i)->takeDeparture(departure, sizeof departure)) {
+            serialSession(i).port().execute(departure);
+        }
     }
     devicecfg::wipe(departure, sizeof departure);
     netcfg::pollCommands();  // a finished AT*WIFIJOIN or AT*WIFISCAN
