@@ -62,9 +62,9 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 - Web page: a firmware install through `/api/update` reboots into this version, and an
   upload dropped part-way frees the modem without a reboot (`e2e/test_web.py
   --browser-upload --upload-tests`).
-- An RS232 command sent 2-3 s into a restart is now answered once the modem is up.
-  `test_internet_settings_survive_restart_and_export` itself needs the console port to
-  reset the modem and was not rerun (the console was unplugged).
+- An RS232 command sent 2-3 s into a restart is now answered once the modem is up, and
+  `test_internet_settings_survive_restart_and_export` passes (3 runs). The whole of
+  `e2e/test_internet.py`: 14 passed, 2 opt-in skipped.
 
 ## [2.16] - 2026-11-13
 
