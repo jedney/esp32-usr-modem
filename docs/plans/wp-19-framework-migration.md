@@ -7,7 +7,7 @@
 | Branch | `firmware/v3.0-idf5` (same branch as WP-18; the name predates the IDF 6.1 decision and stays) |
 | Depends on | WP-18 (done 13 Nov 2026). WP-01 to WP-17 are merged; rebase on `origin/main` at the start of each session |
 | Firmware change | yes, platform-wide |
-| Push | the branch stays **local** until Jon says otherwise (13 Nov 2026); CI would fail until session 3 links |
+| Push | the branch stays **local**. One push and one pull request after session 7, when Jon says so ("Rules" below) |
 
 Follow the token rules in [README.md](README.md). Read this file and, for the session you
 are doing, only the files it names. The spike's evidence is in
@@ -357,6 +357,12 @@ Ask Jon for COM ports and what is wired first.
 ## Rules for this version
 
 - One version bump for the whole branch (v3.0, done in WP-18).
+- **Keep CI runs to a minimum.** CI runs on every push. Commit locally after each
+  session; don't push and don't open a pull request between sessions. Run the CI checks
+  locally instead: native tests, firmware build, lint, clang-format, `test/scripts` and
+  `web` tests. The whole of WP-19 goes up as **one push and one pull request** after the
+  session 7 bench run, when Jon says so. If CI then fails, fix it in as few pushes as
+  possible: reproduce the failure locally first, then push once.
 - Decisions log entry per decision; `credits/LICENSES.md` for third-party code.
 - **Never run the pioarduino platform against the shared PlatformIO install**: its first
   run replaced PlatformIO Core in `~/.platformio/penv` (WP-18). Use an isolated
