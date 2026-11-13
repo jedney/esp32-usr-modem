@@ -20,10 +20,10 @@ Sessions 1 and 2 of WP-19 are done (results below). The rest are one plan each:
 | --- | --- | --- | --- |
 | 20 | [I2S, RMT capture and first link](../history/wp-20-i2s-rmt-first-link.md) (done) | Opus 5.5 / high | L |
 | 21 | [Networking, tooling, CI and the OTA hash](../history/wp-21-networking-ci-ota.md) (done) | Opus 5.5 / high | L |
-| 22 | [Network console](wp-22-network-console.md) | Opus 5.5 / high | L |
-| 23 | [Fresh start: code](wp-23-fresh-start-code.md) | Sonnet 5.5 / high | L |
-| 24 | [Fresh start: documentation and credits](wp-24-fresh-start-docs.md) | Sonnet 5.5 / high | L |
-| 25 | [DCD and RI on the USB modem port](wp-25-usb-dcd-ri.md) | Sonnet 5.5 / high | M |
+| 22 | [Network console](../history/wp-22-network-console.md) (done) | Opus 5.5 / high | L |
+| 23 | [DCD and RI on the USB modem port](wp-23-usb-dcd-ri.md) | Sonnet 5.5 / high | M |
+| 24 | [Fresh start: code](wp-24-fresh-start-code.md) | Sonnet 5.5 / high | L |
+| 25 | [Fresh start: documentation and credits](wp-25-fresh-start-docs.md) | Sonnet 5.5 / high | L |
 | 26 | [Bench run with Jon](wp-26-bench-run.md) | Sonnet 5.5 / medium | M |
 
 Do them in order: WP-22 needs the Wi-Fi events and OTA from WP-21, and WP-23 to WP-26 can
@@ -54,10 +54,10 @@ use WP-22's network console. The spike's evidence is in
 6. **Functional changes** in v3.0 are limited to 3, 5, 8, 10 and 11 and to removing
    migration code. Anything else found on the way gets a decisions-log row and a follow-up, so a
    regression can be traced to the framework move.
-7. **`docs/project-brief.md` is trimmed to the current firmware spec** (WP-24). This
+7. **`docs/project-brief.md` is trimmed to the current firmware spec** (WP-25). This
    copy stops being a snapshot of the shared master and becomes the repo's firmware spec,
    kept current with the code.
-8. **Obsolete features are removed** in WP-23, not just listed (definition there).
+8. **Obsolete features are removed** in WP-24, not just listed (definition there).
 9. **Rewrite to the new framework's way, don't patch.** Where the framework move touches
    code, use the approach Arduino 3.3 and IDF 6.1 now recommend (current drivers,
    components and APIs), even if that means rewriting the module, rather than the
@@ -68,7 +68,7 @@ use WP-22's network console. The spike's evidence is in
    protocol) stays the same unless a decisions-log row says otherwise; the native, e2e
    and bench tests are the check.
 10. **The USB modem port shows DCD and RI** (Jon, 13 Nov 2026), through CDC
-    serial-state notifications, which TinyUSB 0.21.0 supports. WP-25.
+    serial-state notifications, which TinyUSB 0.21.0 supports. WP-23.
 11. **A network console** (Jon, 13 Nov 2026): the maintenance console over a raw TCP
     port, like ser2net, protected by the device password, so the board can be
     debugged, and with ArduinoOTA flashed, over Wi-Fi while the USB cable is on the
@@ -170,11 +170,25 @@ later work.
   (`pio test -e s3`; re-upload the firmware after) and end-to-end tests. Use it from
   WP-20 on (the firmware doesn't link before then), whenever a change needs checking
   on real hardware. Don't save it all for WP-26.
-- **Over the network from WP-22 on:** once the network console works and the modem
-  is on Wi-Fi, sessions may debug through `socket://usr-modem.local:2001` (the e2e
-  `--console-port` takes it) and flash by OTA (`pio run -e s3_ota -t upload`) instead
-  of the console cable. The cable is still needed for the first flash after a full
-  erase, for `pio test -e s3`, and for a modem that doesn't boot or join Wi-Fi.
+- **Over the network from WP-22 on:** with the modem on Wi-Fi, sessions may debug
+  through the network console and flash by OTA (`pio run -e s3_ota -t upload`) instead
+  of the console cable:
+  - e2e: `--console-port socket://10.0.0.223:2001` (or `usr-modem.local`; the first
+    name lookup on Jon's PC takes about 3 s). The fixture logs in with
+    `USR_MODEM_PASSWORD` from `.env` and logs in again after `restart()`
+    (`AT*RESTART`, then the replayed boot banner). `--net-console 10.0.0.223
+    --rs232-port COM18` runs `test_net_console.py`.
+  - By hand: VS Code task "Modem: network console", or
+    `pio device monitor -e s3 --port socket://usr-modem.local:2001`; type the device
+    password (Jon's; Claude never sees it). In a script, use the e2e conftest's
+    `net_console_connect()`, which never prints it.
+  - After log-in the last 16 KB of console output is replayed: the boot banner
+    shows straight after a restart. One client at a time: close the serial monitor
+    (or the other script) first.
+  - Not over the network: `AT*WIFI=OFF` or a Wi-Fi join cuts the connection
+    (`test_wifi.py` needs the cable); the first flash after a full erase;
+    `pio test -e s3`; panic output as it happens (`AT*RESETINFO` shows the record);
+    a modem that doesn't boot or join Wi-Fi.
 - **No backups and no migration.** It is a development unit; settings, NVS and LittleFS
   may be wiped at any time. Erase fully rather than work around old data.
 - **Setup credentials are in `.env`:** `USR_MODEM_WIFI_SSID`, `USR_MODEM_WIFI_PASS` and

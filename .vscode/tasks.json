@@ -64,6 +64,13 @@
       "problemMatcher": []
     },
     {
+      "label": "Modem: network console",
+      "type": "shell",
+      "command": "pio device monitor -e s3 --port socket://usr-modem.local:2001",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
       "label": "Modem: on-board tests",
       "type": "shell",
       "command": "pio test -e s3",

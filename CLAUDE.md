@@ -51,7 +51,9 @@ Owner: Jon Edney. Windows 11 PC, VS Code + PlatformIO, repo at `C:\repo\esp32-us
   requesting local serial port when `AT*PASS` generates a new one (brief 6.6; Jon, 11 Nov
   2026). It is never shown to the browser, never logged, exported or sent to the web page,
   and never shown on a remote (port 23) session. A remote caller (answer mode, port 23)
-  can never reach command mode, `AT*` commands or the configuration screen (Q44).
+  can never reach command mode, `AT*` commands or the configuration screen (Q44). The
+  network console (TCP 2001, behind the device password) counts as a local console and
+  shows what the cable shows, password lines included (Jon, 13 Nov 2026).
 - **Commands.** Standard commands follow USR Sportster behaviour; project commands use
   `AT*`. Everything in the configuration screen also has an `AT*` command (parity rule,
   6.8) and appears in `AT*HELP`.
@@ -75,8 +77,9 @@ use the Python in `%LOCALAPPDATA%\Pythonin` (pytest and pyserial installed).
 | Upload over USB (tests first) | `pio run -e s3 -t upload` | Modem: upload over USB (tests first) |
 | Upload LittleFS (sounds + web) | `pio run -e s3 -t uploadfs` | Modem: upload sounds and web files (LittleFS) |
 | Console (115200) | `pio device monitor -e s3` | Modem: USB console (115200) |
+| Console over Wi-Fi | `pio device monitor -e s3 --port socket://usr-modem.local:2001` | Modem: network console |
 | On-board tests | `pio test -e s3` | Modem: on-board tests |
-| End-to-end tests | `python -m pytest test/e2e --console-port COMx` | Modem: end-to-end tests |
+| End-to-end tests | `python -m pytest test/e2e --console-port COMx` (or `socket://usr-modem.local:2001`) | Modem: end-to-end tests |
 | Web tests | `cd web; npm test` | Modem: web interface tests |
 | Lint | `pio check -e native` | Modem: lint (cppcheck) |
 

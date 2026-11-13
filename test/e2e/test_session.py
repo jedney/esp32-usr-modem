@@ -88,7 +88,11 @@ def test_far_end_hangs_up(console):
     _call(console, "=1")
     console.ser.reset_input_buffer()
     time.sleep(1.5)
-    received = console.ser.read(console.ser.in_waiting or 1)
+    # Read until it arrives: on the network console (socket://) in_waiting is only 0 or 1.
+    received = b""
+    deadline = time.monotonic() + 1.0
+    while b"NO CARRIER\r\n" not in received and time.monotonic() < deadline:
+        received += console.ser.read(console.ser.in_waiting or 1)
     assert b"NO CARRIER" in received
     assert console.command("AT")[-1] == "OK"  # back in command mode
 

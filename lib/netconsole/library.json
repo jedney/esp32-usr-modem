@@ -1,0 +1,8 @@
+{
+  "name": "netconsole",
+  "version": "0.1.0",
+  "description": "Network console: log-in, one client, console output ring and the on/off setting; hardware-independent",
+  "frameworks": "*",
+  "platforms": "*",
+  "dependencies": [{"name": "calls"}, {"name": "devicecfg"}, {"name": "modemcfg"}]
+}

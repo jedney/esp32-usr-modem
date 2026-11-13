@@ -1,10 +1,10 @@
-# WP-25 (v3.0): DCD and RI on the USB modem port
+# WP-23 (v3.0): DCD and RI on the USB modem port
 
 | Item | Value |
 | --- | --- |
 | Model / effort | Sonnet 5.5 / high |
 | Size | M |
-| Depends on | WP-20 (USB port verified on the board), WP-24 (the trimmed docs it edits) |
+| Depends on | WP-20 (USB port verified on the board), WP-22 (network console, not required) |
 
 Read [wp-19-common.md](wp-19-common.md) first (decisions, versions, board testing, rules).
 
@@ -58,7 +58,7 @@ false while the endpoint is busy or the device isn't configured.
    `answer_setup()` and `call_in()`); DSR on. Restore the settings each test changes.
 5. **Docs:** `src/usbport.h`, `lib/hw/src/usb_port.h` and the `tusb_config.h` comment;
    `docs/COMMANDS.md` (the USB port paragraph, `&C`), README (the rear USB-C row),
-   `AT*HELP` if it mentions the USB port's limits, the firmware spec (WP-24's trimmed
+   `AT*HELP` if it mentions the USB port's limits, the firmware spec (WP-25 trims it later;
    `docs/project-brief.md`, the USB modem port), `test/README.md` matrix,
    decisions-log row (it supersedes the old "USB limits" decision; with what Windows
    reports), `CHANGES.md` [3.0] "Added".

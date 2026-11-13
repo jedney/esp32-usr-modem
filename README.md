@@ -26,14 +26,14 @@ Every command is listed in **[docs/COMMANDS.md](docs/COMMANDS.md)**.
 | RS232 (DB25) | The computer. Speed is detected from each "AT" (300-115200), or fixed with `AT*BAUD`. RTS/CTS, DTR, DCD and RI work as on a real modem; DSR is always on |
 | Rear USB-C (the S3's native USB) | **USB modem port** (v2.0): a PC sees a USB serial port that works like the RS232 port, with its own AT session. No line speed, USB flow control, DTR from the PC program; no DCD or RI (calls show by result codes). The same socket powers the modem |
 | USB-C "UART" on the S3 board | Maintenance console, 115200 8N1. Same commands as the RS232 port, plus the boot messages. Inside the case only |
-| Wi-Fi | Calls, the web interface (`http://usr-modem.local`) and OTA updates |
+| Wi-Fi | Calls, the web interface (`http://usr-modem.local`), the network console (TCP port 2001) and OTA updates |
 
 ## First start
 
 1. Connect the USB console (115200) and power on. The banner shows the version, Wi-Fi
    state and the **device password**. The password is made at first boot, is the login
-   for the web interface and OTA (user `admin`), and is shown at each boot until it is
-   first used or changed (`AT*PASS`).
+   for the web interface, the network console and OTA (user `admin`), and is shown at
+   each boot until it is first used or changed (`AT*PASS`).
 2. Join Wi-Fi:
 
    ```text
@@ -222,6 +222,7 @@ Use **Terminal → Run Task…**:
 | Upload LittleFS | `pio run -e s3 -t uploadfs` | Modem: upload sounds and web files (LittleFS) |
 | Upload over Wi-Fi | `pio run -e s3_ota -t upload` | Modem: upload over Wi-Fi / OTA (tests first) |
 | Console | `pio device monitor -e s3` | Modem: USB console (115200) |
+| Console over Wi-Fi | `pio device monitor -e s3 --port socket://usr-modem.local:2001` | Modem: network console |
 | On-board tests | `pio test -e s3` | Modem: on-board tests |
 | End-to-end tests | `python -m pytest test/e2e --console-port COMx [--rs232-port COMy]` | Modem: end-to-end tests |
 | Web tests | `cd web; npm test` | Modem: web interface tests |
@@ -258,6 +259,23 @@ OTA checks the password over UDP 3232, then the modem connects back to the PC on
 run `scripts/allow_ota.ps1` once from an Administrator PowerShell. It allows only
 PlatformIO's Python on that port, from the local subnet, on private networks. If the PC
 and modem are on different subnets, the router must also allow modem → PC TCP 32320.
+
+### Network console
+
+The maintenance console also works over Wi-Fi, on TCP port 2001 (raw bytes, like
+ser2net), so the modem can be used, debugged and, with OTA, flashed while the USB cable is
+on the USB modem port or not plugged in at all. Run **Modem: network console** (or any raw
+TCP client, or `socket://usr-modem.local:2001` in pyserial) and type the device password
+at `Password:` (if no prompt shows, press Enter). It then shows the console's recent output,
+the boot messages included while they fit in its 16 KB, and works as the console itself:
+the same session as the cable, with the same commands and rules. One client at a time.
+`AT*NETCONSOLE=OFF` turns it off (saved). The end-to-end tests take
+`--console-port socket://usr-modem.local:2001` and log in with `USR_MODEM_PASSWORD`.
+
+It is plain TCP, like Telnet: the password crosses the local network unencrypted. Still
+needed the cable: the first flash after a full erase, on-board tests, crash output as it
+happens (`AT*RESETINFO` shows the record afterwards) and a modem that doesn't boot or join
+Wi-Fi.
 
 ### Debugging
 

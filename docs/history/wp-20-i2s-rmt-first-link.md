@@ -86,6 +86,6 @@ log (rows "v3.0 I2S, RMT capture and UART speed", "v3.0 first full link" and the
 
 - **WP-21:** browser WebSockets are reset (12 of 18 `test_web.py` cases fail); added to
   its plan as step 5.
-- **WP-25/26:** the USB modem port (rear USB-C not connected), the sound (needs a
+- **WP-23/26:** the USB modem port (rear USB-C not connected), the sound (needs a
   listener), a real crash record in `AT*RESETINFO`, `test_calls.py` (needs the PC call
   server), and the intermittent Q2 failure in `test_answer.py`.

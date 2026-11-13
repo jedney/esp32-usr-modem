@@ -6,7 +6,7 @@
 | Size | L |
 | Depends on | WP-21 (rewritten Wi-Fi events, new OTA hash) |
 
-Read [wp-19-common.md](wp-19-common.md) first (decisions, versions, board testing, rules).
+Read [wp-19-common.md](../plans/wp-19-common.md) first (decisions, versions, board testing, rules).
 
 Decision 11. The maintenance console (UART0) also works over a raw TCP port, like
 ser2net, so with the PC's USB cable on the rear USB modem port, or no cable at all,
@@ -84,12 +84,46 @@ that doesn't boot or join Wi-Fi.
    upload followed by the boot log on the network console.
 5. **Docs:** decisions-log row; `docs/COMMANDS.md`; `AT*HELP`; README; CLAUDE.md (the
    "Secrets" rule: the device password is never shown on the network console; the build
-   and test table); the firmware spec (`docs/project-brief.md`; WP-24 trims it);
+   and test table); the firmware spec (`docs/project-brief.md`; WP-25 trims it);
    `test/README.md` matrix; `CHANGES.md` [3.0] "Added".
 6. **Hand-over:** update "Testing on the board" in
-   [wp-19-common.md](wp-19-common.md) and Claude's bench memory with the port and how to
+   [wp-19-common.md](../plans/wp-19-common.md) and Claude's bench memory with the port and how to
    use it.
 
 Cut line: 1, 2, 4's log-in, secrets and stall tests, and 3's `conftest.py`. The boot log
 buffer, the VS Code task and the full console suite over `socket://` can move to
 WP-23.
+
+## Result (13-14 Nov 2026)
+
+Done. Reasons and details are in the decisions log (rows "network console: open points",
+"network console: design", "found in WP-22, not changed").
+
+- **Jon's answers (step 0):** port 2001, factory ON, plain TCP, `AT*NETCONSOLE`. No
+  special password rules: the network console counts as a local console, so there is no
+  local-only write path and no canary test for it (step 1 "Secrets" and the step 4 canary
+  are replaced by this).
+- **Code:** `lib/netconsole` (log-in, one client, console log ring, setting; native
+  `test_netconsole`, 25 cases), `Device::matches()` (constant-time hash check),
+  `calls::Listener::refuse()`, per-socket keepalive in `hw::TcpSocket`, and
+  `src/console_out.cpp`, the one path for console output (`Serial` is no longer written
+  anywhere else in `src/`). ESP-IDF log lines are captured; Arduino `log_x` lines and panic
+  output are not, and the previous boot's log is not kept (optional, not done).
+- **Found on the board:** pyserial's `socket://` empties its input just after connecting,
+  so a prompt sent at once was sometimes lost: the prompt now waits 250 ms and the e2e
+  fixture presses Enter if none shows. A client that vanished held the port for about
+  2 minutes: its socket now has a 10 s / 2 s / 3 keepalive. Two e2e tests read one byte
+  where the UART gave a whole line (`in_waiting` on a socket is 0 or 1); fixed in the tests.
+- **Tests on the board** (console on the network unless said): `test_net_console.py`
+  7/7, three runs in a row (with `--rs232-port COM18`); `test_console` 7, `test_settings`
+  13, `test_session` 16, `test_config` 13, `test_hwtest` 17, `test_client` 9,
+  `test_device` 2 (5 need flags), `test_rs232` 21, `test_calls` 3 (7 need a call server),
+  `test_answer` 9, `test_internet` 13 (2 UDP skips) all pass. The three "Wi-Fi loss" tests
+  turn Wi-Fi off and so need the cable (deselected); `test_wifi.py` likewise. USB not
+  connected; web needs `--web-tests`. OTA upload followed by the replayed boot banner on
+  the network console: works. App image 1,499,969 bytes (35.8 %), static RAM 153,424 bytes.
+- **Local checks:** native 514 (1 skip: pins overridden by the bench `.env`), cppcheck,
+  clang-format, UI tables, version.
+- **For Jon:** try the VS Code task "Modem: network console" (it needs a real terminal,
+  so it was not run here; it opens the port the same way as the tests, which get the
+  prompt 10 times out of 10).

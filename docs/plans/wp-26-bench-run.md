@@ -21,7 +21,7 @@ cables.
    --upload-tests`, X/Y/ZMODEM with lrzsz.
 4. ArduinoOTA v3.0 to v3.0 with the SHA-256 hash; web firmware upload.
 5. USB: rear USB-C empty and with a power-only lead for 5 minutes (no reset). DCD and
-   RI on the USB port in a terminal program that shows them (WP-25), during a test
+   RI on the USB port in a terminal program that shows them (WP-23), during a test
    call and an incoming call.
 6. Sound at full volume and at the pot's ends; `AT*BAUD=AUTO` at 300, 2400, 9600, 38400,
    115200 with a 128-character line; then a test build without `uartSync()`.
@@ -34,5 +34,5 @@ cables.
    network console client connected.
 
 When it passes and Jon says so: one push and one pull request for the whole of WP-19
-("Rules for this version" in the common file), then the last step of WP-24: delete
+("Rules for this version" in the common file), then the last step of WP-25: delete
 `docs/plans/`.

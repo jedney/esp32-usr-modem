@@ -317,6 +317,7 @@ atcmd::Reply Commands::exportConfig(atcmd::Port &p) {
     p.printf("AT*WIFI=%s\r\nAT*OTA=%s\r\nATY%u\r\n", s.enabled ? "ON" : "OFF",
              device_.policy() == devicecfg::Policy::kAlways ? "ALWAYS" : "DEMAND", m.nvram().y);
     hardware_.command(p, "WEBEXPORT", "");
+    hardware_.command(p, "NETCONSOLEEXPORT", "");
     hardware_.command(p, "CLIENTEXPORT", "");
     hardware_.command(p, "INTERNETEXPORT", "");
     profileExport(p, m.active());

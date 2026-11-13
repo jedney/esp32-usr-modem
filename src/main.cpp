@@ -29,6 +29,7 @@
 #include "config.h"
 #include "config_dialer.h"
 #include "connection.h"
+#include "console_out.h"
 #include "device_commands.h"
 #include "device_crypto.h"
 #include "dialstring.h"
@@ -41,6 +42,7 @@
 #include "internet_network.h"
 #include "modemcfg.h"
 #include "net_commands.h"
+#include "net_console.h"
 #include "net_probe.h"
 #include "netcfg.h"
 #include "nvs_store.h"
@@ -75,9 +77,7 @@ constexpr uint32_t kBannerWaitMs = 8000;  // for Wi-Fi at boot (decided by Jon, 
 
 class SerialSink : public atcmd::Sink {
 public:
-    void write(const char *data, size_t len) override {
-        Serial.write(reinterpret_cast<const uint8_t *>(data), len);
-    }
+    void write(const char *data, size_t len) override { consoleout::write(data, len); }
 };
 
 hw::NvsStore store;
@@ -96,6 +96,18 @@ bool answerListenFailed = false;
 hw::EspCrypto crypto;
 devicecfg::Device device(deviceStore, crypto);
 hw::OtaService ota(device);
+hw::NvsStore netConsoleStore("netconsole", "cfg");
+netconsole::Settings netConsoleSettings(netConsoleStore);
+hw::TcpSocket netConsoleSocket;
+hw::TcpListener netConsoleListener(netConsoleSocket);
+class NetConsoleHost : public netconsole::Host {
+public:
+    bool passwordMatches(const char *password) override { return device.matches(password); }
+    void loggedIn() override { device.markUsed(); }
+};
+NetConsoleHost netConsoleHost;
+netconsole::Console netConsole(netConsoleListener, netConsoleSocket, consoleout::log(),
+                               netConsoleHost);
 hw::NvsStore webStore("web", "cfg");
 hw::NvsStore clientStore("clients", "cfg");
 clienttest::Settings clientSettings(clientStore);
@@ -152,9 +164,9 @@ atcmd::Port *hardwareOwner = nullptr;
 // The Wi-Fi driver's own saved network and password (firmware before v0.6 let it keep them;
 // WiFi.persistent(false) stops that now). A factory reset clears them too (5.5-19).
 hw::NvsStore wifiDriverStore("nvs.net80211", "unused");
-modemcfg::Store *resetStores[] = {&store,        &netStore,      &bookStore,
-                                  &historyStore, &resetStore,    &webStore,
-                                  &clientStore,  &internetStore, &wifiDriverStore};
+modemcfg::Store *resetStores[] = {&store,           &netStore,       &bookStore,   &historyStore,
+                                  &resetStore,      &webStore,       &clientStore, &internetStore,
+                                  &wifiDriverStore, &netConsoleStore};
 bool restarting = false;
 uint32_t restartAt = 0;
 
@@ -237,12 +249,19 @@ bool ownsMenu(atcmd::Port &port) {
 
 // --- Hardware tests on the port they were typed on ------------------------------------------
 
+void pollNetConsole();
+
 class ConsoleTerm : public hwconsole::Term {
 public:
-    void write(const char *data, size_t len) override {
-        Serial.write(reinterpret_cast<const uint8_t *>(data), len);
+    void write(const char *data, size_t len) override { consoleout::write(data, len); }
+    int read() override {
+        if (Serial.available() > 0) {
+            return Serial.read();
+        }
+        uint8_t c;
+        return netConsole.read(&c, 1) ? c : -1;
     }
-    int read() override { return Serial.available() > 0 ? Serial.read() : -1; }
+    void service() override { pollNetConsole(); }
     bool isRs232() const override { return false; }
 };
 
@@ -499,6 +518,8 @@ public:
             {"RZ", &ConfigHardware::cmdClientTest},
             {"WEBEXPORT", &ConfigHardware::cmdWebExport},
             {"WEB", &ConfigHardware::cmdWeb},
+            {"NETCONSOLEEXPORT", &ConfigHardware::cmdNetConsoleExport},
+            {"NETCONSOLE", &ConfigHardware::cmdNetConsole},
             {"APPLYBAUD", &ConfigHardware::cmdApplyBaud},
             {"CONFIG", &ConfigHardware::cmdConfig},
             {"STYLE", &ConfigHardware::cmdStyle},
@@ -620,6 +641,22 @@ private:
         }
         return webSettings.setEnabled(!strcmp(args, "=ON")) ? Reply::kOk : Reply::kError;
     }
+    Reply cmdNetConsoleExport(atcmd::Port &port, const char *, const char *) {
+        port.printf("AT*NETCONSOLE=%s\r\n", netConsoleSettings.enabled() ? "ON" : "OFF");
+        return Reply::kDone;
+    }
+    // AT*NETCONSOLE=OFF closes a connected client in the next loop pass, after its OK.
+    Reply cmdNetConsole(atcmd::Port &port, const char *, const char *args) {
+        if (isQuery(args)) {
+            port.beginInfo();
+            port.line(netConsoleSettings.enabled() ? "ON" : "OFF");
+            return Reply::kOk;
+        }
+        if (strcmp(args, "=ON") && strcmp(args, "=OFF")) {
+            return Reply::kError;
+        }
+        return netConsoleSettings.setEnabled(!strcmp(args, "=ON")) ? Reply::kOk : Reply::kError;
+    }
     Reply cmdApplyBaud(atcmd::Port &, const char *, const char *) {
         rs232::applyHostBaud();
         return Reply::kDone;
@@ -695,6 +732,23 @@ private:
         netcfg::formatIp(net.link().ip, ip, sizeof ip);
         port.printf("Wi-Fi: %s, %s, %d dBm, IP %s\r\n", net.stateText(), net.settings().ssid,
                     net.link().rssi, ip);
+        switch (netConsole.state()) {
+            case netconsole::Console::State::kOff:
+                port.printf("Network console: %s\r\n",
+                            netConsoleSettings.enabled() ? "on, not listening" : "off");
+                break;
+            case netconsole::Console::State::kListening:
+                port.printf("Network console: port %u, no client\r\n", netconsole::kPort);
+                break;
+            case netconsole::Console::State::kLogin:
+                port.printf("Network console: port %u, %s at the password prompt\r\n",
+                            netconsole::kPort, netConsole.peer());
+                break;
+            case netconsole::Console::State::kReady:
+                port.printf("Network console: port %u, %s logged in\r\n", netconsole::kPort,
+                            netConsole.peer());
+                break;
+        }
         // 5.5-08: the least free stack so far, for the bench record.
         port.printf("Stack headroom: loop %d B, lwIP %d B, web %d B\r\n",
                     hw::stackHeadroom("loopTask"), hw::stackHeadroom("tcpip"),
@@ -819,8 +873,8 @@ uint32_t msNow() {
 
 void printSettings(modemcfg::LoadResult loaded) {
     const modemcfg::Profile &p = modem->active();
-    Serial.printf("Settings: %s, power-on template Y%u\r\n", modemcfg::loadResultText(loaded),
-                  static_cast<unsigned>(modem->nvram().y));
+    consoleout::printf("Settings: %s, power-on template Y%u\r\n", modemcfg::loadResultText(loaded),
+                       static_cast<unsigned>(modem->nvram().y));
     char speed[48];
     if (modem->hostBaud() == 0) {
         snprintf(speed, sizeof speed, "from \"AT\" (starts at %u)",
@@ -829,16 +883,16 @@ void printSettings(modemcfg::LoadResult loaded) {
         snprintf(speed, sizeof speed, "fixed %u (AT*BAUD)",
                  static_cast<unsigned>(modem->hostBaud()));
     }
-    Serial.printf("RS232: speed %s, &B%u, flow control &H%u&R%u, &C%u &D%u\r\n", speed,
-                  static_cast<unsigned>(p.get(modemcfg::kAmpB)),
-                  static_cast<unsigned>(p.get(modemcfg::kAmpH)),
-                  static_cast<unsigned>(p.get(modemcfg::kAmpR)),
-                  static_cast<unsigned>(p.get(modemcfg::kAmpC)),
-                  static_cast<unsigned>(p.get(modemcfg::kAmpD)));
-    Serial.printf("USB modem port: %s; auto-answer %s\r\n",
-                  usbport::started() ? "on (native USB / rear USB-C)" : "failed to start",
-                  modemcfg::answerPortName(modem->answerPort()));
-    Serial.printf(
+    consoleout::printf("RS232: speed %s, &B%u, flow control &H%u&R%u, &C%u &D%u\r\n", speed,
+                       static_cast<unsigned>(p.get(modemcfg::kAmpB)),
+                       static_cast<unsigned>(p.get(modemcfg::kAmpH)),
+                       static_cast<unsigned>(p.get(modemcfg::kAmpR)),
+                       static_cast<unsigned>(p.get(modemcfg::kAmpC)),
+                       static_cast<unsigned>(p.get(modemcfg::kAmpD)));
+    consoleout::printf("USB modem port: %s; auto-answer %s\r\n",
+                       usbport::started() ? "on (native USB / rear USB-C)" : "failed to start",
+                       modemcfg::answerPortName(modem->answerPort()));
+    consoleout::printf(
         "Echo E%u, quiet Q%u, verbal V%u, results X%u\r\n",
         static_cast<unsigned>(p.get(modemcfg::kE)), static_cast<unsigned>(p.get(modemcfg::kQ)),
         static_cast<unsigned>(p.get(modemcfg::kV)), static_cast<unsigned>(p.get(modemcfg::kX)));
@@ -848,57 +902,57 @@ void printSettings(modemcfg::LoadResult loaded) {
 void printNetwork(netcfg::LoadResult netLoaded) {
     const netcfg::Settings &s = net.settings();
     if (netLoaded == netcfg::LoadResult::kDamaged) {
-        Serial.printf("Wi-Fi: %s\r\n", netcfg::loadResultText(netLoaded));
+        consoleout::printf("Wi-Fi: %s\r\n", netcfg::loadResultText(netLoaded));
     }
     if (!s.enabled) {
-        Serial.print("Wi-Fi: off (AT*WIFI=ON switches it on)\r\n");
+        consoleout::print("Wi-Fi: off (AT*WIFI=ON switches it on)\r\n");
     } else if (!s.hasNetwork()) {
-        Serial.print("Wi-Fi: not set up (AT*WIFISCAN, then AT*WIFIJOIN=<n>)\r\n");
+        consoleout::print("Wi-Fi: not set up (AT*WIFISCAN, then AT*WIFIJOIN=<n>)\r\n");
     } else if (net.up()) {
         const netcfg::LinkInfo &l = net.link();
         char ip[16];
         netcfg::formatIp(l.ip, ip, sizeof ip);
-        Serial.printf("Wi-Fi: %s, %d dBm, IP %s (%s)\r\n", s.ssid, static_cast<int>(l.rssi), ip,
-                      s.dhcp ? "DHCP" : "static");
+        consoleout::printf("Wi-Fi: %s, %d dBm, IP %s (%s)\r\n", s.ssid, static_cast<int>(l.rssi),
+                           ip, s.dhcp ? "DHCP" : "static");
     } else {
-        Serial.printf("Wi-Fi: %s, %s\r\n", s.ssid, net.stateText());
+        consoleout::printf("Wi-Fi: %s, %s\r\n", s.ssid, net.stateText());
     }
-    Serial.printf("Name: %s.local\r\n", s.host);
+    consoleout::printf("Name: %s.local\r\n", s.host);
     const int64_t utc = net.utcNow();
     if (utc != 0) {
         char t[48];
         netcfg::tz::formatLocal(net.zone(), utc, t, sizeof t);
-        Serial.printf("Clock: %s\r\n", t);
+        consoleout::printf("Clock: %s\r\n", t);
     } else {
-        Serial.printf("Clock: not set yet (NTP %s, zone %s)\r\n", s.ntp, s.tz);
+        consoleout::printf("Clock: not set yet (NTP %s, zone %s)\r\n", s.ntp, s.tz);
     }
 }
 
 void printBanner(modemcfg::LoadResult loaded, netcfg::LoadResult netLoaded) {
-    Serial.print("\r\n");
-    Serial.print("  _   _ ____  ____    __  __           _\r\n");
-    Serial.print(" | | | / ___||  _ \\  |  \\/  | ___   __| | ___ _ __ ___\r\n");
-    Serial.print(" | | | \\___ \\| |_) | | |\\/| |/ _ \\ / _` |/ _ \\ '_ ` _ \\\r\n");
-    Serial.print(" | |_| |___) |  _ <  | |  | | (_) | (_| |  __/ | | | | |\r\n");
-    Serial.print("  \\___/|____/|_| \\_\\ |_|  |_|\\___/ \\__,_|\\___|_| |_| |_|\r\n");
-    Serial.printf("\r\nUSR Modem Emulator v%s (%s)\r\n", FW_VERSION, FW_COMMIT);
-    Serial.printf("ESP32-S3, flash %u MB, PSRAM %u KB, reset: %s\r\n",
-                  static_cast<unsigned>(ESP.getFlashChipSize() / (1024 * 1024)),
-                  static_cast<unsigned>(ESP.getPsramSize() / 1024),
-                  hwconsole::resetReasonName(static_cast<int>(esp_reset_reason())));
+    consoleout::print("\r\n");
+    consoleout::print("  _   _ ____  ____    __  __           _\r\n");
+    consoleout::print(" | | | / ___||  _ \\  |  \\/  | ___   __| | ___ _ __ ___\r\n");
+    consoleout::print(" | | | \\___ \\| |_) | | |\\/| |/ _ \\ / _` |/ _ \\ '_ ` _ \\\r\n");
+    consoleout::print(" | |_| |___) |  _ <  | |  | | (_) | (_| |  __/ | | | | |\r\n");
+    consoleout::print("  \\___/|____/|_| \\_\\ |_|  |_|\\___/ \\__,_|\\___|_| |_| |_|\r\n");
+    consoleout::printf("\r\nUSR Modem Emulator v%s (%s)\r\n", FW_VERSION, FW_COMMIT);
+    consoleout::printf("ESP32-S3, flash %u MB, PSRAM %u KB, reset: %s\r\n",
+                       static_cast<unsigned>(ESP.getFlashChipSize() / (1024 * 1024)),
+                       static_cast<unsigned>(ESP.getPsramSize() / 1024),
+                       hwconsole::resetReasonName(static_cast<int>(esp_reset_reason())));
     printNetwork(netLoaded);
     printSettings(loaded);
-    Serial.printf("OTA: %s, %s\r\n",
-                  device.policy() == devicecfg::Policy::kAlways ? "ALWAYS" : "DEMAND",
-                  device.wantsListener(millis(), net.up(), true) ? "listening" : "closed");
+    consoleout::printf("OTA: %s, %s\r\n",
+                       device.policy() == devicecfg::Policy::kAlways ? "ALWAYS" : "DEMAND",
+                       device.wantsListener(millis(), net.up(), true) ? "listening" : "closed");
     if (!device.ready()) {
-        Serial.print("Device credentials unavailable. Use AT*PASS or AT*FACTORY.\r\n");
+        consoleout::print("Device credentials unavailable. Use AT*PASS or AT*FACTORY.\r\n");
     } else if (*device.bootPassword() != '\0') {
-        Serial.print("Device login: admin\r\nDevice password: ");
-        Serial.print(device.bootPassword());
-        Serial.print("\r\nShown at boot until first use or change. AT*PASS replaces it.\r\n");
+        consoleout::print("Device login: admin\r\nDevice password: ");
+        consoleout::print(device.bootPassword());
+        consoleout::print("\r\nShown at boot until first use or change. AT*PASS replaces it.\r\n");
     }
-    Serial.print(
+    consoleout::print(
         "Maintenance console. ATI4 shows the settings, AT*HELP the project commands,\r\n"
         "AT*HWTEST tests the hardware.\r\n");
 }
@@ -913,6 +967,9 @@ void pollConsole(uint32_t now) {
     while (n < sizeof buf && n < room && Serial.available() > 0) {
         buf[n++] = static_cast<uint8_t>(Serial.read());
     }
+    if (n < sizeof buf && n < room) {
+        n += netConsole.read(buf + n, std::min(sizeof buf, room) - n);
+    }
     if (n > 0) {
         consoleInput.append(buf, n);
         consoleInput.poll(*console, now);
@@ -924,10 +981,16 @@ void pollConsole(uint32_t now) {
             static_cast<size_t>(space) < sizeof buf ? static_cast<size_t>(space) : sizeof buf;
         size_t out = console->toHost(buf, cap);
         if (out > 0) {
-            Serial.write(buf, out);
+            consoleout::write(buf, out);
         }
     }
     console->tick(now, true);  // the console has no DTR
+}
+
+// The network console listens while it is on, Wi-Fi is up and the device password is set.
+void pollNetConsole() {
+    netConsole.poll(netConsoleSettings.enabled() && device.ready(), net.up() ? net.link().ip : 0,
+                    millis());
 }
 
 // Wi-Fi and clock notices go to the console only, between commands: in command mode,
@@ -939,7 +1002,7 @@ void pollNotices() {
     }
     char text[netcfg::Net::kNoticeMax];
     if (net.takeNotice(text, sizeof text)) {
-        Serial.printf("%s\r\n", text);
+        consoleout::printf("%s\r\n", text);
     }
 }
 
@@ -1387,6 +1450,9 @@ void waitForNetwork() {
 void setup() {
     (void)imageMarker[0];  // retain project identity in the linked application image
     Serial.begin(kConsoleBaud);
+    consoleout::begin();  // before anything is printed: the network console replays it
+    // One network console client at a time: one that vanished frees the port in about 16 s.
+    netConsoleSocket.setKeepAlive(hw::TcpSocket::KeepAlive{10, 2, 3});
     // No ESP-IDF driver messages on the console. A long stream on the RS232 port in
     // command mode overflows the speed capture, and the RMT driver would print an error
     // from its interrupt for every chunk it drops (switchable with AT*LOG in v0.10).
@@ -1396,19 +1462,20 @@ void setup() {
     crypto.begin();
     device.begin();
     webSettings.begin();
+    netConsoleSettings.begin();
     clientSettings.begin();
     internetSettings.begin();
     if (device.needsReset()) {
         if (device.factoryReset(resetStores, sizeof resetStores / sizeof resetStores[0])) {
             ESP.restart();
         }
-        Serial.print("Pending factory reset could not finish. Retry AT*FACTORY.\r\n");
+        consoleout::print("Pending factory reset could not finish. Retry AT*FACTORY.\r\n");
     }
     devicecfg::attachCommands(deviceCommands);
     modem = new atcmd::Modem(store, registry.data(), registry.size());
     modemcfg::LoadResult loaded = modem->begin();
     if (!phonebook.begin()) {
-        Serial.print("Phonebook unavailable/damaged; factory entry used.\r\n");
+        consoleout::print("Phonebook unavailable/damaged; factory entry used.\r\n");
     }
     createPorts();
     startDiagnostics();
@@ -1444,11 +1511,13 @@ void loop() {
             Serial.flush();
             ESP.restart();
         }
+        netConsole.flush();  // the client gets the last lines if its socket takes them
         delay(1);
         return;  // no late Wi-Fi join or command may save settings after the wipe
     }
     const uint32_t now = millis();
     internetNetwork.poll();
+    pollNetConsole();
     pollBrowser();
     if (webServer.uploading()) {
         net.tick(millis());
@@ -1466,7 +1535,7 @@ void loop() {
                    net.scanState() != netcfg::ScanState::kRunning);
     if (net.up() && !incoming->listening() && !answerListenFailed && !console->localOpen() &&
         console->mode() == hostport::Mode::kCommand && console->port().lineEmpty()) {
-        Serial.print("Answer listener unavailable; retrying port 23.\r\n");
+        consoleout::print("Answer listener unavailable; retrying port 23.\r\n");
         answerListenFailed = true;
     } else if (incoming->listening() || !net.up()) {
         answerListenFailed = false;

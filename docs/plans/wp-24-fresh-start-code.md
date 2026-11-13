@@ -1,13 +1,13 @@
-# WP-23 (v3.0): Fresh start, code
+# WP-24 (v3.0): Fresh start, code
 
 | Item | Value |
 | --- | --- |
 | Model / effort | Sonnet 5.5 / high |
 | Size | L |
-| Depends on | WP-22 (its network console helps debugging; not required) |
+| Depends on | WP-23 (and WP-22, whose network console helps debugging) |
 
 Read [wp-19-common.md](wp-19-common.md) first (decisions, versions, board testing, rules).
-WP-24 does the same for the documentation.
+WP-25 does the same for the documentation.
 
 ## Modernisation review row
 
@@ -35,7 +35,7 @@ brief or `Q` references in `lib/`, `src/`, `test/`, `scripts/`, `web/src/`.
    CRC still loads factory settings (that is protection, not migration). NVS namespace
    and key names may be tidied (fresh flash).
 2. **Comments and messages:** strip version tags, finding IDs, `Q` numbers, names and
-   dates; brief section references (such as "brief 6.6") stay, and WP-24 fixes them
+   dates; brief section references (such as "brief 6.6") stay, and WP-25 fixes them
    after the trim. Remove "before vX this did Y" notes. Same for `sdkconfig.defaults`,
    `platformio.ini`, `CMakeLists.txt`, `.github/workflows`, `web/src` and the test files.
    Remove the `v3.0 SPIKE` marks once each is resolved.
@@ -65,4 +65,4 @@ brief or `Q` references in `lib/`, `src/`, `test/`, `scripts/`, `web/src/`.
    key names and "same/different".
 8. Full native tests, lint, clang-format, firmware build.
 
-Cut line: 1, 2 and 7; 3-6 can move to WP-24.
+Cut line: 1, 2 and 7; 3-6 can move to WP-25.

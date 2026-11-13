@@ -21,6 +21,7 @@ struct Hooks {
     }
 USR_CONFIG_COMMAND(CONFIG)
 USR_CONFIG_COMMAND(WEB)
+USR_CONFIG_COMMAND(NETCONSOLE)
 USR_CONFIG_COMMAND(INTERNET)
 USR_CONFIG_COMMAND(STYLE)
 USR_CONFIG_COMMAND(SIZE)
@@ -94,6 +95,8 @@ public:
             {"RY", "AT*RY", "YMODEM upload; validate and discard", registryRY, false},
             {"RZ", "AT*RZ", "ZMODEM upload; validate and discard", registryRZ, false},
             {"WEB", "AT*WEB[?]|=<ON|OFF>", "web listener; saved immediately", registryWEB, false},
+            {"NETCONSOLE", "AT*NETCONSOLE[?]|=<ON|OFF>",
+             "network console on TCP port 2001; saved immediately", registryNETCONSOLE, false},
             {"INTERNET", "AT*INTERNET[?]|=IP,local,peer|=DNS,AUTO|ip|=HANGUP",
              "PPP/SLIP settings, status and local hang-up", registryINTERNET, false},
             {"STYLE", "AT*STYLE=<ANSI|CP437|PLAIN>", "terminal style, local session", registrySTYLE,

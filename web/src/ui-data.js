@@ -311,6 +311,11 @@ export default {
           "id": "updates-reset.web-interface",
           "label": "Web interface",
           "key": "7"
+        },
+        {
+          "id": "updates-reset.network-console",
+          "label": "Network console",
+          "key": "8"
         }
       ]
     },

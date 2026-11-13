@@ -158,7 +158,7 @@ void test_geometry_inventory_and_compact_submenus() {
     }
     size_t count;
     auto *a = actions(count);
-    TEST_ASSERT_EQUAL(90, count);
+    TEST_ASSERT_EQUAL(91, count);
     unsigned root = 0;
     for (size_t i = 0; i < count; ++i) {
         TEST_ASSERT_TRUE(*a[i].id);

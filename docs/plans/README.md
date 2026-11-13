@@ -48,10 +48,10 @@ whole window.
 | 19 | v3.0 | [Framework migration and fresh start: common information](wp-19-common.md) (sessions 1-2 done; the rest are WP-20 to 26) | - | - | 18 |
 | 20 | v3.0 | [I2S, RMT capture and first link](../history/wp-20-i2s-rmt-first-link.md) (done 13 Nov: links and runs on the board) | Opus / high | L | 19 |
 | 21 | v3.0 | [Networking, tooling, CI and the OTA hash](../history/wp-21-networking-ci-ota.md) (done 13 Nov: WebSockets fixed, SHA-256 OTA, CI updated) | Opus / high | L | 20 |
-| 22 | v3.0 | [Network console](wp-22-network-console.md) | Opus / high | L | 21 |
-| 23 | v3.0 | [Fresh start: code](wp-23-fresh-start-code.md) | Sonnet / high | L | 22 |
-| 24 | v3.0 | [Fresh start: documentation and credits](wp-24-fresh-start-docs.md) | Sonnet / high | L | 23 |
-| 25 | v3.0 | [DCD and RI on the USB modem port](wp-25-usb-dcd-ri.md) | Sonnet / high | M | 20, 24 |
+| 22 | v3.0 | [Network console](../history/wp-22-network-console.md) (done 13 Nov: TCP 2001, password log-in, boot log replay) | Opus / high | L | 21 |
+| 23 | v3.0 | [DCD and RI on the USB modem port](wp-23-usb-dcd-ri.md) | Sonnet / high | M | 20, 22 |
+| 24 | v3.0 | [Fresh start: code](wp-24-fresh-start-code.md) | Sonnet / high | L | 23 |
+| 25 | v3.0 | [Fresh start: documentation and credits](wp-25-fresh-start-docs.md) | Sonnet / high | L | 24 |
 | 26 | v3.0 | [Bench run with Jon](wp-26-bench-run.md) | Sonnet / medium | M | 20-25 |
 
 Why this order: WP-01 is cheap and makes the gates real (CI fails, upload gate, pin lock)
@@ -115,7 +115,7 @@ the package confirms each first.
 | --- | --- | --- | --- |
 | SEC-01 | Caller who never hangs up holds the line (8-ring limit, keepalive) | 04 | done (v2.4; (c) browser reject not done, optional) |
 | SEC-02 | Wrong Digest response or half header stalls the web task | 06 | done (v2.6) |
-| SEC-03 | ESP-IDF 4.4 / Arduino 2.0.17 end-of-life | 18-26 | open (WP-18 done: route and versions chosen; WP-19 sessions 1-2, WP-20 and WP-21 done; WP-22 to 26 to do) |
+| SEC-03 | ESP-IDF 4.4 / Arduino 2.0.17 end-of-life | 18-26 | open (WP-18 done: route and versions chosen; WP-19 sessions 1-2, WP-20, WP-21 and WP-22 done; WP-23 to 26 to do) |
 | SEC-04 | Wi-Fi scan names printed with control bytes | 05 | done (v2.5) |
 | SEC-05 | Release workflow from any branch; write token in build steps | 01 | done (v2.1) |
 | SEC-06 | `AT*PASS` prints a generated password (permitted; amend rule) | 01 | done (v2.1) |

@@ -146,7 +146,7 @@ def answer(console):
 def escape(console):
     time.sleep(1.15)
     console.ser.write(b"+++")
-    wait_serial(console, b"OK", timeout=3)
+    wait_serial(console, b"OK\r\n", timeout=3)  # the whole line, or its end looks like caller data
 
 
 def test_manual_answer_binary_telnet_and_local_hangup(answer_console):

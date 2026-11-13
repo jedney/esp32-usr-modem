@@ -10,6 +10,11 @@ public:
     virtual bool begin(uint16_t port) = 0;
     virtual bool accept() = 0;
     virtual void reject() = 0;
+    // Like reject(), but first sends `line` if the connection takes it at once.
+    virtual void refuse(const char *line) {
+        (void)line;
+        reject();
+    }
     virtual void stop() = 0;
 };
 enum class IncomingStage : uint8_t { kIdle, kRinging, kHandshake, kOnline };

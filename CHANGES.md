@@ -18,6 +18,20 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 Work in progress on `firmware/v3.0-idf5`; this entry is completed in WP-19.
 
+### Added
+
+- **Network console:** the maintenance console over Wi-Fi on TCP port 2001 (raw bytes,
+  like ser2net), behind the device password, so the modem can be used and debugged
+  without the console cable: `socket://usr-modem.local:2001` in `pio device monitor`
+  (VS Code task "Modem: network console"), pyserial and the end-to-end tests'
+  `--console-port`. After log-in it shows the console's recent output (16 KB, so the boot
+  messages while they fit, ESP-IDF log lines included) and is the same session as the
+  cable. One client at a time; a wrong password locks log-ins out for a second, and three
+  close the connection. A client that stops reading never holds up the modem: it misses
+  output instead, and is told how much. `AT*NETCONSOLE=ON|OFF` (factory ON), on the
+  configuration screen under Updates and Reset, in `AT*EXPORT`; `AT*STATUS` shows the
+  client.
+
 ### Changed
 
 - Firmware platform moves from Arduino core 2.0.17 on ESP-IDF 4.4.7 (end of life since

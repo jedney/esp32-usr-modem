@@ -9,6 +9,7 @@ public:
     bool begin(uint16_t port) override;
     bool accept() override;
     void reject() override;
+    void refuse(const char *line) override;
     void stop() override;
 
 private:

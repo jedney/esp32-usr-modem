@@ -63,6 +63,7 @@ constexpr Action kActions[] = {
     {Screen::Updates, "Restart", "*RESTART", "Requires confirmation; leaves menu", Screen::Updates, false, false, false, true, "updates-reset.restart", '5', true, "Requires confirmation; leaves menu"},
     {Screen::Updates, "Factory reset", "*FACTORY", "Erase ALL settings and passwords; asks Y/N; leaves menu", Screen::Updates, false, false, false, true, "updates-reset.factory-reset", '6', true, "Erase ALL settings and passwords; asks Y/N; leaves menu"},
     {Screen::Updates, "Web interface", "*WEB=", "ON|OFF; OFF closes browser sessions", Screen::Updates, true, false, false, false, "updates-reset.web-interface", '7', true, "ON|OFF; OFF closes browser sessions"},
+    {Screen::Updates, "Network console", "*NETCONSOLE=", "ON|OFF; TCP port 2001; OFF closes the client", Screen::Updates, true, false, false, false, "updates-reset.network-console", '8', true, "ON|OFF; TCP port 2001; OFF closes the client"},
     {Screen::Hardware, "Guided tests", "*HWTEST", "RS232 skips line/loopback steps", Screen::Hardware, false, false, false, false, "hardware-tests.guided-tests", '1', true, "RS232 skips line/loopback steps"},
     {Screen::Hardware, "Pin map", "*HWPINS", "Confirmed pin map", Screen::Hardware, false, false, false, false, "hardware-tests.pin-map", '2', true, "Confirmed pin map"},
     {Screen::Hardware, "Board information", "*HWINFO", "Chip, memory, firmware and filesystem", Screen::Hardware, false, false, false, false, "hardware-tests.board-information", '3', true, "Chip, memory, firmware and filesystem"},

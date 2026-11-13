@@ -50,6 +50,8 @@ public:
     bool change(const char *password);
     bool generate(char out[kGeneratedLength + 1]);
     bool markUsed();  // called by an authenticated upload, and later by web login
+    // True if `password` is the device password: its hash is compared in constant time.
+    bool matches(const char *password);
     bool setPolicy(Policy policy);
     bool openWindow(uint32_t now);
     void closeWindow() { windowOpen_ = false; }

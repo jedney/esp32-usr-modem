@@ -9,6 +9,7 @@
 #include <Arduino.h>
 
 #include "autobaud.h"
+#include "console_out.h"
 #include "devicecfg.h"
 #include "hw.h"
 #include "input_buffer.h"
@@ -85,7 +86,7 @@ void startCapture() {
         return;
     }
     captureFailed = true;
-    Serial.printf(
+    consoleout::printf(
         "RS232: speed detection could not start. The port stays at %lu bps; "
         "AT*BAUD sets another speed.\r\n",
         static_cast<unsigned long>(currentBaud));

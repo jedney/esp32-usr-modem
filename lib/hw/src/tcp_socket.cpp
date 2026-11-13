@@ -9,21 +9,15 @@
 namespace hw {
 using calls::SocketState;
 namespace {
-// SEC-01: a peer that vanishes without a FIN or RST (cable pulled, router crash) must not
-// hold the call for ever. Idle 60 s, then 6 probes 10 s apart: a dead peer ends the call
-// (NO CARRIER) after about 2 minutes. lwIP counts these options in seconds.
-constexpr int kKeepIdleSeconds = 60;
-constexpr int kKeepIntervalSeconds = 10;
-constexpr int kKeepCount = 6;
-
-void tuneSocket(int fd) {
+// Keepalive as TcpSocket::KeepAlive says (tcp_socket.h).
+void tuneSocket(int fd, const TcpSocket::KeepAlive &keep) {
     const int yes = 1;
     lwip_setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof yes);
     lwip_setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof yes);
-    lwip_setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &kKeepIdleSeconds, sizeof kKeepIdleSeconds);
-    lwip_setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &kKeepIntervalSeconds,
-                    sizeof kKeepIntervalSeconds);
-    lwip_setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &kKeepCount, sizeof kKeepCount);
+    lwip_setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &keep.idleSeconds, sizeof keep.idleSeconds);
+    lwip_setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &keep.intervalSeconds,
+                    sizeof keep.intervalSeconds);
+    lwip_setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &keep.count, sizeof keep.count);
 }
 }  // namespace
 
@@ -43,7 +37,7 @@ bool TcpSocket::adopt(int fd) {
         close();
         return false;
     }
-    tuneSocket(fd_);
+    tuneSocket(fd_, keepAlive_);
     state_ = SocketState::kOpen;
     return true;
 }
@@ -135,7 +129,7 @@ void TcpSocket::connectAddress(uint32_t address) {
         state_ = SocketState::kFailed;
         return;
     }
-    tuneSocket(fd_);
+    tuneSocket(fd_, keepAlive_);
     sockaddr_in endpoint = {};
     endpoint.sin_family = AF_INET;
     endpoint.sin_port = htons(port_);

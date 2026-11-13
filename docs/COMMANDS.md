@@ -19,6 +19,18 @@ codes only. DTR is the PC program's DTR: closing the port drops DTR, and `&D` ap
 - A remote caller (someone who dialled in on port 23) can never reach command mode, any
   `AT*` command or the configuration screen.
 
+The **network console** is the USB maintenance console over Wi-Fi, on TCP port 2001
+(raw bytes, no Telnet negotiation): `socket://usr-modem.local:2001` in `pio device
+monitor`, pyserial or the end-to-end tests' `--console-port`, or any raw TCP client. It
+asks for the device password first (no echo; three wrong ones close the connection, and
+after a wrong one every log-in is refused for a second). Then it shows the console's
+recent output (the last 16 KB, so the boot messages if they still fit) and works as the
+same console session as the cable: commands, the configuration screen and the hardware
+tests, with the same rules, including the device password lines. One client at a time; a
+second one is told "Network console in use." and closed. If no prompt shows, press Enter.
+Not over the network: flashing after a full erase, on-board tests, crash output as it
+happens (`AT*RESETINFO` shows the record afterwards) and a modem that hasn't joined Wi-Fi.
+
 ## Standard commands
 
 These follow the US Robotics Sportster. "Profile" means the setting is part of the active
@@ -225,11 +237,13 @@ resets it. "This boot" means it lasts until the next restart.
 | `AT*OTA=<ALWAYS\|DEMAND>` | OTA always listening, or only on demand. Saved; factory ALWAYS |
 | `AT*OTA=<ON\|OFF>` | In DEMAND mode, open OTA for 10 minutes / close it |
 | `AT*WEB[?]` / `=<ON\|OFF>` | Web interface on or off. Saved; factory ON |
+| `AT*NETCONSOLE[?]` / `=<ON\|OFF>` | Network console (TCP port 2001) on or off. OFF closes a connected client. Saved; factory ON |
 | `AT*FACTORY` | Erase everything (settings, Wi-Fi, phonebook, history, passwords) and restart. Asks Y/N, then Enter, within 30 seconds |
 | `AT*RESTART` | Restart, after Y/N |
 | `AT*VER` | Firmware version and commit |
 
-The device password (user `admin`) protects the web interface and OTA uploads. A new one
+The device password (user `admin`) protects the web interface, the network console and
+OTA uploads. A new one
 is made at first boot and printed on the USB console at each boot until it is first used
 or changed.
 
@@ -240,7 +254,7 @@ or changed.
 | `AT*CONFIG` | Open the configuration screen now (`ATDT123` opens it after dial sounds). A screen with no key for 5 minutes closes itself ("Screen closed after 5 minutes idle."), drops unsaved edits and frees the line. A running test or command is not cut off; the 5 minutes start again when it ends |
 | `AT*STYLE[?]` / `=<ANSI\|CP437\|PLAIN>` | Screen style for this port. This boot |
 | `AT*SIZE[?]` / `=<cols>,<rows>` | Screen size for this port, 1-132 by 1-50. This boot |
-| `AT*STATUS` | Model, front panel, ports, call and Wi-Fi, and the least free stack so far of the main loop, the network (lwIP) task and the web server, in bytes (-1: task not running) |
+| `AT*STATUS` | Model, front panel, ports, call, Wi-Fi, the network console's client, and the least free stack so far of the main loop, the network (lwIP) task and the web server, in bytes (-1: task not running) |
 | `AT*SETTING[?]` / `=<modem command>` | Show the profiles, or change a setting through the normal checks (`AT*SETTING=S0=2`). Exactly one setting command is accepted (`E0`, `&N8`, `S7=45`, `S7.1=1`, `&Z2=host`); anything after it, such as `E0DT555`, gives `ERROR` |
 | `AT*HELP` / `AT*?` | List project commands and hardware tests |
 | `AT*REFERENCE` | All AT and AT* commands |

@@ -167,6 +167,22 @@ bool Device::markUsed() {
     return ok;
 }
 
+bool Device::matches(const char *password) {
+    if (!ready() || !validPassword(password)) {
+        return false;
+    }
+    char ota[kOtaHashLength + 1] = {};
+    char digest[kDigestHashLength + 1] = {};
+    bool hashed = crypto_.hashes(password, ota, digest);
+    uint8_t difference = hashed ? 0 : 1;
+    for (size_t i = 0; i < kOtaHashLength; ++i) {
+        difference |= static_cast<uint8_t>(ota[i] ^ ota_[i]);
+    }
+    wipe(ota, sizeof ota);
+    wipe(digest, sizeof digest);
+    return difference == 0;
+}
+
 bool Device::setPolicy(Policy policy) {
     if (!ready() || (policy != Policy::kAlways && policy != Policy::kDemand) ||
         !save(policy, false, password_, ota_, digest_)) {

@@ -8,6 +8,16 @@ namespace hw {
 // Nonblocking lwIP socket and asynchronous DNS. The object outlives DNS requests.
 class TcpSocket : public calls::Socket {
 public:
+    // SEC-01: a peer that vanishes without a FIN or RST (cable pulled, router crash, or a
+    // lost RST) must not hold the connection for ever. Calls: idle 60 s, then 6 probes
+    // 10 s apart, so a dead peer ends the call (NO CARRIER) after about 2 minutes. lwIP
+    // counts these in seconds. Applies to connections opened or adopted after the change.
+    struct KeepAlive {
+        int idleSeconds = 60;
+        int intervalSeconds = 10;
+        int count = 6;
+    };
+    void setKeepAlive(const KeepAlive &keep) { keepAlive_ = keep; }
     void begin(const char *host, uint16_t port) override;
     void resolve(const char *host) override;
     const char *address() const override { return resolved_; }
@@ -26,6 +36,7 @@ private:
     void found(uint32_t address);
     void connectAddress(uint32_t address);
     int fd_ = -1;
+    KeepAlive keepAlive_;
     bool resolveOnly_ = false;
     char peer_[16] = {}, resolved_[16] = {};
     uint16_t port_ = 0;

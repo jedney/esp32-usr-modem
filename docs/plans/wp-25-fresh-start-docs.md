@@ -1,10 +1,10 @@
-# WP-24 (v3.0): Fresh start, documentation and credits
+# WP-25 (v3.0): Fresh start, documentation and credits
 
 | Item | Value |
 | --- | --- |
 | Model / effort | Sonnet 5.5 / high |
 | Size | L |
-| Depends on | WP-23 |
+| Depends on | WP-24 |
 
 Read [wp-19-common.md](wp-19-common.md) first (decisions, versions, board testing, rules).
 
@@ -15,8 +15,7 @@ Read [wp-19-common.md](wp-19-common.md) first (decisions, versions, board testin
    as the session workflow and token rules, into CLAUDE.md.
 2. **`docs/decisions-log.md`:** rewrite as the current decisions only, one row each,
    superseded rows gone (the file stays, and new decisions keep being appended).
-3. **`CHANGES.md`:** starts at [3.0] as the first entry ("first release of the current
-   design"), older entries removed; `scripts/bump_version.py` and `check_version.py`
+3. **`CHANGES.md`:** single line summary of v1, v2 and v3. Other entries removed; `scripts/bump_version.py` and `check_version.py`
    still work.
 4. **README, `docs/COMMANDS.md`, `AT*HELP`, `test/README.md`, `web/PROTOCOL.md`,
    `docs/ROADMAP.md`:** current behaviour only; no "from vX" notes; ROADMAP becomes what
@@ -50,5 +49,5 @@ Read [wp-19-common.md](wp-19-common.md) first (decisions, versions, board testin
 9. **`images/`, `data/`, `.vscode/`, `.github/`:** remove anything unused.
 10. End checks; `git status` before committing.
 
-Note: WP-25 and WP-26 still edit the docs after this session. They write current behaviour
+Note: WP-26 still edits the docs after this session. It writes current behaviour
 only, in the trimmed files.

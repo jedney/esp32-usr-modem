@@ -379,6 +379,13 @@
     "target": "Updates",
     "input": true
   },
+  "updates-reset.network-console": {
+    "screen": "Updates",
+    "command": "*NETCONSOLE=",
+    "help": "ON|OFF; TCP port 2001; OFF closes the client",
+    "target": "Updates",
+    "input": true
+  },
   "export-configuration": {
     "screen": "Main",
     "command": "*EXPORT",

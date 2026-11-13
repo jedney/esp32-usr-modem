@@ -168,6 +168,22 @@ void test_first_use_erases_plaintext_but_keeps_both_hashes() {
     TEST_ASSERT_EQUAL(saves, r.auth.saves);
 }
 
+void test_matches_checks_the_password_through_its_hash() {
+    Rig r;
+    std::string password(r.device.bootPassword());
+    TEST_ASSERT_TRUE(r.device.matches(password.c_str()));
+    TEST_ASSERT_TRUE(r.device.markUsed());  // the plaintext is gone; the hash still checks
+    TEST_ASSERT_TRUE(r.device.matches(password.c_str()));
+    TEST_ASSERT_FALSE(r.device.matches((password + "x").c_str()));
+    TEST_ASSERT_FALSE(r.device.matches(""));
+    TEST_ASSERT_FALSE(r.device.matches("short"));
+    TEST_ASSERT_TRUE(r.device.change("NewPassword!"));
+    TEST_ASSERT_FALSE(r.device.matches(password.c_str()));
+    TEST_ASSERT_TRUE(r.device.matches("NewPassword!"));
+    r.crypto.failHash = true;
+    TEST_ASSERT_FALSE(r.device.matches("NewPassword!"));
+}
+
 void test_password_validation_preserves_spaces_and_punctuation() {
     TEST_ASSERT_TRUE(validPassword(" abc! = "));
     TEST_ASSERT_TRUE(validPassword("12345678901234567890123456789012"));
@@ -571,6 +587,7 @@ int main() {
     RUN_TEST(test_first_boot_is_random_twelve_and_saved_for_display);
     RUN_TEST(test_first_use_erases_plaintext_but_keeps_both_hashes);
     RUN_TEST(test_password_validation_preserves_spaces_and_punctuation);
+    RUN_TEST(test_matches_checks_the_password_through_its_hash);
     RUN_TEST(test_change_stores_only_hashes_even_without_first_use);
     RUN_TEST(test_failed_changes_keep_previous_credentials);
     RUN_TEST(test_failed_initial_save_never_enables_unauthenticated_ota);

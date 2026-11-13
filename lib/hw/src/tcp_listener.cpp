@@ -1,6 +1,7 @@
 #include "tcp_listener.h"
 #include <fcntl.h>
 #include <lwip/sockets.h>
+#include <cstring>
 
 namespace hw {
 bool TcpListener::begin(uint16_t port) {
@@ -31,6 +32,15 @@ bool TcpListener::accept() {
 void TcpListener::reject() {
     int peer = fd_ < 0 ? -1 : lwip_accept(fd_, nullptr, nullptr);
     if (peer >= 0) {
+        lwip_close(peer);
+    }
+}
+// MSG_DONTWAIT: the line is sent only if it fits now (a short line on a new connection
+// always does); the connection closes either way.
+void TcpListener::refuse(const char *line) {
+    int peer = fd_ < 0 ? -1 : lwip_accept(fd_, nullptr, nullptr);
+    if (peer >= 0) {
+        lwip_send(peer, line, strlen(line), MSG_DONTWAIT);
         lwip_close(peer);
     }
 }
