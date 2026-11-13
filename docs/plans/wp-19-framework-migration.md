@@ -207,8 +207,10 @@ Decisions-log rows and `CHANGES.md` are written; this is what the next sessions 
   (`printVolume()` and the pot read-out) under Picolibc; the volume pot still reads after
   `crypto.begin()`.
 - **For session 4:** `dependencies.lock` is written with CRLF on Windows (git converts it);
-  CI will write LF. The unfinished items in the decisions log row "found in session 1"
-  (C++ standard, `syncedAt`) need Jon's answer.
+  CI will write LF. The native tests now build as `gnu++26` (Jon, 13 Nov), so the runner
+  needs g++ 14 or newer (`ubuntu-latest` has 13), and the interop peers in `ci.yml` and
+  `test/interop/README.md` (`-std=c++17`) move to the same standard. `syncedAt` (decisions
+  log, "found in session 1") is still open.
 - **For session 6 (`credits/LICENSES.md`):** the LittleFS row is now `joltwallet/littlefs`
   1.23.1 from the component registry (no `credits/littlefs/` download any more), and the
   Mbed TLS row no longer uses CTR-DRBG: it is MD5, SHA-256, HMAC-SHA-256 and the hardware

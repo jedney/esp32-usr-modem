@@ -31,6 +31,7 @@ Work in progress on `firmware/v3.0-idf5`; this entry is completed in WP-19.
 - Random numbers for the device password come from a seed drawn once at boot with the
   hardware noise source on (HMAC-SHA-256 expansion through PSA Crypto), never from the
   pseudo-random fallback. Network time uses `esp_netif_sntp`.
+- The native unit tests build as C++26, the standard ESP-IDF 6.1 uses for the firmware.
 
 ### Removed
 
