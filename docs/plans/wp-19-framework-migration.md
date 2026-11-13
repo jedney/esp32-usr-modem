@@ -236,6 +236,31 @@ Decisions-log rows and `CHANGES.md` are written; this is what the next sessions 
    `tud_ready()` guard. Arduino's own USB classes (`USBHost*`, `USBMSC`) not built.
 5. Build to the `hw.cpp` errors only. `credits/LICENSES.md` row for TinyUSB.
 
+### Session 2 result (13 Nov 2026): done, all items
+
+Decisions-log rows ("v3.0 USB route", "found in session 2") and `CHANGES.md` are written.
+
+- **Route:** not the lib-builder download. TinyUSB is the registry's `espressif/tinyusb`
+  `==0.21.0~6` (TinyUSB 0.21.0 plus Espressif's DWC2 fixes), a public dependency of the
+  in-repo `components/arduino_tinyusb` (Kconfig, a trimmed `tusb_config.h`, CMake). IDF
+  finds `components/` by itself. Arduino's USB layer (`USB.begin`) stays; `esp_tinyusb`
+  clashes with it (decisions log says why). `scripts/network_dependencies.py`,
+  `scripts/arduino_tinyusb/` and `test/scripts/test_network_dependencies.py` are gone;
+  `scripts/sdkconfig_refresh.py` (with tests) keeps the `sdkconfig` regeneration.
+- **The build now fails only at** `hw.cpp`'s `driver/i2s.h` (session 3). The USB code,
+  Arduino's USB files and TinyUSB compile with `-Werror`. Arduino's `USBHost.cpp` and
+  `USBMSC.cpp` compile to nothing (`CFG_TUH_ENABLED 0`, no MSC key); the Arduino `USB`
+  library is not built (selective compilation has no key for it, so it is off).
+- **PlatformIO does not re-run CMake** when only a component's `idf_component.yml`
+  changes: touch `CMakeLists.txt` after editing one.
+- **For session 3 (first board run), check the USB modem port:** enumeration on the PC,
+  `e2e/test_usb.py`, and the rear USB-C empty and with a power-only lead (the
+  `tud_ready()` guard was for the old `dcd_esp32sx.c` crash; the DWC2 driver is new).
+- **For session 4 (CI):** `managed_components/espressif__tinyusb` is a new registry
+  download (cache it with the other managed components).
+- **Follow-up after v3.0:** DCD and RI on the USB port through CDC serial-state
+  notifications (`CFG_TUD_CDC_NOTIFY`), now possible with TinyUSB 0.21.0.
+
 ## Session 3: I2S, RMT capture and first link (Opus 5.5 / high, L)
 
 1. **I2S** standard-mode driver (`driver/i2s_std.h`): one TX channel, 16-bit stereo, same

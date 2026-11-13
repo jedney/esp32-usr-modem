@@ -56,7 +56,7 @@ Section numbers refer to the project brief.
 | Outgoing calls: Telnet negotiation, 0xFF escaping, raw mode, ringing and connect delays, host-name digits (6.6) | `test_calls` | `test_calls` | `test_calls.py` |
 | Call errors: BUSY, NO ANSWER, NO DIAL TONE, NO CARRIER (6.5) | `test_calls` | — | `test_calls.py` |
 | Answer mode: port 23, RI, ring, `ATA`, `S0`, `AT*ANSWERPORT` incl. USB and AUTO by DTR (6.6, v2.0) | `test_answer`, `test_modemcfg` | `test_answer` | `test_answer.py`, `test_usb.py` |
-| USB modem port (Q25, v2.0): TinyUSB serial session, flow control, DTR, no reboot on 1200 baud, one call across ports; pinned TinyUSB download | `test_answer`, `test_hostport`; `test/scripts/test_network_dependencies.py` | — | `test_usb.py` |
+| USB modem port (Q25, v2.0): TinyUSB serial session, flow control, DTR, no reboot on 1200 baud, one call across ports | `test_answer`, `test_hostport` | — | `test_usb.py` |
 | Remote callers can't reach command mode (6.6, Q44) | `test_answer` | — | `test_answer.py` |
 | Remote `+++` with guard times stays data on every answer port; Telnet commands from a caller before and after `ATA` (TG-01, TG-04, v2.4) | `test_answer` | — | `test_answer.py` (bench) |
 | Unanswered call dropped after 8 rings for `S0` 0 and above 8; `S0` above 8 answers on ring 8; journal entry (SEC-01, v2.4) | `test_answer` | — | `test_answer.py` (bench) |
@@ -85,7 +85,7 @@ Section numbers refer to the project brief.
 | The web file list agrees in `build_web.py`, `web_service.cpp`, the page imports, the preview and the e2e check (MNT-05h, v2.11) | `scripts/test_web_file_lists.py` | — | — |
 | Browser limit (3), idle connection floods on ports 23 and 80, an interrupted upload, USB unplug during a call (TG-15, v2.11; opt-in) | — | — | `test_web.py --flood-tests`, `--upload-tests`; `test_usb.py --usb-unplug` |
 | Client Tests: display, size (echoed query), keys, transfers (block numbers wrap past 255), hostile X/Y/ZMODEM blocks and headers, noise and slow-link timing, ZFIN without "OO", cable, client settings per port incl. USB (6.13, TG-03, v2.0, v2.10) | `test_client` | `test_client` | `test_client.py`; `interop/serial_lrzsz.py` |
-| Build: network libraries (checked before cached) and image identities | `scripts/test_network_dependencies.py`, `scripts/test_image_manifest.py` | — | — |
+| Build: `sdkconfig` regenerated when `sdkconfig.defaults` changes; image identities | `scripts/test_sdkconfig_refresh.py`, `scripts/test_image_manifest.py` | — | — |
 | Build: compiler warnings apply to the project's own code only (`lib/`, `src/`), the two lists agree, a deprecated API is an error | `scripts/test_project_warnings.py` | — | — |
 
 Checks that need a person (sound, LEDs, loopback plug, Amiga and Windows 9x clients)

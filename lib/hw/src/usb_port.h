@@ -5,7 +5,8 @@
 //   - Writes never wait: what doesn't fit, or arrives with no program connected, is dropped.
 //   - Reads take only what the caller asks for. Unread data stays in TinyUSB's buffer and
 //     the PC is held off, so there is end-to-end flow control and nothing is lost.
-//   - DCD and RI can't be sent: this TinyUSB version has no CDC serial-state notification.
+//   - DCD and RI aren't sent: CDC serial-state notifications are off
+//     (CFG_TUD_CDC_NOTIFY in components/arduino_tinyusb/include/tusb_config.h).
 #pragma once
 
 #include <cstddef>

@@ -32,6 +32,13 @@ Work in progress on `firmware/v3.0-idf5`; this entry is completed in WP-19.
   hardware noise source on (HMAC-SHA-256 expansion through PSA Crypto), never from the
   pseudo-random fallback. Network time uses `esp_netif_sntp`.
 - The native unit tests build as C++26, the standard ESP-IDF 6.1 uses for the firmware.
+- The USB modem port uses TinyUSB 0.21.0 (Espressif's `espressif/tinyusb` 0.21.0~6, with
+  their fixes for the S3's USB controller) from the component registry, pinned and
+  hash-locked in `dependencies.lock`, through Arduino's own USB layer. The project's
+  `components/arduino_tinyusb` holds only its settings (CDC only, device only). The
+  build no longer downloads anything itself: `scripts/network_dependencies.py` is
+  replaced by `scripts/sdkconfig_refresh.py`, which only regenerates `sdkconfig` when
+  `sdkconfig.defaults` changes.
 
 ### Removed
 
