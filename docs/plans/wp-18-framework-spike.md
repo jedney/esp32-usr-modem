@@ -76,3 +76,51 @@ PlatformIO for the firmware build (CI, VS Code tasks, upload scripts all change)
 
 The build route is chosen with evidence, the error list is complete, and WP-19 has a
 session-by-session plan Jon can follow.
+
+## Result (13 Nov 2026)
+
+**Route chosen: B, the official PlatformIO platform `espressif32@8.0.0`, with Arduino
+3.3.12 as a component on ESP-IDF 6.1** (decisions log, 13 Nov 2026). Jon asked mid-spike
+for the newest stable version of every component, which moved the target from IDF 5.5
+(in maintenance since 21 Jul 2026) to IDF 6.1.
+
+Evidence:
+
+- **Step 2, releases.** pioarduino `55.03.312-1` = Arduino 3.3.12 on IDF 5.5.5. The
+  official platform supports Arduino 3 since **8.0.0** (19 Oct 2026; 7.x still shipped
+  2.0.17), including `framework = arduino, espidf` (its `platform.py` pins IDF 5.5.5 for
+  mixed projects; we override to 6.1). Arduino 3.3.12's component allows IDF 5.3-6.1.99
+  and its CI builds against release-v6.1. Arduino 4.0.0 is RC1 only. IDF 6.1 (27 Aug
+  2026) is in service to 25 Aug 2027; 5.5 is in maintenance.
+- **Step 2, advisories** since July 2024 that touch this firmware: CVE-2026-45541
+  "Remote Null Pointer Dereference in WebSocket Server" (high; fixed in 6.0.1 and
+  5.5.5, so in 6.1; the end-of-life 4.4.7 is not listed and presumably still exposed);
+  AR2026-003 "OTA Bug Advisory for WPA3-SAE H2E Configuration Issues in ESP-IDF" (bug,
+  fixed); AR2024-010 S3 reset failure after OTA with 120 MHz flash (bug, not our 80 MHz
+  setting); AR2024-005 S3 RTC memory corruption (bug, fixed); AR2026-005 S3 AES key
+  recovery by voltage fault injection (hardware, physical access, no flash encryption
+  here). IDF 5.5.6 and 6.1 also carry upstream wpa_supplicant fixes. Nothing found for
+  lwIP, Mbed TLS hashes, core dump or TinyUSB. The rest (Bluetooth, BLE provisioning,
+  ESP-NOW, WPS, TEE, other chips) don't apply.
+- **Step 3, route A (pioarduino)** failed at the tooling level twice: its first run
+  replaced PlatformIO Core 6.2.0 in the shared `~/.platformio/penv` with its own fork
+  (`pioarduino-6.2.0.post1`), then refused to run under it ("not compatible with
+  PlatformIO Core v6.2.0-post.1"). Core 6.2.0 was reinstalled (`pip check` clean). In an
+  isolated `PLATFORMIO_CORE_DIR` it failed on a package-mirror DNS error, a bad
+  `tool-esptoolpy` install and the IDF Python step. It is also tied to IDF 5.5. Rejected.
+- **Step 3, route B** with IDF 6.1: installs, sets up the IDF 6.1 Python environment,
+  resolves the managed components, configures CMake and compiles all of IDF and
+  Arduino. Route C was not needed.
+- **Step 4, error list:** complete, by area, in
+  [wp-19-framework-migration.md](wp-19-framework-migration.md) ("What the spike found").
+  Against the review's expected list: Mbed TLS as expected but bigger (Mbed TLS 4: PSA,
+  not renames); RMT as expected (legacy driver now removed, not just in conflict); I2S
+  **removed**, not just deprecated; UART registers **still compile**; TinyUSB as
+  expected (new component and TinyUSB); core dump, `WiFi.onEvent` and `httpd` compile
+  unchanged. New: IDF 6 warnings-as-errors, one removed Wi-Fi reason code, a GCC 15
+  `std::min` type mismatch, `PIN_INPUT_ENABLE`, `neopixelWrite` deprecated, Picolibc.
+- **Step 5 (bonus):** done for the mechanical ones (PSA hashes and random, Wi-Fi reason,
+  `std::min`, LittleFS CMake line, warnings switch for discovery), marked `v3.0 SPIKE`
+  in the code. The firmware does not link yet (TinyUSB, `hw.cpp`), so no flash/RAM
+  figures; session 3 of WP-19 records them.
+- **Step 6:** WP-19 rewritten as a five-session plan.

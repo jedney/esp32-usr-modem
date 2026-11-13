@@ -57,8 +57,7 @@ Reason mapReason(uint8_t r, bool wasUp) {
             return wasUp ? Reason::kLost : Reason::kWrongPassword;
         case WIFI_REASON_NO_AP_FOUND:
             return wasUp ? Reason::kLost : Reason::kNotFound;
-        case WIFI_REASON_AUTH_EXPIRE:
-        case WIFI_REASON_ASSOC_EXPIRE:
+        case WIFI_REASON_AUTH_EXPIRE:  // IDF 6: also covers the old ASSOC_EXPIRE
         case WIFI_REASON_CONNECTION_FAIL:
             return wasUp ? Reason::kLost : Reason::kNoAnswer;
         default:

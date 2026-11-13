@@ -449,7 +449,7 @@ void Service::poll(uint32_t now) {
         if (mode_ == Mode::Cable) {
             if (rts != lastRts_ || dtr != lastDtr_)
                 format("DTR=%u RTS=%u DSR=1\r\n", dtr, rts);
-            unsigned step = std::min(6u, (now - start_) / 1000);
+            unsigned step = std::min<uint32_t>(6, (now - start_) / 1000);
             if (!cableStep_ || step + 1 != cableStep_) {
                 platform_.restore();
                 if (step < 6)
@@ -466,7 +466,8 @@ void Service::poll(uint32_t now) {
                 return;
             format("bytes=%lu ms=%lu cps=%lu RTS-pauses=%lu paused-ms=%lu%s\r\n",
                    static_cast<unsigned long>(bytes_), static_cast<unsigned long>(now - start_),
-                   static_cast<unsigned long>(uint64_t(bytes_) * 1000 / std::max(1u, now - start_)),
+                   static_cast<unsigned long>(uint64_t(bytes_) * 1000 /
+                                              std::max<uint32_t>(1, now - start_)),
                    static_cast<unsigned long>(pauses_), static_cast<unsigned long>(pausedMs_),
                    port_ == kRs232Port ? "" : " (host-cable signals unavailable)");
             if (!platform_.drained())

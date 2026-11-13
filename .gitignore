@@ -2,6 +2,8 @@
 .pio/
 /build/
 /sdkconfig.s3*
+# ESP-IDF component manager downloads (dependencies.lock is committed)
+/managed_components/
 
 # VS Code files the PlatformIO extension regenerates per machine
 .vscode/c_cpp_properties.json

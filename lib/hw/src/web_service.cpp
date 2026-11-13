@@ -4,8 +4,7 @@
 #include <esp_ota_ops.h>
 #include <esp_system.h>
 #include <lwip/sockets.h>
-#include <mbedtls/md5.h>
-#include <mbedtls/sha256.h>
+#include <psa/crypto.h>
 #include <cstring>
 #include <new>
 #include "image_check.h"
@@ -183,8 +182,10 @@ bool WebCrypto::random(uint8_t *out, size_t len) {
 }
 bool WebCrypto::md5(const std::string &text, char out[33]) {
     uint8_t bytes[16] = {};
-    bool ok =
-        mbedtls_md5_ret(reinterpret_cast<const uint8_t *>(text.data()), text.size(), bytes) == 0;
+    size_t length = 0;
+    bool ok = psa_crypto_init() == PSA_SUCCESS &&
+              psa_hash_compute(PSA_ALG_MD5, reinterpret_cast<const uint8_t *>(text.data()),
+                               text.size(), bytes, sizeof bytes, &length) == PSA_SUCCESS;
     std::string encoded = hexBytes(bytes, sizeof bytes);
     memcpy(out, encoded.c_str(), 33);
     devicecfg::wipe(bytes, sizeof bytes);
@@ -752,9 +753,9 @@ esp_err_t WebService::upload(httpd_req_t *req) {
     const esp_partition_t *staging = esp_ota_get_next_update_partition(nullptr);
     bool ok = fs ? staging && esp_partition_erase_range(staging, 0, staging->size) == ESP_OK
                  : Update.begin(req->content_len, U_FLASH);
-    mbedtls_sha256_context sha;
-    mbedtls_sha256_init(&sha);
-    ok = mbedtls_sha256_starts_ret(&sha, 0) == 0 && ok;
+    psa_hash_operation_t sha = PSA_HASH_OPERATION_INIT;
+    ok = psa_crypto_init() == PSA_SUCCESS && psa_hash_setup(&sha, PSA_ALG_SHA_256) == PSA_SUCCESS &&
+         ok;
     uint8_t buffer[1024];
     size_t received = 0, staged = 0;
     while (ok && received < req->content_len && millis() - start < 180000) {
@@ -771,7 +772,7 @@ esp_err_t WebService::upload(httpd_req_t *req) {
             break;
         }
         ok = check.write(buffer, size_t(n)) &&
-             mbedtls_sha256_update_ret(&sha, buffer, size_t(n)) == 0;
+             psa_hash_update(&sha, buffer, size_t(n)) == PSA_SUCCESS;
         if (ok) {
             ok = fs ? stage(staging, staged, buffer, size_t(n))
                     : Update.write(buffer, size_t(n)) == size_t(n);
@@ -779,9 +780,11 @@ esp_err_t WebService::upload(httpd_req_t *req) {
         received += size_t(n);
     }
     uint8_t digest[32] = {};
-    ok = mbedtls_sha256_finish_ret(&sha, digest) == 0 && check.complete() && ok &&
+    size_t digestLength = 0;
+    ok = psa_hash_finish(&sha, digest, sizeof digest, &digestLength) == PSA_SUCCESS &&
+         check.complete() && ok &&
          webinterface::equalSecret(hexBytes(digest, sizeof digest), expected);
-    mbedtls_sha256_free(&sha);
+    psa_hash_abort(&sha);
     if (fs && ok) {
         {
             Lock lock(mutex_);

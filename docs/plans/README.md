@@ -44,8 +44,8 @@ whole window.
 | 15 | v2.15 | [Configuration screen repaint](../history/wp-15-menu-repaint.md) | Opus / high | L | 07 |
 | 16 | v2.16 | [Configuration screen code tidy-up](../history/wp-16-menu-tidy.md) | Sonnet / high | M | 15 |
 | 17 | v2.17 | [Watchdog and phonebook capacity](../history/wp-17-watchdog-phonebook.md) | Opus / high | M | 02, 03, 14 |
-| 18 | v3.0 | [Framework spike](wp-18-framework-spike.md) | Opus / high | L | 01-17 merged (the spike itself can run earlier) |
-| 19 | v3.0 | [Framework migration](wp-19-framework-migration.md) | Opus / high | 3-5 × L | 18 |
+| 18 | v3.0 | [Framework spike](wp-18-framework-spike.md) (done 13 Nov: official platform 8.0.0, Arduino 3.3.12 on IDF 6.1) | Opus / high | L | 01-17 merged (the spike itself can run earlier) |
+| 19 | v3.0 | [Framework migration](wp-19-framework-migration.md) | per session (Sonnet / high, Opus / high) | 4 × L + bench | 18 |
 
 Why this order: WP-01 is cheap and makes the gates real (CI fails, upload gate, pin lock)
 before anything else lands. WP-02 is the only High finding. WP-03, WP-06, WP-14 and WP-17
@@ -108,7 +108,7 @@ the package confirms each first.
 | --- | --- | --- | --- |
 | SEC-01 | Caller who never hangs up holds the line (8-ring limit, keepalive) | 04 | done (v2.4; (c) browser reject not done, optional) |
 | SEC-02 | Wrong Digest response or half header stalls the web task | 06 | done (v2.6) |
-| SEC-03 | ESP-IDF 4.4 / Arduino 2.0.17 end-of-life | 18, 19 | open |
+| SEC-03 | ESP-IDF 4.4 / Arduino 2.0.17 end-of-life | 18, 19 | open (WP-18 done: route and versions chosen; WP-19 to do) |
 | SEC-04 | Wi-Fi scan names printed with control bytes | 05 | done (v2.5) |
 | SEC-05 | Release workflow from any branch; write token in build steps | 01 | done (v2.1) |
 | SEC-06 | `AT*PASS` prints a generated password (permitted; amend rule) | 01 | done (v2.1) |

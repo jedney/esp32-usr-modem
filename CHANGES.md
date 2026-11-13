@@ -14,6 +14,17 @@ Every change that is pushed bumps `VERSION` and adds an entry here
 
 ## [Unreleased]
 
+## [3.0] - 2026-11-13
+
+Work in progress on `firmware/v3.0-idf5`; this entry is completed in WP-19.
+
+### Changed
+
+- Firmware platform moves from Arduino core 2.0.17 on ESP-IDF 4.4.7 (end of life since
+  July 2024) to Arduino core 3.3.12 on ESP-IDF 6.1, built by the official PlatformIO
+  platform `espressif32@8.0.0` (SEC-03). Mbed TLS 4 (PSA Crypto), Picolibc and GCC 15
+  come with it.
+
 ## [2.17] - 2026-11-13
 
 ### Added
