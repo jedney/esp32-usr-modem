@@ -11,15 +11,21 @@ namespace devicecfg {
 constexpr size_t kPasswordMax = 32;
 constexpr size_t kGeneratedLength = 12;
 constexpr uint32_t kWindowMs = 10 * 60 * 1000;
-constexpr size_t kBlobSize = 110;
+constexpr size_t kOtaHashLength = 64;     // SHA-256 of the password, lower-case hex (ArduinoOTA)
+constexpr size_t kDigestHashLength = 32;  // MD5 HA1 for HTTP Digest, lower-case hex
+// USRA, layout, policy, reset marker, then the password and both hashes with their
+// terminators, then a CRC-32.
+constexpr size_t kBlobSize =
+    7 + (kPasswordMax + 1) + (kOtaHashLength + 1) + (kDigestHashLength + 1) + 4;
 constexpr const char *kAlphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz";
 
-// Hardware implementation uses the ESP entropy source and the core's MD5 routines.
+// Hardware implementation uses the ESP entropy source and PSA hashes.
 class Crypto {
 public:
     virtual ~Crypto() = default;
     virtual uint32_t randomWord() = 0;
-    virtual bool hashes(const char *password, char ota[33], char digest[33]) = 0;
+    virtual bool hashes(const char *password, char ota[kOtaHashLength + 1],
+                        char digest[kDigestHashLength + 1]) = 0;
 };
 
 void wipe(void *data, size_t size);
@@ -68,9 +74,9 @@ private:
     bool resetPending_ = false;
     bool windowOpen_ = false;
     uint32_t openedAt_ = 0;
-    char password_[33] = {};
-    char ota_[33] = {};
-    char digest_[33] = {};
+    char password_[kPasswordMax + 1] = {};
+    char ota_[kOtaHashLength + 1] = {};
+    char digest_[kDigestHashLength + 1] = {};
 };
 
 }  // namespace devicecfg

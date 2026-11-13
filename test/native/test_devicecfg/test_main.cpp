@@ -1,4 +1,4 @@
-// v0.7 lifecycle, input privacy, policy timing and reset recovery. No board required.
+// Device password lifecycle, input privacy, policy timing and reset recovery. No board required.
 #include <unity.h>
 
 #include <cstring>
@@ -55,24 +55,27 @@ public:
     }
 };
 
-// Deliberately fake, deterministic hashes; real MD5/realm vectors are checked on-board.
+// Deliberately fake, deterministic hashes; the real SHA-256 and MD5 vectors are checked on-board.
 class FakeCrypto : public Crypto {
 public:
     uint32_t next = 0;
     bool brokenRandom = false;
     bool failHash = false;
     uint32_t randomWord() override { return brokenRandom ? UINT32_MAX : next++; }
-    bool hashes(const char *password, char ota[33], char digest[33]) override {
+    bool hashes(const char *password, char ota[kOtaHashLength + 1],
+                char digest[kDigestHashLength + 1]) override {
         unsigned sum = 0;
         for (const char *p = password; *p; ++p) {
             sum = sum * 31 + static_cast<unsigned char>(*p);
         }
         const char *hex = "0123456789abcdef";
-        for (size_t i = 0; i < 32; ++i) {
-            ota[i] = hex[(sum >> (i % 8 * 4)) & 15];
+        for (size_t i = 0; i < kOtaHashLength; ++i) {
+            ota[i] = hex[((sum + i / 8) >> (i % 8 * 4)) & 15];
+        }
+        for (size_t i = 0; i < kDigestHashLength; ++i) {
             digest[i] = hex[((sum + 73) >> (i % 8 * 4)) & 15];
         }
-        ota[32] = digest[32] = 0;
+        ota[kOtaHashLength] = digest[kDigestHashLength] = 0;
         return !failHash;
     }
 };
@@ -216,7 +219,7 @@ void test_failed_initial_save_never_enables_unauthenticated_ota() {
 void test_damaged_and_future_records_fail_closed_without_overwriting() {
     Rig r;
     const std::vector<uint8_t> original = r.auth.bytes;
-    for (size_t index : {size_t(0), size_t(4), size_t(5), size_t(6), size_t(20), size_t(109)}) {
+    for (size_t index : {size_t(0), size_t(4), size_t(5), size_t(6), size_t(20), size_t(141)}) {
         r.auth.bytes = original;
         r.auth.bytes[index] ^= 0xFF;
         auto damaged = r.auth.bytes;
@@ -237,13 +240,32 @@ void test_damaged_and_future_records_fail_closed_without_overwriting() {
 void test_valid_crc_cannot_hide_invalid_hash_or_missing_terminator() {
     Rig r;
     auto original = r.auth.bytes;
-    for (size_t index : {size_t(39), size_t(40), size_t(72), size_t(105)}) {
+    for (size_t index : {size_t(39), size_t(40), size_t(103), size_t(104), size_t(105), size_t(136),
+                         size_t(137)}) {
         r.auth.bytes = original;
         r.auth.bytes[index] = 0xFF;
         r.auth.fixCrc();
         Device again(r.auth, r.crypto);
         TEST_ASSERT_FALSE(again.begin());
     }
+}
+
+// Layout 1: USRA, layout, policy, reset marker, password (33 bytes from 7), OTA hash
+// (SHA-256 hex, 65 bytes from 40), Digest HA1 (MD5 hex, 33 bytes from 105), CRC-32.
+void test_record_holds_sha256_ota_hash_and_md5_digest_hash() {
+    Rig r;
+    TEST_ASSERT_EQUAL(142, kBlobSize);
+    TEST_ASSERT_EQUAL(kBlobSize, r.auth.bytes.size());
+    TEST_ASSERT_EQUAL(1, r.auth.bytes[4]);
+    TEST_ASSERT_EQUAL(64, strlen(r.device.otaHash()));
+    TEST_ASSERT_EQUAL(32, strlen(r.device.digestHash()));
+    TEST_ASSERT_EQUAL_MEMORY(r.device.otaHash(), r.auth.bytes.data() + 40, 65);
+    TEST_ASSERT_EQUAL_MEMORY(r.device.digestHash(), r.auth.bytes.data() + 105, 33);
+    // An OTA hash of MD5 length (32 characters) is refused, even with a valid CRC.
+    r.auth.bytes[72] = 0;
+    r.auth.fixCrc();
+    Device shortOta(r.auth, r.crypto);
+    TEST_ASSERT_FALSE(shortOta.begin());
 }
 
 void test_broken_entropy_is_bounded_and_rejected() {
@@ -322,7 +344,7 @@ void test_inline_password_is_masked_not_repeated_or_disclosed_by_show_commands()
 void test_lower_case_password_and_backspace_never_reveal_arguments() {
     Rig r;
     TEST_ASSERT_FALSE(has(r.type("at*pass=HiddenXY\bZ\r"), "Hidden"));
-    char ota[33], digest[33];
+    char ota[kOtaHashLength + 1], digest[kDigestHashLength + 1];
     r.crypto.hashes("HiddenXZ", ota, digest);
     TEST_ASSERT_EQUAL_STRING(ota, r.device.otaHash());
 }
@@ -554,6 +576,7 @@ int main() {
     RUN_TEST(test_failed_initial_save_never_enables_unauthenticated_ota);
     RUN_TEST(test_damaged_and_future_records_fail_closed_without_overwriting);
     RUN_TEST(test_valid_crc_cannot_hide_invalid_hash_or_missing_terminator);
+    RUN_TEST(test_record_holds_sha256_ota_hash_and_md5_digest_hash);
     RUN_TEST(test_broken_entropy_is_bounded_and_rejected);
     RUN_TEST(test_ota_always_default_requires_credentials_wifi_and_idle);
     RUN_TEST(test_demand_window_expires_exactly_at_ten_minutes_and_can_reopen);

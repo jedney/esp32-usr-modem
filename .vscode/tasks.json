@@ -8,7 +8,7 @@
   "windows": {
     "options": {
       "env": {
-        "PATH": "${env:USERPROFILE}\\.platformio\\penv\\Scripts;${env:PATH}"
+        "PATH": "${env:LOCALAPPDATA}\\Python\\bin;${env:USERPROFILE}\\.platformio\\penv\\Scripts;${env:PATH}"
       }
     }
   },

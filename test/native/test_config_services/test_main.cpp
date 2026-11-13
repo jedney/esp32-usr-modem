@@ -40,8 +40,8 @@ public:
     uint32_t value = 0;
     uint32_t randomWord() override { return ++value; }
     // Different hashes for different passwords, so a leaked hash can be searched for.
-    static void hex(uint32_t seed, const char *text, char out[33]) {
-        for (int word = 0; word < 4; ++word) {
+    static void hex(uint32_t seed, const char *text, char *out, size_t length) {
+        for (size_t word = 0; word < length / 8; ++word) {
             uint32_t h = 2166136261u ^ (seed + uint32_t(word) * 7919u);
             for (const char *c = text; *c; ++c) {
                 h = (h ^ uint8_t(*c)) * 16777619u;
@@ -49,9 +49,10 @@ public:
             snprintf(out + word * 8, 9, "%08x", unsigned(h));
         }
     }
-    bool hashes(const char *password, char a[33], char b[33]) override {
-        hex(1, password, a);
-        hex(2, password, b);
+    bool hashes(const char *password, char a[devicecfg::kOtaHashLength + 1],
+                char b[devicecfg::kDigestHashLength + 1]) override {
+        hex(1, password, a, devicecfg::kOtaHashLength);
+        hex(2, password, b, devicecfg::kDigestHashLength);
         return true;
     }
 };
@@ -580,7 +581,7 @@ void test_no_output_contains_either_password_or_its_stored_forms() {
     // Everything that must stay out of every output.
     std::vector<std::string> secrets = {wifiCanary, deviceCanary, r.device.otaHash(),
                                         r.device.digestHash()};
-    TEST_ASSERT_EQUAL(32, strlen(r.device.otaHash()));
+    TEST_ASSERT_EQUAL(64, strlen(r.device.otaHash()));
     TEST_ASSERT_EQUAL(32, strlen(r.device.digestHash()));
     TEST_ASSERT_NOT_EQUAL(0, strcmp(r.device.otaHash(), r.device.digestHash()));
     const std::string ota = r.device.otaHash(), digest = r.device.digestHash();

@@ -5,10 +5,10 @@ transfer engine. `run_lrzsz.py` checks every XMODEM variant in both directions,
 YMODEM/ZMODEM batches, binary content/CRC and empty files against independent
 lrzsz processes. It does not implement a second copy of the firmware protocol.
 
-On Linux or Ubuntu in WSL:
+On Linux or Ubuntu in WSL, with g++ 14 or newer (Ubuntu 24.04: `sudo apt install g++-14`):
 
 ```sh
-g++ -std=c++17 -Wall -Wextra -Ilib/clienttest/src -Ilib/calls/src test/interop/client_peer.cpp lib/clienttest/src/transfer.cpp -o .pio/client-peer
+g++-14 -std=gnu++26 -Wall -Wextra -Ilib/clienttest/src -Ilib/calls/src test/interop/client_peer.cpp lib/clienttest/src/transfer.cpp -o .pio/client-peer
 python3 test/interop/run_lrzsz.py --peer .pio/client-peer
 ```
 
@@ -51,7 +51,8 @@ Linux CI builds `internet_peer.cpp` against the portable core and runs
 pppd/kernel stack sends full binary UDP through PPP and negotiates LCP hang-up
 inside a disposable namespace. This tests protocol interoperability separately
 from physical NAPT; it does not simulate the ESP network stack. Required packages
-are g++, Python, iproute2 and ppp, with kernel PPP support and `/dev/ppp`.
+are g++ 14 or newer (the peers are C++26), Python, iproute2 and ppp, with kernel PPP
+support and `/dev/ppp`.
 
 Real Windows 9x/Amiga stack/browser acceptance remains deferred by Jon because
 neither client is available. Automated modern-stack results do not close it.

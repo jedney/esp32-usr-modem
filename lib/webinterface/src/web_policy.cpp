@@ -158,7 +158,7 @@ bool HeaderGate::accept(const uint8_t *data, size_t len) {
             continue;
         }
         head_ += static_cast<char>(data[i]);
-        if (head_.size() > 4096) {
+        if (head_.size() > kMaxHeader) {
             bad_ = true;
             return false;
         }
@@ -171,8 +171,6 @@ bool HeaderGate::accept(const uint8_t *data, size_t len) {
             bad_ = true;
             return false;
         }
-        target_ = head_.substr(pathStart + 1, pathEnd - pathStart - 1);
-        filtered_ = head_.substr(0, lineEnd + 2);
         size_t pos = lineEnd + 2;
         std::map<std::string, unsigned> counts;
         while (pos + 2 < head_.size()) {
@@ -216,32 +214,17 @@ bool HeaderGate::accept(const uint8_t *data, size_t len) {
                     remaining_ = remaining_ * 10 + unsigned(c - '0');
                 }
             }
-            if (key == "host") {
-                host_ = value;
-            }
-            if (key == "origin") {
-                origin_ = value;
-            }
             if (key == "upgrade") {
                 websocket_ = lower(value) == "websocket";
             }
-            if (key == "host" || key == "origin" || key == "authorization" ||
-                key == "content-length" || key == "content-type" || key == "connection" ||
-                key == "upgrade" || key == "sec-websocket-key" || key == "sec-websocket-version" ||
-                key == "x-csrf-token" || key == "x-image-sha256" || key == "x-confirm-downgrade" ||
-                key == "x-confirm-filesystem") {
-                filtered_ += key + ": " + value + "\r\n";
-            }
             pos = end + 2;
         }
-        filtered_ += "\r\n";
-        complete_ = counts["host"] == 1 && remaining_ <= 0x7e0000u && filtered_.size() <= 1024;
+        complete_ = counts["host"] == 1 && remaining_ <= 0x7e0000u;
         if (!complete_) {
             bad_ = true;
             return false;
         }
         devicecfg::wipe(&head_[0], head_.size());
-        headerLength_ = head_.size();
         head_.clear();
     }
     return true;

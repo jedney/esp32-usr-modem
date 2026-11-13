@@ -24,65 +24,13 @@ public:
 private:
     SemaphoreHandle_t mutex_;
 };
-struct Transport {
-    webinterface::HeaderGate gate;
-    WebService *self;
-    uint32_t id = 0;
-    size_t received = 0, pendingAt = 0;
-    std::string pending;
-};
+// Every byte a connection sends passes the header gate before the HTTP server parses it. A
+// chunk that breaks the rules fails the receive, so the server closes the connection before
+// any handler runs.
 int guardedReceive(httpd_handle_t server, int fd, char *buffer, size_t len, int flags) {
-    auto *transport = static_cast<Transport *>(httpd_sess_get_transport_ctx(server, fd));
-    if (!transport) {
+    auto *gate = static_cast<webinterface::HeaderGate *>(httpd_sess_get_transport_ctx(server, fd));
+    if (!gate) {
         return HTTPD_SOCK_ERR_FAIL;
-    }
-    while (!transport->gate.complete()) {
-        uint8_t raw[512];
-        int n = recv(fd, raw, sizeof raw, flags & ~MSG_PEEK);
-        if (n <= 0) {
-            return n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) ? HTTPD_SOCK_ERR_TIMEOUT
-                                                                      : HTTPD_SOCK_ERR_FAIL;
-        }
-        size_t before = transport->received;
-        transport->received += size_t(n);
-        if (!transport->gate.accept(raw, size_t(n))) {
-            return HTTPD_SOCK_ERR_FAIL;
-        }
-        if (!transport->gate.complete()) {
-            continue;
-        }
-        if (transport->gate.websocket()) {
-            transport->id = transport->self->prepareUpgrade(fd, transport->gate);
-            if (!transport->id) {
-                static const char denied[] =
-                    "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
-                send(fd, denied, sizeof denied - 1, 0);
-                return HTTPD_SOCK_ERR_FAIL;
-            }
-        }
-        // IDF 4.4 has a fixed 1 KiB parser header buffer. Browser uploads can
-        // exceed it through User-Agent/Accept/Sec-Fetch headers. Validate the
-        // complete bounded raw header first, then retain only protocol fields.
-        transport->pending = transport->gate.filtered();
-        size_t body = transport->gate.headerLength() - before;
-        transport->pending.append(reinterpret_cast<const char *>(raw + body), size_t(n) - body);
-        devicecfg::wipe(raw, sizeof raw);
-    }
-    if (transport->pendingAt < transport->pending.size()) {
-        size_t n = transport->pending.size() - transport->pendingAt;
-        if (n > len) {
-            n = len;
-        }
-        memcpy(buffer, transport->pending.data() + transport->pendingAt, n);
-        if (!(flags & MSG_PEEK)) {
-            transport->pendingAt += n;
-            if (transport->pendingAt == transport->pending.size()) {
-                devicecfg::wipe(&transport->pending[0], transport->pending.size());
-                transport->pending.clear();
-                transport->pendingAt = 0;
-            }
-        }
-        return int(n);
     }
     int n = recv(fd, buffer, len, flags);
     if (n < 0) {
@@ -90,22 +38,23 @@ int guardedReceive(httpd_handle_t server, int fd, char *buffer, size_t len, int 
                                                        : HTTPD_SOCK_ERR_FAIL;
     }
     if (n > 0 && !(flags & MSG_PEEK) &&
-        !transport->gate.accept(reinterpret_cast<const uint8_t *>(buffer), size_t(n))) {
+        !gate->accept(reinterpret_cast<const uint8_t *>(buffer), size_t(n))) {
         return HTTPD_SOCK_ERR_FAIL;
     }
     return n;
 }
 esp_err_t openSocket(httpd_handle_t server, int fd) {
-    auto *transport = new (std::nothrow) Transport;
-    if (!transport) {
+    auto *gate = new (std::nothrow) webinterface::HeaderGate;
+    if (!gate) {
         return ESP_FAIL;
     }
-    transport->self = static_cast<WebService *>(httpd_get_global_user_ctx(server));
-    httpd_sess_set_transport_ctx(server, fd, transport, [](void *p) {
-        auto *ctx = static_cast<Transport *>(p);
-        ctx->self->disconnect(ctx->id);
-        delete ctx;
-    });
+    httpd_sess_set_transport_ctx(
+        server, fd, gate, [](void *p) { delete static_cast<webinterface::HeaderGate *>(p); });
+    // The server writes a response in several small pieces (status line, headers, body) and
+    // WebSocket frames are small too. Without this, each piece after the first waits for the
+    // browser's delayed ACK (about 50 ms on Windows).
+    const int yes = 1;
+    setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof yes);
     return httpd_sess_set_recv_override(server, fd, guardedReceive);
 }
 std::string header(httpd_req_t *req, const char *key, size_t max = 900) {
@@ -130,7 +79,12 @@ std::string query(httpd_req_t *req, const char *key) {
 }
 void headers(httpd_req_t *req) {
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    // One request per connection (the header gate refuses a second one). The server does not
+    // act on this header itself, so the close is queued here; it runs after this response.
+    // Without it, finished connections hold their slots until the server's least-recently-
+    // used purge, whose queued close can hit the new connection that took the slot.
     httpd_resp_set_hdr(req, "Connection", "close");
+    httpd_sess_trigger_close(req->handle, httpd_req_to_sockfd(req));
     httpd_resp_set_hdr(req, "X-Content-Type-Options", "nosniff");
     httpd_resp_set_hdr(req, "X-Frame-Options", "DENY");
     httpd_resp_set_hdr(req, "Referrer-Policy", "no-referrer");
@@ -266,6 +220,7 @@ void WebService::poll(bool enabled, bool up, const char *name, const char *ip) {
     cfg.global_user_ctx = this;
     cfg.global_user_ctx_free_fn = [](void *) {};  // borrowed, static lifetime
     cfg.stack_size = 12288;
+    cfg.max_req_hdr_len = webinterface::kMaxHeader;  // the header gate's limit
     cfg.max_open_sockets = 6;
     cfg.lru_purge_enable = true;
     cfg.recv_wait_timeout = 1;
@@ -282,6 +237,7 @@ void WebService::poll(bool enabled, bool up, const char *name, const char *ip) {
     route.user_ctx = this;
     route.is_websocket = true;
     route.handle_ws_control_frames = true;
+    route.ws_pre_handshake_cb = upgrade;
     httpd_register_uri_handler(server_, &route);
     route = {};
     route.uri = "/api/update";
@@ -417,17 +373,27 @@ esp_err_t WebService::serve(httpd_req_t *req) {
 esp_err_t WebService::websocket(httpd_req_t *req) {
     return static_cast<WebService *>(req->user_ctx)->ws(req);
 }
-esp_err_t WebService::ws(httpd_req_t *req) {
-    if (req->method == HTTP_GET) {
-        auto *transport = static_cast<Transport *>(
-            httpd_sess_get_transport_ctx(req->handle, httpd_req_to_sockfd(req)));
-        if (!transport || !transport->id) {
-            return ESP_FAIL;
+// Runs before the HTTP server answers a WebSocket upgrade (the server then never calls the
+// route's handler for that GET). A refused upgrade gets 403 and the connection closes.
+esp_err_t WebService::upgrade(httpd_req_t *req) {
+    auto *self = static_cast<WebService *>(req->user_ctx);
+    const uint32_t id = self->prepareUpgrade(httpd_req_to_sockfd(req), header(req, "Host"),
+                                             header(req, "Origin"), req->uri);
+    if (id) {
+        auto *context = new (std::nothrow) Context{self, id};
+        if (context) {
+            req->sess_ctx = context;  // the frame handler's link to the client; freed on close
+            req->free_ctx = freeContext;
+            return ESP_OK;
         }
-        req->sess_ctx = new Context{this, transport->id};
-        req->free_ctx = freeContext;
-        return ESP_OK;
+        self->disconnect(id);
     }
+    headers(req);
+    httpd_resp_set_status(req, "403 Forbidden");
+    httpd_resp_send(req, nullptr, 0);
+    return ESP_FAIL;
+}
+esp_err_t WebService::ws(httpd_req_t *req) {
     auto *context = static_cast<Context *>(req->sess_ctx);
     if (!context) {
         return ESP_FAIL;
@@ -486,13 +452,13 @@ esp_err_t WebService::ws(httpd_req_t *req) {
     devicecfg::wipe(data, sizeof data);
     return ok ? ESP_OK : ESP_FAIL;
 }
-uint32_t WebService::prepareUpgrade(int fd, const webinterface::HeaderGate &gate) {
+uint32_t WebService::prepareUpgrade(int fd, const std::string &host, const std::string &origin,
+                                    const std::string &target) {
     Lock lock(mutex_);
     const std::string prefix = "/ws?token=";
-    if (!webinterface::allowedHost(gate.host(), name_, ip_) ||
-        !webinterface::allowedOrigin(gate.origin(), name_, ip_) ||
-        gate.target().compare(0, prefix.size(), prefix) != 0 ||
-        gate.target().size() != prefix.size() + 32) {
+    if (!webinterface::allowedHost(host, name_, ip_) ||
+        !webinterface::allowedOrigin(origin, name_, ip_) ||
+        target.compare(0, prefix.size(), prefix) != 0 || target.size() != prefix.size() + 32) {
         return 0;
     }
     Client *available = nullptr;
@@ -502,7 +468,7 @@ uint32_t WebService::prepareUpgrade(int fd, const webinterface::HeaderGate &gate
             break;
         }
     }
-    if (!available || !tickets_.consume(gate.target().substr(prefix.size()), millis())) {
+    if (!available || !tickets_.consume(target.substr(prefix.size()), millis())) {
         return 0;
     }
     char csrf[33];

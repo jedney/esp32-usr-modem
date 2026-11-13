@@ -15,9 +15,11 @@ void setUp() {}
 void tearDown() {}
 
 void test_real_hashes_match_ota_and_fixed_digest_realm() {
-    char ota[33] = {}, digest[33] = {};
+    char ota[devicecfg::kOtaHashLength + 1] = {}, digest[devicecfg::kDigestHashLength + 1] = {};
     TEST_ASSERT_TRUE(crypto.hashes("password", ota, digest));
-    TEST_ASSERT_EQUAL_STRING("5f4dcc3b5aa765d61d8327deb882cf99", ota);
+    // SHA-256("password") for ArduinoOTA; MD5("admin:usr-modem:password") for HTTP Digest.
+    TEST_ASSERT_EQUAL_STRING("5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8",
+                             ota);
     TEST_ASSERT_EQUAL_STRING("3ba84c8c9a93845740a46d37bf97bd5d", digest);
 }
 
@@ -71,7 +73,7 @@ void test_credentials_and_first_use_survive_in_nvs() {
     TEST_ASSERT_TRUE(store.erase());
     devicecfg::Device first(store, crypto);
     TEST_ASSERT_TRUE(first.begin());
-    char password[33] = {}, hash[33] = {};
+    char password[devicecfg::kPasswordMax + 1] = {}, hash[devicecfg::kOtaHashLength + 1] = {};
     memcpy(password, first.bootPassword(), sizeof password);
     memcpy(hash, first.otaHash(), sizeof hash);
     hw::NvsStore reopened("authtest", "cfg");
@@ -105,7 +107,7 @@ void test_factory_wipes_each_project_namespace_and_generates_a_new_password() {
     TEST_ASSERT_TRUE(auth.erase());
     devicecfg::Device device(auth, crypto);
     TEST_ASSERT_TRUE(device.begin());
-    char oldHash[33] = {};
+    char oldHash[devicecfg::kOtaHashLength + 1] = {};
     memcpy(oldHash, device.otaHash(), sizeof oldHash);
     uint8_t sample[] = {1, 2, 3};
     TEST_ASSERT_TRUE(modem.save(sample, sizeof sample));

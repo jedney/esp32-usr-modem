@@ -12,7 +12,8 @@ public:
     ~EspCrypto() override;
     bool begin();                    // before Wi-Fi, ADC or I2S initialization
     uint32_t randomWord() override;  // from the main loop only
-    bool hashes(const char *password, char ota[33], char digest[33]) override;
+    bool hashes(const char *password, char ota[devicecfg::kOtaHashLength + 1],
+                char digest[devicecfg::kDigestHashLength + 1]) override;
 
 private:
     uint32_t key_ = 0;  // PSA key id (PSA_KEY_ID_NULL = 0) holding the boot seed

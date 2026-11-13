@@ -19,7 +19,7 @@ Sessions 1 and 2 of WP-19 are done (results below). The rest are one plan each:
 | WP | Plan | Model / effort | Size |
 | --- | --- | --- | --- |
 | 20 | [I2S, RMT capture and first link](../history/wp-20-i2s-rmt-first-link.md) (done) | Opus 5.5 / high | L |
-| 21 | [Networking, tooling, CI and the OTA hash](wp-21-networking-ci-ota.md) | Opus 5.5 / high | L |
+| 21 | [Networking, tooling, CI and the OTA hash](../history/wp-21-networking-ci-ota.md) (done) | Opus 5.5 / high | L |
 | 22 | [Network console](wp-22-network-console.md) | Opus 5.5 / high | L |
 | 23 | [Fresh start: code](wp-23-fresh-start-code.md) | Sonnet 5.5 / high | L |
 | 24 | [Fresh start: documentation and credits](wp-24-fresh-start-docs.md) | Sonnet 5.5 / high | L |
@@ -91,7 +91,7 @@ use WP-22's network console. The spike's evidence is in
 | Unity | from PlatformIO | 2.7.0 if `test_framework` lets it be pinned | ThrowTheSwitch/Unity |
 | cppcheck (CI) | runner's | 2.22.0 | danmar/cppcheck |
 | clang-format | WinLibs LLVM 19 | same style; LLVM 23.1.5 is newest | llvm-project |
-| CI Python | 3.12 | newest that PlatformIO 6.2.0 and the IDF 6.1 tools install on (3.15.0 out 9 Oct 2026; IDF needs 3.10+): try 3.15, else 3.14 | python.org |
+| CI Python | 3.12 | **3.14** (WP-21: 3.15 has no wheel for IDF 6.1's `pydantic_core` 2.41.5) | python.org |
 | CI Node | 22 | **26** (Active LTS from 28 Oct 2026) | nodejs/release |
 | pytest / pytest-timeout / pyserial | 9.1.1 / >=2.3 / >=3.5 | 9.2.0 / 2.5.0 / 3.5 (exact pins) | GitHub releases |
 | GitHub Actions | by SHA | newest tags by SHA (checkout 7.0.1, setup-python 7.1.0, setup-node 7.1.0, cache 6.1.0, upload-artifact 7.0.2) | GitHub releases |
@@ -135,11 +135,16 @@ sessions is in their plans; this is what they all need.
   `scripts/arduino_tinyusb/` are gone; `scripts/sdkconfig_refresh.py` (with tests) keeps the
   `sdkconfig` regeneration. Arduino's `USBHost.cpp` and `USBMSC.cpp` compile to nothing;
   the Arduino `USB` library itself is not built.
-- **Where the build stands (after WP-20):** the firmware builds with no warnings in project
+- **Where the build stands (after WP-21):** the firmware builds with no warnings in project
   code and runs on the board, set up from `.env` (Wi-Fi joined, `.env` device password).
-  App image 1,496,025 bytes (35.7 % of the 4 MB slot), static RAM 151,696 bytes. Clean
-  build about 200 s. What WP-20 left for later sessions is in its plan's "Result"
-  ([../history/wp-20-i2s-rmt-first-link.md](../history/wp-20-i2s-rmt-first-link.md)).
+  App image 1,495,193 bytes (35.6 % of the 4 MB slot), static RAM 151,760 bytes. Clean
+  build about 170-210 s. The browser page, WebSockets and OTA (SHA-256) work on the board.
+  What WP-20 and WP-21 left for later sessions is in their plans' "Result"
+  ([../history/wp-20-i2s-rmt-first-link.md](../history/wp-20-i2s-rmt-first-link.md),
+  [../history/wp-21-networking-ci-ota.md](../history/wp-21-networking-ci-ota.md)).
+- **OTA from the PC** is `scripts/ota_upload.py` (SHA-256 sign-in only), not `espota.py`.
+  The device record changed size in WP-21: a board flashed before it needs `AT*PASS` or a
+  full erase before OTA and the web page work.
 
 ### Build tips
 
@@ -148,8 +153,12 @@ sessions is in their plans; this is what they all need.
   to show the exact flags of any file; delete it afterwards (the repo root is not ignored).
 - **PlatformIO does not re-run CMake** when only a component's `idf_component.yml`
   changes: touch `CMakeLists.txt` after editing one.
-- If the PPP class is wanted (WP-21), turn on `CONFIG_ARDUINO_SELECTIVE_PPP`. Arduino's
-  `USB.h` is part of the core, so selective compilation does not hide it.
+- Arduino's `PPP` class is not used (WP-21 review), so `CONFIG_ARDUINO_SELECTIVE_PPP`
+  stays off. Arduino's `USB.h` is part of the core, so selective compilation does not
+  hide it.
+- **IDF logs are off** (`esp_log_level_set("*", ESP_LOG_NONE)` in `setup()`). To debug a
+  framework component, turn on its tags at `ESP_LOG_WARN` in a throwaway build; debug
+  level is compiled out (`CONFIG_LOG_MAXIMUM_LEVEL` is INFO).
 
 ## Testing on the board (WP-19 only)
 

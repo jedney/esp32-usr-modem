@@ -43,8 +43,27 @@ Work in progress on `firmware/v3.0-idf5`; this entry is completed in WP-19.
   driver; neither uses a legacy driver any more. RS232 speed changes no longer write UART
   registers directly: the port runs from the 80 MHz bus clock, which applies new settings
   by itself.
+- The OTA password hash is SHA-256 (ArduinoOTA's PBKDF2-HMAC-SHA256 sign-in); the web
+  page's Digest login is unchanged. The stored device record is larger: erase the flash
+  when moving a board to v3.0.
+- OTA uploads (`pio run -e s3_ota -t upload`) use the project's own uploader, which signs
+  in once with SHA-256 and never falls back to MD5.
+- The web server checks a WebSocket upgrade (host, origin, one-time ticket) before the
+  handshake, closes each HTTP connection after its response as its `Connection: close`
+  header says, and sends without Nagle delays. The header check no longer rewrites
+  browser headers to fit a small buffer; a request header may be up to 4 KiB.
+- Wi-Fi events come through Arduino's `Network` events.
+- CI runs Python 3.14, Node 26 and g++ 14 (the C++26 native tests and interop peers),
+  caches the registry components and checks that `dependencies.lock` matches the build.
+  The end-to-end test packages are pinned exactly.
 
 ### Fixed
+
+- Browser WebSocket connections were reset at once on IDF 6.1, and a fresh request could
+  be reset when earlier connections still held every slot.
+- The time of the last NTP sync could be read half-updated.
+- The VS Code task "Modem: end-to-end tests" used PlatformIO's Python, which has no pytest.
+- The wrong-password lock-out test passed or failed depending on request timing.
 
 - End-to-end tests no longer print the Wi-Fi password when a test fails: tracebacks are
   always short, without arguments or local variables. The Wi-Fi tests also run on a

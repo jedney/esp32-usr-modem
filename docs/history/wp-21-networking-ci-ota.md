@@ -56,3 +56,33 @@ Read [wp-19-common.md](wp-19-common.md) first (decisions, versions, board testin
    whether IDF 6.1 still needs the header gate at all. `test_web.py` must pass with
    `--web-tests`.
 6. Full end checks (README.md step 7).
+
+## Result (13 Nov 2026)
+
+Done. Reasons and details are in the decisions log (rows "v3.0 networking review", "OTA
+password hash = SHA-256", "OTA uploader", "web server on IDF 6.1", "found in WP-21,
+follow-up", "last NTP sync time", "CI and tools", "VS Code tasks and .gitignore", "e2e
+lock-out test").
+
+- **Review:** PPP, SLIP and NAPT stay on raw lwIP (Arduino's `PPP` is a DTE-side
+  `esp_modem` client; `esp_netif` has no SLIP and its PPP server would replace the tested
+  engine). Wi-Fi events through `Network.onEvent()`; `esp_wifi_scan_stop()` stays (no
+  Arduino call). ArduinoOTA and `Update` stay.
+- **OTA hash:** SHA-256, 142-byte device record (layout 1). Uploader rewritten
+  (`scripts/ota_upload.py`, SHA-256 sign-in only, fake-modem tests).
+- **Web server:** the resets came from IDF 6.1 no longer calling the WebSocket handler for
+  the handshake. Upgrade checks now in `ws_pre_handshake_cb`; the header gate passes bytes
+  through (server header limit 4 KiB); each HTTP response closes its connection;
+  `TCP_NODELAY`. An IDF 6.1 race in the queued LRU purge is a follow-up (flood case only).
+- **CI:** Python 3.14 (3.15 lacks a `pydantic_core` wheel), Node 26, g++ 14, component
+  cache and lock check, exact e2e pins. Not run in CI yet (one push after WP-26).
+- **Tools:** VS Code e2e task fixed (Python PATH); Node is not installed on the PC (web
+  task needs it). `.gitignore` cause found (pioarduino's generator); guard test added.
+- **Board (full erase, USB flash, LittleFS, setup from `.env`):** e2e `test_web.py` 23/23
+  (with `--rs232-port`, floods, uploads); `test_device.py --device-tests --factory-reset
+  --ota-upload` 7/7 (real OTA uploads); `test_internet`, `test_wifi`, `test_console`,
+  `test_rs232`, `test_settings`, `test_session`, `test_hwtest`, `test_config`,
+  `test_client`, `test_answer` 135 passed (2 optional UDP-echo skips). On-board
+  `test_device` 8/8 and `test_calls` 5/5. App image 1,495,193 bytes.
+- **Local checks:** native 488 (1 skip: pins overridden by the bench `.env`), cppcheck,
+  clang-format, `test/scripts` 64, version, image manifest.

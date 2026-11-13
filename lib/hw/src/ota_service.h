@@ -18,7 +18,7 @@ public:
 private:
     devicecfg::Device &device_;
     std::unique_ptr<ArduinoOTAClass> ota_;
-    char hash_[33] = {};
+    char hash_[devicecfg::kOtaHashLength + 1] = {};  // SHA-256 hex, for setPasswordHash()
     char hostname_[33] = {};
     uint32_t ip_ = 0;
 };

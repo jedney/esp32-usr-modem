@@ -38,8 +38,10 @@ public:
     bool takeUploadDone(bool &ok, bool &filesystem);
     bool takeUnmountRequest();
     void unmounted();
-    // The receive gate runs before IDF 4.4's automatic WebSocket handshake.
-    uint32_t prepareUpgrade(int fd, const webinterface::HeaderGate &gate);
+    // Checks a WebSocket upgrade (Host, Origin, one-time ticket) and claims a client slot.
+    // Returns the client's id, or 0 if the upgrade is refused.
+    uint32_t prepareUpgrade(int fd, const std::string &host, const std::string &origin,
+                            const std::string &target);
     void disconnect(uint32_t id);
 
 private:
@@ -61,6 +63,7 @@ private:
     };
     static esp_err_t get(httpd_req_t *req);
     static esp_err_t websocket(httpd_req_t *req);
+    static esp_err_t upgrade(httpd_req_t *req);  // ws_pre_handshake_cb
     static esp_err_t update(httpd_req_t *req);
     static void freeContext(void *ctx);
     static void sendWork(void *ctx);

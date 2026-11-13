@@ -25,13 +25,22 @@ bool validPassword(const char *text) {
 }
 
 namespace {
-bool validHash(const char *hash) {
-    for (size_t i = 0; i < 32; ++i) {
+// Record offsets (layout 1).
+constexpr size_t kPasswordAt = 7;
+constexpr size_t kOtaAt = kPasswordAt + kPasswordMax + 1;
+constexpr size_t kDigestAt = kOtaAt + kOtaHashLength + 1;
+static_assert(kDigestAt + kDigestHashLength + 1 + 4 == kBlobSize, "record layout");
+
+bool validHash(const char *hash, size_t length) {
+    for (size_t i = 0; i < length; ++i) {
         if (!((hash[i] >= '0' && hash[i] <= '9') || (hash[i] >= 'a' && hash[i] <= 'f'))) {
             return false;
         }
     }
-    return hash[32] == '\0';
+    return hash[length] == '\0';
+}
+bool validHashes(const char *ota, const char *digest) {
+    return validHash(ota, kOtaHashLength) && validHash(digest, kDigestHashLength);
 }
 }  // namespace
 
@@ -46,9 +55,9 @@ bool Device::save(Policy policy, bool reset, const char *password, const char *o
     // USRA, layout 1, policy, reset marker, password (or zeroes), two hex hashes, CRC.
     uint8_t blob[kBlobSize] = {
         'U', 'S', 'R', 'A', 1, static_cast<uint8_t>(policy), static_cast<uint8_t>(reset)};
-    memcpy(blob + 7, password, strlen(password));
-    memcpy(blob + 40, ota, 32);
-    memcpy(blob + 73, digest, 32);
+    memcpy(blob + kPasswordAt, password, strlen(password));
+    memcpy(blob + kOtaAt, ota, kOtaHashLength);
+    memcpy(blob + kDigestAt, digest, kDigestHashLength);
     uint32_t crc = modemcfg::crc32(blob, kBlobSize - 4);
     for (size_t i = 0; i < 4; ++i) {
         blob[kBlobSize - 4 + i] = static_cast<uint8_t>(crc >> (8 * i));
@@ -78,12 +87,12 @@ bool Device::begin() {
     for (size_t i = 0; i < 4; ++i) {
         crc |= static_cast<uint32_t>(blob[kBlobSize - 4 + i]) << (8 * i);
     }
-    const char *pass = reinterpret_cast<const char *>(blob + 7);
-    const char *ota = reinterpret_cast<const char *>(blob + 40);
-    const char *digest = reinterpret_cast<const char *>(blob + 73);
+    const char *pass = reinterpret_cast<const char *>(blob + kPasswordAt);
+    const char *ota = reinterpret_cast<const char *>(blob + kOtaAt);
+    const char *digest = reinterpret_cast<const char *>(blob + kDigestAt);
     bool ok = n == kBlobSize && memcmp(blob, "USRA\1", 5) == 0 && blob[5] <= 1 && blob[6] <= 1 &&
-              blob[39] == 0 && crc == modemcfg::crc32(blob, kBlobSize - 4) && validHash(ota) &&
-              validHash(digest) &&
+              blob[kOtaAt - 1] == 0 && crc == modemcfg::crc32(blob, kBlobSize - 4) &&
+              validHashes(ota, digest) &&
               (*pass == '\0' || (strlen(pass) == kGeneratedLength && validPassword(pass)));
     if (ok) {
         policy_ = static_cast<Policy>(blob[5]);
@@ -121,9 +130,9 @@ bool Device::replace(const char *password, bool showAtBoot) {
     if (resetPending_ || !validPassword(password)) {
         return false;
     }
-    char ota[33] = {};
-    char digest[33] = {};
-    bool ok = crypto_.hashes(password, ota, digest) && validHash(ota) && validHash(digest) &&
+    char ota[kOtaHashLength + 1] = {};
+    char digest[kDigestHashLength + 1] = {};
+    bool ok = crypto_.hashes(password, ota, digest) && validHashes(ota, digest) &&
               save(policy_, false, showAtBoot ? password : "", ota, digest);
     if (ok) {
         wipe(password_, sizeof password_);
@@ -190,8 +199,11 @@ bool Device::factoryReset(modemcfg::Store *const *otherStores, size_t count) {
     if (!resetPending_) {
         // A damaged record can still be explicitly reset. Fixed non-secret hashes
         // make the marker readable, but ready() stays false throughout the reset.
-        const char *emptyHash = "00000000000000000000000000000000";
-        if (!save(Policy::kAlways, true, "", emptyHash, emptyHash)) {
+        char emptyOta[kOtaHashLength + 1], emptyDigest[kDigestHashLength + 1];
+        memset(emptyOta, '0', kOtaHashLength);
+        memset(emptyDigest, '0', kDigestHashLength);
+        emptyOta[kOtaHashLength] = emptyDigest[kDigestHashLength] = '\0';
+        if (!save(Policy::kAlways, true, "", emptyOta, emptyDigest)) {
             return false;
         }
         resetPending_ = true;

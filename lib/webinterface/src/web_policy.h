@@ -20,24 +20,22 @@ std::string terminalUtf8(const uint8_t *bytes, size_t len, bool cp437);
 // Strict bounded geometry envelope, distinct from terminal input.
 bool terminalSize(const std::string &message, unsigned &columns, unsigned &rows);
 int compareVersions(const std::string &a, const std::string &b);  // -2 = invalid
-// One HTTP request per connection (WebSocket upgrade is the exception). Reject
-// duplicate security headers before IDF's first-value-only header lookup.
+// Largest request header (request line and fields) the web server takes. The HTTP server's
+// own header limit (httpd_config_t::max_req_hdr_len) is set to the same value.
+constexpr size_t kMaxHeader = 4096;
+// Checks the raw bytes of a connection before the HTTP server parses them; the bytes pass
+// through unchanged. One HTTP request per connection (a WebSocket upgrade is the exception:
+// its frames follow). Duplicate security headers are refused because the server's header
+// lookup returns only the first value; Transfer-Encoding and a body longer than its
+// Content-Length are refused too.
 class HeaderGate {
 public:
     bool accept(const uint8_t *data, size_t len);
     bool complete() const { return complete_; }
     bool websocket() const { return websocket_; }
-    const std::string &host() const { return host_; }
-    const std::string &origin() const { return origin_; }
-    const std::string &target() const { return target_; }
-    const std::string &filtered() const { return filtered_; }
-    size_t headerLength() const { return headerLength_; }
 
 private:
     std::string head_;
-    std::string host_, origin_, target_;
-    std::string filtered_;
-    size_t headerLength_ = 0;
     bool complete_ = false, websocket_ = false, bad_ = false;
     size_t remaining_ = 0;
 };

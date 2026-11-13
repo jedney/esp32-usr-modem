@@ -25,7 +25,10 @@ namespace {
 portMUX_TYPE linkLock = portMUX_INITIALIZER_UNLOCKED;
 LinkState linkState = LinkState::kOff;  // guarded by linkLock
 Reason linkReason = Reason::kNone;      // guarded by linkLock
-volatile int64_t syncedAt = 0;
+// Written by the TCP/IP task, read by loop(). 64 bits are two stores on this CPU, so the
+// lock stops a read from seeing half of an update.
+portMUX_TYPE syncLock = portMUX_INITIALIZER_UNLOCKED;
+int64_t syncedAt = 0;  // guarded by syncLock
 
 void setLink(LinkState state, Reason reason) {
     portENTER_CRITICAL(&linkLock);
@@ -98,7 +101,9 @@ void onWifiEvent(arduino_event_id_t event, arduino_event_info_t info) {
 }
 
 void onTimeSync(struct timeval *tv) {
+    portENTER_CRITICAL(&syncLock);
     syncedAt = tv->tv_sec;
+    portEXIT_CRITICAL(&syncLock);
 }
 
 void start() {
@@ -107,7 +112,7 @@ void start() {
     }
     started = true;
     WiFi.persistent(false);  // no ESP-IDF copy of the network or password in flash
-    WiFi.onEvent(onWifiEvent);
+    Network.onEvent(onWifiEvent);
 }
 
 IPAddress toIp(uint32_t v) {
@@ -278,7 +283,10 @@ int64_t EspRadio::utcNow() {
 }
 
 int64_t EspRadio::lastSync() {
-    return syncedAt;
+    portENTER_CRITICAL(&syncLock);
+    const int64_t at = syncedAt;
+    portEXIT_CRITICAL(&syncLock);
+    return at;
 }
 
 void EspRadio::mac(uint8_t out[6]) {

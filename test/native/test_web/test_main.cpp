@@ -300,6 +300,7 @@ void test_raw_headers_reject_duplicates_smuggling_and_pipelining() {
     TEST_ASSERT_TRUE(post.accept(reinterpret_cast<const uint8_t *>(body.data()), body.size()));
     const uint8_t extra = 0;
     TEST_ASSERT_FALSE(post.accept(&extra, 1));
+    // After a WebSocket upgrade header, the frames pass without limit.
     HeaderGate upgrade;
     std::string request =
         "GET /ws?token=abc HTTP/1.1\r\nHost: usr-modem.local\r\n"
@@ -308,15 +309,22 @@ void test_raw_headers_reject_duplicates_smuggling_and_pipelining() {
         upgrade.accept(reinterpret_cast<const uint8_t *>(request.data()), request.size()));
     TEST_ASSERT_TRUE(upgrade.complete());
     TEST_ASSERT_TRUE(upgrade.websocket());
-    TEST_ASSERT_EQUAL_STRING("http://foreign.invalid", upgrade.origin().c_str());
-    TEST_ASSERT_EQUAL_STRING("/ws?token=abc", upgrade.target().c_str());
+    const std::string frames(5000, '\x82');
+    TEST_ASSERT_TRUE(
+        upgrade.accept(reinterpret_cast<const uint8_t *>(frames.data()), frames.size()));
+    // Browser-sized headers pass whole (the HTTP server's own limit is kMaxHeader too).
     HeaderGate browser;
     std::string large = "GET /api/session HTTP/1.1\r\nHost: usr-modem.local\r\nUser-Agent: " +
                         std::string(1500, 'a') + "\r\n\r\n";
     TEST_ASSERT_TRUE(browser.accept(reinterpret_cast<const uint8_t *>(large.data()), large.size()));
-    TEST_ASSERT_EQUAL(large.size(), browser.headerLength());
-    TEST_ASSERT_EQUAL(std::string::npos, browser.filtered().find("User-Agent"));
-    TEST_ASSERT_LESS_THAN(1024, browser.filtered().size());
+    TEST_ASSERT_TRUE(browser.complete());
+    TEST_ASSERT_FALSE(browser.websocket());
+    // A header longer than kMaxHeader is refused before it ends.
+    HeaderGate huge;
+    std::string tooLong =
+        "GET / HTTP/1.1\r\nHost: usr-modem.local\r\nUser-Agent: " + std::string(kMaxHeader, 'a');
+    TEST_ASSERT_FALSE(
+        huge.accept(reinterpret_cast<const uint8_t *>(tooLong.data()), tooLong.size()));
 }
 void test_terminal_geometry_is_bounded_and_cannot_be_terminal_input() {
     unsigned columns = 80, rows = 25;

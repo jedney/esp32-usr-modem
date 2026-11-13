@@ -183,6 +183,7 @@ def test_wrong_password_locks_out_for_a_second_without_stalling(web):
     passwords.add_password("usr-modem", web.base, "admin", "not-the-password")
     wrong = urllib.request.build_opener(urllib.request.ProxyHandler({}),
                                         urllib.request.HTTPDigestAuthHandler(passwords))
+    web.request("/api/session", auth=False)  # the PC's first name lookup can take seconds
     start = time.monotonic()
     try:
         code = wrong.open(web.base + "/api/session", timeout=10).code
@@ -191,10 +192,25 @@ def test_wrong_password_locks_out_for_a_second_without_stalling(web):
     require(code == 401, "Wrong password accepted")
     # No sleep in the server task: the 401s (and urllib's retries) come back at once.
     require(time.monotonic() - start < 0.8, "Wrong password stalled the web server")
-    # Inside the lock-out even the right password is refused; a second later it works.
-    require(web.request("/api/session")[0] == 401, "Lock-out did not refuse the next attempt")
+    # Inside the lock-out even the right password is refused: one Digest attempt, built from a
+    # fresh challenge. (urllib's own handler would retry six times on the lock-out's 401s and
+    # then refuse every later request on that opener without asking the modem.)
+    code, headers, _ = web.request("/api/session", auth=False)
+    require(code == 401, "Missing Digest challenge")
+    challenge = headers["WWW-Authenticate"].split(" ", 1)[1]
+    fields = urllib.request.parse_keqv_list(urllib.request.parse_http_list(challenge))
+    attempt = urllib.request.Request(web.base + "/api/session")
+    attempt.add_unredirected_header(
+        "Authorization", "Digest " + web.digest.get_authorization(attempt, fields))
+    try:
+        code = urllib.request.build_opener(urllib.request.ProxyHandler({})).open(
+            attempt, timeout=10).code
+    except urllib.error.HTTPError as error:
+        code = error.code
+    require(code == 401, "Lock-out did not refuse the next attempt")
     time.sleep(1.1)
-    require(web.request("/api/session")[0] == 200, "Lock-out lasted longer than a second")
+    code = Web(web.host).request("/api/session")[0]
+    require(code == 200, "Lock-out lasted longer than a second")
 
 
 def test_wrong_host_is_rejected_before_auth(web):
