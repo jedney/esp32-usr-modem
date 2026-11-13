@@ -26,7 +26,6 @@ portMUX_TYPE linkLock = portMUX_INITIALIZER_UNLOCKED;
 LinkState linkState = LinkState::kOff;  // guarded by linkLock
 Reason linkReason = Reason::kNone;      // guarded by linkLock
 volatile int64_t syncedAt = 0;
-volatile bool scanFinished = false;
 
 void setLink(LinkState state, Reason reason) {
     portENTER_CRITICAL(&linkLock);
@@ -35,9 +34,8 @@ void setLink(LinkState state, Reason reason) {
     portEXIT_CRITICAL(&linkLock);
 }
 
-// Our own scan limit. The core's scanNetworks() gives up after 20 x the channel time (6 s),
-// which the first scan after the radio starts can take longer than; its results then
-// turn up as the answer to the next scan.
+// Our own scan limit; the first scan after the radio starts takes the longest. Arduino's
+// own limit (60 s) is longer, so this one always decides.
 constexpr uint32_t kScanLimitMs = 15000;
 bool scanning = false;
 uint32_t scanStartedAt = 0;
@@ -94,10 +92,6 @@ void onWifiEvent(arduino_event_id_t event, arduino_event_info_t info) {
             portEXIT_CRITICAL(&linkLock);
             break;
         }
-        case ARDUINO_EVENT_WIFI_SCAN_DONE:
-            // The core has already copied the results (WiFi.SSID(i) ...) before this runs.
-            scanFinished = true;
-            break;
         default:
             break;
     }
@@ -225,16 +219,9 @@ bool EspRadio::scanStart() {
         scanStartedAt = millis();
         return true;
     }
-    WiFi.scanDelete();
-    // Started here rather than with WiFi.scanNetworks() (see kScanLimitMs). The core
-    // still collects the results when the scan ends, for WiFi.SSID(i) and the rest.
-    wifi_scan_config_t cfg = {};
-    cfg.show_hidden = false;
-    cfg.scan_type = WIFI_SCAN_TYPE_ACTIVE;
-    cfg.scan_time.active.min = 0;
-    cfg.scan_time.active.max = 300;
-    scanFinished = false;
-    if (esp_wifi_scan_start(&cfg, false) != ESP_OK) {
+    // Active scan in the background, 0-300 ms per channel, hidden networks left out.
+    WiFi.setScanActiveMinTime(0);
+    if (WiFi.scanNetworks(true, false, false, 300) != WIFI_SCAN_RUNNING) {
         scanning = false;
         return false;
     }
@@ -247,16 +234,17 @@ int EspRadio::scanResult(netcfg::ScanEntry *out, int max) {
     if (!scanning) {
         return -2;
     }
-    if (!scanFinished) {
+    const int16_t n = WiFi.scanComplete();
+    if (n == WIFI_SCAN_RUNNING) {
         if (millis() - scanStartedAt < kScanLimitMs) {
             return -1;
         }
         esp_wifi_scan_stop();
+        WiFi.scanDelete();
         scanning = false;
         return -2;
     }
     scanning = false;
-    const int16_t n = WiFi.scanComplete();
     if (n < 0) {
         return -2;
     }

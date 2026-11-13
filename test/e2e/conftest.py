@@ -55,6 +55,15 @@ except ImportError:  # pragma: no cover
     serial = None
 
 
+def pytest_configure(config):
+    # pytest's long tracebacks (its default) print the arguments of every frame, and the
+    # fixtures and helpers here take the Wi-Fi and device passwords as arguments. Short
+    # tracebacks and no local variables, whatever the command line asks for.
+    if config.option.tbstyle in ("auto", "long"):
+        config.option.tbstyle = "short"
+    config.option.showlocals = False
+
+
 def pytest_addoption(parser):
     parser.addoption("--web-tests", action="store_true", help="test authenticated web interface")
     parser.addoption("--browser-upload", action="store_true", help="install tested firmware through HTTP")

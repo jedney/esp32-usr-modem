@@ -71,7 +71,7 @@ def test_join_with_masked_password(console, wifi):
     # .env password would lose that one for good, so refuse instead.
     saved = [x.split(":", 1)[1].strip() for x in console.command("AT*WIFI?")
              if x.startswith("Network:")]
-    if saved and saved[0] and saved[0] != ssid:
+    if saved and saved[0] not in ("", "(none)", ssid):
         pytest.skip("the modem has another network saved; AT*WIFIFORGET first to run this test")
     before, after = _join(console, ssid, password)
     echoed = after.split(b"\r", 1)[0]
@@ -198,14 +198,18 @@ def test_wifi_password_prompt_owns_operation_across_ports(console, rs232):
     """No password is entered and no network change is attempted."""
     for port in (console, rs232):
         port.command('ATE0Q0V1')
-    for owner, other in ((console, rs232), (rs232, console)):
-        owner.ser.reset_input_buffer()
-        owner.ser.write(b'AT*WIFIJOIN="review-prompt-only"\r')
-        assert PROMPT in _read_until(owner.ser, (PROMPT,), 3)
-        try:
-            assert 'ERROR' in other.command('AT*WIFIJOIN="other-prompt-only"')
-            assert 'ERROR' in other.command('AT*WIFISCAN')
-        finally:
-            owner.ser.write(b'\x1b')
-            assert b'ERROR' in _read_until(owner.ser, (b'ERROR',), 3)
-        assert 'OK' in owner.command('AT')
+    try:
+        for owner, other in ((console, rs232), (rs232, console)):
+            owner.ser.reset_input_buffer()
+            owner.ser.write(b'AT*WIFIJOIN="review-prompt-only"\r')
+            assert PROMPT in _read_until(owner.ser, (PROMPT,), 3)
+            try:
+                assert 'ERROR' in other.command('AT*WIFIJOIN="other-prompt-only"')
+                assert 'ERROR' in other.command('AT*WIFISCAN')
+            finally:
+                owner.ser.write(b'\x1b')
+                assert b'ERROR' in _read_until(owner.ser, (b'ERROR',), 3)
+            assert 'OK' in owner.command('AT')
+    finally:
+        for port in (console, rs232):
+            port.command('ATE1')  # the factory setting the other tests expect

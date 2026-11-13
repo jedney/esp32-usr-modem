@@ -48,4 +48,11 @@ Read [wp-19-common.md](wp-19-common.md) first (decisions, versions, board testin
    the VS Code extension re-initialising the project) and `git add -A` then picked up
    `build/`, `managed_components/` and `web/preview.html`. Find the cause; always check
    `git status` before committing.
-5. Full end checks (README.md step 7).
+5. **Web server (found in WP-20):** the modem resets every browser WebSocket at once, so
+   12 of the 18 `e2e/test_web.py` cases fail (all `/ws` cases and the wrong-password
+   lock-out); plain HTTP works and nothing is logged. Start from `web_service.cpp`'s
+   receive override and header gate (written for IDF 4.4's 1 KiB header buffer) and IDF
+   6.1's `esp_http_server` (WebSocket upgrade, `httpd_sess_set_recv_override`); check
+   whether IDF 6.1 still needs the header gate at all. `test_web.py` must pass with
+   `--web-tests`.
+6. Full end checks (README.md step 7).

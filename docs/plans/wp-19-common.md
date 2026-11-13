@@ -18,7 +18,7 @@ Sessions 1 and 2 of WP-19 are done (results below). The rest are one plan each:
 
 | WP | Plan | Model / effort | Size |
 | --- | --- | --- | --- |
-| 20 | [I2S, RMT capture and first link](wp-20-i2s-rmt-first-link.md) | Opus 5.5 / high | L |
+| 20 | [I2S, RMT capture and first link](../history/wp-20-i2s-rmt-first-link.md) (done) | Opus 5.5 / high | L |
 | 21 | [Networking, tooling, CI and the OTA hash](wp-21-networking-ci-ota.md) | Opus 5.5 / high | L |
 | 22 | [Network console](wp-22-network-console.md) | Opus 5.5 / high | L |
 | 23 | [Fresh start: code](wp-23-fresh-start-code.md) | Sonnet 5.5 / high | L |
@@ -135,11 +135,11 @@ sessions is in their plans; this is what they all need.
   `scripts/arduino_tinyusb/` are gone; `scripts/sdkconfig_refresh.py` (with tests) keeps the
   `sdkconfig` regeneration. Arduino's `USBHost.cpp` and `USBMSC.cpp` compile to nothing;
   the Arduino `USB` library itself is not built.
-- **Where the build stands:** it fails only at `lib/hw/src/hw.cpp`'s `driver/i2s.h` (WP-20).
-  The rest of `hw.cpp` was checked with stub headers for `driver/i2s.h` and `driver/rmt.h`:
-  the only diagnostics are in the I2S and RMT code, so WP-20 still has to see the warnings
-  inside those two parts. Flash and RAM are not measurable until the firmware links. Clean
-  build time (with `-k`): 144 s.
+- **Where the build stands (after WP-20):** the firmware builds with no warnings in project
+  code and runs on the board, set up from `.env` (Wi-Fi joined, `.env` device password).
+  App image 1,496,025 bytes (35.7 % of the 4 MB slot), static RAM 151,696 bytes. Clean
+  build about 200 s. What WP-20 left for later sessions is in its plan's "Result"
+  ([../history/wp-20-i2s-rmt-first-link.md](../history/wp-20-i2s-rmt-first-link.md)).
 
 ### Build tips
 

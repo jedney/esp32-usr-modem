@@ -46,7 +46,7 @@ whole window.
 | 17 | v2.17 | [Watchdog and phonebook capacity](../history/wp-17-watchdog-phonebook.md) | Opus / high | M | 02, 03, 14 |
 | 18 | v3.0 | [Framework spike](../history/wp-18-framework-spike.md) (done 13 Nov: official platform 8.0.0, Arduino 3.3.12 on IDF 6.1) | Opus / high | L | 01-17 merged (the spike itself can run earlier) |
 | 19 | v3.0 | [Framework migration and fresh start: common information](wp-19-common.md) (sessions 1-2 done; the rest are WP-20 to 26) | - | - | 18 |
-| 20 | v3.0 | [I2S, RMT capture and first link](wp-20-i2s-rmt-first-link.md) | Opus / high | L | 19 |
+| 20 | v3.0 | [I2S, RMT capture and first link](../history/wp-20-i2s-rmt-first-link.md) (done 13 Nov: links and runs on the board) | Opus / high | L | 19 |
 | 21 | v3.0 | [Networking, tooling, CI and the OTA hash](wp-21-networking-ci-ota.md) | Opus / high | L | 20 |
 | 22 | v3.0 | [Network console](wp-22-network-console.md) | Opus / high | L | 21 |
 | 23 | v3.0 | [Fresh start: code](wp-23-fresh-start-code.md) | Sonnet / high | L | 22 |
@@ -115,7 +115,7 @@ the package confirms each first.
 | --- | --- | --- | --- |
 | SEC-01 | Caller who never hangs up holds the line (8-ring limit, keepalive) | 04 | done (v2.4; (c) browser reject not done, optional) |
 | SEC-02 | Wrong Digest response or half header stalls the web task | 06 | done (v2.6) |
-| SEC-03 | ESP-IDF 4.4 / Arduino 2.0.17 end-of-life | 18-26 | open (WP-18 done: route and versions chosen; WP-19 sessions 1-2 done; WP-20 to 26 to do) |
+| SEC-03 | ESP-IDF 4.4 / Arduino 2.0.17 end-of-life | 18-26 | open (WP-18 done: route and versions chosen; WP-19 sessions 1-2 and WP-20 done; WP-21 to 26 to do) |
 | SEC-04 | Wi-Fi scan names printed with control bytes | 05 | done (v2.5) |
 | SEC-05 | Release workflow from any branch; write token in build steps | 01 | done (v2.1) |
 | SEC-06 | `AT*PASS` prints a generated password (permitted; amend rule) | 01 | done (v2.1) |

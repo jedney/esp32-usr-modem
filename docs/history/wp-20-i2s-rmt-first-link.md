@@ -54,3 +54,38 @@ From the earlier sessions:
   USB-C is fine empty and with a power-only lead (the `tud_ready()` guard was for the old
   `dcd_esp32sx.c` crash; the DWC2 driver is new).
 - `esp_core_dump_get_summary` (`AT*RESETINFO`) still works.
+
+## Result (13 Nov 2026)
+
+Done. The firmware links and runs on the board. Details and reasons are in the decisions
+log (rows "v3.0 I2S, RMT capture and UART speed", "v3.0 first full link" and the three
+"found on the first board run" rows).
+
+- **I2S:** `driver/i2s_std.h` channel driver. The legacy "zero the DMA buffers" step is
+  now stop, preload silence, start (`i2sClear()`). `ESP_I2S` not used.
+- **RMT:** `driver/rmt_rx.h`, partial receive, the interrupt callback queues bursts in a
+  PSRAM message buffer. No DMA (reasons in the log). `captureRead()` and `lib/hostport`
+  unchanged.
+- **UART:** the plan's premise was wrong for the S3 (IDF 6.1 never sets `reg_update`
+  there). UART1 now runs from the APB clock, which syncs settings by itself; `uartSync()`
+  and `hal/uart_ll.h` are gone.
+- **Sizes:** app 1,496,025 bytes (35.7 % of the 4 MB slot; v2.17 1,256,657), static RAM
+  151,696 bytes (v2.17 145,232).
+- **Fixed on the first run:** `AT*WIFISCAN` (Arduino 3.3 ignores a scan it didn't
+  start), the `AT*RESETINFO` crash summary (compiled out), the lwIP stack read-out (task
+  renamed `tcpip`), an ADC error on `AT*HWVOL=POT`, and in the e2e tests a Wi-Fi password
+  printed by failing tracebacks plus two `test_wifi.py` bugs.
+- **Board run (full erase, USB flash, LittleFS, setup from `.env`):** e2e `test_console`,
+  `test_wifi` (15), `test_device --device-tests`, `test_rs232` (21: speed detection
+  300-115200, flow control, 16 KB echo), `test_settings`, `test_session`, `test_hwtest`,
+  `test_config`, `test_client`, `test_answer`, `test_internet` pass. On-board
+  `test_device` (8) and `test_hw` (6) pass. The `%.1f` prints, the pot, NTP and
+  `AT*RESETINFO` were checked by hand.
+
+**Left for later sessions:**
+
+- **WP-21:** browser WebSockets are reset (12 of 18 `test_web.py` cases fail); added to
+  its plan as step 5.
+- **WP-25/26:** the USB modem port (rear USB-C not connected), the sound (needs a
+  listener), a real crash record in `AT*RESETINFO`, `test_calls.py` (needs the PC call
+  server), and the intermittent Q2 failure in `test_answer.py`.

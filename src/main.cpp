@@ -697,7 +697,7 @@ private:
                     net.link().rssi, ip);
         // 5.5-08: the least free stack so far, for the bench record.
         port.printf("Stack headroom: loop %d B, lwIP %d B, web %d B\r\n",
-                    hw::stackHeadroom("loopTask"), hw::stackHeadroom("tiT"),
+                    hw::stackHeadroom("loopTask"), hw::stackHeadroom("tcpip"),
                     hw::stackHeadroom("httpd"));
         port.printf("Flow &H%u &R%u; DTR &D%u; DCD &C%u; serial &B%u\r\n",
                     modem->active().get(modemcfg::kAmpH), modem->active().get(modemcfg::kAmpR),
@@ -768,7 +768,7 @@ private:
         if (n == 3 && record[0] == 1) {
             port.printf("Previous reset: %s\r\n", hwconsole::resetReasonName(record[2]));
         }
-#if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH && CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF
+#if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH  // always ELF in IDF 6
         esp_core_dump_summary_t summary = {};
         if (esp_core_dump_get_summary(&summary) == ESP_OK) {
             port.printf("Crash record: PC=0x%08lx, cause=%lu, backtrace depth=%lu\r\n",

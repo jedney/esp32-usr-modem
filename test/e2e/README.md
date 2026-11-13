@@ -36,8 +36,9 @@ monitor and any terminal (PuTTY) first: only one program can open a COM port.
 | `--save-password` | Save the final device password to `.env` as `USR_MODEM_PASSWORD` |
 
 Secrets come from the git-ignored `.env` at the repository root (`USR_MODEM_WIFI_SSID`,
-`USR_MODEM_WIFI_PASS`, `USR_MODEM_PASSWORD`); never put them on the command line. Do not
-use pytest `--showlocals`: test locals hold credentials. Failure messages leave out boot
+`USR_MODEM_WIFI_PASS`, `USR_MODEM_PASSWORD`); never put them on the command line. Test
+arguments and locals hold credentials, so `conftest.py` always uses short tracebacks
+without them (`--tb=long` and `--showlocals` are overridden). Failure messages leave out boot
 banners and upload output.
 
 Every test has a 300 s time-out (`pytest.ini`, plugin `pytest-timeout`; install with

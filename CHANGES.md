@@ -39,6 +39,16 @@ Work in progress on `firmware/v3.0-idf5`; this entry is completed in WP-19.
   build no longer downloads anything itself: `scripts/network_dependencies.py` is
   replaced by `scripts/sdkconfig_refresh.py`, which only regenerates `sdkconfig` when
   `sdkconfig.defaults` changes.
+- Sound uses ESP-IDF's I2S channel driver and the RS232 speed detection its RMT receive
+  driver; neither uses a legacy driver any more. RS232 speed changes no longer write UART
+  registers directly: the port runs from the 80 MHz bus clock, which applies new settings
+  by itself.
+
+### Fixed
+
+- End-to-end tests no longer print the Wi-Fi password when a test fails: tracebacks are
+  always short, without arguments or local variables. The Wi-Fi tests also run on a
+  freshly erased modem and put the echo back after the two-port prompt test.
 
 ### Removed
 

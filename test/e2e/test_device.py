@@ -1,7 +1,7 @@
 """v0.7 password/OTA/reset checks. Maintenance tests require explicit flags.
 
-No assertion prints a password, raw boot banner or upload output. Do not use pytest
---showlocals: local variables necessarily hold credentials during these tests.
+No assertion prints a password, raw boot banner or upload output. Local variables hold
+credentials during these tests; conftest.py keeps them out of tracebacks.
 """
 
 import os
