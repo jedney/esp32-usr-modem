@@ -8,6 +8,7 @@
 | Depends on | WP-18 (done 13 Nov 2026). WP-01 to WP-17 are merged; rebase on `origin/main` at the start of each session |
 | Firmware change | yes, platform-wide |
 | Push | the branch stays **local**. One push and one pull request after session 7, when Jon says so ("Rules" below) |
+| Device | any session may flash and test the connected board as needed, without asking; no backups, no migration ("Testing on the board" below) |
 
 Follow the token rules in [README.md](README.md). Read this file and, for the session you
 are doing, only the files it names. The spike's evidence is in
@@ -218,6 +219,10 @@ Cut line: 1-3 and 7; 4-6 and 8 can move to session 2.
 4. **UART:** speed changes through IDF `uart_*` calls only, no `hal/uart_ll.h`.
    `uartSync()` stays only if it can be written that way; the bench (session 7) tests a
    build without it.
+5. **First run on the board** (once it links): full erase, USB flash of the firmware and
+   LittleFS, setup from `.env`, then a smoke test (boot banner, `ATI`, a test call, the
+   sound, `AT*BAUD=AUTO` at one speed, the USB modem port). Problems found here are
+   fixed in this session where they belong to its work.
 
 ## Session 4: networking, tooling, CI and the OTA hash (Opus 5.5 / high, L)
 
@@ -337,7 +342,9 @@ Cut line: 1, 2 and 7; 3-6 can move to session 6.
 
 ## Session 7: bench run with Jon (Sonnet 5.5 / medium)
 
-Ask Jon for COM ports and what is wired first.
+The full bench run. Earlier sessions will have tested parts of it on the board already;
+this session runs all of it on the final code. Check the ports first ("Testing on the
+board"); Jon is needed for listening, watching the LEDs and changing cables.
 
 1. **Full flash erase, then USB flash** of v3.0 (`pio run -e s3 -t erase`, then upload and
    uploadfs). Boot banner shows a new device password; factory settings.
@@ -353,6 +360,33 @@ Ask Jon for COM ports and what is wired first.
    `AT*FACTORY`.
 8. Heap and stack low-water marks with a call, the web page and PPP together; 30-minute
    soak with the watchdog on.
+
+## Testing on the board (WP-19 only)
+
+Jon's permission for WP-19 (13 Nov 2026); it ends with WP-19 and doesn't carry over to
+later work.
+
+- **Any session may flash and test the connected board as needed**, without asking
+  first: USB or OTA uploads, `pio run -e s3 -t erase`, `uploadfs`, on-board suites
+  (`pio test -e s3`; re-upload the firmware after) and end-to-end tests. Use it from
+  session 3 on (the firmware doesn't link before then), whenever a change needs checking
+  on real hardware. Don't save it all for session 7.
+- **No backups and no migration.** It is a development unit; settings, NVS and LittleFS
+  may be wiped at any time. Erase fully rather than work around old data.
+- **Setup credentials are in `.env`:** `USR_MODEM_WIFI_SSID`, `USR_MODEM_WIFI_PASS` and
+  `USR_MODEM_PASSWORD`. Use them only through the project's scripts and test fixtures
+  (`scripts/load_env.py`, `scripts/ota_upload.py`, the e2e `conftest.py`), or code that
+  reads them into a variable and never prints them. Never print, log or echo `.env` or
+  any of these values, and keep them out of commits, the decisions log and command
+  lines that get shown.
+- **Ports:** list them first (`pio device list`); the last known set is in Claude's
+  bench memory (RS232 on COM18, USB modem port on COM21, console COM20 when plugged in).
+  The first v3.0 flash after an erase is over USB (no OTA from v2.x), which needs the
+  console port, or BOOT held while tapping RST on the native port. If a port the test
+  needs isn't there, ask Jon to plug it in rather than skip the test.
+- Close any serial monitor before uploading; only one program can open a port.
+- Things a person must see or hear (sound, LEDs, cables) are for Jon: ask, or leave them
+  for session 7.
 
 ## Rules for this version
 
