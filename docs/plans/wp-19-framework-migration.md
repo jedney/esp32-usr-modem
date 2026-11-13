@@ -1,13 +1,13 @@
-# WP-19 (v3.0, sessions 2-8): Framework migration and fresh start
+# WP-19 (v3.0, sessions 2-9): Framework migration and fresh start
 
 | Item | Value |
 | --- | --- |
 | Model / effort | per session, below |
-| Size | 6 sessions of L, then a bench session with Jon |
+| Size | 6 sessions of L, one of M, then a bench session with Jon |
 | Branch | `firmware/v3.0-idf5` (same branch as WP-18; the name predates the IDF 6.1 decision and stays) |
 | Depends on | WP-18 (done 13 Nov 2026). WP-01 to WP-17 are merged; rebase on `origin/main` at the start of each session |
 | Firmware change | yes, platform-wide |
-| Push | the branch stays **local**. One push and one pull request after session 7, when Jon says so ("Rules" below) |
+| Push | the branch stays **local**. One push and one pull request after session 8, when Jon says so ("Rules" below) |
 | Device | any session may flash and test the connected board as needed, without asking; no backups, no migration ("Testing on the board" below) |
 
 Follow the token rules in [README.md](README.md). Read this file and, for the session you
@@ -34,8 +34,8 @@ are doing, only the files it names. The spike's evidence is in
 4. **IDF's warnings-as-errors also apply to the project's own code.**
 5. **The S3 board's RGB LED is removed** (done on the branch: code, pin, tests, docs and
    the key in Jon's `.env`).
-6. **Functional changes** in v3.0 are limited to 3, 5 and 8 and to removing migration
-   code. Anything else found on the way gets a decisions-log row and a follow-up, so a
+6. **Functional changes** in v3.0 are limited to 3, 5, 8 and 10 and to removing
+   migration code. Anything else found on the way gets a decisions-log row and a follow-up, so a
    regression can be traced to the framework move.
 7. **`docs/project-brief.md` is trimmed to the current firmware spec** (session 6). This
    copy stops being a snapshot of the shared master and becomes the repo's firmware spec,
@@ -50,6 +50,8 @@ are doing, only the files it names. The spike's evidence is in
    review" below. Behaviour seen from outside (commands, results, timing, the web
    protocol) stays the same unless a decisions-log row says otherwise; the native, e2e
    and bench tests are the check.
+10. **The USB modem port shows DCD and RI** (Jon, 13 Nov 2026), through CDC
+    serial-state notifications, which TinyUSB 0.21.0 supports. Session 7.
 
 ## Target versions (checked 13 Nov 2026)
 
@@ -132,7 +134,7 @@ where it is already the recommended way, and say why in the session's notes):
 | TinyUSB | lib-builder `arduino_tinyusb` sources fetched by a script, own CDC registration | whether Arduino 3.3's own USB stack (`USB`, `USBCDC`) or a registry component (`espressif/tinyusb`, `esp_tinyusb`) now covers the project's needs (CDC, line state, flow control, the `tud_ready()` guard), which would remove the fetch script and the custom component | 2 |
 | I2S | legacy `driver/i2s.h` | `i2s_std` channel API (or Arduino's `ESP_I2S` if it meets the non-blocking need) | 3 |
 | RMT | legacy `driver/rmt.h` | RX channel API, ISR callback into a stream buffer | 3 |
-| UART | `hal/uart_ll.h`, `uartSync()` | IDF `uart_*` driver calls only; drop `uartSync()` if the bench shows it isn't needed | 3 and 7 |
+| UART | `hal/uart_ll.h`, `uartSync()` | IDF `uart_*` driver calls only; drop `uartSync()` if the bench shows it isn't needed | 3 and 8 |
 | PPP, SLIP, NAPT | raw lwIP (`netif`, `tcpip`, `lwip_napt.h`) | whether `esp_netif` (PPP) or Arduino 3.3's `Network`/`PPP` classes fit a DCE-side server; SLIP stays raw lwIP if nothing covers it | 4 |
 | Wi-Fi | `WiFi.onEvent`, `esp_wifi.h` | Arduino 3.3 `Network` events; direct `esp_wifi` calls only where Arduino has no API | 4 |
 | OTA | `ArduinoOTA`, `Update`, `esp_ota_ops` | SHA-256 auth (decision 3); otherwise check | 4 |
@@ -258,8 +260,8 @@ Decisions-log rows ("v3.0 USB route", "found in session 2") and `CHANGES.md` are
   `tud_ready()` guard was for the old `dcd_esp32sx.c` crash; the DWC2 driver is new).
 - **For session 4 (CI):** `managed_components/espressif__tinyusb` is a new registry
   download (cache it with the other managed components).
-- **Follow-up after v3.0:** DCD and RI on the USB port through CDC serial-state
-  notifications (`CFG_TUD_CDC_NOTIFY`), now possible with TinyUSB 0.21.0.
+- **DCD and RI on the USB port** through CDC serial-state notifications
+  (`CFG_TUD_CDC_NOTIFY`), now possible with TinyUSB 0.21.0: session 7 (decision 10).
 
 ## Session 3: I2S, RMT capture and first link (Opus 5.5 / high, L)
 
@@ -276,7 +278,7 @@ Decisions-log rows ("v3.0 USB route", "found in session 2") and `CHANGES.md` are
 3. **First full link.** Record flash and RAM beside v2.17's in the decisions log; check
    the 4 MB app slot.
 4. **UART:** speed changes through IDF `uart_*` calls only, no `hal/uart_ll.h`.
-   `uartSync()` stays only if it can be written that way; the bench (session 7) tests a
+   `uartSync()` stays only if it can be written that way; the bench (session 8) tests a
    build without it.
 5. **First run on the board** (once it links): full erase, USB flash of the firmware and
    LittleFS, setup from `.env`, then a smoke test (boot banner, `ATI`, a test call, the
@@ -399,7 +401,67 @@ Cut line: 1, 2 and 7; 3-6 can move to session 6.
 9. **`images/`, `data/`, `.vscode/`, `.github/`:** remove anything unused.
 10. End checks; `git status` before committing.
 
-## Session 7: bench run with Jon (Sonnet 5.5 / medium)
+## Session 7: DCD and RI on the USB modem port (Sonnet 5.5 / high, M)
+
+Decision 10. The USB modem port shows DCD and RI to the computer's program the way the
+RS232 port does, so terminal programs, BBS software and `pyserial` (`.cd`, `.ri`) see a
+call's carrier and an incoming call's ringing. Today it shows calls by result codes only
+(`src/usbport.h`, `lib/hw/src/usb_port.h`, `docs/COMMANDS.md`, README).
+
+CDC-ACM sends line states to the computer as a SERIAL_STATE notification on the
+interrupt endpoint (0x85, already in the descriptor): `bRxCarrier` is DCD, `bTxCarrier`
+is DSR, `bRingSignal` is RI. TinyUSB 0.21.0 sends one with
+`tud_cdc_n_notify_uart_state(itf, &state)` when `CFG_TUD_CDC_NOTIFY` is 1; it returns
+false while the endpoint is busy or the device isn't configured.
+
+0. **Enumeration first.** Set `CFG_TUD_CDC_NOTIFY 1`
+   (`components/arduino_tinyusb/include/tusb_config.h`), flash, and check the PC still
+   sees the port and `e2e/test_usb.py` passes. esp32-arduino-lib-builder turned this
+   option off on 12 Nov 2026 because the CDC port stopped enumerating with TinyUSB master,
+   and back on after a TinyUSB fix. If enumeration fails with `espressif/tinyusb`
+   0.21.0~6, look for that fix and a newer `espressif/tinyusb` that has it (a patch
+   release of the same line is taken); otherwise stop and ask Jon.
+1. **What the lines show** (the same rules as RS232, so both ports behave alike):
+   - **DCD** = `usbport::session().dcd()` (`hostport::dcdOn()`: `&C1` follows the call's
+     carrier, `&C0` always on). The RS232 code (`src/rs232.cpp`, `dcdSet`/`dcdKnown`)
+     shows how it is pushed now.
+   - **RI** follows the incoming call's ring cadence, `incoming->ri()`, as RS232 RI does
+     in `src/main.cpp`, under the same conditions. If the answer-port setting
+     (`AT*ANSWERPORT`) should limit which port rings, ask Jon rather than guess.
+   - **DSR** always on while the port is configured, as RS232's DSR is hard-wired on.
+2. **When to send** (logic in `lib/hostport`, no TinyUSB calls, native tests first in
+   `test_hostport`): send when a line changes; send the current state again when the
+   computer configures the device or a program opens the port (DTR on), because the
+   driver doesn't remember a state it got while no program had the port; while a send
+   fails (endpoint busy, not configured), keep the newest state and try again on the next
+   loop pass, never wait. A ring burst shorter than one send must still reach the
+   computer as RI on, then off. `lib/hw/src/usb_port.*` gets one call that sends a state
+   (only while `tud_ready()`, like the other calls there); `src/usbport.cpp` wires the
+   two together.
+3. **Check what the PC reports.** In the CDC specification RI (`bRingSignal`) is an
+   "irregular" signal, an event rather than a level, and drivers differ: Linux `cdc-acm`
+   keeps it as a modem-status bit; Windows `usbser.sys` may report it only as a ring
+   event. Find out what `pyserial`'s `.cd` and `.ri` read on Jon's Windows PC during a
+   call and a ring, and write it down (decisions log, `docs/COMMANDS.md`). If RI can't be
+   seen as a level on Windows, keep sending it (Linux and other drivers use it) and say
+   so in the docs.
+4. **End-to-end** (`test/e2e/test_usb.py`, with the board): `.cd` off at idle with
+   `&C1`, on during `AT*TESTCALL` or a call, off after the hang-up; on at idle with
+   `&C0`; `.ri` (or the ring event) during an incoming call on port 23 (the file's
+   `answer_setup()` and `call_in()`); DSR on. Restore the settings each test changes.
+5. **Docs:** `src/usbport.h`, `lib/hw/src/usb_port.h` and the `tusb_config.h` comment;
+   `docs/COMMANDS.md` (the USB port paragraph, `&C`), README (the rear USB-C row),
+   `AT*HELP` if it mentions the USB port's limits, the firmware spec (session 6's
+   trimmed `docs/project-brief.md`, the USB modem port), `test/README.md` matrix,
+   decisions-log row (it supersedes the old "USB limits" decision; with what Windows
+   reports), `CHANGES.md` [3.0] "Added".
+6. End checks (native tests, firmware build, lint, clang-format, `test/scripts`), and the
+   USB e2e file on the board. Session 8's bench run repeats it with a terminal program.
+
+Cut line: 0-2 and 4 for DCD; RI's e2e test and the Windows check (3) can move to the
+bench run (session 8).
+
+## Session 8: bench run with Jon (Sonnet 5.5 / medium)
 
 The full bench run. Earlier sessions will have tested parts of it on the board already;
 this session runs all of it on the final code. Check the ports first ("Testing on the
@@ -412,7 +474,9 @@ board"); Jon is needed for listening, watching the LEDs and changing cables.
    `test_internet.py` (PPP, SLIP, stack headroom), `test_web.py --browser-upload
    --upload-tests`, X/Y/ZMODEM with lrzsz.
 4. ArduinoOTA v3.0 to v3.0 with the SHA-256 hash; web firmware upload.
-5. USB: rear USB-C empty and with a power-only lead for 5 minutes (no reset).
+5. USB: rear USB-C empty and with a power-only lead for 5 minutes (no reset). DCD and
+   RI on the USB port in a terminal program that shows them (session 7), during a test
+   call and an incoming call.
 6. Sound at full volume and at the pot's ends; `AT*BAUD=AUTO` at 300, 2400, 9600, 38400,
    115200 with a 128-character line; then a test build without `uartSync()`.
 7. Wi-Fi join (WPA2, WPA3 if available, open), browser 60 s rollback, scan,
@@ -429,7 +493,7 @@ later work.
   first: USB or OTA uploads, `pio run -e s3 -t erase`, `uploadfs`, on-board suites
   (`pio test -e s3`; re-upload the firmware after) and end-to-end tests. Use it from
   session 3 on (the firmware doesn't link before then), whenever a change needs checking
-  on real hardware. Don't save it all for session 7.
+  on real hardware. Don't save it all for session 8.
 - **No backups and no migration.** It is a development unit; settings, NVS and LittleFS
   may be wiped at any time. Erase fully rather than work around old data.
 - **Setup credentials are in `.env`:** `USR_MODEM_WIFI_SSID`, `USR_MODEM_WIFI_PASS` and
@@ -445,7 +509,7 @@ later work.
   needs isn't there, ask Jon to plug it in rather than skip the test.
 - Close any serial monitor before uploading; only one program can open a port.
 - Things a person must see or hear (sound, LEDs, cables) are for Jon: ask, or leave them
-  for session 7.
+  for session 8.
 
 ## Rules for this version
 
@@ -454,7 +518,7 @@ later work.
   session; don't push and don't open a pull request between sessions. Run the CI checks
   locally instead: native tests, firmware build, lint, clang-format, `test/scripts` and
   `web` tests. The whole of WP-19 goes up as **one push and one pull request** after the
-  session 7 bench run, when Jon says so. If CI then fails, fix it in as few pushes as
+  session 8 bench run, when Jon says so. If CI then fails, fix it in as few pushes as
   possible: reproduce the failure locally first, then push once.
 - Decisions log entry per decision; `credits/LICENSES.md` for third-party code.
 - **Never run the pioarduino platform against the shared PlatformIO install**: its first
