@@ -1,13 +1,13 @@
-# WP-19 (v3.0, sessions 2-9): Framework migration and fresh start
+# WP-19 (v3.0, sessions 2-10): Framework migration and fresh start
 
 | Item | Value |
 | --- | --- |
 | Model / effort | per session, below |
-| Size | 6 sessions of L, one of M, then a bench session with Jon |
+| Size | 7 sessions of L, one of M, then a bench session with Jon |
 | Branch | `firmware/v3.0-idf5` (same branch as WP-18; the name predates the IDF 6.1 decision and stays) |
 | Depends on | WP-18 (done 13 Nov 2026). WP-01 to WP-17 are merged; rebase on `origin/main` at the start of each session |
 | Firmware change | yes, platform-wide |
-| Push | the branch stays **local**. One push and one pull request after session 8, when Jon says so ("Rules" below) |
+| Push | the branch stays **local**. One push and one pull request after session 9, when Jon says so ("Rules" below) |
 | Device | any session may flash and test the connected board as needed, without asking; no backups, no migration ("Testing on the board" below) |
 
 Follow the token rules in [README.md](README.md). Read this file and, for the session you
@@ -34,13 +34,13 @@ are doing, only the files it names. The spike's evidence is in
 4. **IDF's warnings-as-errors also apply to the project's own code.**
 5. **The S3 board's RGB LED is removed** (done on the branch: code, pin, tests, docs and
    the key in Jon's `.env`).
-6. **Functional changes** in v3.0 are limited to 3, 5, 8 and 10 and to removing
+6. **Functional changes** in v3.0 are limited to 3, 5, 8, 10 and 11 and to removing
    migration code. Anything else found on the way gets a decisions-log row and a follow-up, so a
    regression can be traced to the framework move.
-7. **`docs/project-brief.md` is trimmed to the current firmware spec** (session 6). This
+7. **`docs/project-brief.md` is trimmed to the current firmware spec** (session 7). This
    copy stops being a snapshot of the shared master and becomes the repo's firmware spec,
    kept current with the code.
-8. **Obsolete features are removed** in session 5, not just listed (definition there).
+8. **Obsolete features are removed** in session 6, not just listed (definition there).
 9. **Rewrite to the new framework's way, don't patch.** Where the framework move touches
    code, use the approach Arduino 3.3 and IDF 6.1 now recommend (current drivers,
    components and APIs), even if that means rewriting the module, rather than the
@@ -51,7 +51,11 @@ are doing, only the files it names. The spike's evidence is in
    protocol) stays the same unless a decisions-log row says otherwise; the native, e2e
    and bench tests are the check.
 10. **The USB modem port shows DCD and RI** (Jon, 13 Nov 2026), through CDC
-    serial-state notifications, which TinyUSB 0.21.0 supports. Session 7.
+    serial-state notifications, which TinyUSB 0.21.0 supports. Session 8.
+11. **A network console** (Jon, 13 Nov 2026): the maintenance console over a raw TCP
+    port, like ser2net, protected by the device password, so the board can be
+    debugged, and with ArduinoOTA flashed, over Wi-Fi while the USB cable is on the
+    USB modem port. Session 5, so that sessions 6-9 can use it.
 
 ## Target versions (checked 13 Nov 2026)
 
@@ -134,12 +138,12 @@ where it is already the recommended way, and say why in the session's notes):
 | TinyUSB | lib-builder `arduino_tinyusb` sources fetched by a script, own CDC registration | whether Arduino 3.3's own USB stack (`USB`, `USBCDC`) or a registry component (`espressif/tinyusb`, `esp_tinyusb`) now covers the project's needs (CDC, line state, flow control, the `tud_ready()` guard), which would remove the fetch script and the custom component | 2 |
 | I2S | legacy `driver/i2s.h` | `i2s_std` channel API (or Arduino's `ESP_I2S` if it meets the non-blocking need) | 3 |
 | RMT | legacy `driver/rmt.h` | RX channel API, ISR callback into a stream buffer | 3 |
-| UART | `hal/uart_ll.h`, `uartSync()` | IDF `uart_*` driver calls only; drop `uartSync()` if the bench shows it isn't needed | 3 and 8 |
+| UART | `hal/uart_ll.h`, `uartSync()` | IDF `uart_*` driver calls only; drop `uartSync()` if the bench shows it isn't needed | 3 and 9 |
 | PPP, SLIP, NAPT | raw lwIP (`netif`, `tcpip`, `lwip_napt.h`) | whether `esp_netif` (PPP) or Arduino 3.3's `Network`/`PPP` classes fit a DCE-side server; SLIP stays raw lwIP if nothing covers it | 4 |
 | Wi-Fi | `WiFi.onEvent`, `esp_wifi.h` | Arduino 3.3 `Network` events; direct `esp_wifi` calls only where Arduino has no API | 4 |
 | OTA | `ArduinoOTA`, `Update`, `esp_ota_ops` | SHA-256 auth (decision 3); otherwise check | 4 |
 | Watchdog | `esp_task_wdt_reset()`, set up by `sdkconfig` | check the IDF 6.1 keys and that the loop task is subscribed | 1 |
-| Settings | `Preferences` in `hw/nvs_store.cpp` and `src/main.cpp` | all access through `nvs_store` (fresh start: layout 1) | 5 |
+| Settings | `Preferences` in `hw/nvs_store.cpp` and `src/main.cpp` | all access through `nvs_store` (fresh start: layout 1) | 6 |
 
 A rewrite that changes behaviour is a decisions-log row; a large one that doesn't fit its
 session gets its own follow-up session rather than a shim.
@@ -213,7 +217,7 @@ Decisions-log rows and `CHANGES.md` are written; this is what the next sessions 
   needs g++ 14 or newer (`ubuntu-latest` has 13), and the interop peers in `ci.yml` and
   `test/interop/README.md` (`-std=c++17`) move to the same standard. `syncedAt` (decisions
   log, "found in session 1") is still open.
-- **For session 6 (`credits/LICENSES.md`):** the LittleFS row is now `joltwallet/littlefs`
+- **For session 7 (`credits/LICENSES.md`):** the LittleFS row is now `joltwallet/littlefs`
   1.23.1 from the component registry (no `credits/littlefs/` download any more), and the
   Mbed TLS row no longer uses CTR-DRBG: it is MD5, SHA-256, HMAC-SHA-256 and the hardware
   noise source through PSA.
@@ -261,7 +265,7 @@ Decisions-log rows ("v3.0 USB route", "found in session 2") and `CHANGES.md` are
 - **For session 4 (CI):** `managed_components/espressif__tinyusb` is a new registry
   download (cache it with the other managed components).
 - **DCD and RI on the USB port** through CDC serial-state notifications
-  (`CFG_TUD_CDC_NOTIFY`), now possible with TinyUSB 0.21.0: session 7 (decision 10).
+  (`CFG_TUD_CDC_NOTIFY`), now possible with TinyUSB 0.21.0: session 8 (decision 10).
 
 ## Session 3: I2S, RMT capture and first link (Opus 5.5 / high, L)
 
@@ -278,7 +282,7 @@ Decisions-log rows ("v3.0 USB route", "found in session 2") and `CHANGES.md` are
 3. **First full link.** Record flash and RAM beside v2.17's in the decisions log; check
    the 4 MB app slot.
 4. **UART:** speed changes through IDF `uart_*` calls only, no `hal/uart_ll.h`.
-   `uartSync()` stays only if it can be written that way; the bench (session 8) tests a
+   `uartSync()` stays only if it can be written that way; the bench (session 9) tests a
    build without it.
 5. **First run on the board** (once it links): full erase, USB flash of the firmware and
    LittleFS, setup from `.env`, then a smoke test (boot banner, `ATI`, a test call, the
@@ -314,7 +318,93 @@ Decisions-log rows ("v3.0 USB route", "found in session 2") and `CHANGES.md` are
    `git status` before committing.
 5. Full end checks (README.md step 7).
 
-## Session 5: fresh start, code (Sonnet 5.5 / high, L)
+## Session 5: network console (Opus 5.5 / high, L)
+
+Decision 11. The maintenance console (UART0) also works over a raw TCP port, like
+ser2net, so with the PC's USB cable on the rear USB modem port, or no cable at all,
+Claude and Jon can use it over Wi-Fi: `socket://usr-modem.local:<port>` in `pyserial`,
+`pio device monitor` and the e2e `--console-port`. Together with ArduinoOTA (SHA-256
+from session 4), sessions 6-9 can debug and flash the board without the console cable.
+It comes after session 4 because it needs the rewritten Wi-Fi events and the new OTA.
+
+**Not possible over the network** (these still need the console cable): the first flash
+after a full erase (the ROM bootloader, esptool), on-board tests (`pio test -e s3`),
+panic output as it happens (the core dump still shows with `AT*RESETINFO`), and a modem
+that doesn't boot or join Wi-Fi.
+
+0. **Jon confirms the open points first** (*Proposed* until then; decisions-log row):
+   - Port: **2001** (ser2net's usual range; not 23, which is the answer port, and not
+     2323, which clients treat as Telnet).
+   - Factory setting: **on**, like the web page, which uses the same device password.
+   - **Plain TCP, no TLS:** the password crosses the LAN unencrypted, as with Telnet.
+     The web page keeps its Digest log-in. TLS would rule out `socket://` clients.
+   - `AT*PASS` typed on the network console is **refused**: the new password must only
+     be shown on a local serial port.
+1. **Behaviour:**
+   - Raw bytes both ways, no Telnet negotiation. One client at a time; a second
+     connection gets a one-line "in use" message and is closed.
+   - **Log-in first:** `Password:` with no echo, the device password, compared in
+     constant time, with the web log-in's lock-out rule (`lib/webinterface/src/web_policy.h`).
+     Three wrong passwords close the connection. Nothing else is sent before log-in.
+   - **The same console session, not a second one:** after log-in the client types into
+     the console's AT session (`console`, `consoleSink` in `src/main.cpp`), including
+     `AT*CONFIG` and the hardware tests under the console's rules, and sees all console
+     output. The UART keeps working alongside it.
+   - **Secrets:** the device password is never sent to the network console or kept for
+     it. The boot banner's password line (`device.bootPassword()`) and `AT*PASS`'s new
+     password go through an explicit local-serial-only write. The Wi-Fi password is never
+     printed anywhere already.
+   - **Never waits:** output to the socket is non-blocking. If the socket can't take
+     more, it is dropped under the same rule as the other serial sinks
+     (`hostport::SinkGate`), so the loop and the watchdog never wait for the network.
+   - **Boot log:** a RAM ring buffer (about 16 KB, in PSRAM) keeps console output since
+     boot, including ESP-IDF and Arduino log output (`esp_log_set_vprintf`). It is replayed
+     to the client after log-in, so boot messages from before Wi-Fi came up can be read
+     over IP. The password lines never enter it. Optional if cheap: keep the previous
+     boot's buffer across a software restart, watchdog or panic (no-init RAM).
+   - Callers on port 23 still never reach command mode (Q44 unchanged). This is a
+     separate maintenance port with its own password.
+   - **Settings:** `AT*NETCONSOLE=ON|OFF` and `AT*NETCONSOLE?` (name to confirm), saved
+     through `nvs_store`. Turning it off closes a connected client. It also gets an entry
+     on the configuration screen, a line in `AT*HELP` and in `docs/COMMANDS.md` (the
+     parity rule). `AT*STATUS` shows a connected client's address.
+2. **Code:** the logic goes in `lib/`, with native tests first: the log-in (prompt, no
+   echo, compare, lock-out, tries), one client, the output copy with local-only writes
+   kept out of the socket and the buffer, the ring buffer, and the non-blocking rule. The
+   socket code goes in `lib/hw` (reuse `hw::TcpListener` and `hw::TcpSocket`). In
+   `src/main.cpp`, console output is written straight to `Serial` in about 30 places:
+   route all of it through one function, so nothing can bypass the copy by accident.
+   Keep it in the loop task.
+3. **Tooling:**
+   - The e2e `conftest.py` opens `--console-port` with `serial.serial_for_url()`, so
+     `socket://host:2001` works.
+   - On a socket it logs in with `USR_MODEM_PASSWORD` from `.env` (never printed), and it
+     reconnects after tests that restart the modem.
+   - A VS Code task "Modem: network console" (`pio device monitor --port
+     socket://usr-modem.local:2001`; Jon types the password).
+4. **Tests:** native as above. A new `test/e2e/test_net_console.py`:
+   - log-in: a wrong password is refused, with the lock-out; nothing is sent before
+     log-in; a second client is refused;
+   - AT commands work; the boot log is replayed;
+   - the device password never reaches the socket (a boot banner, `AT*PASS`; canary like
+     the existing canary sweeps);
+   - a client that stops reading doesn't stall the modem (RS232 `AT` still answers);
+   - `AT*NETCONSOLE=OFF` closes the client.
+
+   Then run the existing console e2e tests once through `socket://`, and do one OTA
+   upload followed by the boot log on the network console.
+5. **Docs:** decisions-log row; `docs/COMMANDS.md`; `AT*HELP`; README; CLAUDE.md (the
+   "Secrets" rule: the device password is never shown on the network console; the build
+   and test table); the firmware spec (`docs/project-brief.md`; session 7 trims it);
+   `test/README.md` matrix; `CHANGES.md` [3.0] "Added".
+6. **Hand-over:** update "Testing on the board" below and Claude's bench memory with the
+   port and how to use it.
+
+Cut line: 1, 2, 4's log-in, secrets and stall tests, and 3's `conftest.py`. The boot log
+buffer, the VS Code task and the full console suite over `socket://` can move to
+session 6.
+
+## Session 6: fresh start, code (Sonnet 5.5 / high, L)
 
 Rule for every file outside `case/` and `electronics/`: keep what someone needs to
 understand, build, test and change the **current** design with a new ESP32-S3; remove the
@@ -332,7 +422,7 @@ brief or `Q` references in `lib/`, `src/`, `test/`, `scripts/`, `web/src/`.
    CRC still loads factory settings (that is protection, not migration). NVS namespace
    and key names may be tidied (fresh flash).
 2. **Comments and messages:** strip version tags, finding IDs, `Q` numbers, names and
-   dates; brief section references (such as "brief 6.6") stay, and session 6 fixes them
+   dates; brief section references (such as "brief 6.6") stay, and session 7 fixes them
    after the trim. Remove "before vX this did Y" notes. Same for `sdkconfig.defaults`,
    `platformio.ini`, `CMakeLists.txt`, `.github/workflows`, `web/src` and the test files.
    Remove the `v3.0 SPIKE` marks once each is resolved.
@@ -362,9 +452,9 @@ brief or `Q` references in `lib/`, `src/`, `test/`, `scripts/`, `web/src/`.
    key names and "same/different".
 8. Full native tests, lint, clang-format, firmware build.
 
-Cut line: 1, 2 and 7; 3-6 can move to session 6.
+Cut line: 1, 2 and 7; 3-6 can move to session 7.
 
-## Session 6: fresh start, documentation and credits (Sonnet 5.5 / high, L)
+## Session 7: fresh start, documentation and credits (Sonnet 5.5 / high, L)
 
 1. **Delete** `docs/history/` and, as the last step of WP-19, `docs/plans/` (fold
    anything still useful, such as the session workflow and token rules, into CLAUDE.md).
@@ -401,7 +491,7 @@ Cut line: 1, 2 and 7; 3-6 can move to session 6.
 9. **`images/`, `data/`, `.vscode/`, `.github/`:** remove anything unused.
 10. End checks; `git status` before committing.
 
-## Session 7: DCD and RI on the USB modem port (Sonnet 5.5 / high, M)
+## Session 8: DCD and RI on the USB modem port (Sonnet 5.5 / high, M)
 
 Decision 10. The USB modem port shows DCD and RI to the computer's program the way the
 RS232 port does, so terminal programs, BBS software and `pyserial` (`.cd`, `.ri`) see a
@@ -451,17 +541,17 @@ false while the endpoint is busy or the device isn't configured.
    `answer_setup()` and `call_in()`); DSR on. Restore the settings each test changes.
 5. **Docs:** `src/usbport.h`, `lib/hw/src/usb_port.h` and the `tusb_config.h` comment;
    `docs/COMMANDS.md` (the USB port paragraph, `&C`), README (the rear USB-C row),
-   `AT*HELP` if it mentions the USB port's limits, the firmware spec (session 6's
+   `AT*HELP` if it mentions the USB port's limits, the firmware spec (session 7's
    trimmed `docs/project-brief.md`, the USB modem port), `test/README.md` matrix,
    decisions-log row (it supersedes the old "USB limits" decision; with what Windows
    reports), `CHANGES.md` [3.0] "Added".
 6. End checks (native tests, firmware build, lint, clang-format, `test/scripts`), and the
-   USB e2e file on the board. Session 8's bench run repeats it with a terminal program.
+   USB e2e file on the board. Session 9's bench run repeats it with a terminal program.
 
 Cut line: 0-2 and 4 for DCD; RI's e2e test and the Windows check (3) can move to the
-bench run (session 8).
+bench run (session 9).
 
-## Session 8: bench run with Jon (Sonnet 5.5 / medium)
+## Session 9: bench run with Jon (Sonnet 5.5 / medium)
 
 The full bench run. Earlier sessions will have tested parts of it on the board already;
 this session runs all of it on the final code. Check the ports first ("Testing on the
@@ -475,7 +565,7 @@ board"); Jon is needed for listening, watching the LEDs and changing cables.
    --upload-tests`, X/Y/ZMODEM with lrzsz.
 4. ArduinoOTA v3.0 to v3.0 with the SHA-256 hash; web firmware upload.
 5. USB: rear USB-C empty and with a power-only lead for 5 minutes (no reset). DCD and
-   RI on the USB port in a terminal program that shows them (session 7), during a test
+   RI on the USB port in a terminal program that shows them (session 8), during a test
    call and an incoming call.
 6. Sound at full volume and at the pot's ends; `AT*BAUD=AUTO` at 300, 2400, 9600, 38400,
    115200 with a 128-character line; then a test build without `uartSync()`.
@@ -483,6 +573,9 @@ board"); Jon is needed for listening, watching the LEDs and changing cables.
    `AT*FACTORY`.
 8. Heap and stack low-water marks with a call, the web page and PPP together; 30-minute
    soak with the watchdog on.
+9. Network console (session 5): log-in and lock-out, the password never shown, an OTA
+   upload followed by the boot log over the network, and the soak in step 8 with a
+   network console client connected.
 
 ## Testing on the board (WP-19 only)
 
@@ -493,7 +586,12 @@ later work.
   first: USB or OTA uploads, `pio run -e s3 -t erase`, `uploadfs`, on-board suites
   (`pio test -e s3`; re-upload the firmware after) and end-to-end tests. Use it from
   session 3 on (the firmware doesn't link before then), whenever a change needs checking
-  on real hardware. Don't save it all for session 8.
+  on real hardware. Don't save it all for session 9.
+- **Over the network from session 5 on:** once the network console works and the modem
+  is on Wi-Fi, sessions may debug through `socket://usr-modem.local:2001` (the e2e
+  `--console-port` takes it) and flash by OTA (`pio run -e s3_ota -t upload`) instead
+  of the console cable. The cable is still needed for the first flash after a full
+  erase, for `pio test -e s3`, and for a modem that doesn't boot or join Wi-Fi.
 - **No backups and no migration.** It is a development unit; settings, NVS and LittleFS
   may be wiped at any time. Erase fully rather than work around old data.
 - **Setup credentials are in `.env`:** `USR_MODEM_WIFI_SSID`, `USR_MODEM_WIFI_PASS` and
@@ -509,7 +607,7 @@ later work.
   needs isn't there, ask Jon to plug it in rather than skip the test.
 - Close any serial monitor before uploading; only one program can open a port.
 - Things a person must see or hear (sound, LEDs, cables) are for Jon: ask, or leave them
-  for session 8.
+  for session 9.
 
 ## Rules for this version
 
@@ -518,7 +616,7 @@ later work.
   session; don't push and don't open a pull request between sessions. Run the CI checks
   locally instead: native tests, firmware build, lint, clang-format, `test/scripts` and
   `web` tests. The whole of WP-19 goes up as **one push and one pull request** after the
-  session 8 bench run, when Jon says so. If CI then fails, fix it in as few pushes as
+  session 9 bench run, when Jon says so. If CI then fails, fix it in as few pushes as
   possible: reproduce the failure locally first, then push once.
 - Decisions log entry per decision; `credits/LICENSES.md` for third-party code.
 - **Never run the pioarduino platform against the shared PlatformIO install**: its first
