@@ -36,6 +36,9 @@ are doing, only the files it names. The spike's evidence is in
 6. **Functional changes** in v3.0 are limited to 3 and 5 above and to removing migration
    code. Anything else found on the way gets a decisions-log row and a follow-up, so a
    regression can be traced to the framework move.
+7. **`docs/project-brief.md` is trimmed to the current firmware spec** (session 6). This
+   copy stops being a snapshot of the shared master and becomes the repo's firmware spec,
+   kept current with the code.
 
 ## Target versions (checked 13 Nov 2026)
 
@@ -201,8 +204,8 @@ brief or `Q` references in `lib/`, `src/`, `test/`, `scripts/`, `web/src/`.
    CRC still loads factory settings (that is protection, not migration). NVS namespace
    and key names may be tidied (fresh flash).
 2. **Comments and messages:** strip version tags, finding IDs, `Q` numbers, names and
-   dates; brief section references stay only if `docs/project-brief.md` stays (question 1
-   below). Remove "before vX this did Y" notes. Same for `sdkconfig.defaults`,
+   dates; brief section references (such as "brief 6.6") stay, and session 6 fixes them
+   after the trim. Remove "before vX this did Y" notes. Same for `sdkconfig.defaults`,
    `platformio.ini`, `CMakeLists.txt`, `.github/workflows`, `web/src` and the test files.
    Remove the `v3.0 SPIKE` marks once each is resolved.
 3. **Pins:** `lib/hw/src/pins.h`, `.env.example`, `test_pins` and `scripts/pin_*.py`
@@ -246,10 +249,20 @@ Cut line: 1, 2 and 6; 3-5 can move to session 6.
 6. **`ui/`:** keep what `scripts/generate_ui.py` and the tests use and the current
    design spec; remove the Codex prompt, reference images and previews that only record
    how the design came about.
-7. **CLAUDE.md:** current project only (no review, history or old plan pointers; build
-   table for IDF 6.1; hardware summary).
-8. **`images/`, `data/`, `.vscode/`, `.github/`:** remove anything unused.
-9. End checks; `git status` before committing.
+7. **`docs/project-brief.md` → current firmware spec** (decision 7). Keep: the goal, the
+   hardware the firmware drives (from section 3), the firmware spec (section 6) and the
+   firmware side of the interfaces (section 7), written as the code now behaves; the
+   attribution (section 8); only the open questions that are still open. Remove: the case
+   and electronics workstreams (sections 4 and 5; `case/` and `electronics/` hold their
+   own docs), answered questions, *Proposed* items that were decided (write the decision
+   in), and anything the code no longer does. Rename the title to say it is the firmware
+   spec. Then grep `lib/`, `src/`, `test/`, `scripts/`, `web/` and the docs for "brief"
+   section references and fix each one against the new numbering.
+8. **CLAUDE.md:** current project only (no review, history or old plan pointers; build
+   table for IDF 6.1; hardware summary). The brief entry becomes "the firmware spec: keep
+   it current with the code"; remove the "don't edit" rule and "Jon merges the log back".
+9. **`images/`, `data/`, `.vscode/`, `.github/`:** remove anything unused.
+10. End checks; `git status` before committing.
 
 ## Session 7: bench run with Jon (Sonnet 5.5 / medium)
 
@@ -272,12 +285,9 @@ Ask Jon for COM ports and what is wired first.
 
 ## Questions for Jon (start of session 5)
 
-1. **`docs/project-brief.md`** is a snapshot whose master copy is shared with the other
-   workstreams, and CLAUDE.md says not to edit it. Under the fresh-start rule: (a) leave
-   it as it is, (b) trim this copy to the current firmware spec (sections 6, 7 and the
-   open questions still open), or (c) replace it with a short `docs/spec.md` written from
-   the current code and docs, and delete the snapshot?
-2. Any obsolete features that session 5 lists: keep or remove?
+1. Any obsolete features that session 5 lists: keep or remove?
+
+(The brief question is answered: decision 7.)
 
 ## Rules for this version
 
