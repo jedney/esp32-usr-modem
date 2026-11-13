@@ -8,8 +8,16 @@ The **USB modem port** is the S3's native USB, carried by the rear USB-C socket.
 it as a USB serial port (a new COM port on Windows). It works like the RS232 port, with
 its own session, configuration screen and Client Tests settings. Only one port can have a
 call at a time. Differences: it has no line speed (the speed the PC sets is shown but not
-used), USB does the flow control, and it can't show DCD or RI, so calls show by result
-codes only. DTR is the PC program's DTR: closing the port drops DTR, and `&D` applies.
+used) and USB does the flow control. DTR is the PC program's DTR: closing the port drops
+DTR, and `&D` applies. The modem sends DCD, DSR and RI to the PC as USB serial-state
+notifications, by the same rules as on RS232: DCD follows `&C`, DSR is always on and RI
+follows an incoming call's rings. On Windows (`usbser.sys`) programs see all three as
+modem-status lines (pyserial `.cd`, `.dsr`, `.ri`; RI as a level, on and off with each
+ring), and CTS shows as on. The PC sees the device as the selected model: product name
+"US Robotics Sportster 14.4k" (or the model `AT*MODEL` chose), maker "US Robotics",
+serial number the firmware version. The names are read when the modem starts, so a new
+model shows after `AT*RESTART`, and Windows may give each firmware version its own COM
+port number.
 
 - Commands start with `AT` and end with Enter (CR, `S3`). Several standard commands can
   share a line: `ATE1V1X4`. A project command (`AT*...`) takes the rest of the line.
@@ -22,8 +30,10 @@ codes only. DTR is the PC program's DTR: closing the port drops DTR, and `&D` ap
 The **network console** is the USB maintenance console over Wi-Fi, on TCP port 2001
 (raw bytes, no Telnet negotiation): `socket://usr-modem.local:2001` in `pio device
 monitor`, pyserial or the end-to-end tests' `--console-port`, or any raw TCP client. It
-asks for the device password first (no echo; three wrong ones close the connection, and
-after a wrong one every log-in is refused for a second). Then it shows the console's
+shows the selected model and the modem's status (for example "US Robotics Sportster
+14.4k" and "Idle") on two lines, then asks for the device password (no echo; three wrong
+ones close the connection, and after a wrong one every log-in is refused for a
+second). Then it shows the console's
 recent output (the last 16 KB, so the boot messages if they still fit) and works as the
 same console session as the cable: commands, the configuration screen and the hardware
 tests, with the same rules, including the device password lines. One logged-in client
@@ -69,7 +79,7 @@ Factory values are for `&F1`, the power-on default.
 | `P` / `T` | Default dial method pulse / tone | T |
 | `&A` | Extra CONNECT text: 0 none, 1 `/ARQ`, 2 modulation, 3 protocol | 0 |
 | `&B` | RS232 speed: 0 follows the call speed, 1 stays at the speed of "AT", 2 mixed (follows the call speed, as 0). Ignored when `AT*BAUD` fixes the speed | 1 |
-| `&C` | DCD: 0 always on, 1 follows the call | 1 |
+| `&C` | DCD (RS232 and USB modem port): 0 always on, 1 follows the call | 1 |
 | `&D` | DTR: 0 ignored, 2 dropping DTR hangs up, 3 dropping DTR hangs up and runs `ATZ` | 2 |
 | `&G` | Guard tone (stored for compatibility) | 0 |
 | `&H` | Transmit flow control: 0 none, 1 CTS, 2 XON/XOFF, 3 both | 1 |

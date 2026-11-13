@@ -5,8 +5,11 @@
 //   - Writes never wait: what doesn't fit, or arrives with no program connected, is dropped.
 //   - Reads take only what the caller asks for. Unread data stays in TinyUSB's buffer and
 //     the PC is held off, so there is end-to-end flow control and nothing is lost.
-//   - DCD and RI aren't sent: CDC serial-state notifications are off
-//     (CFG_TUD_CDC_NOTIFY in components/arduino_tinyusb/include/tusb_config.h).
+//   - DCD, DSR and RI go to the PC as CDC SERIAL_STATE notifications on the interrupt
+//     endpoint (usbSendSerialState); hostport::SerialStateSender decides when.
+//   - The PC sees the device as the selected model: product "US Robotics Sportster 14.4k"
+//     (or the model chosen), maker "US Robotics", serial number the firmware version. The
+//     names are fixed when the USB device starts, so a model change shows after a restart.
 #pragma once
 
 #include <cstddef>
@@ -14,7 +17,9 @@
 
 namespace hw {
 
-bool usbBegin();     // false if the driver couldn't start; call once at boot
+// Starts the USB device with these descriptor strings; false if the driver couldn't start.
+// Call once at boot.
+bool usbBegin(const char *product, const char *manufacturer, const char *serial);
 bool usbStarted();   // usbBegin succeeded
 bool usbMounted();   // a PC has enumerated the port and it isn't suspended
 bool usbDtr();       // mounted and the PC's program has DTR on (port open)
@@ -26,5 +31,8 @@ size_t usbWriteSpace();  // 0 while no program has the port open
 size_t usbWrite(const uint8_t *data, size_t length);
 void usbDiscardInput();
 bool usbTxDrained();  // nothing waiting to go to the PC (or no PC to send to)
+// Sends the lines to the PC (CDC SERIAL_STATE). False, and nothing sent, while the device
+// isn't configured or the last notification is still going; never waits.
+bool usbSendSerialState(bool dcd, bool dsr, bool ri);
 
 }  // namespace hw

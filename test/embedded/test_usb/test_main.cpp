@@ -12,9 +12,9 @@ void setUp() {}
 void tearDown() {}
 
 void test_driver_starts_once() {
-    TEST_ASSERT_TRUE(hw::usbBegin());
+    TEST_ASSERT_TRUE(hw::usbBegin("US Robotics Sportster 14.4k", "US Robotics", "test"));
     TEST_ASSERT_TRUE(hw::usbStarted());
-    TEST_ASSERT_TRUE(hw::usbBegin());  // a second call is harmless
+    TEST_ASSERT_TRUE(hw::usbBegin("other", "other", "other"));  // a second call is harmless
 }
 
 void test_pc_enumerates_the_port() {
@@ -48,6 +48,21 @@ void test_reads_without_data_return_nothing() {
     }
 }
 
+void test_serial_state_goes_only_to_a_configured_device() {
+    if (!hw::usbMounted()) {
+        TEST_ASSERT_FALSE(hw::usbSendSerialState(true, true, false));
+        TEST_IGNORE_MESSAGE("no PC on the native USB port");
+    }
+    // The notification endpoint is free once the last one has gone (a few ms at most).
+    bool sent = false;
+    const uint32_t start = millis();
+    while (!sent && millis() - start < 100) {
+        sent = hw::usbSendSerialState(false, true, false);
+        delay(1);
+    }
+    TEST_ASSERT_TRUE(sent);
+}
+
 void setup() {
     delay(2000);  // give the USB-serial monitor time to attach
     UNITY_BEGIN();
@@ -55,6 +70,7 @@ void setup() {
     RUN_TEST(test_pc_enumerates_the_port);
     RUN_TEST(test_closed_port_takes_no_output_and_counts_as_drained);
     RUN_TEST(test_reads_without_data_return_nothing);
+    RUN_TEST(test_serial_state_goes_only_to_a_configured_device);
     UNITY_END();
 }
 

@@ -111,10 +111,14 @@ private:
     hw::TcpListener listener_{netConsoleSockets[0]};
 };
 NetConsoleListener netConsoleListener;
+const char *linkStatus();
+const char *selectedModel();
 class NetConsoleHost : public netconsole::Host {
 public:
     bool passwordMatches(const char *password) override { return device.matches(password); }
     void loggedIn() override { device.markUsed(); }
+    const char *modelName() override { return selectedModel(); }
+    const char *status() override { return linkStatus(); }
 };
 NetConsoleHost netConsoleHost;
 netconsole::Console netConsole(netConsoleListener, netConsoleSockets[0], netConsoleSockets[1],
@@ -498,6 +502,19 @@ atcmd::Reply cmdTestCall(atcmd::Port &port, const char *args) {
 const config::Registry registry(config::Hooks{cmdAnswerPort, cmdPhonebook, cmdPhoneDelete, cmdHelp,
                                               cmdVer, cmdBaud, cmdTestCall, cmdDialTest, cmdHw});
 
+// The modem's state in one word, for the configuration screen and the network console.
+const char *linkStatus() {
+    return journal.active()                                               ? "Connected"
+           : outgoing && outgoing->stage() != calls::CallStage::kIdle     ? "Dialling"
+           : incoming && incoming->stage() != calls::IncomingStage::kIdle ? "Ringing"
+                                                                          : "Idle";
+}
+
+// "US Robotics Sportster 14.4k" for the model AT*MODEL selected.
+const char *selectedModel() {
+    return modemcfg::productName(modem ? modem->model() : 0);
+}
+
 class ConfigHardware : public config::Hardware, public config::UiServices {
 public:
     calls::Phonebook *phonebook() override { return &::phonebook; }
@@ -506,12 +523,7 @@ public:
         result.hostBaud = rs232::baud();
         if (journal.active() && journal.session())
             result.reportedRate = journal.session()->reportedSpeed();
-        const char *link = journal.active()                                           ? "Connected"
-                           : outgoing && outgoing->stage() != calls::CallStage::kIdle ? "Dialling"
-                           : incoming && incoming->stage() != calls::IncomingStage::kIdle
-                               ? "Ringing"
-                               : "Idle";
-        snprintf(result.link, sizeof result.link, "%s", link);
+        snprintf(result.link, sizeof result.link, "%s", linkStatus());
         return result;
     }
     // The project commands lib/config hands to the firmware (registry.cpp names them).
@@ -1384,7 +1396,7 @@ void pollBrowser() {
 void createPorts() {
     console = new hostport::Session(*modem, consoleSink, kConsoleBaud, callSlot);
     rs232::begin(*modem, callSlot);
-    usbport::begin(*modem, callSlot);
+    usbport::begin(*modem, callSlot, FW_VERSION);
     auto makeMenu = [](hostport::Session &session, bool rs232Port) {
         void *memory = ps_malloc(sizeof(config::Terminal));
         return memory ? new (memory) config::Terminal(session, rs232Port)
@@ -1572,7 +1584,7 @@ void loop() {
     }
     pollConsole(now);
     rs232::poll(now);
-    usbport::poll(now);
+    usbport::poll(now, incoming->ri());  // RI as on the RS232 port above
     net.tick(millis());
     static bool wifiWasUp = false;
     if (wifiWasUp != net.up()) {

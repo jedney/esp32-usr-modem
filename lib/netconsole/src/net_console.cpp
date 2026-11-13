@@ -214,7 +214,7 @@ void Console::login(Client &client, uint32_t now) {
             return;
         }
         client.prompted = true;
-        send(client, "Password: ");
+        prompt(client);
     }
     uint8_t c = 0;
     for (size_t i = 0; i < kLoginBytes && client.stage == Stage::kLogin; ++i) {
@@ -241,9 +241,17 @@ void Console::login(Client &client, uint32_t now) {
     c = 0;
 }
 
+void Console::prompt(Client &client) {
+    send(client, host_.modelName());
+    send(client, "\r\n");
+    send(client, host_.status());
+    send(client, "\r\nPassword: ");
+}
+
 void Console::submit(Client &client, uint32_t now) {
     if (client.length == 0 && !client.overflow) {
-        send(client, "\r\nPassword: ");
+        send(client, "\r\n");
+        prompt(client);
         return;
     }
     bool locked = wrong_ && now - wrongAt_ < kLockOutMs;

@@ -564,6 +564,13 @@ void test_recovery_returns_nothing_when_no_slot_has_a_good_blob() {
     TEST_ASSERT_EQUAL(0, recoverBlob(readSlot, &big, tiny, sizeof tiny));
 }
 
+void test_product_name_follows_the_model() {
+    TEST_ASSERT_EQUAL_STRING("US Robotics Sportster 14.4k", productName(14400));
+    TEST_ASSERT_EQUAL_STRING("US Robotics Sportster 28.8k", productName(28800));
+    TEST_ASSERT_EQUAL_STRING("US Robotics Sportster 33.6k", productName(33600));
+    TEST_ASSERT_EQUAL_STRING("US Robotics Sportster 56k", productName(56000));
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_layout_4_migrates_with_default_delays_and_validates_new_values);
@@ -593,5 +600,6 @@ int main() {
     RUN_TEST(test_recovery_prefers_file_then_temporary_then_backup);
     RUN_TEST(test_recovery_returns_nothing_when_no_slot_has_a_good_blob);
     RUN_TEST(test_extended_speed_profiles_survive_restart_and_keep_old_auto);
+    RUN_TEST(test_product_name_follows_the_model);
     return UNITY_END();
 }

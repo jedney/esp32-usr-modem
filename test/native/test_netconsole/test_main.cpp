@@ -108,7 +108,14 @@ public:
         return password == text;
     }
     void loggedIn() override { ++logins; }
+    std::string model = "US Robotics Sportster 14.4k";
+    std::string state = "Idle";
+    const char *modelName() override { return model.c_str(); }
+    const char *status() override { return state.c_str(); }
 };
+
+// What a new connection gets before log-in: the model, the status, the prompt.
+const char kGreeting[] = "US Robotics Sportster 14.4k\r\nIdle\r\nPassword: ";
 
 class CountingLock : public ConsoleLog::Lock {
 public:
@@ -320,12 +327,24 @@ void test_new_address_closes_the_client_and_listens_again() {
 void test_nothing_but_the_prompt_before_log_in() {
     Rig r;
     r.write("Device password: Secret123\r\nboot messages\r\n");
-    TEST_ASSERT_EQUAL_STRING("Password: ", r.connect().c_str());
+    TEST_ASSERT_EQUAL_STRING(kGreeting, r.connect().c_str());
     TEST_ASSERT_TRUE(r.console.state() == Console::State::kLogin);
     TEST_ASSERT_EQUAL_STRING("10.0.0.5", r.console.waiting());
     r.write("more output\r\n");
     TEST_ASSERT_EQUAL_STRING("", r.type("Secr").c_str());  // no echo
     TEST_ASSERT_EQUAL_STRING("", r.typed().c_str());       // nothing reaches the console
+}
+
+void test_greeting_shows_the_current_model_and_status() {
+    Rig r;
+    r.host.model = "US Robotics Sportster 56k";
+    r.host.state = "Connected";
+    TEST_ASSERT_EQUAL_STRING("US Robotics Sportster 56k\r\nConnected\r\nPassword: ",
+                             r.connect().c_str());
+    r.host.state = "Idle";
+    std::string out = r.type("wrong\r");  // a wrong password prompts without the greeting
+    TEST_ASSERT_TRUE(has(out, "Wrong password.\r\nPassword: "));
+    TEST_ASSERT_FALSE(has(out, "Idle"));
 }
 
 void test_prompt_waits_for_the_client_to_finish_opening() {
@@ -339,7 +358,7 @@ void test_prompt_waits_for_the_client_to_finish_opening() {
     TEST_ASSERT_EQUAL_STRING("", r.socket.take().c_str());
     r.now += 1;
     r.poll();
-    TEST_ASSERT_EQUAL_STRING("Password: ", r.socket.take().c_str());
+    TEST_ASSERT_EQUAL_STRING(kGreeting, r.socket.take().c_str());
 }
 
 void test_right_password_replays_the_log_then_live_output() {
@@ -369,7 +388,8 @@ void test_input_after_log_in_goes_to_the_console() {
 void test_line_endings_backspace_and_empty_lines() {
     Rig r;
     r.connect();
-    TEST_ASSERT_EQUAL_STRING("\r\nPassword: ", r.type("\r\n").c_str());  // not a try
+    TEST_ASSERT_EQUAL_STRING((std::string("\r\n") + kGreeting).c_str(),
+                             r.type("\r\n").c_str());  // not a try
     r.type("Secret12X\b3\r");
     TEST_ASSERT_TRUE(r.console.loggedIn());
     TEST_ASSERT_EQUAL(1, r.host.checks);
@@ -453,7 +473,7 @@ void test_second_client_takes_over_when_it_logs_in() {
     Rig r;
     r.write("boot line\r\n");
     r.login();
-    TEST_ASSERT_EQUAL_STRING("Password: ", r.connectSecond().c_str());
+    TEST_ASSERT_EQUAL_STRING(kGreeting, r.connectSecond().c_str());
     TEST_ASSERT_EQUAL(1, r.listener.slots.back());
     TEST_ASSERT_TRUE(r.console.loggedIn());  // the first still works meanwhile
     TEST_ASSERT_EQUAL_STRING("10.0.0.5", r.console.waiting());
@@ -498,7 +518,7 @@ void test_new_connection_replaces_the_one_at_the_prompt() {
     r.login();
     r.connectSecond();
     r.typeSecond("Secr");  // half-typed, then hangs
-    TEST_ASSERT_EQUAL_STRING("Password: ", r.connectSecond().c_str());
+    TEST_ASSERT_EQUAL_STRING(kGreeting, r.connectSecond().c_str());
     TEST_ASSERT_EQUAL(1, r.socket2.closes);  // the hung one
     TEST_ASSERT_EQUAL(0, r.socket.closes);
     TEST_ASSERT_TRUE(r.console.loggedIn());
@@ -510,7 +530,7 @@ void test_hung_client_at_the_prompt_keeps_nobody_out() {
     Rig r;
     r.connect();  // never types
     TEST_ASSERT_TRUE(r.console.state() == Console::State::kLogin);
-    TEST_ASSERT_EQUAL_STRING("Password: ", r.connectSecond().c_str());
+    TEST_ASSERT_EQUAL_STRING(kGreeting, r.connectSecond().c_str());
     r.typeSecond("Secret123\r");
     TEST_ASSERT_TRUE(r.console.loggedIn());
     TEST_ASSERT_EQUAL_STRING("10.0.0.5", r.console.waiting());  // the hung one, until 60 s
@@ -528,7 +548,7 @@ void test_client_that_leaves_frees_the_port() {
     r.poll();
     TEST_ASSERT_TRUE(r.console.state() == Console::State::kListening);
     TEST_ASSERT_EQUAL_STRING("", r.console.peer());
-    TEST_ASSERT_EQUAL_STRING("Password: ", r.connect().c_str());
+    TEST_ASSERT_EQUAL_STRING(kGreeting, r.connect().c_str());
 }
 
 void test_turning_off_sends_what_it_can_then_closes() {
@@ -609,6 +629,7 @@ int main() {
     RUN_TEST(test_failed_listen_is_retried_after_five_seconds);
     RUN_TEST(test_new_address_closes_the_client_and_listens_again);
     RUN_TEST(test_nothing_but_the_prompt_before_log_in);
+    RUN_TEST(test_greeting_shows_the_current_model_and_status);
     RUN_TEST(test_prompt_waits_for_the_client_to_finish_opening);
     RUN_TEST(test_right_password_replays_the_log_then_live_output);
     RUN_TEST(test_input_after_log_in_goes_to_the_console);

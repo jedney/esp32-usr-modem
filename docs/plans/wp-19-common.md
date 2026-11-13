@@ -21,7 +21,7 @@ Sessions 1 and 2 of WP-19 are done (results below). The rest are one plan each:
 | 20 | [I2S, RMT capture and first link](../history/wp-20-i2s-rmt-first-link.md) (done) | Opus 5.5 / high | L |
 | 21 | [Networking, tooling, CI and the OTA hash](../history/wp-21-networking-ci-ota.md) (done) | Opus 5.5 / high | L |
 | 22 | [Network console](../history/wp-22-network-console.md) (done) | Opus 5.5 / high | L |
-| 23 | [DCD and RI on the USB modem port](wp-23-usb-dcd-ri.md) | Sonnet 5.5 / high | M |
+| 23 | [DCD and RI on the USB modem port](../history/wp-23-usb-dcd-ri.md) (done) | Sonnet 5.5 / high | M |
 | 24 | [Fresh start: code](wp-24-fresh-start-code.md) | Sonnet 5.5 / high | L |
 | 25 | [Fresh start: documentation and credits](wp-25-fresh-start-docs.md) | Sonnet 5.5 / high | L |
 | 26 | [Bench run with Jon](wp-26-bench-run.md) | Sonnet 5.5 / medium | M |

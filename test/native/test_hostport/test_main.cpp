@@ -13,6 +13,7 @@
 #include "hwtest.h"
 #include "linectl.h"
 #include "panel.h"
+#include "serial_state.h"
 #include "session.h"
 #include "sink_gate.h"
 
@@ -1033,6 +1034,124 @@ void test_s5_zero_and_127_erase_one_character_on_the_host_port() {
         TEST_ASSERT_EQUAL(3, r.modem.active().get(modemcfg::kX));
     }
 }
+// --- USB serial state (DCD, DSR, RI notifications) ---------------------------------------
+
+class FakeStatePort : public SerialStateSender::Port {
+public:
+    std::vector<SerialState> sent;
+    bool busy = false;
+    bool send(const SerialState &state) override {
+        if (busy) {
+            return false;
+        }
+        sent.push_back(state);
+        return true;
+    }
+};
+
+SerialState lines(bool dcd, bool dsr, bool ri) {
+    SerialState s;
+    s.dcd = dcd;
+    s.dsr = dsr;
+    s.ri = ri;
+    return s;
+}
+
+void test_serial_state_sent_on_configure_and_on_change_only() {
+    FakeStatePort port;
+    SerialStateSender sender;
+    sender.poll(port, false, false, true, false);  // not configured: nothing goes
+    TEST_ASSERT_EQUAL(0, port.sent.size());
+    // Port closed (DTR off): still sent, as some programs open the port without DTR.
+    sender.poll(port, true, false, false, false);
+    TEST_ASSERT_EQUAL(1, port.sent.size());
+    TEST_ASSERT_TRUE(port.sent[0] == lines(false, true, false));  // DSR always on
+    sender.poll(port, true, false, false, false);
+    TEST_ASSERT_EQUAL(1, port.sent.size());  // no change, nothing sent
+    sender.poll(port, true, false, true, false);
+    TEST_ASSERT_EQUAL(2, port.sent.size());
+    TEST_ASSERT_TRUE(port.sent[1] == lines(true, true, false));
+    sender.poll(port, true, false, false, false);
+    TEST_ASSERT_EQUAL(3, port.sent.size());
+    TEST_ASSERT_TRUE(port.sent[2] == lines(false, true, false));
+}
+
+void test_serial_state_sent_again_when_a_program_opens_the_port() {
+    FakeStatePort port;
+    SerialStateSender sender;
+    sender.poll(port, true, false, true, false);
+    TEST_ASSERT_EQUAL(1, port.sent.size());
+    sender.poll(port, true, true, true, false);  // DTR on: the same state again
+    TEST_ASSERT_EQUAL(2, port.sent.size());
+    TEST_ASSERT_TRUE(port.sent[1] == lines(true, true, false));
+    sender.poll(port, true, true, true, false);
+    sender.poll(port, true, false, true, false);  // DTR off: nothing to send
+    TEST_ASSERT_EQUAL(2, port.sent.size());
+    sender.poll(port, true, true, true, false);  // opened again
+    TEST_ASSERT_EQUAL(3, port.sent.size());
+}
+
+void test_serial_state_sent_again_after_the_computer_configures_again() {
+    FakeStatePort port;
+    SerialStateSender sender;
+    sender.poll(port, true, true, true, false);
+    sender.poll(port, false, false, true, false);  // unplugged or reset
+    sender.poll(port, true, true, true, false);
+    TEST_ASSERT_EQUAL(2, port.sent.size());
+    TEST_ASSERT_TRUE(port.sent[1] == lines(true, true, false));
+}
+
+void test_serial_state_busy_endpoint_keeps_the_newest_state() {
+    FakeStatePort port;
+    SerialStateSender sender;
+    sender.poll(port, true, true, false, false);
+    port.busy = true;
+    sender.poll(port, true, true, true, false);   // DCD on: can't go now
+    sender.poll(port, true, true, false, false);  // back off before it went
+    TEST_ASSERT_EQUAL(1, port.sent.size());
+    port.busy = false;
+    sender.poll(port, true, true, false, false);
+    TEST_ASSERT_EQUAL(1, port.sent.size());  // the computer already has DCD off
+    port.busy = true;
+    sender.poll(port, true, true, true, false);
+    port.busy = false;
+    sender.poll(port, true, true, true, false);
+    TEST_ASSERT_EQUAL(2, port.sent.size());
+    TEST_ASSERT_TRUE(port.sent[1] == lines(true, true, false));
+}
+
+void test_serial_state_short_ring_still_reaches_the_computer() {
+    FakeStatePort port;
+    SerialStateSender sender;
+    sender.poll(port, true, true, false, false);
+    port.busy = true;
+    sender.poll(port, true, true, false, true);  // RI on for one pass, can't go
+    port.busy = false;
+    sender.poll(port, true, true, false, false);  // RI is off again by now
+    TEST_ASSERT_EQUAL(2, port.sent.size());
+    TEST_ASSERT_TRUE(port.sent[1] == lines(false, true, true));  // still sent as on
+    sender.poll(port, true, true, false, false);
+    TEST_ASSERT_EQUAL(3, port.sent.size());
+    TEST_ASSERT_TRUE(port.sent[2] == lines(false, true, false));  // then off
+    sender.poll(port, true, true, false, false);
+    TEST_ASSERT_EQUAL(3, port.sent.size());
+}
+
+void test_serial_state_ring_cadence_sends_each_edge() {
+    FakeStatePort port;
+    SerialStateSender sender;
+    const bool cadence[] = {false, true, true, false, true, false, false};
+    for (bool ri : cadence) {
+        sender.poll(port, true, true, false, ri);
+    }
+    TEST_ASSERT_EQUAL(5, port.sent.size());  // first state, on, off, on, off
+    TEST_ASSERT_FALSE(port.sent[0].ri);
+    TEST_ASSERT_TRUE(port.sent[1].ri);
+    TEST_ASSERT_FALSE(port.sent[2].ri);
+    TEST_ASSERT_TRUE(port.sent[3].ri);
+    TEST_ASSERT_FALSE(port.sent[4].ri);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_call_slot_says_who_holds_it);
@@ -1095,5 +1214,11 @@ int main() {
     RUN_TEST(test_throttle_credit_is_the_same_across_the_clock_wrap);
     RUN_TEST(test_s3_zero_and_127_end_the_line_on_the_host_port);
     RUN_TEST(test_s5_zero_and_127_erase_one_character_on_the_host_port);
+    RUN_TEST(test_serial_state_sent_on_configure_and_on_change_only);
+    RUN_TEST(test_serial_state_sent_again_when_a_program_opens_the_port);
+    RUN_TEST(test_serial_state_sent_again_after_the_computer_configures_again);
+    RUN_TEST(test_serial_state_busy_endpoint_keeps_the_newest_state);
+    RUN_TEST(test_serial_state_short_ring_still_reaches_the_computer);
+    RUN_TEST(test_serial_state_ring_cadence_sends_each_edge);
     return UNITY_END();
 }

@@ -178,6 +178,19 @@ const char *modelName(uint32_t speed) {
     }
 }
 
+const char *productName(uint32_t speed) {
+    switch (speed) {
+        case 28800:
+            return "US Robotics Sportster 28.8k";
+        case 33600:
+            return "US Robotics Sportster 33.6k";
+        case 56000:
+            return "US Robotics Sportster 56k";
+        default:
+            return "US Robotics Sportster 14.4k";
+    }
+}
+
 Profile factoryProfile(unsigned n) {
     Profile p = {};
     p.v[kB] = 0;

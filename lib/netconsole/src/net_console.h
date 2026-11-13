@@ -5,10 +5,12 @@
 //   - One logged-in client at a time. A new connection gets its own password prompt; when
 //     it logs in, the earlier client is told and closed (so a hung connection never
 //     keeps anyone out, and nobody without the password can throw a client out).
-//   - Log-in first: "Password: ", no echo, the device password. Nothing else is sent
-//     before log-in. A wrong password locks every log-in out for kLockOutMs (attempts in
-//     that time are refused without checking, as on the web page); kTries wrong passwords
-//     close the connection, and so does kLoginMs without a log-in.
+//   - Log-in first. The client is greeted with the selected model ("US Robotics Sportster
+//     14.4k") and the modem's status ("Idle", "Connected") on two lines, then "Password: ";
+//     the password isn't echoed. Nothing else is sent before log-in. A wrong password
+//     locks every log-in out for kLockOutMs (attempts in that time are refused without
+//     checking, as on the web page); kTries wrong passwords close the connection, and so
+//     does kLoginMs without a log-in.
 //   - After log-in the client gets the console output kept in the ConsoleLog (the boot
 //     messages, if they still fit), then the live output, and what it types goes to the
 //     console's AT session (read()). It is the same session as the UART, not a second one.
@@ -50,6 +52,10 @@ public:
     // True if `password` is the device password. Compared in constant time.
     virtual bool passwordMatches(const char *password) = 0;
     virtual void loggedIn() = 0;  // the device password has been used
+    // For the greeting before the password prompt: the selected model ("US Robotics
+    // Sportster 14.4k") and the modem's status ("Idle", "Dialling", "Ringing", "Connected").
+    virtual const char *modelName() = 0;
+    virtual const char *status() = 0;
 };
 
 // The TCP port. A connection is accepted into one of the console's two sockets.
@@ -70,7 +76,7 @@ public:
     static constexpr uint32_t kLoginMs = 60000;   // to type the password
     // The prompt waits this long after the connection opens: pyserial's socket:// (and so
     // pio device monitor) empties its input buffer just after connecting, which would
-    // throw away a prompt sent at once. An empty line prompts again.
+    // throw away a prompt sent at once. An empty line greets and prompts again.
     static constexpr uint32_t kPromptDelayMs = 250;
     static constexpr uint32_t kRetryMs = 5000;  // between tries to open the port
     static constexpr size_t kPasswordMax = 64;  // longer input is a wrong password
@@ -122,6 +128,7 @@ private:
     void submit(Client &client, uint32_t now);
     void drop(Client &client);
     static void send(Client &client, const char *text);
+    void prompt(Client &client);  // the greeting, then "Password: "
     static void clearPassword(Client &client);
     bool sendNote(Client &client);
 

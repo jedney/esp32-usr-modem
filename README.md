@@ -24,7 +24,7 @@ Every command is listed in **[docs/COMMANDS.md](docs/COMMANDS.md)**.
 | Port | Use |
 |---|---|
 | RS232 (DB25) | The computer. Speed is detected from each "AT" (300-115200), or fixed with `AT*BAUD`. RTS/CTS, DTR, DCD and RI work as on a real modem; DSR is always on |
-| Rear USB-C (the S3's native USB) | **USB modem port** (v2.0): a PC sees a USB serial port that works like the RS232 port, with its own AT session. No line speed, USB flow control, DTR from the PC program; no DCD or RI (calls show by result codes). The same socket powers the modem |
+| Rear USB-C (the S3's native USB) | **USB modem port** (v2.0): a PC sees a USB serial port that works like the RS232 port, with its own AT session. No line speed, USB flow control, DTR from the PC program; DCD, DSR and RI reach the PC program as on RS232. The PC sees it as "US Robotics Sportster" and the selected model. The same socket powers the modem |
 | USB-C "UART" on the S3 board | Maintenance console, 115200 8N1. Same commands as the RS232 port, plus the boot messages. Inside the case only |
 | Wi-Fi | Calls, the web interface (`http://usr-modem.local`), the network console (TCP port 2001) and OTA updates |
 
@@ -265,8 +265,9 @@ and modem are on different subnets, the router must also allow modem → PC TCP 
 The maintenance console also works over Wi-Fi, on TCP port 2001 (raw bytes, like
 ser2net), so the modem can be used, debugged and, with OTA, flashed while the USB cable is
 on the USB modem port or not plugged in at all. Run **Modem: network console** (or any raw
-TCP client, or `socket://usr-modem.local:2001` in pyserial) and type the device password
-at `Password:` (if no prompt shows, press Enter). It then shows the console's recent output,
+TCP client, or `socket://usr-modem.local:2001` in pyserial). It shows the selected model
+and the modem's status ("Idle", "Connected"), then type the device password at
+`Password:` (if no prompt shows, press Enter). It then shows the console's recent output,
 the boot messages included while they fit in its 16 KB, and works as the console itself:
 the same session as the cable, with the same commands and rules. One logged-in client at
 a time: logging in from a new connection closes the earlier one, so a hung connection never

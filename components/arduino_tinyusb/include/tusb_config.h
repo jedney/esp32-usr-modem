@@ -27,8 +27,9 @@
 //
 // Based on components/arduino_tinyusb/include/tusb_config.h of Espressif's
 // esp32-arduino-lib-builder (branch release/v6.1, commit dc06dec270dd). Changed for this
-// project: device only (no host stack), only the CDC class, the S3 only, and CDC
-// serial-state notifications off, as in the Arduino 3.3.12 release.
+// project: device only (no host stack), only the CDC class, the S3 only. CDC serial-state
+// notifications are on (Arduino 3.3.12 turns them off): the USB modem port sends DCD, DSR
+// and RI to the PC with them (lib/hw/src/usb_port.h).
 //
 // TinyUSB includes this file from tusb_option.h, after the OPT_* values are defined, so
 // it must not include tusb_option.h itself.
@@ -64,7 +65,7 @@ extern "C" {
 #else
 #define CFG_TUD_CDC 0
 #endif
-#define CFG_TUD_CDC_NOTIFY 0
+#define CFG_TUD_CDC_NOTIFY 1
 #define CFG_TUD_MSC 0
 #define CFG_TUD_HID 0
 #define CFG_TUD_MIDI 0

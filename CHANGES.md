@@ -31,7 +31,14 @@ Work in progress on `firmware/v3.0-idf5`; this entry is completed in WP-19.
   connection. A client that stops reading never holds up the modem: it misses
   output instead, and is told how much. `AT*NETCONSOLE=ON|OFF` (factory ON), on the
   configuration screen under Updates and Reset, in `AT*EXPORT`; `AT*STATUS` shows the
-  client.
+  client. Before the password prompt it shows the selected model and the modem's status
+  ("US Robotics Sportster 14.4k", "Idle").
+- **DCD, DSR and RI on the USB modem port:** sent to the PC as USB serial-state
+  notifications, by the same rules as the RS232 lines (DCD by `&C`, DSR on, RI with an
+  incoming call's rings). On Windows, terminal programs and pyserial see all three.
+- **USB names:** the USB modem port reports the selected model as its product name ("US
+  Robotics Sportster 14.4k"), "US Robotics" as the maker and the firmware version as its
+  serial number.
 
 ### Changed
 

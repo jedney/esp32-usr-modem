@@ -161,7 +161,10 @@ constexpr size_t kBlobSizeV4 = kBlobSizeV3 + 1;
 constexpr size_t kBlobSize = kBlobSizeV4 + 8;
 
 bool validModel(uint32_t speed);
-const char *modelName(uint32_t speed);
+const char *modelName(uint32_t speed);  // "Sportster 14.4k Series", as ATI3 shows it
+// The maker and model, "US Robotics Sportster 14.4k": the network console's greeting and
+// the USB modem port's product name.
+const char *productName(uint32_t speed);
 
 void serialize(const Nvram &n, uint8_t *out);  // writes kBlobSize bytes
 

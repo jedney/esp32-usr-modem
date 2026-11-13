@@ -6,6 +6,7 @@ The stall and on/off tests also need --rs232-port. One test restarts the modem.
 """
 
 import os
+import re
 import socket
 import time
 
@@ -74,9 +75,20 @@ def connect(host, receive_buffer=None):
     return sock
 
 
+# Before log-in: the selected model and the modem's status, then the prompt.
+GREETING = re.compile(
+    rb"US Robotics Sportster (14\.4|28\.8|33\.6|56)k\r\n(Idle|Dialling|Ringing|Connected)\r\n"
+    + re.escape(NET_PROMPT)
+)
+
+
+def is_greeting(data):
+    return GREETING.fullmatch(data) is not None
+
+
 def log_in(sock, password):
     data, _ = receive(sock, NET_PROMPT)
-    assert data == NET_PROMPT
+    assert is_greeting(data)
     sock.sendall(password.encode("utf-8") + b"\r")
     data, _ = receive(sock, NET_LOGGED_IN)
     assert NET_LOGGED_IN in data, "the network console refused the device password"
@@ -86,11 +98,11 @@ def wait_for_lock_out():
     time.sleep(1.2)  # the lock-out after a wrong password is one second
 
 
-def test_nothing_but_the_prompt_before_log_in(host):
+def test_nothing_but_the_greeting_before_log_in(host):
     sock = connect(host)
     try:
         data, closed = receive(sock, wait=2.0)
-        assert data == NET_PROMPT and not closed
+        assert is_greeting(data) and not closed
         sock.sendall(b"AT\r")  # not a command yet: a (wrong) password
         data, _ = receive(sock, NET_PROMPT)
         assert b"OK" not in data and b"Wrong password." in data
@@ -131,7 +143,7 @@ def test_second_client_takes_over_when_it_logs_in(host, password):
         receive(first, wait=0.5)  # the replay
         second = connect(host)
         data, _ = receive(second, NET_PROMPT)
-        assert data == NET_PROMPT
+        assert is_greeting(data)
         first.sendall(b"AT\r")  # the first still works while the second is at the prompt
         data, _ = receive(first, b"OK\r\n")
         assert b"OK\r\n" in data

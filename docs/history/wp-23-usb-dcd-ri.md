@@ -67,3 +67,27 @@ false while the endpoint is busy or the device isn't configured.
 
 Cut line: 0-2 and 4 for DCD; RI's e2e test and the Windows check (3) can move to the
 bench run (WP-26).
+
+## Result (14 Nov 2026)
+
+Done, with Jon's branding changes in the same session. Reasons and details are in the
+decisions log (rows "USB modem port DCD, DSR and RI (WP-23)" and "USB names and network
+console greeting").
+
+- **Step 0:** with `CFG_TUD_CDC_NOTIFY 1` the port enumerates with `espressif/tinyusb`
+  0.21.0~6; no newer TinyUSB needed.
+- **Root cause found on the board:** Arduino's notification endpoint 0x85 has no transmit
+  FIFO on the S3, so the first notification never left and the endpoint stayed busy.
+  `lib/hw/src/usb_port.cpp` now takes a free IN endpoint (0x83).
+- **Code:** `hostport::SerialStateSender` (`lib/hostport/src/serial_state.*`, 6 native
+  cases in `test_hostport`), `hw::usbSendSerialState()`, wired in `src/usbport.cpp`; RI
+  is `incoming->ri()` on every port, as on RS232 (`AT*ANSWERPORT` doesn't limit it).
+- **Windows 11 (step 3):** pyserial `.cd`, `.dsr` and `.ri` all work; RI is a level that
+  follows the ring cadence, and `.cts` reads on.
+- **Branding (Jon):** USB product name = the selected model ("US Robotics Sportster
+  14.4k"), maker "US Robotics", serial number the firmware version (VID/PID unchanged);
+  the network console greets with the model and status before `Password: `. The new
+  serial number moved the bench USB port from COM21 to COM22.
+- **Tests on the board (OTA, network console):** `test_usb.py` 11 passed, 1 skipped (the
+  manual unplug test); `test_net_console.py` 7 passed. The on-board `test_usb` suite got
+  a serial-state case but wasn't run (it needs the console cable); WP-26 can run it.

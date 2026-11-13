@@ -4,6 +4,8 @@
 #include <Arduino.h>
 
 #include "input_buffer.h"
+#include "modemcfg.h"
+#include "serial_state.h"
 #include "sink_gate.h"
 #include "usb_port.h"
 
@@ -36,7 +38,17 @@ private:
     hostport::SinkGate gate_;
 };
 
+// DCD, DSR and RI to the PC.
+class UsbLines : public hostport::SerialStateSender::Port {
+public:
+    bool send(const hostport::SerialState &s) override {
+        return hw::usbSendSerialState(s.dcd, s.dsr, s.ri);
+    }
+};
+
 UsbSink sink;
+UsbLines lines;
+hostport::SerialStateSender lineSender;
 hostport::InputBuffer input;
 hostport::Session *sess = nullptr;  // made once at boot
 uint32_t fromComputer = 0;
@@ -92,13 +104,13 @@ void writeOutput() {
 
 }  // namespace
 
-void begin(atcmd::Modem &modem, hostport::CallSlot &slot) {
-    hw::usbBegin();
+void begin(atcmd::Modem &modem, hostport::CallSlot &slot, const char *version) {
+    hw::usbBegin(modemcfg::productName(modem.model()), "US Robotics", version);
     sess = new hostport::Session(modem, sink, kDefaultBaud, slot);
     reportedBaud = kDefaultBaud;
 }
 
-void poll(uint32_t nowMs) {
+void poll(uint32_t nowMs, bool ri) {
     if (sess == nullptr) {
         return;
     }
@@ -108,6 +120,9 @@ void poll(uint32_t nowMs) {
         writeOutput();
     }
     sess->tick(nowMs, hw::usbDtr());
+    if (hw::usbStarted()) {
+        lineSender.poll(lines, hw::usbMounted(), hw::usbDtr(), sess->dcd(), ri);
+    }
 }
 
 hostport::Session &session() {
