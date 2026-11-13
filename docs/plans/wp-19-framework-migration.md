@@ -40,6 +40,15 @@ are doing, only the files it names. The spike's evidence is in
    copy stops being a snapshot of the shared master and becomes the repo's firmware spec,
    kept current with the code.
 8. **Obsolete features are removed** in session 5, not just listed (definition there).
+9. **Rewrite to the new framework's way, don't patch.** Where the framework move touches
+   code, use the approach Arduino 3.3 and IDF 6.1 now recommend (current drivers,
+   components and APIs), even if that means rewriting the module, rather than the
+   smallest change that compiles. No shims that keep an old API or approach alive, and
+   no deprecated APIs in project code (`-Werror=deprecated-declarations`). The same
+   applies to project code the build doesn't force to change: see "Modernisation
+   review" below. Behaviour seen from outside (commands, results, timing, the web
+   protocol) stays the same unless a decisions-log row says otherwise; the native, e2e
+   and bench tests are the check.
 
 ## Target versions (checked 13 Nov 2026)
 
@@ -103,14 +112,46 @@ Also: `uartSync()` (`hw.cpp`) still compiles, and Arduino 3.3.12 now changes spe
 IDF's `uart_set_baudrate()`, which calls `uart_ll_update()`: bench-check whether it's still
 needed. `esp_core_dump_get_summary` compiles unchanged.
 
-## Session 1: build policy and mechanical fixes (Sonnet 5.5 / high, L)
+## Modernisation review (decision 9)
 
-Goal: everything except TinyUSB, I2S and RMT is final, reviewed and tested.
+Compiling is not the test. Each session checks the code it touches against the current
+Arduino 3.3 and IDF 6.1 documentation and migration guides (read the current docs online,
+not from memory), and rewrites where the recommended approach has changed. Candidates
+found in a survey of `lib/` and `src/` on 13 Nov 2026 (check each; keep the current code
+where it is already the recommended way, and say why in the session's notes):
+
+| Area | Now | Look at | Session |
+| --- | --- | --- | --- |
+| Warnings | `-Wall -Wextra` | plus `-Werror=deprecated-declarations` on project code | 1 |
+| Random and hashes | PSA (spike) | review as written; no Mbed TLS 2 idioms left | 1 |
+| GPIO | `soc/gpio_periph.h`, `PIN_INPUT_ENABLE` | `driver/gpio.h` calls only, no register access | 1 |
+| SNTP | `esp_sntp.h` | `esp_netif_sntp` API, or Arduino's `configTime` if enough | 1 |
+| mDNS | `ESPmDNS` | still right with the managed `espressif/mdns`; check | 1 |
+| ADC (volume pot) | `analogReadMilliVolts` | fine if it uses `adc_oneshot` and calibration in 3.3; check | 1 |
+| TinyUSB | lib-builder `arduino_tinyusb` sources fetched by a script, own CDC registration | whether Arduino 3.3's own USB stack (`USB`, `USBCDC`) or a registry component (`espressif/tinyusb`, `esp_tinyusb`) now covers the project's needs (CDC, line state, flow control, the `tud_ready()` guard), which would remove the fetch script and the custom component | 2 |
+| I2S | legacy `driver/i2s.h` | `i2s_std` channel API (or Arduino's `ESP_I2S` if it meets the non-blocking need) | 3 |
+| RMT | legacy `driver/rmt.h` | RX channel API, ISR callback into a stream buffer | 3 |
+| UART | `hal/uart_ll.h`, `uartSync()` | IDF `uart_*` driver calls only; drop `uartSync()` if the bench shows it isn't needed | 3 and 7 |
+| PPP, SLIP, NAPT | raw lwIP (`netif`, `tcpip`, `lwip_napt.h`) | whether `esp_netif` (PPP) or Arduino 3.3's `Network`/`PPP` classes fit a DCE-side server; SLIP stays raw lwIP if nothing covers it | 4 |
+| Wi-Fi | `WiFi.onEvent`, `esp_wifi.h` | Arduino 3.3 `Network` events; direct `esp_wifi` calls only where Arduino has no API | 4 |
+| OTA | `ArduinoOTA`, `Update`, `esp_ota_ops` | SHA-256 auth (decision 3); otherwise check | 4 |
+| Watchdog | `esp_task_wdt_reset()`, set up by `sdkconfig` | check the IDF 6.1 keys and that the loop task is subscribed | 1 |
+| Settings | `Preferences` in `hw/nvs_store.cpp` and `src/main.cpp` | all access through `nvs_store` (fresh start: layout 1) | 5 |
+
+A rewrite that changes behaviour is a decisions-log row; a large one that doesn't fit its
+session gets its own follow-up session rather than a shim.
+
+## Session 1: build policy, fixes and modernisation (Sonnet 5.5 / high, L)
+
+Goal: everything except TinyUSB, I2S, RMT and the session 4 rows of the modernisation
+review is final, reviewed and tested, and written the way Arduino 3.3 and IDF 6.1
+recommend (decision 9).
 
 1. Rebase; check for newer stable releases. Confirm the `platformio.ini` pins.
 2. **Warnings policy.** `-Wall -Wextra` only on the project's own code (`build_src_flags`;
    if `lib/` doesn't get them, a `pre:` script adds them to the project libraries'
-   environments). Remove `CONFIG_COMPILER_DISABLE_DEFAULT_ERRORS=y`; fix what IDF's
+   environments), plus `-Werror=deprecated-declarations`. Remove
+   `CONFIG_COMPILER_DISABLE_DEFAULT_ERRORS=y`; fix what IDF's
    default errors then find in project code. A framework file that still fails gets that
    one warning suppressed for that file, recorded.
 3. **`sdkconfig.defaults`** written with IDF 6.1 names (no rename tables):
@@ -129,16 +170,27 @@ Goal: everything except TinyUSB, I2S and RMT is final, reviewed and tested.
    IDF 6.1's PSA generator reseeds and from what (the old code refused to reseed with the
    radio off). If it can reseed from a weak source, keep a generator seeded at boot.
    Wipe rules for PSA hash contexts.
-7. `PIN_INPUT_ENABLE` -> `gpio_input_enable()`.
-8. Picolibc stays unless something breaks (check `<sys/signal.h>`, per-task `stdout`,
+7. **GPIO:** `PIN_INPUT_ENABLE` and `soc/gpio_periph.h` go; `driver/gpio.h` calls only
+   (`gpio_input_enable()`).
+8. **Modernisation review, session 1 rows** (SNTP, mDNS, ADC, watchdog): rewrite where
+   the recommended approach changed; note the ones kept and why.
+9. Picolibc stays unless something breaks (check `<sys/signal.h>`, per-task `stdout`,
    `%ll` and float `printf`).
-9. Native tests (full), lint, clang-format. Firmware build should fail only at TinyUSB
-   and `hw.cpp`.
+10. Native tests (full), lint, clang-format. Firmware build should fail only at TinyUSB
+    and `hw.cpp`.
 
-Cut line: 1-3 and 7; 4-6 can move to session 2.
+Cut line: 1-3 and 7; 4-6 and 8 can move to session 2.
 
 ## Session 2: TinyUSB (Opus 5.5 / high, L)
 
+0. **Choose the USB route first** (modernisation review, TinyUSB row). Compare, from the
+   current docs: Arduino 3.3's own `USB`/`USBCDC` classes as an IDF component; the
+   registry components (`espressif/tinyusb`, `espressif/esp_tinyusb`); and the
+   lib-builder sources below. Pick the one Espressif recommends for an Arduino-as-component
+   project that meets the project's needs (CDC device, DTR/RTS line state, flow control,
+   the `tud_ready()` guard, rear USB-C with nothing attached). Prefer the route with the
+   least project-owned build glue; record the choice in the decisions log. Steps 1-4
+   are the lib-builder route; change them to fit if another route wins.
 1. `scripts/network_dependencies.py`: lib-builder `release/v6.1` commit and TinyUSB
    `0.21.0` (codeload tarballs, SHA-256 checked; `test/scripts` updated). Rename the
    script if it now only fetches USB sources.
@@ -163,9 +215,18 @@ Cut line: 1-3 and 7; 4-6 can move to session 2.
    `rmt_receive()` after each `is_last`.
 3. **First full link.** Record flash and RAM beside v2.17's in the decisions log; check
    the 4 MB app slot.
-4. `uartSync()` stays; bench item to test without it.
+4. **UART:** speed changes through IDF `uart_*` calls only, no `hal/uart_ll.h`.
+   `uartSync()` stays only if it can be written that way; the bench (session 7) tests a
+   build without it.
 
-## Session 4: tooling, CI and the OTA hash (Sonnet 5.5 / high, L)
+## Session 4: networking, tooling, CI and the OTA hash (Opus 5.5 / high, L)
+
+0. **Modernisation review, session 4 rows** (PPP, SLIP, NAPT; Wi-Fi; OTA). PPP and the
+   Wi-Fi events are the likely rewrites. Decide from the current docs whether `esp_netif`
+   or Arduino 3.3's `Network` classes can serve PPP on the DCE side (the modem is the
+   server, the host computer the client). If they can, move to them; if not, record why
+   raw lwIP stays. `e2e/test_internet.py` must pass unchanged on the bench. If the PPP
+   rewrite is large, it becomes its own session after this one (renumber the rest).
 
 1. **CI** (`ci.yml`, `release.yml`): cache keys for the new packages; Python, Node,
    pytest and action versions (table); `managed_components/`; the release still publishes
