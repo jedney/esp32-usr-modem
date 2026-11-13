@@ -182,6 +182,38 @@ recommend (decision 9).
 
 Cut line: 1-3 and 7; 4-6 and 8 can move to session 2.
 
+### Session 1 result (13 Nov 2026): done, all items
+
+Decisions-log rows and `CHANGES.md` are written; this is what the next sessions need.
+
+- **See every build error at once:** `SCONSFLAGS=-k pio run -e s3` (SCons keeps going past
+  a failed file). `pio run -e s3 -t compiledb` writes `compile_commands.json` (about 15 s)
+  to show the exact flags of any file; delete it afterwards (the repo root is not ignored).
+- **The build now fails only at** `esp32-hal-tinyusb.c` and `dcd_esp32sx.c` (session 2) and
+  at `hw.cpp`'s `driver/i2s.h` (session 3). Everything else in the project compiles with
+  `-Werror`. The rest of `hw.cpp` was checked with stub headers for `driver/i2s.h` and
+  `driver/rmt.h`: the only diagnostics are in the I2S and RMT code, so session 3 still has
+  to see the warnings inside those two parts.
+- **Not measurable yet:** flash and RAM (the firmware does not link). Clean build time
+  (with `-k`): 144 s now, 154 s before the library trim.
+- **For session 2:** `scripts/network_dependencies.py` still describes Arduino 2.0.17
+  revisions in its docstring and now fetches TinyUSB only (rename it if that stays so).
+  `usb_port.cpp` includes Arduino's `USB.h`, which is part of the core, so
+  `CONFIG_ARDUINO_SELECTIVE_COMPILATION` does not hide it. If the PPP class is wanted in
+  session 4, turn on `CONFIG_ARDUINO_SELECTIVE_PPP`.
+- **For session 3 (first board run), check:** `crypto.begin()` and the new `test_device`
+  tests (they also prove MD5 and HMAC-SHA-256 exist in the PSA build); that the clock
+  syncs after a join (`esp_netif_sntp`); the two `%.1f` dB prints in `src/hwconsole.cpp`
+  (`printVolume()` and the pot read-out) under Picolibc; the volume pot still reads after
+  `crypto.begin()`.
+- **For session 4:** `dependencies.lock` is written with CRLF on Windows (git converts it);
+  CI will write LF. The unfinished items in the decisions log row "found in session 1"
+  (C++ standard, `syncedAt`) need Jon's answer.
+- **For session 6 (`credits/LICENSES.md`):** the LittleFS row is now `joltwallet/littlefs`
+  1.23.1 from the component registry (no `credits/littlefs/` download any more), and the
+  Mbed TLS row no longer uses CTR-DRBG: it is MD5, SHA-256, HMAC-SHA-256 and the hardware
+  noise source through PSA.
+
 ## Session 2: TinyUSB (Opus 5.5 / high, L)
 
 0. **Choose the USB route first** (modernisation review, TinyUSB row). Compare, from the

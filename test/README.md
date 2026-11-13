@@ -72,7 +72,7 @@ Section numbers refer to the project brief.
 | Clock: NTP (no empty labels), time zones, daylight saving, cached offset for the web status (6.8, Q59, PERF-02) | `test_netcfg` | `test_wifi` | `test_wifi.py` |
 | Browser Wi-Fi changes: 60 s check, failed join, `AT*WIFI=OFF`/`FORGET` in the window; scan names without control bytes | `test_netcfg` | — | — |
 | Wi-Fi and device password, OTA hash and Digest hash never in any output: canary sweep over every `AT*` command, `AT&V`, `ATI`, export, logs and every configuration screen (6.6, 6.8, TG-02, v2.9) | `test_netcfg`, `test_config_services` (`test_no_output_contains_either_password_or_its_stored_forms`) | — | `test_wifi.py`, `test_config.py` |
-| Device password: first boot, first use, change, hashes only, masked input (6.6) | `test_devicecfg` | `test_device` | `test_device.py` |
+| Device password: first boot, first use, change, hashes only, masked input, random words from a seed drawn once at boot with the hardware noise source on (6.6) | `test_devicecfg` | `test_device` | `test_device.py` |
 | OTA: password, ALWAYS/DEMAND, 10-minute window (6.6) | `test_devicecfg`, `scripts/test_ota_upload.py` (`.env` BOM, UTF-16) | `test_device` | `test_device.py` |
 | `AT*FACTORY`: Y/N, timeout, every namespace, interrupted reset, no filesystem (6.7) | `test_devicecfg` | `test_device` | `test_device.py --factory-reset` |
 | Configuration screen, styles, sizes, `AT*` parity, `AT*HELP`, no idle repaint, closes after 5 minutes idle, Esc cancels a waiting command, `AT*SETTING=` takes one command (6.8, STA-02b/09d, SEC-07a, v2.7); a key sends only the changed cells (under 240 bytes at 80x25), full frames after resize, Ctrl-L, style, colour, theme or other port output, changes-only screen equals a full repaint, output pages step by the lines shown, Alt+letter ignored, "too long" shown at once (PERF-01, 5.5-14, v2.15) | `test_config`, `test_config_services`, `scripts/test_generate_ui.py` (single-key hotkeys), `ui/tests` | `test_config` | `test_config.py` |
@@ -86,6 +86,7 @@ Section numbers refer to the project brief.
 | Browser limit (3), idle connection floods on ports 23 and 80, an interrupted upload, USB unplug during a call (TG-15, v2.11; opt-in) | — | — | `test_web.py --flood-tests`, `--upload-tests`; `test_usb.py --usb-unplug` |
 | Client Tests: display, size (echoed query), keys, transfers (block numbers wrap past 255), hostile X/Y/ZMODEM blocks and headers, noise and slow-link timing, ZFIN without "OO", cable, client settings per port incl. USB (6.13, TG-03, v2.0, v2.10) | `test_client` | `test_client` | `test_client.py`; `interop/serial_lrzsz.py` |
 | Build: network libraries (checked before cached) and image identities | `scripts/test_network_dependencies.py`, `scripts/test_image_manifest.py` | — | — |
+| Build: compiler warnings apply to the project's own code only (`lib/`, `src/`), the two lists agree, a deprecated API is an error | `scripts/test_project_warnings.py` | — | — |
 
 Checks that need a person (sound, LEDs, loopback plug, Amiga and Windows 9x clients)
 are listed in `docs/ROADMAP.md`.

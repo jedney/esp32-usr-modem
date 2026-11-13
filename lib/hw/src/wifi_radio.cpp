@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <ESPmDNS.h>
 #include <WiFi.h>
-#include <esp_sntp.h>
+#include <esp_netif_sntp.h>
 #include <esp_wifi.h>
 #include <sys/time.h>
 
@@ -114,7 +114,6 @@ void start() {
     started = true;
     WiFi.persistent(false);  // no ESP-IDF copy of the network or password in flash
     WiFi.onEvent(onWifiEvent);
-    sntp_set_time_sync_notification_cb(onTimeSync);
 }
 
 IPAddress toIp(uint32_t v) {
@@ -277,7 +276,12 @@ void EspRadio::startServices(const netcfg::Settings &s) {
     mdnsStop();
     mdnsRunning = MDNS.begin(s.host);
     snprintf(ntpServer, sizeof ntpServer, "%s", s.ntp);
-    configTime(0, 0, ntpServer);  // the clock runs in UTC; netcfg::tz does the local time
+    // The clock runs in UTC (the default time zone); netcfg::tz does the local time.
+    esp_netif_sntp_deinit();  // a new join starts SNTP again with the current server
+    esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG(ntpServer);
+    config.wait_for_sync = false;
+    config.sync_cb = onTimeSync;
+    esp_netif_sntp_init(&config);
 }
 
 int64_t EspRadio::utcNow() {

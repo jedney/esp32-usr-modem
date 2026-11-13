@@ -1,0 +1,6 @@
+# Components the firmware needs beyond ESP-IDF and Arduino, from the IDF component registry.
+# dependencies.lock (committed) records the exact versions of everything that gets resolved.
+dependencies:
+  # The LittleFS file system behind Arduino's LittleFS library. Arduino itself asks for
+  # "^1.22.1"; this pins the exact version the firmware is tested with.
+  joltwallet/littlefs: "==1.23.1"

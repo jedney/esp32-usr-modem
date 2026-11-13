@@ -15,11 +15,11 @@ spec.loader.exec_module(dependencies)
 def test_corrupt_cached_source_fails_before_extraction(tmp_path):
     cache = tmp_path / '.pio/network-archives'
     cache.mkdir(parents=True)
-    (cache / 'esp_littlefs.tar.gz').write_bytes(b'corrupted')
+    (cache / 'arduino_tinyusb.tar.gz').write_bytes(b'corrupted')
     with pytest.raises(ValueError, match='SHA-256'):
         dependencies.prepare(tmp_path)
-    assert not (tmp_path / '.pio/network-deps/esp_littlefs/CMakeLists.txt').exists()
-    assert not (cache / 'esp_littlefs.tar.gz').exists()  # bad cached copy is removed
+    assert not (tmp_path / '.pio/network-deps/arduino_tinyusb/CMakeLists.txt').exists()
+    assert not (cache / 'arduino_tinyusb.tar.gz').exists()  # bad cached copy is removed
 
 
 class _Response(io.BytesIO):

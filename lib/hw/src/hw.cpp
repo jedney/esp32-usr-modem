@@ -1,5 +1,6 @@
 #include "hw.h"
 
+#include <driver/gpio.h>
 #include <driver/i2s.h>
 #include <driver/rmt.h>
 #include <driver/uart.h>
@@ -7,7 +8,6 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <hal/uart_ll.h>
-#include <soc/gpio_periph.h>
 
 #include "pins.h"
 #include "volume.h"
@@ -421,8 +421,9 @@ bool ctsOutAsserted() {
     if (!hostOn) {
         return lineIsAsserted(hwtest::OutSignal::kCTS);
     }
-    PIN_INPUT_ENABLE(GPIO_PIN_MUX_REG[pins::kCts]);  // read the pad the UART drives
-    return gpio_get_level(static_cast<gpio_num_t>(pins::kCts)) == 0;
+    const gpio_num_t cts = static_cast<gpio_num_t>(pins::kCts);
+    gpio_input_enable(cts);  // the UART drives this pad as an output; read it back
+    return gpio_get_level(cts) == 0;
 }
 
 // --- Speed capture (RMT) ------------------------------------------------------------------

@@ -24,6 +24,13 @@ Work in progress on `firmware/v3.0-idf5`; this entry is completed in WP-19.
   July 2024) to Arduino core 3.3.12 on ESP-IDF 6.1, built by the official PlatformIO
   platform `espressif32@8.0.0` (SEC-03). Mbed TLS 4 (PSA Crypto), Picolibc and GCC 15
   come with it.
+- Compiler warnings apply to the project's own code only; a deprecated framework API in
+  project code fails the build, and ESP-IDF's warnings-as-errors apply to project code.
+- Only the Arduino libraries the firmware uses are compiled, once. LittleFS is the managed
+  `joltwallet/littlefs` component, pinned exactly.
+- Random numbers for the device password come from a seed drawn once at boot with the
+  hardware noise source on (HMAC-SHA-256 expansion through PSA Crypto), never from the
+  pseudo-random fallback. Network time uses `esp_netif_sntp`.
 
 ### Removed
 

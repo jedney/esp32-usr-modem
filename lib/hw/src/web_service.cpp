@@ -183,8 +183,7 @@ bool WebCrypto::random(uint8_t *out, size_t len) {
 bool WebCrypto::md5(const std::string &text, char out[33]) {
     uint8_t bytes[16] = {};
     size_t length = 0;
-    bool ok = psa_crypto_init() == PSA_SUCCESS &&
-              psa_hash_compute(PSA_ALG_MD5, reinterpret_cast<const uint8_t *>(text.data()),
+    bool ok = psa_hash_compute(PSA_ALG_MD5, reinterpret_cast<const uint8_t *>(text.data()),
                                text.size(), bytes, sizeof bytes, &length) == PSA_SUCCESS;
     std::string encoded = hexBytes(bytes, sizeof bytes);
     memcpy(out, encoded.c_str(), 33);
@@ -754,8 +753,7 @@ esp_err_t WebService::upload(httpd_req_t *req) {
     bool ok = fs ? staging && esp_partition_erase_range(staging, 0, staging->size) == ESP_OK
                  : Update.begin(req->content_len, U_FLASH);
     psa_hash_operation_t sha = PSA_HASH_OPERATION_INIT;
-    ok = psa_crypto_init() == PSA_SUCCESS && psa_hash_setup(&sha, PSA_ALG_SHA_256) == PSA_SUCCESS &&
-         ok;
+    ok = psa_hash_setup(&sha, PSA_ALG_SHA_256) == PSA_SUCCESS && ok;
     uint8_t buffer[1024];
     size_t received = 0, staged = 0;
     while (ok && received < req->content_len && millis() - start < 180000) {

@@ -1,4 +1,4 @@
-# Arduino 2.0.17 as an IDF 4.4.7 component; compile the network stack from source.
+# Arduino 3.3 as an ESP-IDF 6.1 component. Every key uses the IDF 6.1 name.
 CONFIG_AUTOSTART_ARDUINO=y
 CONFIG_ARDUINO_VARIANT="esp32s3"
 CONFIG_FREERTOS_HZ=1000
@@ -6,14 +6,54 @@ CONFIG_ARDUINO_LOOP_STACK_SIZE=8192
 CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
 CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
 CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
-CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_16mb.csv"
-CONFIG_ESP32S3_SPIRAM_SUPPORT=y
+CONFIG_SPIRAM=y
 CONFIG_SPIRAM_BOOT_INIT=y
 CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_USE_MALLOC=y
+# Build only the Arduino libraries the firmware includes: WiFi.h (Network), Update.h,
+# Preferences.h, LittleFS.h (FS), ESPmDNS.h and ArduinoOTA.h (Hash). Each library key
+# defaults to y once selective compilation is on, so every other one is switched off.
+CONFIG_ARDUINO_SELECTIVE_COMPILATION=y
+CONFIG_ARDUINO_SELECTIVE_Network=y
+CONFIG_ARDUINO_SELECTIVE_WiFi=y
+CONFIG_ARDUINO_SELECTIVE_Update=y
+CONFIG_ARDUINO_SELECTIVE_Preferences=y
+CONFIG_ARDUINO_SELECTIVE_FS=y
+CONFIG_ARDUINO_SELECTIVE_LittleFS=y
+CONFIG_ARDUINO_SELECTIVE_Hash=y
+CONFIG_ARDUINO_SELECTIVE_ESPmDNS=y
+CONFIG_ARDUINO_SELECTIVE_ArduinoOTA=y
+CONFIG_ARDUINO_SELECTIVE_SPI=n
+CONFIG_ARDUINO_SELECTIVE_Wire=n
+CONFIG_ARDUINO_SELECTIVE_ESP_SR=n
+CONFIG_ARDUINO_SELECTIVE_ESP_Video=n
+CONFIG_ARDUINO_SELECTIVE_EEPROM=n
+CONFIG_ARDUINO_SELECTIVE_Ticker=n
+CONFIG_ARDUINO_SELECTIVE_Zigbee=n
+CONFIG_ARDUINO_SELECTIVE_SD=n
+CONFIG_ARDUINO_SELECTIVE_SD_MMC=n
+CONFIG_ARDUINO_SELECTIVE_SPIFFS=n
+CONFIG_ARDUINO_SELECTIVE_FFat=n
+CONFIG_ARDUINO_SELECTIVE_Ethernet=n
+CONFIG_ARDUINO_SELECTIVE_PPP=n
+CONFIG_ARDUINO_SELECTIVE_AsyncUDP=n
+CONFIG_ARDUINO_SELECTIVE_DNSServer=n
+CONFIG_ARDUINO_SELECTIVE_HTTPClient=n
+CONFIG_ARDUINO_SELECTIVE_Matter=n
+CONFIG_ARDUINO_SELECTIVE_NetBIOS=n
+CONFIG_ARDUINO_SELECTIVE_WebServer=n
+CONFIG_ARDUINO_SELECTIVE_NetworkClientSecure=n
+CONFIG_ARDUINO_SELECTIVE_WiFiProv=n
+CONFIG_ARDUINO_SELECTIVE_BLE=n
+CONFIG_ARDUINO_SELECTIVE_BluetoothSerial=n
+CONFIG_ARDUINO_SELECTIVE_SimpleBLE=n
+CONFIG_ARDUINO_SELECTIVE_RainMaker=n
+CONFIG_ARDUINO_SELECTIVE_OpenThread=n
+CONFIG_ARDUINO_SELECTIVE_Insights=n
 CONFIG_LWIP_IP_FORWARD=y
 CONFIG_LWIP_IPV4_NAPT=y
 CONFIG_LWIP_L2_TO_L3_COPY=y
@@ -23,23 +63,23 @@ CONFIG_HTTPD_WS_SUPPORT=y
 CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024
 CONFIG_HTTPD_MAX_URI_LEN=512
 CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
-CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
-# v2.17 (STA-06): the task watchdog restarts the modem when a watched task stops for 15 s:
-# the Arduino loop (enableLoopWDT() at the end of setup()) and the CPU 0 idle task (Wi-Fi,
-# lwIP, web server). Not the CPU 1 idle task, as in Arduino's own defaults: loop() runs
-# there and a busy loop (the on-board test programs, a hardware test fed keys without a
-# pause) would starve it; the loop task itself is watched instead. The panic writes a core
-# dump; AT*RESETINFO then shows "task watchdog".
-CONFIG_ESP_TASK_WDT=y
+# The task watchdog restarts the modem when a watched task stops for 15 s: the Arduino
+# loop (enableLoopWDT() at the end of setup()) and the CPU 0 idle task (Wi-Fi, lwIP, web
+# server). Not the CPU 1 idle task, as in Arduino's own defaults: loop() runs there and a
+# busy loop (the on-board test programs, a hardware test fed keys without a pause) would
+# starve it; the loop task itself is watched instead. The panic writes a core dump;
+# AT*RESETINFO then shows "task watchdog".
+CONFIG_ESP_TASK_WDT_EN=y
+CONFIG_ESP_TASK_WDT_INIT=y
 CONFIG_ESP_TASK_WDT_PANIC=y
 CONFIG_ESP_TASK_WDT_TIMEOUT_S=15
 CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=y
 # CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1 is not set
 CONFIG_LITTLEFS_PAGE_SIZE=256
 CONFIG_LITTLEFS_OBJ_NAME_LEN=64
-# v2.0: the native USB port (GPIO19/20) is the USB modem port, a TinyUSB CDC-ACM device
-# (lib/hw/src/usb_port.cpp) through Arduino's TinyUSB component (.pio/network-deps).
-# The USB-Serial/JTAG secondary console can't share the PHY. Only the CDC class is used.
+# The native USB port (GPIO19/20) is the USB modem port, a TinyUSB CDC-ACM device
+# (lib/hw/src/usb_port.cpp). The USB-Serial/JTAG secondary console can't share the PHY.
+# Only the CDC class is used.
 CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
 CONFIG_TINYUSB_ENABLED=y
 CONFIG_TINYUSB_CDC_ENABLED=y
@@ -52,5 +92,3 @@ CONFIG_TINYUSB_VIDEO_ENABLED=n
 CONFIG_TINYUSB_DFU_RT_ENABLED=n
 CONFIG_TINYUSB_DFU_ENABLED=n
 CONFIG_TINYUSB_VENDOR_ENABLED=n
-# v3.0 SPIKE (WP-18): IDF 6 makes default warnings errors; off only to list the real errors.
-CONFIG_COMPILER_DISABLE_DEFAULT_ERRORS=y

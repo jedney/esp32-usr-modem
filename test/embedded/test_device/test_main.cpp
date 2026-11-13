@@ -21,6 +21,25 @@ void test_real_hashes_match_ota_and_fixed_digest_realm() {
     TEST_ASSERT_EQUAL_STRING("3ba84c8c9a93845740a46d37bf97bd5d", digest);
 }
 
+void test_random_words_are_distinct_and_never_the_rejection_value() {
+    TEST_ASSERT_TRUE(cryptoReady);
+    uint32_t words[64];
+    for (size_t i = 0; i < 64; ++i) {
+        words[i] = crypto.randomWord();
+        TEST_ASSERT_TRUE(words[i] != UINT32_MAX);
+        for (size_t j = 0; j < i; ++j) {
+            TEST_ASSERT_TRUE(words[i] != words[j]);  // 32-bit collision odds: about 5 in 10 million
+        }
+    }
+}
+
+void test_random_words_are_refused_until_the_boot_seed_is_drawn() {
+    hw::EspCrypto unseeded;
+    TEST_ASSERT_EQUAL_UINT32(UINT32_MAX, unseeded.randomWord());
+    TEST_ASSERT_TRUE(crypto.begin());  // a second begin() keeps the seed it has
+    TEST_ASSERT_TRUE(crypto.randomWord() != UINT32_MAX);
+}
+
 void test_random_passwords_are_distinct_and_have_the_decided_alphabet() {
     TEST_ASSERT_TRUE(cryptoReady);
     hw::NvsStore store("authtest", "cfg");
@@ -131,6 +150,8 @@ void setup() {
     UNITY_BEGIN();
     RUN_TEST(test_oversized_nvs_is_not_missing_and_preserves_credentials);
     RUN_TEST(test_real_hashes_match_ota_and_fixed_digest_realm);
+    RUN_TEST(test_random_words_are_distinct_and_never_the_rejection_value);
+    RUN_TEST(test_random_words_are_refused_until_the_boot_seed_is_drawn);
     RUN_TEST(test_random_passwords_are_distinct_and_have_the_decided_alphabet);
     RUN_TEST(test_offline_password_generation_preserves_pot_adc);
     RUN_TEST(test_credentials_and_first_use_survive_in_nvs);

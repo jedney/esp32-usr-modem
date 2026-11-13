@@ -1,4 +1,4 @@
-"""Prepare immutable LittleFS and TinyUSB sources for the Arduino-as-IDF-component build.
+"""Prepare immutable TinyUSB sources for the Arduino-as-IDF-component build.
 
 These are the same revisions recorded in Arduino 2.0.17's SDK versions.txt. The
 arduino_tinyusb component comes from Espressif's esp32-arduino-lib-builder (the commit
@@ -14,20 +14,11 @@ import shutil
 import tarfile
 from urllib.request import urlopen
 
-LITTLEFS = Path("esp_littlefs")
 TINYUSB = Path("arduino_tinyusb")
 
 # name, GitHub repository, revision, SHA-256 of the archive, folder inside the archive
 # ("" = all of it), destination under .pio/network-deps
 SOURCES = (
-    ("esp_littlefs", "joltwallet/esp_littlefs",
-     "41873c20fb5cdbcf28d7d6cc04e4bcb4a1305317",
-     "8240ad063e1fb5a5108a6fb1bb7e0b29c49745affa408a57a96ddc6bcd597570",
-     "", LITTLEFS),
-    ("littlefs", "littlefs-project/littlefs",
-     "f53a0cc961a8acac85f868b431d2f3e58e447ba3",
-     "8172652dc546a408190f259c590d9c4badab3744ef3fa584335cadb822bb34e1",
-     "", LITTLEFS / "src/littlefs"),
     ("arduino_tinyusb", "espressif/esp32-arduino-lib-builder",
      "3eb9cb06af",
      "d38038f08b380764d4df69ab43ed8f7a7058d9e80a2b29d8ca8a4dec19808bb1",

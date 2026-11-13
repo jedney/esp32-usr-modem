@@ -154,6 +154,6 @@ direct_dependencies:
 - espressif/w5500
 - idf
 - joltwallet/littlefs
-manifest_hash: 9c22151592ed27fa5905c9d6ef50dd68734998a1dbadcefc81e577cb4878df4e
+manifest_hash: 1378f23ff35a6cb9f589c16bf94ef6dd569d67c059674897dc49254a17f3a57d
 target: esp32s3
 version: 3.0.0
