@@ -33,12 +33,13 @@ are doing, only the files it names. The spike's evidence is in
 4. **IDF's warnings-as-errors also apply to the project's own code.**
 5. **The S3 board's RGB LED is removed** (done on the branch: code, pin, tests, docs and
    the key in Jon's `.env`).
-6. **Functional changes** in v3.0 are limited to 3 and 5 above and to removing migration
+6. **Functional changes** in v3.0 are limited to 3, 5 and 8 and to removing migration
    code. Anything else found on the way gets a decisions-log row and a follow-up, so a
    regression can be traced to the framework move.
 7. **`docs/project-brief.md` is trimmed to the current firmware spec** (session 6). This
    copy stops being a snapshot of the shared master and becomes the repo's firmware spec,
    kept current with the code.
+8. **Obsolete features are removed** in session 5, not just listed (definition there).
 
 ## Target versions (checked 13 Nov 2026)
 
@@ -218,14 +219,23 @@ brief or `Q` references in `lib/`, `src/`, `test/`, `scripts/`, `web/src/`.
 5. **Dead code and files:** cppcheck `unusedFunction` and a grep for unused scripts
    (`scripts/allow_call_tests.ps1`, `allow_ota.ps1`, `test_refusal.ps1`,
    `make_preview.py`, `build_handshakes.py`, `generate_credits.py`: check what uses each).
-   Features that look obsolete but still work: **list them for Jon, don't delete.**
-6. **Jon's `.env`** (never print it): compare key names with `.env.example` and remove
+6. **Obsolete features: remove them** (decision 8). Obsolete means a feature that is
+   superseded by another one, kept only for compatibility with an older version (old
+   command spellings, aliases, settings formats, protocol variants), or a development or
+   diagnostic aid that served an earlier version's work and that no current test or
+   bench step uses. A feature in the firmware spec (brief section 6) or in a current e2e
+   or bench test is not obsolete. When it isn't clear, ask Jon rather than guess. Remove
+   each one completely: code, `AT*` command and `AT*HELP` line, configuration screen and
+   web page entries, settings fields, tests, `docs/COMMANDS.md`, README and
+   `web/PROTOCOL.md`. **One commit per feature**, so a regression can be traced to it;
+   one decisions-log row listing them all, and a CHANGES.md "Removed" line each.
+7. **Jon's `.env`** (never print it): compare key names with `.env.example` and remove
    keys that are no longer read. If its pin values equal `.env.example`'s, remove those
    lines and `USR_MODEM_PINS_OVERRIDDEN`. Compare values in a script that prints only
    key names and "same/different".
-7. Full native tests, lint, clang-format, firmware build.
+8. Full native tests, lint, clang-format, firmware build.
 
-Cut line: 1, 2 and 6; 3-5 can move to session 6.
+Cut line: 1, 2 and 7; 3-6 can move to session 6.
 
 ## Session 6: fresh start, documentation and credits (Sonnet 5.5 / high, L)
 
@@ -282,12 +292,6 @@ Ask Jon for COM ports and what is wired first.
    `AT*FACTORY`.
 8. Heap and stack low-water marks with a call, the web page and PPP together; 30-minute
    soak with the watchdog on.
-
-## Questions for Jon (start of session 5)
-
-1. Any obsolete features that session 5 lists: keep or remove?
-
-(The brief question is answered: decision 7.)
 
 ## Rules for this version
 
