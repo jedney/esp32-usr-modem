@@ -112,7 +112,7 @@ Evidence:
   resolves the managed components, configures CMake and compiles all of IDF and
   Arduino. Route C was not needed.
 - **Step 4, error list:** complete, by area, in
-  [wp-19-framework-migration.md](wp-19-framework-migration.md) ("What the spike found").
+  [wp-19-framework-migration.md](../plans/wp-19-common.md) ("What the spike found").
   Against the review's expected list: Mbed TLS as expected but bigger (Mbed TLS 4: PSA,
   not renames); RMT as expected (legacy driver now removed, not just in conflict); I2S
   **removed**, not just deprecated; UART registers **still compile**; TinyUSB as
