@@ -26,8 +26,10 @@ asks for the device password first (no echo; three wrong ones close the connecti
 after a wrong one every log-in is refused for a second). Then it shows the console's
 recent output (the last 16 KB, so the boot messages if they still fit) and works as the
 same console session as the cable: commands, the configuration screen and the hardware
-tests, with the same rules, including the device password lines. One client at a time; a
-second one is told "Network console in use." and closed. If no prompt shows, press Enter.
+tests, with the same rules, including the device password lines. One logged-in client
+at a time: a new connection gets its own password prompt, and when it logs in the earlier
+client is told and closed, so a hung connection never keeps you out. If no prompt shows,
+press Enter.
 Not over the network: flashing after a full erase, on-board tests, crash output as it
 happens (`AT*RESETINFO` shows the record afterwards) and a modem that hasn't joined Wi-Fi.
 

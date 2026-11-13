@@ -202,6 +202,7 @@ atcmd::Reply Commands::reference(atcmd::Port &p, const char *args) {
     if (!query(args)) {
         return atcmd::Reply::kError;
     }
+    p.beginInfo();
     p.line("AT / A/ repeat; D/DT/DP dial; DS0-3 stored dial; ATA answer; ATH hang up");
     p.line("+++ guarded escape; ATO resume; ATI0-7,9 inquiry; +FCLASS=0 modem");
     p.line("B E F L M Q V X; P/T dial mode; S0-S63=value or ? (S1 live ring count)");
@@ -214,6 +215,7 @@ atcmd::Reply Commands::about(atcmd::Port &p, const char *args) {
     if (!query(args)) {
         return atcmd::Reply::kError;
     }
+    p.beginInfo();
     p.printf("USR Modem Emulator v%s (%s)\r\n", FW_VERSION, FW_COMMIT);
     p.line("USRobotics command behavior; replica project by Jon Edney.");
     for (const char *credit : kCredits) {
@@ -241,6 +243,7 @@ atcmd::Reply Commands::logCommand(atcmd::Port &p, const char *args) {
             return atcmd::Reply::kError;
         }
     }
+    p.beginInfo();
     p.printf("Log level %u, capacity %u bytes%s\r\n", log_.level, unsigned(log_.capacity()),
              log_.capacity() < 256 * 1024 ? " (reduced capacity)" : " PSRAM");
     p.printf("Bytes %u-%u of %u; AT*LOG=offset,count reads up to 8192 bytes.\r\n", offset,
@@ -256,6 +259,7 @@ atcmd::Reply Commands::callLog(atcmd::Port &p, const char *args) {
     if (!query(args)) {
         return atcmd::Reply::kError;
     }
+    p.beginInfo();
     p.printf("Call history: %u/50 (configured time zone, result, seconds, TX/RX payload)\r\n",
              unsigned(history_.size()));
     for (size_t i = 0; i < history_.size(); ++i) {
@@ -274,6 +278,7 @@ atcmd::Reply Commands::exportConfig(atcmd::Port &p) {
     const auto &m = p.modem();
     // This is deliberately an explicit allowlist. No password storage or generic
     // NVS/debug dump is consulted. Network credentials must be entered separately.
+    p.beginInfo();
     p.print("ATQ0V1S3=13S4=10\r\n");
     for (unsigned t = 0; t < 2; ++t) {
         profileExport(p, m.nvram().tmpl[t]);

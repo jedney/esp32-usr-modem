@@ -126,9 +126,9 @@ NET_LOGGED_IN = b"Logged in. Recent console output follows.\r\n"
 
 
 def net_console_connect(url, password, timeout=45.0):
-    """Opens the network console at `url` and logs in. Retries while the modem restarts,
-    joins Wi-Fi or still has another client. Returns (serial port, replayed output).
-    The password is never printed."""
+    """Opens the network console at `url` and logs in (which closes any earlier client).
+    Retries while the modem restarts or joins Wi-Fi. Returns (serial port, replayed
+    output). The password is never printed."""
     deadline = time.monotonic() + timeout
     while True:
         ser = None

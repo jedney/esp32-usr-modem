@@ -129,6 +129,8 @@ void Terminal::write(const char *data, size_t len) {
         unsigned char c = static_cast<unsigned char>(data[i]);
         if (c == '\r')
             continue;
+        if (c == '\n' && length_ == 0)
+            continue;  // the line break that starts an information reply (S3 S4)
         if (c == '\n') {
             column_ = 0;
             ++responseLines_;

@@ -73,6 +73,7 @@ static_assert(CONFIG_ESP_TASK_WDT_PANIC && CONFIG_ESP_TASK_WDT_TIMEOUT_S == 15,
 namespace {
 
 constexpr uint32_t kConsoleBaud = 115200;
+constexpr size_t kConsoleTxBuffer = 16 * 1024;
 constexpr uint32_t kBannerWaitMs = 8000;  // for Wi-Fi at boot (decided by Jon, v0.6)
 
 class SerialSink : public atcmd::Sink {
@@ -98,16 +99,26 @@ devicecfg::Device device(deviceStore, crypto);
 hw::OtaService ota(device);
 hw::NvsStore netConsoleStore("netconsole", "cfg");
 netconsole::Settings netConsoleSettings(netConsoleStore);
-hw::TcpSocket netConsoleSocket;
-hw::TcpListener netConsoleListener(netConsoleSocket);
+hw::TcpSocket netConsoleSockets[2];
+// Port 2001: connections go into either socket (a logged-in client and one at the prompt).
+class NetConsoleListener : public netconsole::Listener {
+public:
+    bool begin(uint16_t port) override { return listener_.begin(port); }
+    bool accept(unsigned slot) override { return listener_.accept(netConsoleSockets[slot & 1]); }
+    void stop() override { listener_.stop(); }
+
+private:
+    hw::TcpListener listener_{netConsoleSockets[0]};
+};
+NetConsoleListener netConsoleListener;
 class NetConsoleHost : public netconsole::Host {
 public:
     bool passwordMatches(const char *password) override { return device.matches(password); }
     void loggedIn() override { device.markUsed(); }
 };
 NetConsoleHost netConsoleHost;
-netconsole::Console netConsole(netConsoleListener, netConsoleSocket, consoleout::log(),
-                               netConsoleHost);
+netconsole::Console netConsole(netConsoleListener, netConsoleSockets[0], netConsoleSockets[1],
+                               consoleout::log(), netConsoleHost);
 hw::NvsStore webStore("web", "cfg");
 hw::NvsStore clientStore("clients", "cfg");
 clienttest::Settings clientSettings(clientStore);
@@ -633,6 +644,7 @@ private:
     }
     Reply cmdWeb(atcmd::Port &port, const char *, const char *args) {
         if (isQuery(args)) {
+            port.beginInfo();
             port.line(webSettings.enabled() ? "ON" : "OFF");
             return Reply::kOk;
         }
@@ -679,6 +691,7 @@ private:
     Reply cmdStyle(atcmd::Port &port, const char *, const char *args) {
         if (isQuery(args)) {
             auto style = menuOf(port).style();
+            port.beginInfo();
             port.line(style == config::Style::Plain   ? "PLAIN"
                       : style == config::Style::Cp437 ? "CP437"
                                                       : "ANSI");
@@ -689,6 +702,7 @@ private:
     Reply cmdSize(atcmd::Port &port, const char *, const char *args) {
         auto &menu = menuOf(port);
         if (isQuery(args)) {
+            port.beginInfo();
             port.printf("%u,%u\r\n", menu.columns(), menu.rows());
             return Reply::kOk;
         }
@@ -699,6 +713,7 @@ private:
             return Reply::kError;
         }
         debugLog.event(millis(), config::Event::StatusRead);
+        port.beginInfo();
         port.printf("%s\r\nPanel AA CD RD SD TR CS ARQ: ", modemcfg::modelName(modem->model()));
         for (unsigned i = 0; i < 7; ++i) {
             port.printf("%u ", (ledMask >> i) & 1);
@@ -742,11 +757,13 @@ private:
                 break;
             case netconsole::Console::State::kLogin:
                 port.printf("Network console: port %u, %s at the password prompt\r\n",
-                            netconsole::kPort, netConsole.peer());
+                            netconsole::kPort, netConsole.waiting());
                 break;
             case netconsole::Console::State::kReady:
-                port.printf("Network console: port %u, %s logged in\r\n", netconsole::kPort,
-                            netConsole.peer());
+                port.printf("Network console: port %u, %s logged in%s%s%s\r\n", netconsole::kPort,
+                            netConsole.peer(), *netConsole.waiting() ? "; " : "",
+                            netConsole.waiting(),
+                            *netConsole.waiting() ? " at the password prompt" : "");
                 break;
         }
         // 5.5-08: the least free stack so far, for the bench record.
@@ -763,6 +780,7 @@ private:
         if (!isQuery(args)) {
             return Reply::kError;
         }
+        port.beginInfo();
         port.line("Generated: DIAL BUSY RING DTMF PULSE SWEEP");
         File dir = LittleFS.open("/sounds");
         File file = dir.openNextFile();
@@ -818,6 +836,7 @@ private:
         }
         uint8_t record[4] = {};
         size_t n = resetStore.load(record, sizeof record);
+        port.beginInfo();
         port.printf("Current reset: %s\r\n", hwconsole::resetReasonName(int(esp_reset_reason())));
         if (n == 3 && record[0] == 1) {
             port.printf("Previous reset: %s\r\n", hwconsole::resetReasonName(record[2]));
@@ -1449,10 +1468,18 @@ void waitForNetwork() {
 
 void setup() {
     (void)imageMarker[0];  // retain project identity in the linked application image
+    // Console replies go into the UART driver's buffer and out at 115200 while the loop
+    // runs on, instead of holding it (AT*REFERENCE, 5.5 KB, used to hold it for 0.5 s). The
+    // largest reply, AT*ABOUT, is 9.4 KB. Only more output than this at once (several long
+    // replies back to back) waits for the cable, for the rest. The UART interrupt empties
+    // it, so output still gets out if the loop hangs. Internal RAM (UART driver).
+    Serial.setTxBufferSize(kConsoleTxBuffer);
     Serial.begin(kConsoleBaud);
     consoleout::begin();  // before anything is printed: the network console replays it
     // One network console client at a time: one that vanished frees the port in about 16 s.
-    netConsoleSocket.setKeepAlive(hw::TcpSocket::KeepAlive{10, 2, 3});
+    for (auto &socket : netConsoleSockets) {
+        socket.setKeepAlive(hw::TcpSocket::KeepAlive{10, 2, 3});
+    }
     // No ESP-IDF driver messages on the console. A long stream on the RS232 port in
     // command mode overflows the speed capture, and the RMT driver would print an error
     // from its interrupt for every chunk it drops (switchable with AT*LOG in v0.10).

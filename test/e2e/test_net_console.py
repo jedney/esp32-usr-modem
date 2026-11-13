@@ -62,6 +62,11 @@ def receive(sock, marker=None, wait=3.0):
 
 def connect(host, receive_buffer=None):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # Without it, Windows holds each line until the last is acknowledged, and while the
+    # modem can't send to a client that stops reading, several long commands reach it at
+    # once; their replies together outgrow the console's 16 KB UART buffer, which then
+    # waits for the cable. The stall test is about the network client, not the cable.
+    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     if receive_buffer:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, receive_buffer)
     sock.settimeout(5)
@@ -118,21 +123,37 @@ def test_wrong_passwords_lock_out_and_three_close(host, password):
         sock.close()
 
 
-def test_second_client_is_refused(host, password):
+def test_second_client_takes_over_when_it_logs_in(host, password):
     first = connect(host)
+    second = None
     try:
         log_in(first, password)
+        receive(first, wait=0.5)  # the replay
         second = connect(host)
-        try:
-            data, closed = receive(second, wait=3.0)
-            assert data == b"Network console in use.\r\n" and closed
-        finally:
-            second.close()
-        first.sendall(b"AT\r")  # the first client is unharmed
+        data, _ = receive(second, NET_PROMPT)
+        assert data == NET_PROMPT
+        first.sendall(b"AT\r")  # the first still works while the second is at the prompt
         data, _ = receive(first, b"OK\r\n")
+        assert b"OK\r\n" in data
+        second.sendall(b"not-the-password\r")  # a wrong password throws nobody out
+        data, _ = receive(second, NET_PROMPT)
+        assert b"Wrong password." in data
+        first.sendall(b"AT\r")
+        data, closed = receive(first, b"OK\r\n")
+        assert b"OK\r\n" in data and not closed
+        wait_for_lock_out()
+        second.sendall(password.encode("utf-8") + b"\r")
+        data, _ = receive(second, NET_LOGGED_IN)
+        assert NET_LOGGED_IN in data
+        data, closed = receive(first, wait=3.0)
+        assert b"logged in from another connection; closed." in data and closed
+        second.sendall(b"AT\r")
+        data, _ = receive(second, b"OK\r\n")
         assert b"OK\r\n" in data
     finally:
         first.close()
+        if second is not None:
+            second.close()
 
 
 def test_at_commands_and_status(net):
@@ -156,17 +177,18 @@ def test_client_that_stops_reading_does_not_stall_the_modem(host, password, rs23
     try:
         log_in(sock, password)
         receive(sock, wait=0.5)  # the replay
-        # The client asks for about 5.5 KB at a time and reads nothing: about 110 KB in all,
+        # The client asks for about 9.4 KB a second (AT*ABOUT) and reads nothing: about 190 KB,
         # more than the 16 KB log plus the TCP buffers, even if Windows grows its window.
         sock.settimeout(1.0)
         for _ in range(20):
-            sock.sendall(b"AT*REFERENCE\r")
-            # A long console reply holds the loop while UART0 sends it (5.5 KB is about
-            # 0.5 s at 115200), client or not. Waiting for this client would take seconds.
+            sock.sendall(b"AT*ABOUT\r")
             started = time.monotonic()
             assert rs232.command("AT", timeout=3.0)[-1] == "OK"
-            assert time.monotonic() - started < 2.0, "the modem waited for the network client"
-            time.sleep(0.4)
+            assert time.monotonic() - started < 1.0, "the modem waited for the network client"
+            # Slower than UART0 sends (11.5 KB/s at 115200), with room for two replies
+            # arriving together: more output at once than its 16 KB buffer waits for the
+            # cable, whatever the network client does.
+            time.sleep(1.0)
         time.sleep(4.0)  # the console finishes writing (115200 bps)
         data, closed = receive(sock, wait=5.0)
         assert not closed

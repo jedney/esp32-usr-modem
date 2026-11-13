@@ -2,7 +2,9 @@
 // modem can be used and debugged over Wi-Fi without the console cable. No Telnet
 // negotiation; bytes pass as they are.
 //
-//   - One client at a time. Another connection gets one "in use" line and is closed.
+//   - One logged-in client at a time. A new connection gets its own password prompt; when
+//     it logs in, the earlier client is told and closed (so a hung connection never
+//     keeps anyone out, and nobody without the password can throw a client out).
 //   - Log-in first: "Password: ", no echo, the device password. Nothing else is sent
 //     before log-in. A wrong password locks every log-in out for kLockOutMs (attempts in
 //     that time are refused without checking, as on the web page); kTries wrong passwords
@@ -21,7 +23,6 @@
 #include <cstdint>
 
 #include "console_log.h"
-#include "incoming.h"
 #include "modemcfg.h"
 #include "tcp_connection.h"
 
@@ -51,6 +52,17 @@ public:
     virtual void loggedIn() = 0;  // the device password has been used
 };
 
+// The TCP port. A connection is accepted into one of the console's two sockets.
+class Listener {
+public:
+    virtual ~Listener() = default;
+    virtual bool begin(uint16_t port) = 0;
+    // The waiting connection, if there is one, into socket `slot` (0 or 1); whatever that
+    // socket had is closed then. False (and nothing changes) when none is waiting.
+    virtual bool accept(unsigned slot) = 0;
+    virtual void stop() = 0;
+};
+
 class Console {
 public:
     static constexpr unsigned kTries = 3;
@@ -67,54 +79,66 @@ public:
 
     enum class State : uint8_t { kOff, kListening, kLogin, kReady };
 
-    Console(calls::Listener &listener, calls::Socket &socket, const ConsoleLog &log, Host &host)
-        : listener_(listener), socket_(socket), log_(log), host_(host) {}
+    Console(Listener &listener, calls::Socket &first, calls::Socket &second, const ConsoleLog &log,
+            Host &host);
     ~Console();
     Console(const Console &) = delete;
     Console &operator=(const Console &) = delete;
 
     // Every loop pass. `ip` is the Wi-Fi address (0 while Wi-Fi is down); the port closes
-    // and opens again when it changes. Turning the console off closes the client.
+    // and opens again when it changes. Turning the console off closes every client.
     void poll(bool enabled, uint32_t ip, uint32_t now);
-    // Sends what the client has not had yet, as far as the socket takes it now.
+    // Sends the logged-in client what it has not had yet, as far as its socket takes it.
     void flush();
-    // What a logged-in client typed, for the console session.
+    // What the logged-in client typed, for the console session.
     size_t read(uint8_t *out, size_t cap);
 
-    State state() const { return state_; }
-    bool loggedIn() const { return state_ == State::kReady; }
-    const char *peer() const;  // the client's address, or "" without one
+    // kReady while a client is logged in, else kLogin while one is at the password prompt.
+    State state() const;
+    bool loggedIn() const { return ready() != nullptr; }
+    const char *peer() const;     // the logged-in client's address, or ""
+    const char *waiting() const;  // the address of a client at the password prompt, or ""
 
 private:
+    enum class Stage : uint8_t { kFree, kLogin, kReady };
+    struct Client {
+        calls::Socket *socket = nullptr;
+        Stage stage = Stage::kFree;
+        uint32_t since = 0;
+        unsigned tries = 0;
+        bool afterCr = false;
+        bool prompted = false;
+        char password[kPasswordMax + 1] = {};
+        size_t length = 0;
+        bool overflow = false;
+    };
+    static constexpr unsigned kSlots = 2;
+
+    const Client *ready() const;
+    Client *ready();
     void stop();
     void accept(uint32_t now);
-    void login(uint32_t now);
-    void submit(uint32_t now);
-    void drop();
-    void send(const char *text);
-    void clearPassword();
-    bool sendNote();
+    void login(Client &client, uint32_t now);
+    void submit(Client &client, uint32_t now);
+    void drop(Client &client);
+    static void send(Client &client, const char *text);
+    static void clearPassword(Client &client);
+    bool sendNote(Client &client);
 
-    calls::Listener &listener_;
-    calls::Socket &socket_;
+    Listener &listener_;
     const ConsoleLog &log_;
     Host &host_;
-    State state_ = State::kOff;
+    Client clients_[kSlots];
+    bool listening_ = false;
     uint32_t ip_ = 0;
     bool tried_ = false;
     uint32_t triedAt_ = 0;
-    uint32_t since_ = 0;
-    unsigned tries_ = 0;
     bool wrong_ = false;
     uint32_t wrongAt_ = 0;
-    bool afterCr_ = false;
-    bool prompted_ = false;
-    char password_[kPasswordMax + 1] = {};
-    size_t length_ = 0;
-    bool overflow_ = false;
+    // The logged-in client's place in the log, and the "skipped" note still to send.
     uint64_t cursor_ = 0;
-    uint64_t skipped_ = 0;  // output the client missed, for the next note
-    char note_[64] = {};    // a "skipped" note still to send
+    uint64_t skipped_ = 0;
+    char note_[64] = {};
     size_t noteAt_ = 0, noteLength_ = 0;
 };
 

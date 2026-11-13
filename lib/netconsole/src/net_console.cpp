@@ -45,175 +45,253 @@ bool Settings::setEnabled(bool on) {
 
 // --- Console ----------------------------------------------------------------------------
 
+Console::Console(Listener &listener, calls::Socket &first, calls::Socket &second,
+                 const ConsoleLog &log, Host &host)
+    : listener_(listener), log_(log), host_(host) {
+    clients_[0].socket = &first;
+    clients_[1].socket = &second;
+}
+
 Console::~Console() {
-    clearPassword();
+    for (auto &client : clients_) {
+        clearPassword(client);
+    }
+}
+
+const Console::Client *Console::ready() const {
+    for (const auto &client : clients_) {
+        if (client.stage == Stage::kReady) {
+            return &client;
+        }
+    }
+    return nullptr;
+}
+
+Console::Client *Console::ready() {
+    for (auto &client : clients_) {
+        if (client.stage == Stage::kReady) {
+            return &client;
+        }
+    }
+    return nullptr;
+}
+
+Console::State Console::state() const {
+    if (!listening_) {
+        return State::kOff;
+    }
+    if (ready()) {
+        return State::kReady;
+    }
+    for (const auto &client : clients_) {
+        if (client.stage == Stage::kLogin) {
+            return State::kLogin;
+        }
+    }
+    return State::kListening;
 }
 
 const char *Console::peer() const {
-    return state_ == State::kLogin || state_ == State::kReady ? socket_.peer() : "";
+    const Client *client = ready();
+    return client ? client->socket->peer() : "";
+}
+
+const char *Console::waiting() const {
+    for (const auto &client : clients_) {
+        if (client.stage == Stage::kLogin) {
+            return client.socket->peer();
+        }
+    }
+    return "";
 }
 
 void Console::poll(bool enabled, uint32_t ip, uint32_t now) {
     if (!enabled || ip == 0 || ip != ip_) {
-        if (state_ == State::kReady) {
-            flush();  // the OK of AT*NETCONSOLE=OFF, if the socket takes it
-        }
+        flush();  // the OK of AT*NETCONSOLE=OFF, if the socket takes it
         stop();
         ip_ = ip;
         if (!enabled || ip == 0) {
             return;
         }
     }
-    if (state_ == State::kOff) {
+    if (!listening_) {
         if (tried_ && now - triedAt_ < kRetryMs) {
             return;
         }
         tried_ = true;
         triedAt_ = now;
-        if (!listener_.begin(kPort)) {
+        listening_ = listener_.begin(kPort);
+        if (!listening_) {
             return;
         }
-        state_ = State::kListening;
     }
-    if (state_ != State::kListening && socket_.state() != calls::SocketState::kOpen) {
-        drop();  // the client went away
+    for (auto &client : clients_) {
+        if (client.stage != Stage::kFree && client.socket->state() != calls::SocketState::kOpen) {
+            drop(client);  // the client went away
+        }
     }
-    if (state_ == State::kListening) {
-        accept(now);
-    } else {
-        listener_.refuse("Network console in use.\r\n");
+    accept(now);
+    for (auto &client : clients_) {
+        if (client.stage == Stage::kLogin) {
+            login(client, now);
+        }
     }
-    if (state_ == State::kLogin) {
-        login(now);
-    }
-    if (state_ == State::kReady) {
-        flush();
-    }
+    flush();
 }
 
 void Console::stop() {
-    if (state_ == State::kLogin || state_ == State::kReady) {
-        drop();
+    for (auto &client : clients_) {
+        if (client.stage != Stage::kFree) {
+            drop(client);
+        }
     }
-    if (state_ != State::kOff) {
+    if (listening_) {
         listener_.stop();
     }
-    state_ = State::kOff;
+    listening_ = false;
     tried_ = false;
 }
 
+// A new connection takes a free socket, or the one of the client longest at the password
+// prompt. It never replaces the logged-in client: that one is closed only when another
+// client logs in (submit()), so a connection without the password can't throw it out.
 void Console::accept(uint32_t now) {
-    if (!listener_.accept()) {
+    Client *slot = nullptr;
+    for (auto &client : clients_) {
+        if (client.stage == Stage::kFree) {
+            slot = &client;
+            break;
+        }
+    }
+    for (auto &client : clients_) {
+        if (!slot && client.stage == Stage::kLogin) {
+            slot = &client;
+        } else if (slot && slot->stage == Stage::kLogin && client.stage == Stage::kLogin &&
+                   now - client.since > now - slot->since) {
+            slot = &client;
+        }
+    }
+    if (!slot || !listener_.accept(static_cast<unsigned>(slot - clients_))) {
         return;
     }
-    state_ = State::kLogin;
-    since_ = now;
-    tries_ = 0;
-    afterCr_ = false;
-    prompted_ = false;
-    clearPassword();
+    clearPassword(*slot);
+    slot->stage = Stage::kLogin;
+    slot->since = now;
+    slot->tries = 0;
+    slot->afterCr = false;
+    slot->prompted = false;
 }
 
-void Console::drop() {
-    socket_.close();
-    clearPassword();
-    noteAt_ = noteLength_ = 0;
-    skipped_ = 0;
-    state_ = State::kListening;
+void Console::drop(Client &client) {
+    client.socket->close();
+    clearPassword(client);
+    if (client.stage == Stage::kReady) {
+        noteAt_ = noteLength_ = 0;
+        skipped_ = 0;
+    }
+    client.stage = Stage::kFree;
 }
 
-void Console::send(const char *text) {
-    socket_.write(reinterpret_cast<const uint8_t *>(text), strlen(text));
+void Console::send(Client &client, const char *text) {
+    client.socket->write(reinterpret_cast<const uint8_t *>(text), strlen(text));
 }
 
-void Console::clearPassword() {
-    devicecfg::wipe(password_, sizeof password_);
-    length_ = 0;
-    overflow_ = false;
+void Console::clearPassword(Client &client) {
+    devicecfg::wipe(client.password, sizeof client.password);
+    client.length = 0;
+    client.overflow = false;
 }
 
 // One byte at a time, so that what follows the password stays in the socket for read().
-void Console::login(uint32_t now) {
-    if (now - since_ >= kLoginMs) {
-        send("\r\nNo password: closed.\r\n");
-        drop();
+void Console::login(Client &client, uint32_t now) {
+    if (now - client.since >= kLoginMs) {
+        send(client, "\r\nNo password: closed.\r\n");
+        drop(client);
         return;
     }
-    if (!prompted_) {
-        if (now - since_ < kPromptDelayMs) {
+    if (!client.prompted) {
+        if (now - client.since < kPromptDelayMs) {
             return;
         }
-        prompted_ = true;
-        send("Password: ");
+        client.prompted = true;
+        send(client, "Password: ");
     }
     uint8_t c = 0;
-    for (size_t i = 0; i < kLoginBytes && state_ == State::kLogin; ++i) {
-        if (!socket_.read(&c, 1)) {
+    for (size_t i = 0; i < kLoginBytes && client.stage == Stage::kLogin; ++i) {
+        if (!client.socket->read(&c, 1)) {
             break;
         }
-        bool cr = afterCr_;
-        afterCr_ = c == '\r';
+        bool cr = client.afterCr;
+        client.afterCr = c == '\r';
         if ((c == '\n' || c == '\0') && cr) {
             continue;  // CR LF or CR NUL ends one line
         }
         if (c == '\r' || c == '\n') {
-            submit(now);
+            submit(client, now);
         } else if (c == 8 || c == 127) {
-            if (length_ && !overflow_) {
-                password_[--length_] = '\0';
+            if (client.length && !client.overflow) {
+                client.password[--client.length] = '\0';
             }
-        } else if (length_ < kPasswordMax) {
-            password_[length_++] = static_cast<char>(c);
+        } else if (client.length < kPasswordMax) {
+            client.password[client.length++] = static_cast<char>(c);
         } else {
-            overflow_ = true;
+            client.overflow = true;
         }
     }
     c = 0;
 }
 
-void Console::submit(uint32_t now) {
-    if (length_ == 0 && !overflow_) {
-        send("\r\nPassword: ");
+void Console::submit(Client &client, uint32_t now) {
+    if (client.length == 0 && !client.overflow) {
+        send(client, "\r\nPassword: ");
         return;
     }
     bool locked = wrong_ && now - wrongAt_ < kLockOutMs;
-    bool ok = !locked && !overflow_ && host_.passwordMatches(password_);
-    clearPassword();
+    bool ok = !locked && !client.overflow && host_.passwordMatches(client.password);
+    clearPassword(client);
     if (ok) {
         wrong_ = false;
-        state_ = State::kReady;
+        if (Client *previous = ready()) {  // one logged-in client: the newest
+            flush();
+            send(*previous, "\r\nNetwork console: logged in from another connection; closed.\r\n");
+            drop(*previous);
+        }
+        client.stage = Stage::kReady;
         cursor_ = log_.start();  // all the console output still held
+        noteAt_ = noteLength_ = 0;
+        skipped_ = 0;
         host_.loggedIn();
-        send("\r\nLogged in. Recent console output follows.\r\n");
+        send(client, "\r\nLogged in. Recent console output follows.\r\n");
         return;
     }
     if (!locked) {  // a refused attempt during the lock-out does not extend it
         wrong_ = true;
         wrongAt_ = now;
     }
-    if (++tries_ >= kTries) {
-        send("\r\nWrong password: closed.\r\n");
-        drop();
+    if (++client.tries >= kTries) {
+        send(client, "\r\nWrong password: closed.\r\n");
+        drop(client);
         return;
     }
-    send("\r\nWrong password.\r\nPassword: ");
+    send(client, "\r\nWrong password.\r\nPassword: ");
 }
 
 void Console::flush() {
-    if (state_ != State::kReady) {
+    Client *client = ready();
+    if (!client) {
         return;
     }
     uint8_t chunk[512];
     size_t sent = 0;
-    while (sent < kFlushMax && socket_.state() == calls::SocketState::kOpen) {
+    while (sent < kFlushMax && client->socket->state() == calls::SocketState::kOpen) {
         uint64_t from = cursor_, skipped = 0;
         size_t n = log_.read(from, chunk, sizeof chunk, skipped);
         cursor_ = from - n;  // moved to the oldest byte held if the client fell behind
         skipped_ += skipped;
-        if (!sendNote() || n == 0) {
+        if (!sendNote(*client) || n == 0) {
             break;
         }
-        size_t w = socket_.write(chunk, n);
+        size_t w = client->socket->write(chunk, n);
         cursor_ += w;
         sent += w;
         if (w < n) {
@@ -225,7 +303,7 @@ void Console::flush() {
 // The "skipped" note goes before the output that follows the gap. It is written only
 // once the socket takes its first byte, so it counts every byte skipped until then.
 // Returns true when no note is left to send.
-bool Console::sendNote() {
+bool Console::sendNote(Client &client) {
     if (noteLength_ == 0 && skipped_ != 0) {
         int len = snprintf(note_, sizeof note_, "\r\n[Network console: %llu bytes skipped]\r\n",
                            static_cast<unsigned long long>(skipped_));
@@ -235,8 +313,8 @@ bool Console::sendNote() {
     if (noteLength_ == 0) {
         return true;
     }
-    size_t w =
-        socket_.write(reinterpret_cast<const uint8_t *>(note_) + noteAt_, noteLength_ - noteAt_);
+    size_t w = client.socket->write(reinterpret_cast<const uint8_t *>(note_) + noteAt_,
+                                    noteLength_ - noteAt_);
     if (noteAt_ == 0) {
         if (w == 0) {
             noteLength_ = 0;  // not started: written again later with the new count
@@ -253,12 +331,13 @@ bool Console::sendNote() {
 }
 
 size_t Console::read(uint8_t *out, size_t cap) {
-    if (state_ != State::kReady) {
+    Client *client = ready();
+    if (!client) {
         return 0;
     }
-    size_t n = socket_.read(out, cap);
-    if (n && afterCr_) {  // the LF or NUL of the password's line end
-        afterCr_ = false;
+    size_t n = client->socket->read(out, cap);
+    if (n && client->afterCr) {  // the LF or NUL of the password's line end
+        client->afterCr = false;
         if (out[0] == '\n' || out[0] == '\0') {
             memmove(out, out + 1, --n);
         }

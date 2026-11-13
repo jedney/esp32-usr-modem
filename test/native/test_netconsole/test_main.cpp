@@ -61,34 +61,34 @@ public:
     }
 };
 
-class FakeListener : public calls::Listener {
+// Accepts into either socket, as hw::TcpListener does: whatever the socket had is closed.
+class FakeListener : public Listener {
 public:
-    FakeSocket &socket;
+    FakeSocket *sockets[2];
     unsigned pending = 0, starts = 0, stops = 0;
     bool fail = false, open = false;
-    std::vector<std::string> refused;
-    explicit FakeListener(FakeSocket &s) : socket(s) {}
+    std::vector<unsigned> slots;  // where each connection went
+    FakeListener(FakeSocket &a, FakeSocket &b) : sockets{&a, &b} {}
     bool begin(uint16_t port) override {
         TEST_ASSERT_EQUAL(2001, port);
         ++starts;
         open = !fail;
         return open;
     }
-    bool accept() override {
+    bool accept(unsigned slot) override {
+        TEST_ASSERT_TRUE(slot < 2);
         if (!open || !pending) {
             return false;
         }
         --pending;
+        FakeSocket &socket = *sockets[slot];
+        if (socket.status == SocketState::kOpen) {
+            socket.close();
+        }
         socket.status = SocketState::kOpen;
         socket.output.clear();
+        slots.push_back(slot);
         return true;
-    }
-    void reject() override { TEST_FAIL_MESSAGE("reject() instead of refuse()"); }
-    void refuse(const char *line) override {
-        if (open && pending) {
-            --pending;
-            refused.push_back(line);
-        }
     }
     void stop() override {
         ++stops;
@@ -101,8 +101,10 @@ class FakeHost : public Host {
 public:
     std::string password = "Secret123";
     unsigned checks = 0, logins = 0;
+    std::string lastPassword;
     bool passwordMatches(const char *text) override {
         ++checks;
+        lastPassword = text;
         return password == text;
     }
     void loggedIn() override { ++logins; }
@@ -124,10 +126,10 @@ constexpr uint32_t kIp = 0x0500000A;
 struct Rig {
     uint8_t storage[256] = {};
     ConsoleLog log;
-    FakeSocket socket;
-    FakeListener listener{socket};
+    FakeSocket socket, socket2;
+    FakeListener listener{socket, socket2};
     FakeHost host;
-    Console console{listener, socket, log, host};
+    Console console{listener, socket, socket2, log, host};
     uint32_t now = 1000;
     Rig() { log.begin(storage, sizeof storage); }
     void write(const char *text) { log.append(text, strlen(text)); }
@@ -149,6 +151,19 @@ struct Rig {
     std::string login() {
         connect();
         return type("Secret123\r\n");
+    }
+    // A second client connects while the first is there; returns what it got.
+    std::string connectSecond() {
+        ++listener.pending;
+        poll();
+        now += Console::kPromptDelayMs;
+        poll();
+        return socket2.take();
+    }
+    std::string typeSecond(const char *text) {
+        socket2.input += text;
+        poll();
+        return socket2.take();
     }
     std::string typed() {
         uint8_t buf[64];
@@ -307,7 +322,7 @@ void test_nothing_but_the_prompt_before_log_in() {
     r.write("Device password: Secret123\r\nboot messages\r\n");
     TEST_ASSERT_EQUAL_STRING("Password: ", r.connect().c_str());
     TEST_ASSERT_TRUE(r.console.state() == Console::State::kLogin);
-    TEST_ASSERT_EQUAL_STRING("10.0.0.5", r.console.peer());
+    TEST_ASSERT_EQUAL_STRING("10.0.0.5", r.console.waiting());
     r.write("more output\r\n");
     TEST_ASSERT_EQUAL_STRING("", r.type("Secr").c_str());  // no echo
     TEST_ASSERT_EQUAL_STRING("", r.typed().c_str());       // nothing reaches the console
@@ -434,17 +449,75 @@ void test_no_password_in_time_closes() {
     TEST_ASSERT_TRUE(r.console.state() == Console::State::kListening);
 }
 
-void test_second_client_is_told_and_closed() {
+void test_second_client_takes_over_when_it_logs_in() {
     Rig r;
-    r.connect();
-    ++r.listener.pending;
+    r.write("boot line\r\n");
+    r.login();
+    TEST_ASSERT_EQUAL_STRING("Password: ", r.connectSecond().c_str());
+    TEST_ASSERT_EQUAL(1, r.listener.slots.back());
+    TEST_ASSERT_TRUE(r.console.loggedIn());  // the first still works meanwhile
+    TEST_ASSERT_EQUAL_STRING("10.0.0.5", r.console.waiting());
+    r.socket.input = "AT\r";
+    TEST_ASSERT_EQUAL_STRING("AT\r", r.typed().c_str());
+    r.write("OK\r\n");
+    std::string out = r.typeSecond("Secret123\r");
+    TEST_ASSERT_TRUE(has(out, "Logged in."));
+    TEST_ASSERT_TRUE(has(out, "boot line\r\n"));  // the replay
+    std::string first = r.socket.take();
+    TEST_ASSERT_TRUE(has(first, "OK\r\n"));  // what it had not had yet, then the notice
+    TEST_ASSERT_TRUE(has(first, "logged in from another connection; closed."));
+    TEST_ASSERT_EQUAL(1, r.socket.closes);
+    TEST_ASSERT_TRUE(r.console.loggedIn());
+    TEST_ASSERT_EQUAL_STRING("", r.console.waiting());
+    r.socket2.input = "ATI\r";
+    TEST_ASSERT_EQUAL_STRING("ATI\r", r.typed().c_str());
+    r.write("live\r\n");
     r.poll();
-    TEST_ASSERT_EQUAL(1, r.listener.refused.size());
-    TEST_ASSERT_EQUAL_STRING("Network console in use.\r\n", r.listener.refused[0].c_str());
-    r.type("Secret123\r");
-    ++r.listener.pending;
+    TEST_ASSERT_EQUAL_STRING("live\r\n", r.socket2.take().c_str());
+    TEST_ASSERT_EQUAL(2, r.host.logins);
+}
+
+void test_connection_without_the_password_never_throws_the_client_out() {
+    Rig r;
+    r.login();
+    r.connectSecond();
+    for (int i = 0; i < 3; ++i) {
+        r.now += Console::kLockOutMs;
+        r.typeSecond("guess\r");
+    }
+    TEST_ASSERT_EQUAL(1, r.socket2.closes);  // three wrong passwords
+    TEST_ASSERT_EQUAL(0, r.socket.closes);
+    TEST_ASSERT_TRUE(r.console.loggedIn());
+    r.write("still here\r\n");
     r.poll();
-    TEST_ASSERT_EQUAL(2, r.listener.refused.size());
+    TEST_ASSERT_TRUE(has(r.socket.take(), "still here"));
+}
+
+void test_new_connection_replaces_the_one_at_the_prompt() {
+    Rig r;
+    r.login();
+    r.connectSecond();
+    r.typeSecond("Secr");  // half-typed, then hangs
+    TEST_ASSERT_EQUAL_STRING("Password: ", r.connectSecond().c_str());
+    TEST_ASSERT_EQUAL(1, r.socket2.closes);  // the hung one
+    TEST_ASSERT_EQUAL(0, r.socket.closes);
+    TEST_ASSERT_TRUE(r.console.loggedIn());
+    r.typeSecond("Secret123\r");  // the earlier half password is gone
+    TEST_ASSERT_EQUAL_STRING("Secret123", r.host.lastPassword.c_str());
+}
+
+void test_hung_client_at_the_prompt_keeps_nobody_out() {
+    Rig r;
+    r.connect();  // never types
+    TEST_ASSERT_TRUE(r.console.state() == Console::State::kLogin);
+    TEST_ASSERT_EQUAL_STRING("Password: ", r.connectSecond().c_str());
+    r.typeSecond("Secret123\r");
+    TEST_ASSERT_TRUE(r.console.loggedIn());
+    TEST_ASSERT_EQUAL_STRING("10.0.0.5", r.console.waiting());  // the hung one, until 60 s
+    r.now += Console::kLoginMs;
+    r.poll();
+    TEST_ASSERT_EQUAL(1, r.socket.closes);
+    TEST_ASSERT_EQUAL_STRING("", r.console.waiting());
     TEST_ASSERT_TRUE(r.console.loggedIn());
 }
 
@@ -506,10 +579,10 @@ void test_one_poll_sends_at_most_a_bounded_amount() {
     uint8_t big[16384];
     ConsoleLog log;
     log.begin(big, sizeof big);
-    FakeSocket socket;
-    FakeListener listener(socket);
+    FakeSocket socket, spare;
+    FakeListener listener(socket, spare);
     FakeHost host;
-    Console console(listener, socket, log, host);
+    Console console(listener, socket, spare, log, host);
     console.poll(true, kIp, 0);
     ++listener.pending;
     console.poll(true, kIp, 0);
@@ -545,7 +618,10 @@ int main() {
     RUN_TEST(test_lock_out_covers_the_next_connection);
     RUN_TEST(test_overlong_password_is_wrong_without_a_check);
     RUN_TEST(test_no_password_in_time_closes);
-    RUN_TEST(test_second_client_is_told_and_closed);
+    RUN_TEST(test_second_client_takes_over_when_it_logs_in);
+    RUN_TEST(test_connection_without_the_password_never_throws_the_client_out);
+    RUN_TEST(test_new_connection_replaces_the_one_at_the_prompt);
+    RUN_TEST(test_hung_client_at_the_prompt_keeps_nobody_out);
     RUN_TEST(test_client_that_leaves_frees_the_port);
     RUN_TEST(test_turning_off_sends_what_it_can_then_closes);
     RUN_TEST(test_client_that_stops_reading_never_holds_up_output);

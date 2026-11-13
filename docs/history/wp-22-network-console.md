@@ -124,6 +124,9 @@ Done. Reasons and details are in the decisions log (rows "network console: open 
   the network console: works. App image 1,499,969 bytes (35.8 %), static RAM 153,424 bytes.
 - **Local checks:** native 514 (1 skip: pins overridden by the bench `.env`), cppcheck,
   clang-format, UI tables, version.
+- **Follow-up (14 Nov, Jon):** a new client that logs in takes over from the earlier
+  one (instead of "in use"); the two quirks found here are fixed (decisions log rows
+  "network console: takeover", "information replies", "console transmit buffer").
 - **For Jon:** try the VS Code task "Modem: network console" (it needs a real terminal,
   so it was not run here; it opens the port the same way as the tests, which get the
   prompt 10 times out of 10).

@@ -268,7 +268,9 @@ on the USB modem port or not plugged in at all. Run **Modem: network console** (
 TCP client, or `socket://usr-modem.local:2001` in pyserial) and type the device password
 at `Password:` (if no prompt shows, press Enter). It then shows the console's recent output,
 the boot messages included while they fit in its 16 KB, and works as the console itself:
-the same session as the cable, with the same commands and rules. One client at a time.
+the same session as the cable, with the same commands and rules. One logged-in client at
+a time: logging in from a new connection closes the earlier one, so a hung connection never
+keeps you out.
 `AT*NETCONSOLE=OFF` turns it off (saved). The end-to-end tests take
 `--console-port socket://usr-modem.local:2001` and log in with `USR_MODEM_PASSWORD`.
 

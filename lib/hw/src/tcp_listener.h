@@ -8,8 +8,8 @@ public:
     explicit TcpListener(TcpSocket &socket) : socket_(socket) {}
     bool begin(uint16_t port) override;
     bool accept() override;
+    bool accept(TcpSocket &into);  // the waiting connection into another socket
     void reject() override;
-    void refuse(const char *line) override;
     void stop() override;
 
 private:

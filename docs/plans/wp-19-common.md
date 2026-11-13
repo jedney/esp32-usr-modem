@@ -183,8 +183,10 @@ later work.
     password (Jon's; Claude never sees it). In a script, use the e2e conftest's
     `net_console_connect()`, which never prints it.
   - After log-in the last 16 KB of console output is replayed: the boot banner
-    shows straight after a restart. One client at a time: close the serial monitor
-    (or the other script) first.
+    shows straight after a restart. One logged-in client at a time: logging in from a
+    new connection closes the earlier one (the serial monitor or another script).
+  - Opening COM20 (the console cable) can reset the board through the USB-serial
+    chip's reset lines; a test run that starts by opening it may see the board boot.
   - Not over the network: `AT*WIFI=OFF` or a Wi-Fi join cuts the connection
     (`test_wifi.py` needs the cable); the first flash after a full erase;
     `pio test -e s3`; panic output as it happens (`AT*RESETINFO` shows the record);

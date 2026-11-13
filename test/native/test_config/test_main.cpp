@@ -153,6 +153,24 @@ void test_renderers_and_paging_work_with_one_byte_output() {
     TEST_ASSERT_EQUAL(0, screen.scrolls);
     TEST_ASSERT_TRUE(screen.wrap && screen.cursor);
 }
+// An information reply starts with S3 S4 (beginInfo); the screen doesn't show that as an
+// empty first line.
+void test_reply_line_break_at_the_start_is_not_shown() {
+    Rig plain, info;
+    plain.terminal.open();
+    info.terminal.open();
+    ScreenView a, b;
+    a.accept(plain.drain());
+    b.accept(info.drain());
+    plain.terminal.write("first\r\nsecond\r\n", 15);
+    info.terminal.write("\r\nfirst\r\nsecond\r\n", 17);
+    a.accept(plain.drain());
+    b.accept(info.drain());
+    TEST_ASSERT_TRUE(a.has("first"));
+    for (unsigned row = 0; row < 25; ++row) {
+        TEST_ASSERT_EQUAL_STRING(a.row(row).c_str(), b.row(row).c_str());
+    }
+}
 void test_response_pagination_does_not_leak_next_page() {
     Rig r;
     r.terminal.open();
@@ -422,6 +440,7 @@ int main() {
     RUN_TEST(test_menu_actions_have_production_at_star_handlers);
     RUN_TEST(test_direct_menu_reserves_without_carrier_and_releases);
     RUN_TEST(test_renderers_and_paging_work_with_one_byte_output);
+    RUN_TEST(test_reply_line_break_at_the_start_is_not_shown);
     RUN_TEST(test_response_pagination_does_not_leak_next_page);
     RUN_TEST(test_menu_secret_input_is_wiped_and_never_echoed);
     RUN_TEST(test_ring_wrap_has_only_structured_events_and_can_disable);

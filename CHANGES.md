@@ -26,8 +26,9 @@ Work in progress on `firmware/v3.0-idf5`; this entry is completed in WP-19.
   (VS Code task "Modem: network console"), pyserial and the end-to-end tests'
   `--console-port`. After log-in it shows the console's recent output (16 KB, so the boot
   messages while they fit, ESP-IDF log lines included) and is the same session as the
-  cable. One client at a time; a wrong password locks log-ins out for a second, and three
-  close the connection. A client that stops reading never holds up the modem: it misses
+  cable. One logged-in client at a time: logging in from a new connection closes the
+  earlier one. A wrong password locks log-ins out for a second, and three close the
+  connection. A client that stops reading never holds up the modem: it misses
   output instead, and is told how much. `AT*NETCONSOLE=ON|OFF` (factory ON), on the
   configuration screen under Updates and Reset, in `AT*EXPORT`; `AT*STATUS` shows the
   client.
@@ -73,6 +74,13 @@ Work in progress on `firmware/v3.0-idf5`; this entry is completed in WP-19.
 
 ### Fixed
 
+- Information replies always start on a line of their own. `AT*WEB?`, `AT*STYLE?`,
+  `AT*SIZE?`, `AT*STATUS`, `AT*SOUNDS`, `AT*RESETINFO`, `AT*INTERNET?`, `AT*REFERENCE`,
+  `AT*ABOUT`, `AT*LOG`, `AT*CALLLOG` and `AT*EXPORT` printed theirs on the line that
+  echoes the command. The configuration screen doesn't show that first line break.
+- A long reply on the maintenance console no longer holds up the modem while the cable
+  carries it (`AT*REFERENCE` held every port for half a second): the console has a 16 KB
+  transmit buffer.
 - Browser WebSocket connections were reset at once on IDF 6.1, and a fresh request could
   be reset when earlier connections still held every slot.
 - The time of the last NTP sync could be read half-updated.
