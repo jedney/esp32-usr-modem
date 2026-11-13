@@ -450,34 +450,28 @@ struct NetRig {
     }
 };
 
-void test_nothing_saved_red_light_no_join() {
+void test_nothing_saved_light_off_no_join() {
     NetRig r;
     TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kEmpty), static_cast<int>(r.net.begin(0)));
     r.net.tick(10);
     TEST_ASSERT_EQUAL(0, r.radio.connects);
-    TEST_ASSERT_EQUAL(static_cast<int>(Rgb::kRed), static_cast<int>(r.net.rgb(10)));
-    TEST_ASSERT_EQUAL(static_cast<int>(Rgb::kRed), static_cast<int>(r.net.rgb(510)));
     TEST_ASSERT_EQUAL(static_cast<int>(Arq::kOff), static_cast<int>(r.net.arq()));
     TEST_ASSERT_EQUAL_STRING("not set up", r.net.stateText());
 }
 
-void test_saved_network_flashes_green_then_solid() {
+void test_saved_network_blinks_then_shows_on() {
     Settings s = saved("HomeNet", "password1");
     NetRig r(&s);
     r.net.begin(0);
     TEST_ASSERT_EQUAL(1, r.radio.connects);
     TEST_ASSERT_EQUAL_STRING("HomeNet", r.radio.last.ssid);
     r.net.tick(100);
-    TEST_ASSERT_EQUAL(static_cast<int>(Rgb::kGreen), static_cast<int>(r.net.rgb(100)));
-    TEST_ASSERT_EQUAL(static_cast<int>(Rgb::kOff), static_cast<int>(r.net.rgb(600)));
-    TEST_ASSERT_EQUAL(static_cast<int>(Rgb::kGreen), static_cast<int>(r.net.rgb(1000)));
     TEST_ASSERT_EQUAL(static_cast<int>(Arq::kBlink), static_cast<int>(r.net.arq()));
     TEST_ASSERT_EQUAL_STRING("connecting", r.net.stateText());
 
     r.radio.up();
     r.net.tick(1200);
     TEST_ASSERT_TRUE(r.net.up());
-    TEST_ASSERT_EQUAL(static_cast<int>(Rgb::kGreen), static_cast<int>(r.net.rgb(1600)));
     TEST_ASSERT_EQUAL(static_cast<int>(Arq::kOn), static_cast<int>(r.net.arq()));
     TEST_ASSERT_EQUAL(1, r.radio.services);
     TEST_ASSERT_EQUAL_STRING("usr-modem", r.radio.host.c_str());
@@ -547,8 +541,6 @@ void test_switched_off_lights_off() {
     TEST_ASSERT_TRUE(r.net.setEnabled(false));
     TEST_ASSERT_EQUAL(1, r.radio.offs);
     r.net.tick(200);
-    TEST_ASSERT_EQUAL(static_cast<int>(Rgb::kOff), static_cast<int>(r.net.rgb(200)));
-    TEST_ASSERT_EQUAL(static_cast<int>(Rgb::kOff), static_cast<int>(r.net.rgb(700)));
     TEST_ASSERT_EQUAL(static_cast<int>(Arq::kOff), static_cast<int>(r.net.arq()));
     TEST_ASSERT_EQUAL_STRING("off", r.net.stateText());
     Settings back;
@@ -574,7 +566,7 @@ void test_forget_wipes_network_and_password() {
     r.net.tick(200);
     TEST_ASSERT_FALSE(r.net.settings().hasNetwork());
     TEST_ASSERT_EQUAL_STRING("", r.net.settings().pass);
-    TEST_ASSERT_EQUAL(static_cast<int>(Rgb::kRed), static_cast<int>(r.net.rgb(200)));
+    TEST_ASSERT_EQUAL(static_cast<int>(Arq::kOff), static_cast<int>(r.net.arq()));
     Settings back;
     load(r.store, &back);
     TEST_ASSERT_FALSE(back.hasNetwork());
@@ -680,7 +672,7 @@ void test_join_retries_a_missing_network_then_gives_up() {
     r.net.tick(10000);
     TEST_ASSERT_EQUAL(static_cast<int>(JoinResult::kFailed), static_cast<int>(r.net.joinResult()));
     TEST_ASSERT_EQUAL(static_cast<int>(Reason::kNotFound), static_cast<int>(r.net.joinReason()));
-    TEST_ASSERT_EQUAL(static_cast<int>(Rgb::kRed), static_cast<int>(r.net.rgb(10000)));
+    TEST_ASSERT_EQUAL(static_cast<int>(Arq::kOff), static_cast<int>(r.net.arq()));
 }
 
 void test_join_with_no_answer_times_out() {
@@ -1330,8 +1322,8 @@ int main(int, char **) {
     RUN_TEST(test_offset_cache_recomputes_only_for_a_new_minute_or_rule);
     RUN_TEST(test_resolve_gives_the_stored_name);
     RUN_TEST(test_format_local_time);
-    RUN_TEST(test_nothing_saved_red_light_no_join);
-    RUN_TEST(test_saved_network_flashes_green_then_solid);
+    RUN_TEST(test_nothing_saved_light_off_no_join);
+    RUN_TEST(test_saved_network_blinks_then_shows_on);
     RUN_TEST(test_lost_wifi_reconnects_at_once);
     RUN_TEST(test_failed_attempts_back_off);
     RUN_TEST(test_attempt_with_no_answer_gives_up_after_30_s);

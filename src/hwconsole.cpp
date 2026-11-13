@@ -229,8 +229,7 @@ void printPins() {
     for (uint8_t i = 0; i < hwtest::kLedCount; ++i) {
         out().printf(" %s=GPIO%d", hwtest::ledName(i), pins::kLeds[i]);
     }
-    out().printf("\r\nOn board: RGB LED GPIO%d; console UART0 GPIO%d/%d\r\n", pins::kRgbLed,
-                 pins::kConsoleTx, pins::kConsoleRx);
+    out().printf("\r\nOn board: console UART0 GPIO%d/%d\r\n", pins::kConsoleTx, pins::kConsoleRx);
 }
 
 // --- Info and files ----------------------------------------------------------------------

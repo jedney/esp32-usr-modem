@@ -25,6 +25,11 @@ Work in progress on `firmware/v3.0-idf5`; this entry is completed in WP-19.
   platform `espressif32@8.0.0` (SEC-03). Mbed TLS 4 (PSA Crypto), Picolibc and GCC 15
   come with it.
 
+### Removed
+
+- The S3 board's own RGB LED is no longer used: it can't be seen in the case. The front
+  ARQ LED still shows Wi-Fi. `USR_MODEM_PIN_RGB_LED` is gone from `.env.example`.
+
 ## [2.17] - 2026-11-13
 
 ### Added

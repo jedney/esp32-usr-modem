@@ -11,8 +11,6 @@
 #include <cstdio>
 #include <cstring>
 
-#include "pins.h"
-
 namespace hw {
 
 using netcfg::LinkState;
@@ -293,40 +291,6 @@ int64_t EspRadio::lastSync() {
 
 void EspRadio::mac(uint8_t out[6]) {
     WiFi.macAddress(out);
-}
-
-// --- On-board RGB LED -----------------------------------------------------------------------
-
-namespace {
-bool rgbKnown = false;
-uint8_t rgbLast[3] = {0, 0, 0};
-constexpr uint8_t kRgbLevel = 24;  // of 255: plenty for a status light, not dazzling
-}  // namespace
-
-void rgbSet(uint8_t r, uint8_t g, uint8_t b) {
-    if (rgbKnown && rgbLast[0] == r && rgbLast[1] == g && rgbLast[2] == b) {
-        return;
-    }
-    neopixelWrite(pins::kRgbLed, r, g, b);
-    rgbLast[0] = r;
-    rgbLast[1] = g;
-    rgbLast[2] = b;
-    rgbKnown = true;
-}
-
-void rgbShow(netcfg::Rgb colour) {
-    switch (colour) {
-        case netcfg::Rgb::kRed:
-            rgbSet(kRgbLevel, 0, 0);
-            break;
-        case netcfg::Rgb::kGreen:
-            rgbSet(0, kRgbLevel, 0);
-            break;
-        case netcfg::Rgb::kOff:
-        default:
-            rgbSet(0, 0, 0);
-            break;
-    }
 }
 
 }  // namespace hw

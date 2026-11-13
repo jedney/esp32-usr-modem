@@ -17,7 +17,8 @@
 //          R4-R10 RS232 [1 RXD, 2 TXD, 42 CTS, 41 RTS, 40 DTR, 39 DCD, 38 RI]
 //          R11-13 (37 36 35) | R14 (0) | R15 (45) | R16 48 | R17 (47) | R18 21
 //          R19 (20) | R20 (19) | R21-22 GND (not connected)
-// [ ] = used below; ( ) = not usable (strapping, PSRAM, USB, UART0 console, RGB LED).
+// [ ] = used below; ( ) = not usable (strapping, PSRAM, USB, UART0 console, and 47: the
+// board's own RGB LED, still wired on the DevKit but not used from v3.0).
 // Spare: 8, 9, 18, 21, 48 (18 and 8 are also the nominal pins of the test-only UART2
 // below; nothing is connected to them). 19/20 (native USB) are also wired to the USB-C
 // PD board's D-/D+: from v2.0 they are the USB modem port (TinyUSB, lib/hw/src/usb_port.h),
@@ -76,8 +77,6 @@ constexpr int kTestUartTx = USR_MODEM_PIN_TEST_UART_TX;
 constexpr int kTestUartRx = USR_MODEM_PIN_TEST_UART_RX;
 
 // --- On the S3 board itself -------------------------------------------------------------
-constexpr int kRgbLed =
-    USR_MODEM_PIN_RGB_LED;  // WS2812-type RGB LED (Jon, 22 Oct): Wi-Fi status (v0.6)
 constexpr int kConsoleTx =
     USR_MODEM_PIN_CONSOLE_TX;  // UART0 via the onboard USB-serial chip: console only
 constexpr int kConsoleRx = USR_MODEM_PIN_CONSOLE_RX;

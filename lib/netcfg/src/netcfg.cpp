@@ -287,20 +287,6 @@ const char *Net::stateText() const {
 
 // --- Lights ---------------------------------------------------------------------------------
 
-Rgb Net::rgb(uint32_t nowMs) const {
-    const Rgb flash = (nowMs / kFlashMs) % 2 == 0 ? Rgb::kGreen : Rgb::kOff;
-    if (join_ == JoinResult::kRunning) {
-        return flash;
-    }
-    if (!s_.enabled) {
-        return Rgb::kOff;
-    }
-    if (!s_.hasNetwork()) {
-        return Rgb::kRed;
-    }
-    return up() ? Rgb::kGreen : flash;
-}
-
 Arq Net::arq() const {
     if (join_ == JoinResult::kRunning) {
         return Arq::kBlink;

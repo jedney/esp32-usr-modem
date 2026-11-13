@@ -103,5 +103,6 @@ use the Python in `%LOCALAPPDATA%\Pythonin` (pytest and pyserial installed).
 - UART0 (GPIO43/44, USB-serial chip) = maintenance console, 115200, `Serial`.
   UART1 = host RS232 via 2× MAX3232 (DCE). Native USB (GPIO19/20) kept for USB-JTAG.
 - MAX98357A I2S amp (SD pin = shutdown), GAIN pin unconnected (9 dB), Same Sky CLS0361 8 Ω 2 W speaker, WH148 10 kΩ pot
-  on ADC1, 7 front LEDs (AA CD RD SD TR CS ARQ; ARQ = Wi-Fi status), RGB LED GPIO47.
+  on ADC1, 7 front LEDs (AA CD RD SD TR CS ARQ; ARQ = Wi-Fi status). The S3 board's own
+  RGB LED (GPIO47) is hidden in the case and not used from v3.0; GPIO47 stays reserved.
 - Bench prototype uses a DB9 wired as DCE; the final build uses a DB25.

@@ -34,7 +34,7 @@ Automated tests can't cover these. They are not blockers for v1.0 but should be 
 once on the finished unit:
 
 - Listen to the dial tone, DTMF, pulse, ringing, handshake sounds and the volume knob.
-- Watch every front-panel LED during a call, and the RGB Wi-Fi LED.
+- Watch every front-panel LED during a call (ARQ shows Wi-Fi).
 - `AT*HWLOOP` with a loopback plug.
 - The configuration screen and Client Tests on a real Amiga terminal, and the PuTTY
   visual check.

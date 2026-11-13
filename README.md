@@ -153,8 +153,7 @@ so there is no extra limit. Handshake recordings come from Gough Lui's modem sou
 | CS | CTS to the computer |
 | ARQ | Wi-Fi: off = not set up or off, blinking = connecting, on = connected |
 
-The RGB LED on the S3 board also shows Wi-Fi: red = not set up, flashing green =
-connecting, green = connected.
+The RGB LED on the S3 board itself is not used (it can't be seen in the case).
 
 ## Client Tests and transfers
 

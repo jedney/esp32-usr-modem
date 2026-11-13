@@ -45,7 +45,7 @@ whole window.
 | 16 | v2.16 | [Configuration screen code tidy-up](../history/wp-16-menu-tidy.md) | Sonnet / high | M | 15 |
 | 17 | v2.17 | [Watchdog and phonebook capacity](../history/wp-17-watchdog-phonebook.md) | Opus / high | M | 02, 03, 14 |
 | 18 | v3.0 | [Framework spike](wp-18-framework-spike.md) (done 13 Nov: official platform 8.0.0, Arduino 3.3.12 on IDF 6.1) | Opus / high | L | 01-17 merged (the spike itself can run earlier) |
-| 19 | v3.0 | [Framework migration](wp-19-framework-migration.md) | per session (Sonnet / high, Opus / high) | 4 × L + bench | 18 |
+| 19 | v3.0 | [Framework migration and fresh start](wp-19-framework-migration.md) | per session (Sonnet / high, Opus / high) | 6 × L + bench | 18 |
 
 Why this order: WP-01 is cheap and makes the gates real (CI fails, upload gate, pin lock)
 before anything else lands. WP-02 is the only High finding. WP-03, WP-06, WP-14 and WP-17

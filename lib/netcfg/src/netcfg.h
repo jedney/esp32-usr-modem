@@ -5,12 +5,12 @@
 // The radio itself is behind Radio (the board's is hw::EspRadio in lib/hw; the unit
 // tests use a fake). No Arduino dependencies: unit-tested on the PC.
 //
-// Lights (decided by Jon, 24 Oct):
-//   Wi-Fi state                          on-board RGB LED    front ARQ LED
-//   no network set up                    red                 off
-//   network saved, connecting/retrying   flashing green      blinking
-//   connected                            green               on
-//   switched off (AT*WIFI=OFF)           off                 off
+// Front ARQ LED (decided by Jon, 24 Oct; the S3 board's RGB LED is not used from v3.0,
+// Jon, 13 Nov 2026: it can't be seen in the case):
+//   no network set up                    off
+//   network saved, connecting/retrying   blinking
+//   connected                            on
+//   switched off (AT*WIFI=OFF)           off
 
 #pragma once
 
@@ -74,7 +74,6 @@ public:
     virtual void mac(uint8_t out[6]) = 0;
 };
 
-enum class Rgb : uint8_t { kOff, kRed, kGreen };
 enum class Arq : uint8_t { kOff, kBlink, kOn };  // hostport::WifiLed kOff/kConnecting/kConnected
 
 enum class JoinResult : uint8_t { kNone, kRunning, kJoined, kFailed };
@@ -84,7 +83,6 @@ class Net {
 public:
     static constexpr uint32_t kJoinTimeoutMs = 20000;     // AT*WIFIJOIN gives up
     static constexpr uint32_t kAttemptTimeoutMs = 30000;  // a background attempt gives up
-    static constexpr uint32_t kFlashMs = 500;             // RGB flash and ARQ blink
     static constexpr size_t kScanMax = 20;
     static constexpr size_t kNoticeMax = 96;
 
@@ -104,7 +102,6 @@ public:
     const char *stateText() const;
 
     // --- Lights ------------------------------------------------------------------------
-    Rgb rgb(uint32_t nowMs) const;  // with the flashing applied
     Arq arq() const;
 
     // --- Changes (saved at once; false if not valid or not saved) -----------------------

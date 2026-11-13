@@ -25,10 +25,4 @@ public:
     void mac(uint8_t out[6]) override;
 };
 
-// --- On-board RGB LED (GPIO47, pins::kRgbLed): Wi-Fi status (v0.6) --------------------------
-// Uses the core's neopixelWrite() (RMT transmit channel 0); the speed capture uses receive
-// channel 4. Written only when the colour changes.
-void rgbSet(uint8_t r, uint8_t g, uint8_t b);
-void rgbShow(netcfg::Rgb colour);  // red / green / off at a low brightness
-
 }  // namespace hw

@@ -956,7 +956,6 @@ hostport::WifiLed arqLed() {
 }
 
 void pollLeds(uint32_t now) {
-    hw::rgbShow(net.rgb(now));  // on-board LED: not used by the hardware tests
     if (hwconsole::ledsHeld()) {
         ledMask = 0xFF;  // set again when the test gives them back
         return;
