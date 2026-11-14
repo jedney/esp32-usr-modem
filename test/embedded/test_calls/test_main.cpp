@@ -102,10 +102,10 @@ void printNvs(const char *when) {
 void eraseScratch() {
     for (size_t i = 0; i < kOtherCount; ++i) {
         char ns[16];
-        snprintf(ns, sizeof ns, "v17o%u", unsigned(i));
+        snprintf(ns, sizeof ns, "scratch_o%u", unsigned(i));
         hw::NvsStore(ns, "cfg").erase();
     }
-    hw::NvsStore("v17book", "cfg").erase();
+    hw::NvsStore("scratch_book", "cfg").erase();
 }
 calls::Entry longEntry(unsigned i) {
     calls::Entry e;
@@ -123,14 +123,14 @@ void test_full_phonebook_fits_beside_the_other_settings() {
     for (size_t i = 0; i < kOtherCount; ++i) {
         if (usedEntries(kOtherSettings[i].ns) == 0) {
             char ns[16];
-            snprintf(ns, sizeof ns, "v17o%u", unsigned(i));
+            snprintf(ns, sizeof ns, "scratch_o%u", unsigned(i));
             static uint8_t fill[2048];
             memset(fill, 0x5a, sizeof fill);
             TEST_ASSERT_TRUE(hw::NvsStore(ns, "cfg").save(fill, kOtherSettings[i].size));
         }
     }
     printNvs("with the other settings");
-    hw::NvsStore store("v17book", "cfg");
+    hw::NvsStore store("scratch_book", "cfg");
     auto *book = new calls::Phonebook(store);  // 6 KB: on the heap, not the loop stack
     TEST_ASSERT_TRUE(book->begin());           // the factory entry
     for (unsigned i = 1; i < calls::kPhonebookCount; ++i) {

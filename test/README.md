@@ -31,7 +31,7 @@ Unitek adapter instead. All nine `embedded/test_rs232` cases are ignored on the 
 board (no loopback plug), so the `test_rs232` entries in the matrix below mean "present, but
 skipped on the bench". `embedded/test_board` writes only the scratch namespace `test_board`, and keeps the
 watchdog fed for 17 s (a failure resets the board). `embedded/test_calls` writes its full
-phonebook to scratch namespaces (`v17book`, `v17o0`-`v17o7`) and removes them.
+phonebook to scratch namespaces (`scratch_book`, `scratch_o0`-`scratch_o7`) and removes them.
 
 ## Feature matrix
 
