@@ -206,7 +206,7 @@ A Client Tests section of the configuration screen (and `AT*TEST`, `AT*SX/SY/SZ`
 
 ## 4. Attribution
 
-- Case model: **luizpacheco** (Luiz Pacheco), Thingiverse thing:7063155, **CC BY-NC**. Modified versions keep the attribution and stay non-commercial.
+- Case model: **luizpacheco** (Luiz Pacheco), Thingiverse thing:7063155, **CC BY-NC**. Modified versions keep the attribution and stay non-commercial. The front label art is inspired by two of luizpacheco's designs, with higher resolution, more model designs and hole alignment improvements added by ChatGPT.
 - Firmware base: **Zimodem** by Bo Zimmerman, **Apache-2.0**. Keep its LICENSE and NOTICE and mark every ported or changed file as changed. Its ZMODEM code derives from the Synchronet/SyncTERM code (licence not stated in the file).
 - Concept: **RetroExternalModem** by caiot5 (GPL-3.0), which builds on WiFi2DialUp (Luis Miguel Silva), PodSix pimodem (Matt Whitted) and tcpser (Jim Brain / FozzTexx).
 - Handshake recordings: Gough Lui's 2016 modem sound collection.

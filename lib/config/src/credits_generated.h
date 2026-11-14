@@ -4,7 +4,7 @@
 namespace config {
 constexpr const char *kCredits[] = {
     "RetroExternalModem case model (`case/`: `parts/` STLs and the two Bambu Studio print projects) | 3D-printed case (modified, with added mounting parts) | luizpacheco, <https://www.thingiverse.com/thing:7063155> | CC BY-NC | Attribute; non-commercial only; modified versions keep the same terms | In repo",
-    "Front label art (`case/labels/`) | Printed front label | luizpacheco (as above) | CC BY-NC | As above | In repo",
+    "Front label art (`case/labels/`) | Printed front label | Inspired by the two designs from luizpacheco (as above); higher resolution, more model designs and hole alignment improvements added by ChatGPT | CC BY-NC (follows the original designs) | As above | In repo",
     "Arduino-ESP32 core 3.3.12 | Firmware framework, built as an ESP-IDF component | Espressif Systems, <https://github.com/espressif/arduino-esp32> | LGPL-2.1 (core), Apache-2.0 (parts) | Allow relinking if distributed as a binary; keep upstream notices | Used",
     "ESP-IDF 6.1 | Firmware framework: FreeRTOS, drivers, Wi-Fi, NVS, partitions, OTA, core dump | Espressif Systems, <https://github.com/espressif/esp-idf> | Apache-2.0 (with the licences of its bundled components) | Keep upstream licence and notices; bundled code is unchanged | Used",
     "lwIP in ESP-IDF 6.1 (with NAPT) | TCP/IP stack and IPv4 translation and forwarding for Internet dial-up | Adam Dunkels / Swedish Institute of Computer Science and lwIP contributors; Espressif Systems (NAPT) | BSD-3-Clause (lwIP), Apache-2.0 (Espressif parts) | Preserve upstream notices; source is unchanged in the pinned framework package | Used",
