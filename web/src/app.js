@@ -50,7 +50,7 @@ const state = {
     clock: { epoch: 0, tzo: 0, at: 0 },
     wifi: null,
     cell: null, // measured { w, h } per px of font size
-    csrf: null, version: null, edit: false, upload: false, sizeSupported: false,
+    csrf: null, version: null, edit: false, upload: false,
     reloadWhenOnline: false, // set after a successful update: reload once the modem is back
 };
 
@@ -129,7 +129,6 @@ function handleMessage(msg) {
             state.csrf = msg.csrf;
             state.version = msg.ver;
             document.title = `${msg.name || 'USR Modem'} v${msg.ver || '?'}`;
-            state.sizeSupported = msg.size === true;
             requestAnimationFrame(fitTerminal);
             break;
         case 'access':
@@ -190,14 +189,14 @@ function fitTerminal() {
         const size = term.options.fontSize;
         state.cell = { w: el.offsetWidth / term.cols / size, h: el.offsetHeight / term.rows / size };
     }
-    const geometry = state.sizeSupported ? terminalGeometry(width, height, state.cell.w * 16, state.cell.h * 16) : {cols: COLS, rows: ROWS};
+    const geometry = terminalGeometry(width, height, state.cell.w * 16, state.cell.h * 16);
     if (term.cols !== geometry.cols || term.rows !== geometry.rows) term.resize(geometry.cols, geometry.rows);
     const size = S.fitFontSize(width, height, term.cols, term.rows, state.cell.w, state.cell.h);
     if (size !== term.options.fontSize) {
         term.options.fontSize = size;
     }
     clearTimeout(sizeTimer);
-    if (state.sizeSupported && state.edit) sizeTimer = setTimeout(() => send(sizeMessage(term.cols, term.rows)), 100);
+    if (state.edit) sizeTimer = setTimeout(() => send(sizeMessage(term.cols, term.rows)), 100);
 }
 
 // ---------------------------------------------------------------- transport
@@ -239,7 +238,6 @@ function connectModem() {
         disconnect: () => {
             state.csrf = null;
             state.edit = false;
-            state.sizeSupported = false;
             clearTimeout(sizeTimer);
             $('upload').disabled = true;
             $('line-controls').hidden = true;

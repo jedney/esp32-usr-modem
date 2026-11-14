@@ -48,7 +48,7 @@ Host accepts the current `<name>.local` or IPv4 address, optionally `:80`. Dupli
 
 | `t` | Fields | When |
 |---|---|---|
-| `hello` | `name` (mDNS name), `ver` (firmware version), `csrf` (token for POSTs), `size` (true if geometry envelopes are supported) | On connect |
+| `hello` | `name` (mDNS name), `ver` (firmware version), `csrf` (token for POSTs) | On connect |
 | `led` | `m`: bit mask, bit 0 AA, 1 CD, 2 RD, 3 SD, 4 TR, 5 CS, 6 ARQ/FAX | On connect, then whenever the physical LEDs change, at most 20 per second. RD/SD flashes are the same stretched flashes as the front panel |
 | `clock` | `epoch` (UTC seconds), `tzo` (UTC offset in minutes, e.g. 780 for NZDT) | On connect, every 60 s, and when NTP or the time zone changes. `epoch` 0 = clock not set |
 | `call` | `state`: `idle`, `dialling`, `ringing`, `connected`, `ppp`, `slip`, `config`, `test`; `mode`: `telnet`, `raw`, `ppp` or `slip`; `dir`: `out` or `in`; `number` (as dialled); `host`; `ip`; `port`; `speed` (emulated line speed); `since` (UTC seconds the call connected). Internet calls additionally carry `ready` (IP forwarding enabled), `local` and `peer` (private IPv4 addresses); `ip` is empty and `port` is omitted | On connect and on every change |

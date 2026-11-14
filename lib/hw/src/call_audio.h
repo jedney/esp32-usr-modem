@@ -43,6 +43,7 @@ private:
     float potLevel_ = 0.0f;
     uint32_t potAt_ = 0;
     bool potRead_ = false;
+    float sourceGain_ = 1.0f;  // volume::callToneGain() for generated call tones
     bool active_ = false, draining_ = false, eof_ = false;
     bool failed_ = false;
     sounds::WavSource *wav_ = nullptr;

@@ -79,9 +79,9 @@ their own fakes were left as they are (moving them would not shorten them much).
   macros and tables (`Commands::dispatch`, the `cmd*` handlers: not dead). `scripts/test_refusal.ps1` removed.
   `allow_call_tests.ps1`, `allow_ota.ps1`, `make_preview.py`, `build_handshakes.py` and
   `generate_credits.py` are used (e2e README, README, VS Code task, tests, credits).
-- **Step 6:** no feature met the definition, so none was removed. For Jon to decide: the
-  `FAX` spelling of the ARQ LED in the `AT*HW` tests (`hwtest::parseLed`), and the
-  always-true `size` flag in the web `hello` message (`web/PROTOCOL.md`).
+- **Step 6:** no feature met the definition, so none was removed. Decided 14 Nov: the
+  `FAX` spelling of the ARQ LED stays and is documented; the always-true `size` flag in
+  the web `hello` message is removed.
 - **Step 7:** `.env` has no stale keys; its 22 pin lines equal to `.env.example` are gone.
   `USR_MODEM_PIN_LED_TR` differs on the bench and `USR_MODEM_PINS_OVERRIDDEN` stays.
 - Also fixed: `test_generate_ui` expected 77 menu items; there are 78.

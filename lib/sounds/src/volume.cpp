@@ -47,6 +47,10 @@ float outputGain(float userGain) {
     return userGain > 1.0f ? 1.0f : userGain;
 }
 
+float callToneGain() {
+    return dbToGain(kCallToneDb);
+}
+
 int16_t scale(int16_t sample, float gain) {
     float v = std::round(static_cast<float>(sample) * gain);
     if (v > 32767.0f) {

@@ -18,6 +18,7 @@ bool CallAudio::preview(const char *name, const modemcfg::Profile &profile) {
                            : !strcmp(name, "BUSY") ? tones::kUkBusyTone
                                                    : tones::kUkRingTone;
         source_.reset(new (std::nothrow) tones::ToneSource(spec, 3000));
+        sourceGain_ = volume::callToneGain();
     } else {
         char path[100];
         uint32_t speed;
@@ -58,6 +59,9 @@ bool CallAudio::start(calls::SoundStage stage, const char *digits, bool pulse, u
     stop();
     failed_ = false;
     using calls::SoundStage;
+    if (stage != SoundStage::kHandshake && !(stage == SoundStage::kDigits && pulse)) {
+        sourceGain_ = volume::callToneGain();
+    }
     switch (stage) {
         case SoundStage::kRing:
             source_.reset(new (std::nothrow) tones::ToneSource(tones::kUkRingTone, 0));
@@ -118,6 +122,7 @@ void CallAudio::stop() {
     active_ = draining_ = eof_ = false;
     failed_ = false;
     potRead_ = false;
+    sourceGain_ = 1.0f;
     count_ = sent_ = 0;
 }
 void CallAudio::poll(uint32_t now, const modemcfg::Profile &profile) {
@@ -148,8 +153,9 @@ void CallAudio::poll(uint32_t now, const modemcfg::Profile &profile) {
         potAt_ = now;
         potRead_ = true;
     }
-    sent_ += audioStreamWrite(samples_ + sent_, count_ - sent_,
-                              volume::speakerGain(potLevel_, profile.get(modemcfg::kL)));
+    sent_ +=
+        audioStreamWrite(samples_ + sent_, count_ - sent_,
+                         sourceGain_ * volume::speakerGain(potLevel_, profile.get(modemcfg::kL)));
     if (eof_ && sent_ == count_) {
         draining_ = true;
         since_ = now;

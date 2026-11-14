@@ -25,13 +25,28 @@ cables.
    call and an incoming call.
 6. Sound at full volume and at the pot's ends; `AT*BAUD=AUTO` at 300, 2400, 9600, 38400,
    115200 with a 128-character line; then a test build without `uartSync()`.
+   **Call-tone level:** with the pot and `ATL` fixed, place a test call at 14400 and
+   listen to the dial tone, DTMF, ringback and busy against the handshake. They should be
+   about as loud; if not, change `volume::kCallToneDb` (the generated tones are cut by
+   10.5 dB) and say what was chosen. `AT*HWTEST` and `AT*HWPOT=TONE` stay at full scale.
+   Pulse clicks (`ATDP`) are at full scale: say if they are too loud or too soft.
 7. Wi-Fi join (WPA2, WPA3 if available, open), browser 60 s rollback, scan,
-   `AT*FACTORY`.
+   `AT*FACTORY`. These and the on-board `test_wifi` cut the connection, so use the console
+   cable, not the network console.
 8. Heap and stack low-water marks with a call, the web page and PPP together; 30-minute
    soak with the watchdog on.
 9. Network console (WP-22): log-in and lock-out, the password never shown, an OTA
    upload followed by the boot log over the network, and the soak in step 8 with a
    network console client connected.
+
+10. By eye and ear, with Jon: every front-panel LED during a test call and an incoming
+    call (ARQ shows Wi-Fi), and `AT*HWLOOP` with a loopback plug.
+11. Web `hello` message (no `size` flag): the page still sizes the terminal in a large and
+    a small browser window, and `test_web.py` passes.
+
+The roadmap's other person checks (Amiga terminal, Windows 9x or Amiga over PPP and
+SLIP, the DB25 case, a real crash record) need kit that is not on the bench. They stay in
+`docs/ROADMAP.md` unless Jon has it at hand.
 
 When it passes and Jon says so: one push and one pull request for the whole of WP-19
 ("Rules for this version" in the common file), then the last step of WP-25: delete

@@ -153,7 +153,7 @@ export function startDemoModem({message, write}) {
         }
         redraw();
     };
-    message({t: 'hello', name: 'Sportster DEMO', ver: 'DEMO', size: true});
+    message({t: 'hello', name: 'Sportster DEMO', ver: 'DEMO'});
     message({t: 'clock', epoch: 0, tzo: 0});
     message({t: 'wifi', state: 'down'}); message({t: 'led', m: 0}); message(call);
     redraw();

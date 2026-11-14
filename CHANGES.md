@@ -13,7 +13,7 @@ Every change that is pushed bumps `VERSION` and adds an entry here (`python scri
 
 ## [3.0] - 2026-11-13
 
-- Fresh start on a new platform: Arduino core 3.3.12 on ESP-IDF 6.1, a network console on TCP port 2001, DCD, DSR and RI on the USB modem port, and a SHA-256 OTA password hash. Nothing from v2 is migrated: flash over USB after a full erase.
+- Fresh start on a new platform: Arduino core 3.3.12 on ESP-IDF 6.1, a network console on TCP port 2001, DCD, DSR and RI on the USB modem port, and a SHA-256 OTA password hash. Nothing from v2 is migrated: flash over USB after a full erase. The generated call tones (dial, ring, busy, carrier, DTMF) now play at the handshake recordings' level, `FAX` is a documented name for the ARQ LED in the hardware tests, and the web `hello` message no longer carries an always-true `size` flag.
 
 ## [2.x]
 

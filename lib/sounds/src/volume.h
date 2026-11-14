@@ -34,6 +34,14 @@ float speakerGain(float pot, unsigned level);  // ATL0/1 low, ATL2 medium, ATL3 
 // The gain applied to the samples: the user gain clamped to 0..1 (1 = full scale).
 float outputGain(float userGain);
 
+// The generated call tones (dial, ring, busy, carrier, DTMF) are cut by this much so they
+// play at the handshake recordings' level: a two-tone sound is -6 dBFS RMS at full scale,
+// the recordings about -16.5 dBFS. Single tones (busy, carrier) end up 3 dB above the
+// recordings. Test and calibration tones (AT*HWTEST, AT*HWPOT=TONE, the sweep) and the
+// pulse clicks stay at full scale. Tune it here after listening.
+constexpr float kCallToneDb = -10.5f;
+float callToneGain();
+
 // Scales one sample, with rounding and clipping.
 int16_t scale(int16_t sample, float gain);
 

@@ -38,7 +38,7 @@ Design priority: stay future-proof (current framework, spare memory and GPIO).
 ### 2.3 Audio
 
 - MAX98357A I2S amplifier on 5 V, mono from a stereo stream. The SD pin is driven by a GPIO: low = shutdown, high = on (left channel). It is low whenever no sound plays.
-- GAIN pin unconnected (9 dB). Speaker: Same Sky CLS0361-L152, 8 Ω, 2 W. **There is no volume cap**: full scale is the amp's full output, which the speaker can take. Every sound still goes through `volume::outputGain()`; a smaller speaker or a higher gain needs a cap there again.
+- GAIN pin unconnected (9 dB). Speaker: Same Sky CLS0361-L152, 8 Ω, 2 W. **There is no volume cap**: full scale is the amp's full output, which the speaker can take. Every sound still goes through `volume::outputGain()`; a smaller speaker or a higher gain needs a cap there again. The generated call tones (dial, ring, busy, carrier, DTMF) are cut by `volume::kCallToneDb` to the handshake recordings' level; pulse clicks and the hardware test tones stay at full scale.
 - The volume pot (WH148, 10 kΩ linear, 100 nF at the wiper) is read on **ADC1** (ADC2 is unusable with Wi-Fi). The pot sets the overall level and `ATL` scales within it.
 
 ### 2.4 LEDs

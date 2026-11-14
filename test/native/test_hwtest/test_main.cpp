@@ -305,6 +305,32 @@ void test_output_gain_is_clamped_with_no_cap() {
     TEST_ASSERT_EQUAL_INT16(-32768, volume::scale(-32768, volume::outputGain(1.0f)));
 }
 
+float rmsDbfs(const std::vector<int16_t> &samples, float gain) {
+    double sum = 0.0;
+    for (int16_t s : samples) {
+        double v = static_cast<double>(s) * gain / 32768.0;
+        sum += v * v;
+    }
+    return static_cast<float>(10.0 * std::log10(sum / static_cast<double>(samples.size())));
+}
+
+// The generated call tones (dial, ring, DTMF) play at the handshake recordings' RMS,
+// about -16.5 dBFS; two-tone sounds are -6 dBFS RMS at full scale. Single tones (busy,
+// carrier) come out 3 dB above that. The test and calibration tones are not scaled.
+void test_call_tones_match_the_handshake_recordings() {
+    const float gain = volume::callToneGain();
+    TEST_ASSERT_TRUE(gain > 0.0f && gain < 1.0f);
+    tones::ToneSource dial(tones::kUkDialTone, 1000);
+    tones::DtmfSource dtmf("5");
+    auto dialSamples = render(dial, 16000);
+    auto dtmfSamples = render(dtmf, 1600);
+    TEST_ASSERT_FLOAT_WITHIN(0.5f, -6.0f, rmsDbfs(dialSamples, 1.0f));
+    TEST_ASSERT_FLOAT_WITHIN(0.5f, -16.5f, rmsDbfs(dialSamples, gain));
+    TEST_ASSERT_FLOAT_WITHIN(0.5f, -16.5f, rmsDbfs(dtmfSamples, gain));
+    tones::ToneSource busy(400.0f, 0.0f, 1000);
+    TEST_ASSERT_FLOAT_WITHIN(0.5f, -13.5f, rmsDbfs(render(busy, 16000), gain));
+}
+
 void test_level_curve_mute_monotonic_and_top() {
     TEST_ASSERT_EQUAL_FLOAT(0.0f, volume::levelToGain(0.0f));
     TEST_ASSERT_EQUAL_FLOAT(0.0f, volume::levelToGain(0.019f));
@@ -430,6 +456,7 @@ int main(int, char **) {
     RUN_TEST(test_sweep_rises_in_frequency);
     RUN_TEST(test_speaker_levels_and_pot_stay_within_full_scale);
     RUN_TEST(test_output_gain_is_clamped_with_no_cap);
+    RUN_TEST(test_call_tones_match_the_handshake_recordings);
     RUN_TEST(test_level_curve_mute_monotonic_and_top);
     RUN_TEST(test_pot_level_dead_zones);
     RUN_TEST(test_scale_rounds_and_clips);

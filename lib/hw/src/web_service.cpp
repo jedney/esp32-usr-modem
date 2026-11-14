@@ -493,7 +493,7 @@ uint32_t WebService::prepareUpgrade(int fd, const std::string &host, const std::
     available->csrf = csrf;
     available->messages[4] =
         "{\"t\":\"hello\",\"name\":" + webinterface::jsonString(name_.c_str()) +
-        ",\"ver\":\"" FW_VERSION "\",\"size\":true,\"csrf\":\"" + csrf + "\"}";
+        ",\"ver\":\"" FW_VERSION "\",\"csrf\":\"" + csrf + "\"}";
     return available->id;
 }
 uint32_t WebService::clientId(unsigned index) {
