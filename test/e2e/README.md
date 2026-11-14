@@ -22,12 +22,12 @@ Find the COM ports in Device Manager → Ports (COM & LPT). The S3 board's USB-s
 | `--live-bbs` | One real call to `www.amigaretro.com:23` |
 | `--live-internet` | Tests that need the Internet (the DNS lookup in the NAT test) |
 | `--web-tests --web-host usr-modem.local` | HTTP/WebSocket tests (device password from `.env`; `--web-host` may be an IP) |
-| `--browser-upload` | Install the tested firmware through the web interface (with `--web-tests`) |
+| `--browser-upload` | Install `.pio/build/s3/firmware.bin` through the web interface (with `--web-tests` and a serial console; build it first with `pio run -e s3`) |
 | `--flood-tests` | Fourth browser refused, idle connection floods on ports 23 and 80 (with `--web-tests`) |
 | `--upload-tests` | A web upload cut off half way must free the modem (with `--web-tests`; writes nothing that can be installed) |
 | `--usb-unplug` | Pull the rear USB cable during a call when asked (needs a person; with `--usb-port`) |
 | `--udp-tests` | Two optional PPP/SLIP UDP echo cases (PC UDP port 32322 must be reachable) |
-| `--device-tests` | Device password changes |
+| `--device-tests` | Device password changes (use a serial console: a password change or a restart ends a network console session) |
 | `--factory-reset` | `AT*FACTORY` (with `--device-tests`); rejoins the Wi-Fi in `.env` |
 | `--ota-upload` | Real OTA uploads (with `--device-tests`) |
 | `--save-password` | Save the final device password to `.env` as `USR_MODEM_PASSWORD` |

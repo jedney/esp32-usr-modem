@@ -25,9 +25,10 @@ void test_idle_menu_has_no_periodic_display_output() {
     modem.begin();
     hostport::CallSlot slot;
     hostport::Session session(modem, sink, 115200, slot);
-    auto *terminal = new config::Terminal(session, false);
     uint8_t bytes[256];
     for (const char *style : {"ANSI", "CP437", "PLAIN"}) {
+        // A new screen per style: its clock starts at 0, as the polls below assume.
+        auto *terminal = new config::Terminal(session, false);
         TEST_ASSERT_TRUE(terminal->setStyle(style));
         TEST_ASSERT_TRUE(terminal->open());
         std::string frame;
@@ -53,8 +54,8 @@ void test_idle_menu_has_no_periodic_display_output() {
         while (terminal->read(bytes, sizeof bytes)) {
         }
         terminal->close();
+        delete terminal;
     }
-    delete terminal;
 }
 void test_psram_log_capacity_and_wrap() {
     char *memory = static_cast<char *>(ps_malloc(256 * 1024));

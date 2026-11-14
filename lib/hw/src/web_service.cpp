@@ -79,12 +79,11 @@ std::string query(httpd_req_t *req, const char *key) {
 }
 void headers(httpd_req_t *req) {
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
-    // One request per connection (the header gate refuses a second one). The server does not
-    // act on this header itself, so the close is queued here; it runs after this response.
-    // Without it, finished connections hold their slots until the server's least-recently-
-    // used purge, whose queued close can hit the new connection that took the slot.
+    // One request per connection (the header gate refuses a second one). The client closes its
+    // end after this response and the server then frees the slot. The server is not asked to
+    // close: a close queued from here names the slot, not the connection, so after a burst of
+    // requests it closes whichever connection took the slot next.
     httpd_resp_set_hdr(req, "Connection", "close");
-    httpd_sess_trigger_close(req->handle, httpd_req_to_sockfd(req));
     httpd_resp_set_hdr(req, "X-Content-Type-Options", "nosniff");
     httpd_resp_set_hdr(req, "X-Frame-Options", "DENY");
     httpd_resp_set_hdr(req, "Referrer-Policy", "no-referrer");
@@ -221,7 +220,7 @@ void WebService::poll(bool enabled, bool up, const char *name, const char *ip) {
     cfg.global_user_ctx_free_fn = [](void *) {};  // borrowed, static lifetime
     cfg.stack_size = 12288;
     cfg.max_req_hdr_len = webinterface::kMaxHeader;  // the header gate's limit
-    cfg.max_open_sockets = 6;
+    cfg.max_open_sockets = 12;  // 3 browsers + a page load (about 8 connections)
     cfg.lru_purge_enable = true;
     cfg.recv_wait_timeout = 1;
     cfg.send_wait_timeout = 1;

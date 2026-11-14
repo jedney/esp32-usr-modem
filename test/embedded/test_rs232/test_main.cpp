@@ -12,8 +12,6 @@
 #include <driver/gpio.h>
 #include <driver/uart.h>
 #include <esp_rom_gpio.h>
-#include <hal/uart_ll.h>
-#include <soc/gpio_periph.h>
 #include <soc/gpio_sig_map.h>
 #include <unity.h>
 
@@ -30,16 +28,6 @@ namespace {
 bool fitted = false;
 autobaud::Run runs[2048];
 uint32_t current = 38400;
-
-// The S3 needs its UART settings copied into the UART core by hand (see hw.cpp).
-void sync(int n) {
-    uart_dev_t *u = UART_LL_GET_HW(n);
-    u->id.high_speed = 0;
-    u->id.reg_update = 1;
-    while (u->id.reg_update) {
-    }
-    u->id.high_speed = 1;
-}
 
 // Does something else drive the pin (a MAX3232 receiver)? With the internal pull-down
 // on, an undriven pin reads LOW.
@@ -66,7 +54,6 @@ void release(int pin) {
 
 void rigBaud(uint32_t b) {
     Serial2.updateBaudRate(b);
-    sync(2);
 }
 
 void portBaud(uint32_t b) {
@@ -176,10 +163,9 @@ void test_cts_drops_when_the_buffer_is_full_and_nothing_is_lost() {
     hw::captureEnd();  // online, as in the firmware: data comes through the UART only
     TEST_ASSERT_TRUE(hw::ctsOutAsserted());
     // The "computer" obeys our CTS.
-    PIN_INPUT_ENABLE(GPIO_PIN_MUX_REG[pins::kCts]);
+    gpio_set_direction(static_cast<gpio_num_t>(pins::kCts), GPIO_MODE_INPUT);
     esp_rom_gpio_connect_in_signal(pins::kCts, U2CTS_IN_IDX, false);
     uart_set_hw_flow_ctrl(UART_NUM_2, UART_HW_FLOWCTRL_CTS, 0);
-    sync(2);
 
     const size_t total = hw::kHostRxBuffer + 2048;
     uint8_t chunk[64];
@@ -220,7 +206,6 @@ void test_cts_drops_when_the_buffer_is_full_and_nothing_is_lost() {
     TEST_ASSERT_EQUAL(0, wrong);
 
     uart_set_hw_flow_ctrl(UART_NUM_2, UART_HW_FLOWCTRL_DISABLE, 0);
-    sync(2);
     hw::captureBegin();
 }
 

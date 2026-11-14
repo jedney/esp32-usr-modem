@@ -52,7 +52,7 @@ whole window.
 | 23 | v3.0 | [DCD and RI on the USB modem port](../history/wp-23-usb-dcd-ri.md) (done 14 Nov: DCD, DSR and RI reach Windows; USB names and console greeting) | Sonnet / high | M | 20, 22 |
 | 24 | v3.0 | [Fresh start: code](wp-24-fresh-start-code.md) (done 14 Nov: one stored layout, comments and pins cleaned; no obsolete features found) | Sonnet / high | L | 23 |
 | 25 | v3.0 | [Fresh start: documentation and credits](wp-25-fresh-start-docs.md) (done 14 Nov: spec, decisions log, credits, CLAUDE.md and READMEs trimmed to the current design; `docs/history/` gone; `docs/plans/` goes after WP-26) | Sonnet / high | L | 24 |
-| 26 | v3.0 | [Bench run with Jon](wp-26-bench-run.md) | Sonnet / medium | M | 20-25 |
+| 26 | v3.0 | [Bench run with Jon](wp-26-bench-run.md) (run 14-15 Nov; a few by-eye checks open) | Sonnet / medium | M | 20-25 |
 
 Why this order: WP-01 is cheap and makes the gates real (CI fails, upload gate, pin lock)
 before anything else lands. WP-02 is the only High finding. WP-03, WP-06, WP-14 and WP-17

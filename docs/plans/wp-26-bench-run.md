@@ -51,3 +51,23 @@ SLIP, the DB25 case, a real crash record) need kit that is not on the bench. The
 When it passes and Jon says so: one push and one pull request for the whole of WP-19
 ("Rules for this version" in the common file), then the last step of WP-25: delete
 `docs/plans/`.
+
+## Result (14-15 Nov 2026)
+
+Done on the final code, flashed over USB after a full erase:
+
+- 1: erase and USB flash; factory settings and a generated device password in the boot banner.
+- 2: all on-board suites pass. `test_rs232` skips its nine tests (the bench board has the MAX3232 receivers fitted). Test faults fixed on the way: `test_rs232` did not compile under IDF 6.1, `test_config` ran its clock backwards between styles, `test_internet` failed instead of skipping with no Wi-Fi saved.
+- 3: full `test/e2e` with every option (212 passed; skipped: live BBS, two UDP echo cases, `--usb-unplug`), lrzsz X/Y/ZMODEM over RS232, PPP against pppd.
+- 4: OTA and browser firmware upload pass in the e2e run. The browser test installs `.pio/build/s3/firmware.bin`: build it first.
+- 5: rear USB-C empty and powered by the power-only lead alone for 5 minutes: no reset. DCD, DSR and RI on the USB port are covered by `test_usb.py` only (not checked by eye).
+- 6: call tones sound as loud as the handshake, so `kCallToneDb` stays -10.5 dB; pulse clicks are about right; the pot is silent at its minimum and loud and clean at its maximum. 128-character lines at 300, 2400, 9600, 38400 and 115200 come back whole. There is no `uartSync()` any more, so the test build without it does not apply.
+- 7: Wi-Fi join, `AT*FACTORY` and the on-board `test_wifi` pass. A browser join with a wrong password restored the old network in about 4 s; the full 60 s window is untested (follow-up in the roadmap).
+- 8: five passes of the PPP, web, session and answer suites over the network console: heap steady (97 KB free), stack headroom steady, no watchdog or panic reset. Uptime restarted each pass because the tests restart the modem.
+- 9: network console log-in, lock-out and password checks pass in `test_net_console.py`.
+- 10: LEDs checked by eye in a test call and an incoming call; `AT*HWLOOP` not done (no loopback plug).
+- 11: the page sizes the terminal in large and small windows, but a resize can leave layout corruption until the page is reloaded (roadmap follow-up).
+
+Found and fixed: the web server reset connections when a browser loaded the page (6 slots, and a queued close that hit the next connection to use the slot). It now has 12 slots, 24 sockets and 40 active TCP connections, and no server-side close; `test_parallel_page_load_has_no_connection_resets` covers it. A first attempt (half-closing each connection) caused a panic in the `tcpip` task and was dropped (decisions log, "Web server on IDF 6.1").
+
+Still open: the TR light flashing for a few seconds when the rear USB lead is plugged in (probably Windows opening and closing the port; to confirm by logging DTR while plugging in), `AT*HWLOOP`, the DCD/RI check by eye, and the push and pull request, after which `docs/plans/` goes.

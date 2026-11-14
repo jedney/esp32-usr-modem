@@ -4,6 +4,7 @@ The existing USR_MODEM_PASSWORD is reused in memory. Traffic is never included
 in assertion messages. --web-tests opts in; upload acceptance is separate.
 """
 import base64
+import concurrent.futures
 import contextlib
 import gzip
 import hashlib
@@ -176,6 +177,26 @@ def test_assets_require_digest_and_have_correct_gzip_mime(web):
     require("script-src 'self'" in headers.get("Content-Security-Policy", ""), "Missing CSP")
     for path in ("/call-history.bin", "/image-id.txt", "/../call-history.bin", "/%2e%2e/call-history.bin"):
         require(web.request(path)[0] == 404, "Non-web file exposed")
+
+
+def test_parallel_page_load_has_no_connection_resets(web):
+    """A browser loads a dozen files at once, each on its own connection."""
+    paths = ["/", "/app.js", "/upload.js", "/upload_flow.js", "/link.js", "/geometry.js",
+             "/ui-data.js", "/api/session"] * 2
+
+    def fetch(path):
+        try:
+            return Web(web.host).request(path)[0]
+        except OSError as error:
+            return type(error).__name__
+
+    failures = []
+    for _ in range(5):
+        with concurrent.futures.ThreadPoolExecutor(6) as pool:
+            failures += [code for code in pool.map(fetch, paths) if code != 200]
+        time.sleep(0.5)
+    require(not failures, f"{len(failures)} of {5 * len(paths)} parallel requests failed: "
+            + ", ".join(sorted(set(map(str, failures)))))
 
 
 def test_wrong_password_locks_out_for_a_second_without_stalling(web):

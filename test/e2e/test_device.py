@@ -183,6 +183,7 @@ def test_factory_cancel_leaves_settings_and_password_intact(managed_device):
     _ok(console, "ATS7=60&W")
 
 
+@pytest.mark.timeout(900)  # four uploads, each through the native-test gate, and two restarts
 def test_factory_new_password_and_authenticated_first_use(managed_device, wifi, request):
     if not request.config.getoption("--factory-reset"):
         pytest.skip("destructive reset needs --factory-reset")
