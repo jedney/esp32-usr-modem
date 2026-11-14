@@ -17,7 +17,6 @@
 #include <Arduino.h>
 #include <LittleFS.h>
 
-#include <Preferences.h>
 #include <esp_core_dump.h>
 #include <lwip/inet.h>
 #include <new>
@@ -176,12 +175,9 @@ config::CallJournal journal(history, debugLog, msNow, utcNow);
 char fallbackLog[4096];
 uint8_t ledMask = 0xFF;
 atcmd::Port *hardwareOwner = nullptr;
-// The Wi-Fi driver's own saved network and password (firmware before v0.6 let it keep them;
-// WiFi.persistent(false) stops that now). A factory reset clears them too (5.5-19).
-hw::NvsStore wifiDriverStore("nvs.net80211", "unused");
-modemcfg::Store *resetStores[] = {&store,           &netStore,       &bookStore,   &historyStore,
-                                  &resetStore,      &webStore,       &clientStore, &internetStore,
-                                  &wifiDriverStore, &netConsoleStore};
+modemcfg::Store *resetStores[] = {&store,        &netStore,      &bookStore,
+                                  &historyStore, &resetStore,    &webStore,
+                                  &clientStore,  &internetStore, &netConsoleStore};
 bool restarting = false;
 uint32_t restartAt = 0;
 
@@ -1172,9 +1168,9 @@ void publishCall(uint32_t now, bool force) {
         const auto &r = journal.current();
         const bool internet = r.kind == calls::Kind::Ppp || r.kind == calls::Kind::Slip;
         call += std::string(",\"mode\":\"") +
-                (internet ? (r.kind == calls::Kind::Ppp ? "ppp" : "slip")
-                 : r.raw  ? "raw"
-                          : "telnet") +
+                (internet                     ? (r.kind == calls::Kind::Ppp ? "ppp" : "slip")
+                 : r.kind == calls::Kind::Raw ? "raw"
+                                              : "telnet") +
                 "\",\"dir\":\"" + (r.incoming ? "in" : "out") +
                 "\",\"number\":" + webinterface::jsonString(r.number) +
                 ",\"host\":" + webinterface::jsonString(r.host) + ",\"ip\":" +

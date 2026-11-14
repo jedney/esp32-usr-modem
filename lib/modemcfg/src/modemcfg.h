@@ -3,7 +3,7 @@
 // with &W0/&W1), the four stored phone numbers (&Z0-&Z3) and the saved format.
 //
 // Behaviour and defaults follow the USR Sportster technical reference; differences
-// decided for this project are listed in docs/decisions-log.md (v0.4).
+// decided for this project are listed in docs/decisions-log.md.
 //
 // No Arduino dependencies: this module is unit-tested on the PC. The board stores the
 // blob in NVS through hw::NvsStore (lib/hw).
@@ -16,8 +16,8 @@
 namespace modemcfg {
 
 // --- Settings ---------------------------------------------------------------------------
-// The order is part of the saved format: add new settings at the end and bump
-// kLayoutVersion.
+// The order is part of the saved format: a new setting goes at the end and changes
+// kLayoutVersion (an unknown layout loads factory settings).
 enum Setting : uint8_t {
     kB,     // B   answer sequence (0 ITU-T, 1 Bell)
     kE,     // E   command echo
@@ -116,9 +116,9 @@ constexpr unsigned kTemplates = 2;   // Y0, Y1
 constexpr unsigned kPhoneSlots = 4;  // &Z0-&Z3
 constexpr size_t kPhoneLen = 40;     // characters per stored number
 
-// AT*ANSWERPORT: where S0 auto-answer rings through. The values are the saved byte
-// (0 and 1 are the v0.9 RS232/CONSOLE values). AUTO (v2.0 factory default) picks the first
-// port with DTR on, in the order RS232, USB, console (lib/calls pickAnswerPort).
+// AT*ANSWERPORT: where S0 auto-answer rings through. The values are the saved byte. AUTO
+// (the factory default) picks the first port with DTR on, in the order RS232, USB, console
+// (lib/calls pickAnswerPort).
 enum class AnswerPort : uint8_t { kRs232 = 0, kConsole = 1, kUsb = 2, kAuto = 3 };
 constexpr uint8_t kAnswerPortCount = 4;
 const char *answerPortName(AnswerPort port);  // "RS232", "CONSOLE", "USB", "AUTO"
@@ -147,18 +147,12 @@ Profile powerOnProfile(const Nvram &n);
 
 // --- Saved format ---------------------------------------------------------------------------
 // magic "USRM", layout version, then the Nvram fields, then a CRC-32 of everything
-// before it. Multi-byte values are little-endian.
-//   Layout 1 (v0.4): y, templates, phone numbers.
-//   Layout 2 (v0.5): adds hostBaud after the phone numbers.
-//   Layout 5 (v0.17): appends ringback and pre-CONNECT delay milliseconds.
-//   v2.0 keeps layout 5; the answer-port byte (layout 4) may now also be 2 (USB) or 3 (AUTO).
-constexpr uint8_t kLayoutVersion = 5;
-constexpr size_t kBlobSizeV1 =
-    4 + 1 + 1 + kTemplates * (kSettingCount + kSRegCount + 4) + kPhoneSlots * kPhoneLen + 4;
-constexpr size_t kBlobSizeV2 = kBlobSizeV1 + 4;
-constexpr size_t kBlobSizeV3 = kBlobSizeV2 + kTemplates + 4 + 1;
-constexpr size_t kBlobSizeV4 = kBlobSizeV3 + 1;
-constexpr size_t kBlobSize = kBlobSizeV4 + 8;
+// before it. Multi-byte values are little-endian. Order: y, the two templates, the phone
+// numbers, hostBaud, each template's lineExplicit, model, throttle, answerPort, ringDelayMs,
+// connectDelayMs. A blob with another layout version, size or CRC loads factory settings.
+constexpr uint8_t kLayoutVersion = 1;
+constexpr size_t kBlobSize = 4 + 1 + 1 + kTemplates * (kSettingCount + kSRegCount + 4) +
+                             kPhoneSlots * kPhoneLen + 4 + kTemplates + 4 + 1 + 1 + 4 + 4 + 4;
 
 bool validModel(uint32_t speed);
 const char *modelName(uint32_t speed);  // "Sportster 14.4k Series", as ATI3 shows it
@@ -170,7 +164,6 @@ void serialize(const Nvram &n, uint8_t *out);  // writes kBlobSize bytes
 
 enum class LoadResult : uint8_t {
     kOk,
-    kMigrated,  // layout 1 (v0.4) read and converted; &B set to 1 in both templates
     kEmpty,
     kBadSize,
     kBadMagic,
@@ -179,7 +172,7 @@ enum class LoadResult : uint8_t {
     kBadValue
 };
 
-// On anything but kOk or kMigrated, *out is set to factoryNvram().
+// On anything but kOk, *out is set to factoryNvram().
 LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out);
 
 // "saved settings", "nothing saved yet", ... for the boot banner.

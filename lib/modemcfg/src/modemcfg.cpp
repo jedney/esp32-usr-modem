@@ -331,19 +331,13 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
     if (memcmp(in, kMagic, 4) != 0) {
         return LoadResult::kBadMagic;
     }
-    const uint8_t version = in[4];
-    if (version < 1 || version > kLayoutVersion) {
+    if (in[4] != kLayoutVersion) {
         return LoadResult::kBadVersion;
     }
-    const size_t size = version == 1   ? kBlobSizeV1
-                        : version == 2 ? kBlobSizeV2
-                        : version == 3 ? kBlobSizeV3
-                        : version == 4 ? kBlobSizeV4
-                                       : kBlobSize;
-    if (len != size) {
+    if (len != kBlobSize) {
         return LoadResult::kBadSize;
     }
-    if (crc32(in, size - 4) != getU32(in + size - 4)) {
+    if (crc32(in, kBlobSize - 4) != getU32(in + kBlobSize - 4)) {
         return LoadResult::kBadCrc;
     }
     Nvram n = {};
@@ -353,7 +347,6 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
         return LoadResult::kBadValue;
     }
     for (Profile &t : n.tmpl) {
-        t.lineExplicit = version < 3;  // preserve old saved speed; its provenance is unknown
         memcpy(t.v, p, kSettingCount);
         p += kSettingCount;
         memcpy(t.s, p, kSRegCount);
@@ -375,59 +368,41 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
         phone[kPhoneLen] = '\0';
         p += kPhoneLen;
     }
-    if (version == 1) {
-        // v0.4 stored &B with the brief's first meaning (0 = detect). Since v0.5 &B has
-        // the Sportster meaning, and the speed is always detected unless AT*BAUD is set.
-        for (Profile &t : n.tmpl) {
-            t.v[kAmpB] = 1;
-        }
-        n.hostBaud = 0;
-        *out = n;
-        return LoadResult::kMigrated;
-    }
     n.hostBaud = getU32(p);
     p += 4;
     if (n.hostBaud != 0 && !isHostRate(n.hostBaud)) {
         return LoadResult::kBadValue;
     }
-    if (version >= 3) {
-        for (Profile &t : n.tmpl) {
-            if (*p > 1) {
-                return LoadResult::kBadValue;
-            }
-            t.lineExplicit = *p++ != 0;
-        }
-        n.model = getU32(p);
-        p += 4;
-        if (!validModel(n.model) || *p > 1) {
+    for (Profile &t : n.tmpl) {
+        if (*p > 1) {
             return LoadResult::kBadValue;
         }
-        n.throttle = *p++ != 0;
+        t.lineExplicit = *p++ != 0;
     }
-    if (version >= 4) {
-        if (*p >= kAnswerPortCount) {
-            return LoadResult::kBadValue;
-        }
-        n.answerPort = static_cast<AnswerPort>(*p++);
+    n.model = getU32(p);
+    p += 4;
+    if (!validModel(n.model) || *p > 1) {
+        return LoadResult::kBadValue;
     }
-    if (version >= 5) {
-        n.ringDelayMs = getU32(p);
-        p += 4;
-        n.connectDelayMs = getU32(p);
-        if (n.ringDelayMs > kMaxCallDelayMs || n.connectDelayMs > kMaxCallDelayMs) {
-            return LoadResult::kBadValue;
-        }
+    n.throttle = *p++ != 0;
+    if (*p >= kAnswerPortCount) {
+        return LoadResult::kBadValue;
+    }
+    n.answerPort = static_cast<AnswerPort>(*p++);
+    n.ringDelayMs = getU32(p);
+    p += 4;
+    n.connectDelayMs = getU32(p);
+    if (n.ringDelayMs > kMaxCallDelayMs || n.connectDelayMs > kMaxCallDelayMs) {
+        return LoadResult::kBadValue;
     }
     *out = n;
-    return version < kLayoutVersion ? LoadResult::kMigrated : LoadResult::kOk;
+    return LoadResult::kOk;
 }
 
 const char *loadResultText(LoadResult r) {
     switch (r) {
         case LoadResult::kOk:
             return "saved settings";
-        case LoadResult::kMigrated:
-            return "saved settings (converted from an older firmware's format)";
         case LoadResult::kEmpty:
             return "factory settings (nothing saved yet)";
         case LoadResult::kBadVersion:

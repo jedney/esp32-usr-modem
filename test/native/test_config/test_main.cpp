@@ -257,26 +257,32 @@ void test_history_eviction_reload_and_atomic_rollback() {
     TEST_ASSERT_TRUE(history.clear());
     TEST_ASSERT_TRUE(store.bytes.empty());
 }
-void test_history_reads_legacy_raw_and_persists_internet_kinds() {
+void test_history_persists_every_kind_and_refuses_another_layout() {
     Store store;
     History history(store);
     CallRecord record;
-    record.raw = true;
+    record.kind = calls::Kind::Raw;
     TEST_ASSERT_TRUE(history.append(record));
-    store.bytes[4] = 1;
+    record.kind = calls::Kind::Ppp;
+    TEST_ASSERT_TRUE(history.append(record));
+    record.kind = calls::Kind::Slip;
+    record.incoming = true;
+    TEST_ASSERT_TRUE(history.append(record));
+    History restored(store);
+    TEST_ASSERT_TRUE(restored.begin());
+    TEST_ASSERT_EQUAL(3, restored.size());
+    TEST_ASSERT_EQUAL(calls::Kind::Raw, restored.at(0).kind);
+    TEST_ASSERT_EQUAL(calls::Kind::Ppp, restored.at(1).kind);
+    TEST_ASSERT_EQUAL(calls::Kind::Slip, restored.at(2).kind);
+    TEST_ASSERT_TRUE(restored.at(2).incoming);
+    // Another layout number with a good CRC is not read.
+    store.bytes[4] = 2;
     uint32_t crc = modemcfg::crc32(store.bytes.data(), store.bytes.size() - 4);
     for (unsigned i = 0; i < 4; ++i)
         store.bytes[store.bytes.size() - 4 + i] = uint8_t(crc >> (8 * i));
-    History legacy(store);
-    TEST_ASSERT_TRUE(legacy.begin());
-    TEST_ASSERT_EQUAL(calls::Kind::Raw, legacy.at(0).kind);
-    record.raw = false;
-    record.kind = calls::Kind::Ppp;
-    TEST_ASSERT_TRUE(legacy.append(record));
-    History restored(store);
-    TEST_ASSERT_TRUE(restored.begin());
-    TEST_ASSERT_EQUAL(calls::Kind::Raw, restored.at(0).kind);
-    TEST_ASSERT_EQUAL(calls::Kind::Ppp, restored.at(1).kind);
+    History other(store);
+    TEST_ASSERT_FALSE(other.begin());
+    TEST_ASSERT_EQUAL(0, other.size());
 }
 void test_history_rejects_corruption_without_overwriting_flash() {
     Store store;
@@ -445,7 +451,7 @@ int main() {
     RUN_TEST(test_menu_secret_input_is_wiped_and_never_echoed);
     RUN_TEST(test_ring_wrap_has_only_structured_events_and_can_disable);
     RUN_TEST(test_history_eviction_reload_and_atomic_rollback);
-    RUN_TEST(test_history_reads_legacy_raw_and_persists_internet_kinds);
+    RUN_TEST(test_history_persists_every_kind_and_refuses_another_layout);
     RUN_TEST(test_history_rejects_corruption_without_overwriting_flash);
     RUN_TEST(test_display_sanitizes_untrusted_escape_sequences);
     RUN_TEST(test_direct_menu_dtr_drop_closes_and_releases_reservation);

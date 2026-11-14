@@ -95,7 +95,7 @@ private:
     unsigned next_ = 0;
 };
 
-// A separate namespace avoids migrating Sportster profiles for a web-only flag.
+// The web-only flag, saved apart from the Sportster profiles.
 class Settings {
 public:
     explicit Settings(modemcfg::Store &store) : store_(store) {}

@@ -37,7 +37,6 @@ struct CallRecord {
     uint32_t duration = 0, sent = 0, received = 0;
     uint16_t result = 0;
     bool incoming = false;
-    bool raw = false;
     calls::Kind kind = calls::Kind::Telnet;
     char host[64] = {}, number[12] = {};
 };

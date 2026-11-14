@@ -82,9 +82,6 @@ Modem::Modem(modemcfg::Store &store, const StarCommand *star, size_t starCount)
 modemcfg::LoadResult Modem::begin() {
     modemcfg::LoadResult r = modemcfg::loadNvram(store_, &nvram_);
     active_ = modemcfg::powerOnProfile(nvram_);
-    if (r == modemcfg::LoadResult::kMigrated) {
-        modemcfg::saveNvram(store_, nvram_);  // in the current format from now on
-    }
     return r;
 }
 

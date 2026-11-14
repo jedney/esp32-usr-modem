@@ -7,7 +7,6 @@ void CallJournal::started(bool incoming, const calls::Entry &target) {
     connectedUtc_ = 0;
     port_ = target.port;
     record_.incoming = incoming;
-    record_.raw = target.raw;
     record_.kind = target.raw ? calls::Kind::Raw : target.kind;
     memcpy(record_.host, target.host, sizeof record_.host);
     memcpy(record_.number, target.number, sizeof record_.number);
