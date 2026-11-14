@@ -57,7 +57,7 @@
 #include "web_service.h"
 #include "wifi_radio.h"
 
-// STA-06: sdkconfig.defaults turns the task watchdog's panic on; the 15 s is in the
+// Sdkconfig.defaults turns the task watchdog's panic on; the 15 s is in the
 // AT*RESETINFO text (hwconsole.cpp) and the decisions log.
 static_assert(CONFIG_ESP_TASK_WDT_PANIC && CONFIG_ESP_TASK_WDT_TIMEOUT_S == 15,
               "Task watchdog: expected CONFIG_ESP_TASK_WDT_PANIC=y and a 15 s time-out");
@@ -73,7 +73,7 @@ namespace {
 
 constexpr uint32_t kConsoleBaud = 115200;
 constexpr size_t kConsoleTxBuffer = 16 * 1024;
-constexpr uint32_t kBannerWaitMs = 8000;  // for Wi-Fi at boot (decided by Jon, v0.6)
+constexpr uint32_t kBannerWaitMs = 8000;  // for Wi-Fi at boot
 
 class SerialSink : public atcmd::Sink {
 public:
@@ -426,7 +426,7 @@ atcmd::Reply cmdHw(atcmd::Port &port, const char *args) {
     hardwareOwner = nullptr;
     if (capture) {
         port.redirect(&menuOf(port), true);
-        menuOf(port).repaint();  // the test wrote over the screen (PERF-01)
+        menuOf(port).repaint();  // the test wrote over the screen
     }
     return atcmd::Reply::kDone;
 }
@@ -774,7 +774,7 @@ private:
                             *netConsole.waiting() ? " at the password prompt" : "");
                 break;
         }
-        // 5.5-08: the least free stack so far, for the bench record.
+        // The least free stack so far, for the bench record.
         port.printf("Stack headroom: loop %d B, lwIP %d B, web %d B\r\n",
                     hw::stackHeadroom("loopTask"), hw::stackHeadroom("tcpip"),
                     hw::stackHeadroom("httpd"));
@@ -1000,7 +1000,7 @@ void pollConsole(uint32_t now) {
     if (n > 0) {
         consoleInput.append(buf, n);
         consoleInput.poll(*console, now);
-        devicecfg::wipe(buf, n);  // input can contain passwords (SEC-07e)
+        devicecfg::wipe(buf, n);  // input can contain passwords
     }
     int space = Serial.availableForWrite();
     if (space > 0) {
@@ -1058,7 +1058,7 @@ void pollLeds(uint32_t now) {
     in.tr = p.get(modemcfg::kAmpD) == 0;
     in.cs = hw::ctsOutAsserted();  // RS232 only: USB has no CTS
     in.wifi = arqLed();
-    // RS232 and the USB modem port both drive CD, TR, RD and SD (Jon, v2.0).
+    // RS232 and the USB modem port both drive CD, TR, RD and SD.
     hostport::addHostPort(in, {!rs232::suspended() && rs232::session().dcd(), rs232::dtrOn(),
                                rs232::bytesToComputer(), rs232::bytesFromComputer()});
     hostport::addHostPort(in, {usbport::session().dcd(), usbport::dtrOn(),
@@ -1097,7 +1097,7 @@ void publishClock(uint32_t now, bool force) {
     static uint32_t at = 0;
     static int lastOffset = -9999;
     static bool clockSet = false;
-    static netcfg::tz::OffsetCache offsets;  // offsetAt() is slow for every pass (PERF-02)
+    static netcfg::tz::OffsetCache offsets;  // offsetAt() is slow for every pass
     int64_t epoch = net.utcNow();
     int offset = epoch > 0 ? offsets.at(net.zone(), epoch) / 60 : 0;
     if (force || now - at >= 60000 || clockSet != (epoch > 0) || offset != lastOffset) {
@@ -1193,7 +1193,7 @@ void publishCall(uint32_t now, bool force) {
     webServer.snapshot(3, call + "}");
 }
 
-// Nothing is built while no browser is connected (PERF-02). A browser that arrives
+// Nothing is built while no browser is connected. A browser that arrives
 // after none gets all four messages rebuilt in the same pass.
 void publishWebStatus() {
     static bool hadBrowser = false;
@@ -1253,8 +1253,8 @@ void answerUploadRequest() {
         ota.poll(millis(), net.up(), false, net.settings().host, net.link().ip);
     }
     // The server may have stopped waiting (2 s) while we checked: then allowUpload()
-    // changes nothing and we release the claim, so no upload is left half-started
-    // (STA-07). ArduinoOTA resumes on the next ota.poll(); the browser keeps its
+    // changes nothing and we release the claim, so no upload is left half-started.
+    // ArduinoOTA resumes on the next ota.poll(); the browser keeps its
     // read-only view and can press E again.
     if (!webServer.allowUpload(allow) && allow) {
         callSlot.release(&webServer);
@@ -1280,7 +1280,7 @@ void releaseConfigBrowser() {
     browserClient = 0;
 }
 
-// Every browser starts read-only (STA-02): opening the page claims nothing, so a
+// Every browser starts read-only: opening the page claims nothing, so a
 // forgotten tab can't turn callers away. E takes the configuration screen when free;
 // other keys are dropped.
 void serveReadOnlyBrowser(uint32_t id, bool fresh) {
@@ -1305,7 +1305,7 @@ void serveReadOnlyBrowser(uint32_t id, bool fresh) {
 }
 
 // A menu action the browser leaves the screen for. The browser has no data line, so a
-// dial goes to the RS232 host port when that port can take it (MNT-05a: check first).
+// dial goes to the RS232 host port when that port can take it (checked first).
 void runBrowserDeparture() {
     char departure[atcmd::kLineMax + 1];
     if (browserMenu->takeDeparture(departure, sizeof departure)) {
@@ -1490,7 +1490,7 @@ void setup() {
     }
     // No ESP-IDF driver messages on the console. A long stream on the RS232 port in
     // command mode overflows the speed capture, and the RMT driver would print an error
-    // from its interrupt for every chunk it drops (switchable with AT*LOG in v0.10).
+    // from its interrupt for every chunk it drops (switchable with AT*LOG).
     esp_log_level_set("*", ESP_LOG_NONE);
     delay(500);
     LittleFS.begin(false);  // mount before recovering a reset which erases history
@@ -1526,7 +1526,7 @@ void setup() {
     printBanner(loaded, netLoaded);
     char skip[netcfg::Net::kNoticeMax];
     net.takeNotice(skip, sizeof skip);  // the banner has already said it
-    // STA-06: from here the task watchdog restarts the modem if one loop() pass takes 15 s.
+    // From here the task watchdog restarts the modem if one loop() pass takes 15 s.
     // The core feeds it before each pass. Work that can take longer inside one pass feeds
     // it as it goes (hw::feedWatchdog()):
     //   - interactive hardware tests (hwconsole.cpp readKey() and testDelay(): every test

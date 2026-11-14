@@ -66,3 +66,26 @@ brief or `Q` references in `lib/`, `src/`, `test/`, `scripts/`, `web/src/`.
 8. Full native tests, lint, clang-format, firmware build.
 
 Cut line: 1, 2 and 7; 3-6 can move to WP-25.
+
+## Result (14 Nov 2026)
+
+Done: steps 1, 2, 3, 5 (the unused-function check and the script check), 7 and 8. Step 4:
+the test names already describe behaviour; the migration tests are gone; the suites with
+their own fakes were left as they are (moving them would not shorten them much).
+
+- **Step 1:** every stored record is layout 1 (`modemcfg`, client settings, call history;
+  the rest already were). The Wi-Fi driver's `nvs.net80211` clearing is gone.
+- **Step 5:** cppcheck's unused-function report lists only functions reached through
+  macros and tables (`Commands::dispatch`, the `cmd*` handlers: not dead). `scripts/test_refusal.ps1` removed.
+  `allow_call_tests.ps1`, `allow_ota.ps1`, `make_preview.py`, `build_handshakes.py` and
+  `generate_credits.py` are used (e2e README, README, VS Code task, tests, credits).
+- **Step 6:** no feature met the definition, so none was removed. For Jon to decide: the
+  `FAX` spelling of the ARQ LED in the `AT*HW` tests (`hwtest::parseLed`), and the
+  always-true `size` flag in the web `hello` message (`web/PROTOCOL.md`).
+- **Step 7:** `.env` has no stale keys; its 22 pin lines equal to `.env.example` are gone.
+  `USR_MODEM_PIN_LED_TR` differs on the bench and `USR_MODEM_PINS_OVERRIDDEN` stays.
+- Also fixed: `test_generate_ui` expected 77 menu items; there are 78.
+
+For WP-25 (docs, not touched here): `test/README.md` still names `rev B`, `Q89` and some
+version tags (32 hits), `credits_generated.h` is generated, and the brief section
+references in `lib/` and `src/` (kept) need checking after the brief is trimmed.

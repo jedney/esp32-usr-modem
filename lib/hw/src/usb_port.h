@@ -1,4 +1,4 @@
-// The USB modem port (v2.0, brief Q25): the S3's native USB (GPIO19/20, also wired to the
+// The USB modem port: the S3's native USB (GPIO19/20, also wired to the
 // rear USB-C socket) as a TinyUSB CDC-ACM serial device. A PC sees it as a COM port.
 //
 // Only the port itself lives here; the AT session is in src/usbport.cpp.

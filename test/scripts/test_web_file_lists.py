@@ -1,4 +1,4 @@
-"""The web file list is kept in several places; they must name the same files (MNT-05h).
+"""The web file list is kept in several places; they must name the same files.
 
 - scripts/build_web.py        what goes into the LittleFS image
 - lib/hw/src/web_service.cpp  what the modem serves

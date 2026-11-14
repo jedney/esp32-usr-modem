@@ -263,7 +263,7 @@ void test_telnet_refusals_no_loops_and_oversized_subnegotiation() {
     TEST_ASSERT_EQUAL(1, t.rx.read(&byte, 1));
     TEST_ASSERT_EQUAL('x', byte);
 }
-// TG-04: option negotiation can't loop, and a full send queue stops reading.
+// Option negotiation can't loop, and a full send queue stops reading.
 void test_telnet_mixed_storm_is_bounded_and_two_ends_settle() {
     Telnet t;
     t.begin();
@@ -333,7 +333,7 @@ void test_telnet_full_send_queue_stops_reading_the_socket() {
     }
     TEST_ASSERT_TRUE(socket.input.empty());
 }
-// 5.5-12: S7 limits the wait for the network connection. Once the TCP connection is open
+// S7 limits the wait for the network connection. Once the TCP connection is open
 // it must not drop the call while the handshake sound plays.
 void test_s7_does_not_cut_a_connected_call_during_the_handshake_sound() {
     Rig r;
@@ -981,7 +981,7 @@ void test_wav_validation_upsampling_and_handshake_mapping() {
     TEST_ASSERT_EQUAL_UINT32(56000, sounds::handshakeSpeed(56000));
 }
 
-// TG-16: the sound fake could never refuse, so none of these paths was run. A sound that
+// The sound fake could never refuse, so none of these paths was run. A sound that
 // cannot start, or one that breaks while playing, ends the call with NO CARRIER and frees the
 // line at every stage, and the next call works.
 void test_sound_that_cannot_start_ends_the_call_at_every_stage() {

@@ -24,8 +24,8 @@ public:
     void printf(const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 };
 
-// What the RS232 line, loopback and bridge tests need from the rest of the firmware
-// (Q79): they run only on the USB console, only with no call up, and the RS232 session is
+// What the RS232 line, loopback and bridge tests need from the rest of the firmware:
+// they run only on the USB console, only with no call up, and the RS232 session is
 // suspended while they use the port.
 struct PortControl {
     bool (*idle)();     // no call on any port

@@ -62,7 +62,7 @@ public:
     bool token(char out[33]);
     // True for kLockOutMs after a wrong response. Attempts in that time are refused
     // without extending it, so a guesser gets one try a second and the server task
-    // never sleeps (SEC-02; replaces the old one-second delay).
+    // never sleeps.
     bool lockedOut(uint32_t now) const { return wrong_ && now - wrongAt_ < kLockOutMs; }
     static constexpr uint32_t kLockOutMs = 1000;
 

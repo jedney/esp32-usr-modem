@@ -46,15 +46,15 @@ void test_factory_f1_has_the_decided_defaults() {
     TEST_ASSERT_EQUAL(1, p.get(kE));
     TEST_ASSERT_EQUAL(0, p.get(kQ));
     TEST_ASSERT_EQUAL(1, p.get(kV));
-    TEST_ASSERT_EQUAL(4, p.get(kX));  // all result codes (v0.4 decision)
+    TEST_ASSERT_EQUAL(4, p.get(kX));  // all result codes
     TEST_ASSERT_EQUAL(1, p.get(kM));
     TEST_ASSERT_EQUAL(2, p.get(kL));
-    TEST_ASSERT_EQUAL(0, p.get(kAmpA));  // plain CONNECT result (Q34)
-    TEST_ASSERT_EQUAL(1, p.get(kAmpB));  // speed stays as detected from "AT" (v0.5)
-    TEST_ASSERT_EQUAL(1, p.get(kAmpC));  // Q33
-    TEST_ASSERT_EQUAL(2, p.get(kAmpD));  // Q33
-    TEST_ASSERT_EQUAL(1, p.get(kAmpH));  // Q33
-    TEST_ASSERT_EQUAL(2, p.get(kAmpR));  // Q33
+    TEST_ASSERT_EQUAL(0, p.get(kAmpA));  // plain CONNECT result
+    TEST_ASSERT_EQUAL(1, p.get(kAmpB));  // speed stays as detected from "AT"
+    TEST_ASSERT_EQUAL(1, p.get(kAmpC));  // DCD follows the connection
+    TEST_ASSERT_EQUAL(2, p.get(kAmpD));  // DTR drop hangs up
+    TEST_ASSERT_EQUAL(1, p.get(kAmpH));  // hardware transmit flow control
+    TEST_ASSERT_EQUAL(2, p.get(kAmpR));  // RTS receive flow control
     TEST_ASSERT_EQUAL(0, p.get(kAmpS));  // DSR hard-wired
     TEST_ASSERT_EQUAL(8, p.get(kAmpN));  // 14400
     TEST_ASSERT_EQUAL(1, p.get(kTone));

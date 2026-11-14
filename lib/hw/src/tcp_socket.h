@@ -8,7 +8,7 @@ namespace hw {
 // Nonblocking lwIP socket and asynchronous DNS. The object outlives DNS requests.
 class TcpSocket : public calls::Socket {
 public:
-    // SEC-01: a peer that vanishes without a FIN or RST (cable pulled, router crash, or a
+    // A peer that vanishes without a FIN or RST (cable pulled, router crash, or a
     // lost RST) must not hold the connection for ever. Calls: idle 60 s, then 6 probes
     // 10 s apart, so a dead peer ends the call (NO CARRIER) after about 2 minutes. lwIP
     // counts these in seconds. Applies to connections opened or adopted after the change.

@@ -1,4 +1,4 @@
-"""End-to-end checks of the USB maintenance console (v0.1)."""
+"""End-to-end checks of the USB maintenance console."""
 
 import pathlib
 import time
@@ -63,6 +63,6 @@ def test_long_reply_does_not_hold_up_the_rs232_port(console, rs232):
 
 
 def test_unknown_command_is_error(console):
-    # J and G are not Sportster commands. (Since v0.4 "ATXYZZY" is valid: X, Y, Z.)
+    # J and G are not Sportster commands. ("ATXYZZY" is valid: X, Y, Z.)
     assert console.command("ATJ")[-1] == "ERROR"
     assert console.command("ATG1")[-1] == "ERROR"

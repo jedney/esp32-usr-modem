@@ -1,4 +1,4 @@
-// Host speed detection from "AT" (project brief 6.2, Q1) and 8N1 decoding of a captured
+// Host speed detection from "AT" (project brief 6.2) and 8N1 decoding of a captured
 // waveform.
 //
 // The board's RMT receiver records the RS232 TXD-in pin (TTL side, after the MAX3232)

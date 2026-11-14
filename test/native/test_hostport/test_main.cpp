@@ -742,7 +742,7 @@ void test_panel_ring_and_wifi() {
     TEST_ASSERT_EQUAL_HEX8(mask(hwtest::kARQ), p.update(in, Panel::kWifiBlinkMs));
 }
 
-// --- Sink gate (STA-01): a port nobody reads never stops the modem ------------------------
+// --- Sink gate: a port nobody reads never stops the modem ------------------------
 // A fake port with a fake clock. pause() is the only thing that moves time; the computer
 // frees one byte of room every `drainEveryMs` (0 = never reads).
 
@@ -901,7 +901,7 @@ void test_call_slot_says_who_holds_it() {
     TEST_ASSERT_FALSE(slot.heldBy(&b));
 }
 
-// --- TG-06: the 2^32 ms clock wrap, throttle rates, S3/S5 limits -------------------------------
+// --- The 2^32 ms clock wrap, throttle rates, S3/S5 limits -------------------------------
 constexpr uint32_t kNearWrap = 0xffffff00u;  // 256 ms before the clock wraps to 0
 
 void test_escape_guard_times_hold_across_the_clock_wrap() {

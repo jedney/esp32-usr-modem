@@ -1,4 +1,4 @@
-"""v0.7 password/OTA/reset checks. Maintenance tests require explicit flags.
+"""Password, OTA and reset checks. Maintenance tests require explicit flags.
 
 No assertion prints a password, raw boot banner or upload output. Local variables hold
 credentials during these tests; conftest.py keeps them out of tracebacks.

@@ -1,4 +1,4 @@
-"""v0.10 local configuration. No credential rotation, erases or external BBS calls."""
+"""Local configuration. No credential rotation, erases or external BBS calls."""
 import os
 import re
 import socket

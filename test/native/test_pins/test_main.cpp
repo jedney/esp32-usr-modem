@@ -1,6 +1,6 @@
-// Checks the GPIO pin map (lib/hw/src/pins.h): it is the map Electronics confirmed (Q89,
-// rev B), and it avoids the S3 board's reserved pins (project brief 5.2), so a
-// pin change, by accident or one that would break the board, fails before upload.
+// Checks the GPIO pin map (lib/hw/src/pins.h): it is the map Electronics confirmed, and it
+// avoids the S3 board's reserved pins (project brief 5.2), so a pin change, by accident or
+// one that would break the board, fails before upload.
 // Run with: pio test -e native
 #include <unity.h>
 
@@ -12,7 +12,7 @@
 void setUp() {}
 void tearDown() {}
 
-// The confirmed map (Q89, rev B; replaces rev A, Q76). The numbers come from .env.example
+// The confirmed map. The numbers come from .env.example
 // (scripts/pin_config.py); a changed map fails this test unless USR_MODEM_PINS_OVERRIDDEN=1 says it
 // is on purpose. If Electronics changes the board, change .env.example and these numbers together.
 void test_pin_map_is_the_confirmed_one() {

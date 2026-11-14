@@ -1,4 +1,4 @@
-"""End-to-end checks of Wi-Fi, the mDNS name and the clock (v0.6, brief 6.6, 6.7).
+"""End-to-end checks of Wi-Fi, the mDNS name and the clock (brief 6.6, 6.7).
 
 They need the USB console and the Wi-Fi name and password in `.env` (or environment
 variables) as USR_MODEM_WIFI_SSID / USR_MODEM_WIFI_PASS; without them they are skipped.
@@ -177,7 +177,7 @@ SHOW_COMMANDS = [
 
 
 def test_password_never_shown(console, wifi):
-    """Brief 6.6 / Q46: the Wi-Fi password is never displayed, after joining or at boot."""
+    """Brief 6.6: the Wi-Fi password is never displayed, after joining or at boot."""
     ssid, password = wifi
     if not password:
         pytest.skip("open network: no password to look for")

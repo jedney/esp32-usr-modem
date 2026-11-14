@@ -50,7 +50,7 @@ whole window.
 | 21 | v3.0 | [Networking, tooling, CI and the OTA hash](../history/wp-21-networking-ci-ota.md) (done 13 Nov: WebSockets fixed, SHA-256 OTA, CI updated) | Opus / high | L | 20 |
 | 22 | v3.0 | [Network console](../history/wp-22-network-console.md) (done 13 Nov: TCP 2001, password log-in, boot log replay) | Opus / high | L | 21 |
 | 23 | v3.0 | [DCD and RI on the USB modem port](../history/wp-23-usb-dcd-ri.md) (done 14 Nov: DCD, DSR and RI reach Windows; USB names and console greeting) | Sonnet / high | M | 20, 22 |
-| 24 | v3.0 | [Fresh start: code](wp-24-fresh-start-code.md) | Sonnet / high | L | 23 |
+| 24 | v3.0 | [Fresh start: code](wp-24-fresh-start-code.md) (done 14 Nov: one stored layout, comments and pins cleaned; no obsolete features found) | Sonnet / high | L | 23 |
 | 25 | v3.0 | [Fresh start: documentation and credits](wp-25-fresh-start-docs.md) | Sonnet / high | L | 24 |
 | 26 | v3.0 | [Bench run with Jon](wp-26-bench-run.md) | Sonnet / medium | M | 20-25 |
 
@@ -115,7 +115,7 @@ the package confirms each first.
 | --- | --- | --- | --- |
 | SEC-01 | Caller who never hangs up holds the line (8-ring limit, keepalive) | 04 | done (v2.4; (c) browser reject not done, optional) |
 | SEC-02 | Wrong Digest response or half header stalls the web task | 06 | done (v2.6) |
-| SEC-03 | ESP-IDF 4.4 / Arduino 2.0.17 end-of-life | 18-26 | open (WP-18 done: route and versions chosen; WP-19 sessions 1-2 and WP-20 to WP-23 done; WP-24 to 26 to do) |
+| SEC-03 | ESP-IDF 4.4 / Arduino 2.0.17 end-of-life | 18-26 | open (WP-18 done: route and versions chosen; WP-19 sessions 1-2 and WP-20 to WP-24 done; WP-25 and 26 to do) |
 | SEC-04 | Wi-Fi scan names printed with control bytes | 05 | done (v2.5) |
 | SEC-05 | Release workflow from any branch; write token in build steps | 01 | done (v2.1) |
 | SEC-06 | `AT*PASS` prints a generated password (permitted; amend rule) | 01 | done (v2.1) |

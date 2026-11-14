@@ -1,4 +1,4 @@
-// Fakes shared by the PC unit tests (TG-16). One of each, so a suite cannot drift from the
+// Fakes shared by the PC unit tests. One of each, so a suite cannot drift from the
 // others, and every one can fail on demand so the failure paths are testable.
 //
 //   fakes::MemoryStore    modemcfg::Store held in memory      failSave, failLoad, failErase,

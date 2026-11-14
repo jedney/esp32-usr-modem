@@ -1,4 +1,4 @@
-"""The USB modem port (v2.0): the S3's native USB, carried by the rear USB-C socket.
+"""The USB modem port: the S3's native USB, carried by the rear USB-C socket.
 
 Run with --usb-port (the TinyUSB serial port, e.g. COM21). The cross-port tests also
 need --rs232-port. No console port is needed: everything is driven from USB and RS232.

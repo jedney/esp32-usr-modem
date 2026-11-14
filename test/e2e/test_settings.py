@@ -1,5 +1,5 @@
 """End-to-end checks of the AT command parser and stored settings on the USB console
-(v0.4, brief 6.2, 6.5, 6.6, 6.7).
+(brief 6.2, 6.5, 6.6, 6.7).
 
 These tests change settings. Each one starts and ends with ATZ (back to the stored
 template). The restart test saves the factory &F1 template to Y0 when it finishes.
@@ -103,7 +103,7 @@ def test_project_commands_still_work(console):
 
 
 def test_saved_settings_survive_a_restart(console):
-    """Roadmap v0.4 "done when": AT&V shows the saved profile after a restart."""
+    """AT&V shows the saved profile after a restart."""
     try:
         assert console.command("AT&F1 S7=45 X3 &W")[-1] == "OK"
         console.command("AT&F1")  # change the active settings so the restart matters

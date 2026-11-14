@@ -1,4 +1,4 @@
-// PERF-01: what one key costs on the line, and which changes still send a full frame.
+// What one key costs on the line, and which changes still send a full frame.
 #pragma once
 
 struct KeyCost {

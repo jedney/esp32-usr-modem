@@ -1,11 +1,10 @@
 // GPIO pin map (project brief 5.2, 6.14).
 //
-// *** Rev B (project brief Q89), replacing the rev A map confirmed in Q76. ***
 // The pin NUMBERS are not in the source: scripts/pin_config.py reads USR_MODEM_PIN_* from
-// .env.example (the rev B defaults), then .env, then the environment, and passes them to
-// the compiler. Every driver and test reads its pins from this file.
+// .env.example (the defaults), then .env, then the environment, and passes them to the
+// compiler. Every driver and test reads its pins from this file.
 // test/native/test_pins locks in the .env.example values, so a pin can't change by accident.
-// The header layout below describes the rev B defaults.
+// The header layout below describes the defaults.
 //
 // Board: ESP32-S3 N16R8 DevKitC-1 clone (ePartners ST8002). Header J1 = left (L), J3 =
 // right (R); pin 1 is at the antenna end.
@@ -18,11 +17,11 @@
 //          R11-13 (37 36 35) | R14 (0) | R15 (45) | R16 48 | R17 (47) | R18 21
 //          R19 (20) | R20 (19) | R21-22 GND (not connected)
 // [ ] = used below; ( ) = not usable (strapping, PSRAM, USB, UART0 console, and 47: the
-// board's own RGB LED, still wired on the DevKit but not used from v3.0).
+// board's own RGB LED, wired on the DevKit but not used).
 // Spare: 8, 9, 18, 21, 48 (18 and 8 are also the nominal pins of the test-only UART2
 // below; nothing is connected to them). 19/20 (native USB) are also wired to the USB-C
-// PD board's D-/D+: from v2.0 they are the USB modem port (TinyUSB, lib/hw/src/usb_port.h),
-// reached through the rear USB-C socket. Amp VIN and GND come from the PD board, not the S3.
+// PD board's D-/D+: they are the USB modem port (TinyUSB, lib/hw/src/usb_port.h), reached
+// through the rear USB-C socket. Amp VIN and GND come from the PD board, not the S3.
 //
 // RS232 goes through two RS232 Pal modules (U1, U2) with a DB9 DCE pinout. The DB9 pins
 // are given beside each signal below.

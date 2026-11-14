@@ -1,6 +1,5 @@
 {
   "name": "atcmd",
-  "version": "0.4.0",
   "description": "USR Sportster AT command parser for the USR Modem Emulator: command-line input, result codes, ATI identity, AT* command table (brief 6.2, 6.5, 6.6, 6.8)",
   "frameworks": "*",
   "platforms": "*",

@@ -1,15 +1,15 @@
 // Front-panel LED rules (project brief 5.4). Returns the LED mask in hwtest::Led bit
 // order (AA bit 0 ... ARQ bit 6, as in web/PROTOCOL.md); the board shows it with
 // hw::ledsSet().
-//   AA   on when S0 >= 1; flashes while a call rings (answer mode, v0.9)
-// Two host ports drive CD, RD, SD and TR: RS232 and, from v2.0, the USB modem port
+//   AA   on when S0 >= 1; flashes while a call rings (answer mode)
+// Two host ports drive CD, RD, SD and TR: RS232 and the USB modem port
 // (addHostPort). CS is RS232 only: USB has no CTS line.
 //   CD   mirrors DCD (&C0: always on), or a call on the USB console
 //   RD   modem -> computer data, SD computer -> modem data; each byte keeps the LED lit
 //        for kStretchMs so single characters are visible
 //   TR   mirrors DTR (&D0: always on)
 //   CS   mirrors the CTS output
-//   ARQ  Wi-Fi: solid when connected, blinking while connecting (v0.6)
+//   ARQ  Wi-Fi: solid when connected, blinking while connecting
 //
 // No Arduino dependencies: unit-tested on the PC.
 

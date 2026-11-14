@@ -265,7 +265,7 @@ void Terminal::render() {
 size_t Terminal::visibleItems() const {
     return std::min(15, std::max(1, int(rows_) - 10));
 }
-// Lines of text the output and help views show: their page step (5.5-14). The small
+// Lines of text the output and help views show: their page step. The small
 // layout shows one line.
 size_t Terminal::responseRows() const {
     if (cols_ < 20 || rows_ < 8)
@@ -502,7 +502,7 @@ void Terminal::drawFooter(bool main) {
     grid_.text(2, rows_ - 2, focus_ == Focus::Confirm ? "Command > Y / N" : "Command >", Ink::Body,
                cols_ - 4);
 }
-// PERF-01: a full frame clears the screen and sends every row; otherwise only the changed
+// A full frame clears the screen and sends every row; otherwise only the changed
 // cells of each row are sent, and nothing at all when nothing changed.
 void Terminal::planFrame() {
     frameWrites_ = session_.port().directWrites();
@@ -1265,7 +1265,7 @@ void Terminal::input(char c) {
         if (escapeLen_ == 1 && c != '[' && c != 'O') {
             escapeLen_ = 0;
             // Esc with a printable key at once is Alt+key, which the screen does not use:
-            // drop both, so it neither cancels (or exits) nor runs a hotkey (5.5-14).
+            // drop both, so it neither cancels (or exits) nor runs a hotkey.
             if (c >= 32 && c <= 126)
                 return;
             key(27);

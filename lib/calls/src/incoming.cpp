@@ -207,7 +207,7 @@ void Incoming::poll(bool available) {
             }
             if (now - ringAt_ >= kRingPeriodMs) {
                 if (rings_ >= kMaxRings) {
-                    clear(true);  // SEC-01: nobody answered. End it like a caller who hung up.
+                    clear(true);  // nobody answered. End it like a caller who hung up.
                 } else {
                     ring(now);  // no catch-up burst after a delayed poll
                 }

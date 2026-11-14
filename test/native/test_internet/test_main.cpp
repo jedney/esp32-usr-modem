@@ -534,7 +534,7 @@ void test_uart_input_buffer_retains_ppp_tail_until_reply_queue_drains() {
     session.hangUp();
 }
 
-// --- TG-03: malformed PPP control packets, table driven ---------------------------------------
+// --- Malformed PPP control packets, table driven ---------------------------------------
 // Each case is fed to an engine at one stage of the negotiation. Afterwards the engine must
 // still be open, have answered as the table says (and nothing else), and still be able to
 // finish negotiating and carry an IP packet.
@@ -715,7 +715,7 @@ void test_ppp_malformed_control_packets_are_dropped_rejected_or_ignored() {
     for (const auto &c : cases)
         runPppCase(c);
 }
-// 5.5-09: a peer cannot keep an unfinished negotiation alive with Terminate-Requests.
+// A peer cannot keep an unfinished negotiation alive with Terminate-Requests.
 void test_ipcp_terminate_request_does_not_extend_the_negotiation_deadline() {
     Fixture f;
     f.ppp(0);

@@ -228,7 +228,7 @@ void test_ssid_and_password_checks() {
     TEST_ASSERT_FALSE(validPassword(notHex64.c_str()));
     TEST_ASSERT_FALSE(validPassword("password\x01"));
     TEST_ASSERT_FALSE(validPassword("password\x7f"));
-    // WPA2 passphrases are bytes: UTF-8 text is allowed, counted in bytes (5.5-15).
+    // WPA2 passphrases are bytes: UTF-8 text is allowed, counted in bytes.
     TEST_ASSERT_TRUE(validPassword("caf\xc3\xa9 au lait"));
     TEST_ASSERT_TRUE(validPassword("\xe2\x9c\x93\xe2\x9c\x93\xe2\x9c\x93"));  // 9 bytes
     TEST_ASSERT_FALSE(validPassword("\xc3\xa9\xc3\xa9\xc3"));                 // 5 bytes: too short
@@ -256,7 +256,7 @@ void test_hostname_rules() {
     TEST_ASSERT_FALSE(validServer(""));
     TEST_ASSERT_FALSE(validServer("pool ntp"));
     TEST_ASSERT_FALSE(validServer(".pool"));
-    TEST_ASSERT_FALSE(validServer("a..b"));  // an empty label (5.5-15)
+    TEST_ASSERT_FALSE(validServer("a..b"));  // an empty label
     TEST_ASSERT_FALSE(validServer("pool..ntp.org"));
     TEST_ASSERT_FALSE(validServer("pool.ntp.org."));
     TEST_ASSERT_TRUE(validServer("a.b"));
@@ -381,7 +381,7 @@ void test_northern_zones_and_utc() {
     TEST_ASSERT_EQUAL(0, tz::offsetAt(r, utcOf(2026, 7, 1, 0, 0, 0)));
 }
 
-// PERF-02: the web status asks for the offset on every pass; the cache works it out again
+// The web status asks for the offset on every pass; the cache works it out again
 // only in a new minute or for a different rule, and still turns at the exact second.
 void test_offset_cache_recomputes_only_for_a_new_minute_or_rule() {
     tz::Rule nz, london;
@@ -711,7 +711,7 @@ void test_scan_sorts_and_merges() {
     TEST_ASSERT_EQUAL(2, r.radio.connects);  // back to joining the saved network
 }
 
-// 5.5-01: a scan turns the radio on. With Wi-Fi switched off, the radio goes off again when
+// A scan turns the radio on. With Wi-Fi switched off, the radio goes off again when
 // the scan ends, however it ends. The radio itself reports "off" all the while, so netcfg
 // must not wait for a link state change to notice.
 void test_radio_goes_off_again_after_a_scan_with_wifi_off() {
@@ -1001,7 +1001,7 @@ void test_help_lists_wifi_and_clock_commands() {
     }
 }
 
-// The Wi-Fi password never appears in any output (brief 6.6, Q46).
+// The Wi-Fi password never appears in any output (brief 6.6).
 void test_password_never_shown() {
     const char *kCanary = "Canary-pw-9f3K";
     Settings s = saved("HomeNet", kCanary);

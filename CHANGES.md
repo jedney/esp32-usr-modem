@@ -103,6 +103,15 @@ Work in progress on `firmware/v3.0-idf5`; this entry is completed in WP-19.
 
 - The S3 board's own RGB LED is no longer used: it can't be seen in the case. The front
   ARQ LED still shows Wi-Fi. `USR_MODEM_PIN_RGB_LED` is gone from `.env.example`.
+- Migration code. Saved settings, the client settings, the call history and the other
+  stored records each have one layout, number 1: a record with another layout number or a
+  bad CRC loads factory settings. The modem no longer reads settings saved by v2.x, and
+  a factory reset no longer clears the Wi-Fi driver's own copy of the network, which the
+  firmware stopped writing in v0.6. The v3.0 firmware is flashed over USB after a full
+  erase.
+- Version tags, review-finding IDs, project-brief question numbers, names and dates in
+  code comments, tests, `library.json` and the pin map text; `scripts/test_refusal.ps1`
+  (a v0.8 bench helper: `pytest -k` does the same).
 
 ## [2.17] - 2026-11-13
 

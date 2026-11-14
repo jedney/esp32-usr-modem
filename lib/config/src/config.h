@@ -227,7 +227,7 @@ private:
     bool dirty_ = false, drawing_ = false, querySize_ = false;
     bool styled_ = false;
     unsigned drawRow_ = 0;
-    // What the terminal shows (PERF-01). A frame sends only the cells that differ from it,
+    // What the terminal shows. A frame sends only the cells that differ from it,
     // unless it is a full frame: first frame, new size, style, colours or theme, Ctrl-L,
     // or other output on the port since (Port::directWrites()). Plain text is always full.
     struct Shown {

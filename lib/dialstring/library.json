@@ -1,6 +1,5 @@
 {
   "name": "dialstring",
-  "version": "0.1.0",
   "description": "Dial-string classifier for the USR Modem Emulator (brief 6.3)",
   "frameworks": "*",
   "platforms": "*"

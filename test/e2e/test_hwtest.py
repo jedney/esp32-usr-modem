@@ -1,4 +1,4 @@
-"""End-to-end checks of the AT*HW hardware-test commands (v0.3, brief 6.14).
+"""End-to-end checks of the AT*HW hardware-test commands (brief 6.14).
 
 These need only the USB console; nothing has to be wired to the S3 (the commands drive
 the pins whether or not anything is connected). The bridge test also needs the RS232
@@ -30,9 +30,9 @@ def test_pins_are_shown(console):
 
 
 def test_pins_are_the_confirmed_map(console):
-    """The map Electronics confirmed (Q89, rev B)."""
+    """The map Electronics confirmed."""
     text = "\n".join(console.command("AT*HWPINS"))
-    assert "confirmed (rev B)" in text
+    assert "confirmed" in text
     assert re.search(r"\bAA=GPIO4\b", text)
     assert re.search(r"\bARQ=GPIO17\b", text)
     assert "pot wiper: GPIO10" in text

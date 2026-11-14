@@ -3,7 +3,7 @@
 These tests talk to a real modem over serial ports:
   --console-port   the USB maintenance console (UART0, 115200), e.g. COM5
   --rs232-port     the RS232 port through the Unitek adapter, e.g. COM18
-  --usb-port       the USB modem port (v2.0, native USB / rear USB-C), e.g. COM21
+  --usb-port       the USB modem port (native USB / rear USB-C), e.g. COM21
 
 --console-port also takes the network console, socket://usr-modem.local:2001. The fixture
 logs in with USR_MODEM_PASSWORD (from `.env` or the environment; never printed) and logs
@@ -12,7 +12,7 @@ in again after a test restarts the modem.
 Tests that need a port that was not given are skipped, so the suite is safe to run
 anywhere.
 
-Wi-Fi tests (v0.6) need the network name and password. They come from a `.env` file at
+Wi-Fi tests need the network name and password. They come from a `.env` file at
 the repository root (git-ignored; see `.env.example`) or from environment variables of
 the same names, which win. They are never printed.
 """
@@ -26,7 +26,7 @@ import pytest
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
-# Unsolicited console lines (v0.6): Wi-Fi connected/lost and clock set. Not part of a
+# Unsolicited console lines: Wi-Fi connected/lost and clock set. Not part of a
 # command's response, so command() leaves them out.
 NOTICE = re.compile(r"^(Wi-Fi: (connected to|lost|can't join) |Clock: set by NTP)")
 
@@ -89,7 +89,7 @@ def pytest_addoption(parser):
     parser.addoption("--net-console", default=None, help="modem host or IPv4 for test_net_console.py")
     parser.addoption("--rs232-port", default=None, help="RS232 serial port (Unitek adapter)")
     parser.addoption("--rs232-baud", default=38400, type=int, help="RS232 host speed")
-    parser.addoption("--usb-port", default=None, help="USB modem port (v2.0 TinyUSB serial)")
+    parser.addoption("--usb-port", default=None, help="USB modem port (TinyUSB serial)")
     parser.addoption("--device-tests", action="store_true", help="allow device password changes")
     parser.addoption("--factory-reset", action="store_true", help="allow erasing all modem settings")
     parser.addoption("--ota-upload", action="store_true", help="allow real OTA uploads (tests first)")
@@ -192,7 +192,7 @@ class Port:
     def restart(self, banner=b"USR Modem Emulator v", timeout=15.0):
         """Reset the ESP32 through the USB-serial chip's RTS line (EN), as esptool does,
         and return the boot output once the banner has been printed. With a Wi-Fi
-        network saved, the banner waits up to 8 s for it (v0.6).
+        network saved, the banner waits up to 8 s for it.
 
         On the network console: AT*RESTART, then log in again and return the replayed
         boot output."""

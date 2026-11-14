@@ -44,7 +44,7 @@ void OtaService::poll(uint32_t now, bool wifiUp, bool idle, const char *hostname
             }
         });
         // ArduinoOTA receives the whole image inside handle(), in the loop task: feed the
-        // watchdog after every chunk (STA-06).
+        // watchdog after every chunk.
         ota_->onProgress([](unsigned int, unsigned int) { hw::feedWatchdog(); });
         ota_->begin();
     }

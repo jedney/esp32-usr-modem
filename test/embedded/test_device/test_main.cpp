@@ -1,4 +1,5 @@
-// v0.7 hardware checks. Only scratch NVS namespaces are written; no extra wiring.
+// Hardware checks for the device password and OTA policy. Only scratch NVS namespaces are written;
+// no extra wiring.
 #include <Arduino.h>
 #include <unity.h>
 

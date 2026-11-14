@@ -17,7 +17,7 @@ def test_generated_firmware_and_demo_are_current_and_deterministic():
     assert ui.demo_data() == (ROOT / "web/src/ui-data.js").read_text(encoding="utf-8")
     menu = json.loads((ROOT / "ui/menu-definition.json").read_text(encoding="utf-8"))
     assert len(menu["main_menu"]) == 13
-    assert sum(len(p["items"]) for p in menu["main_menu"]) == 77
+    assert sum(len(p["items"]) for p in menu["main_menu"]) == 78
 
 
 def test_missing_binding_fails_generation(tmp_path):

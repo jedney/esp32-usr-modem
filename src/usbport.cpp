@@ -19,7 +19,7 @@ constexpr uint32_t kDefaultBaud = 115200;  // reported until the PC sets a speed
 
 // Direct writes (results the Session sends straight to the sink). Like the RS232 port,
 // SinkGate decides how long to wait: a program that has the port open but stops reading
-// must not stop the modem (STA-01). Nothing is sent while the port is closed.
+// must not stop the modem. Nothing is sent while the port is closed.
 class UsbSink : public atcmd::Sink, private hostport::SinkGate::Device {
 public:
     void write(const char *data, size_t len) override { send(data, len, false); }

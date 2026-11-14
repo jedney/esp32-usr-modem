@@ -235,7 +235,7 @@ void test_ring_clock_rollover_and_delayed_poll() {
     TEST_ASSERT_EQUAL(2, r.modem.active().s[1]);
     TEST_ASSERT_TRUE(r.call.ringing());
 }
-// SEC-01: a caller nobody answers is dropped after kMaxRings rings (8, about 24 s).
+// A caller nobody answers is dropped after kMaxRings rings (8, about 24 s).
 class Journal : public Observer {
 public:
     unsigned started_ = 0, connected_ = 0, ended_ = 0;
@@ -455,7 +455,7 @@ void test_remote_commands_and_guarded_escape_are_data_even_locally_escaped() {
     TEST_ASSERT_EQUAL_STRING(attack.c_str(), r.receive().c_str());
     TEST_ASSERT_TRUE(r.socket.output.find("password") == std::string::npos);
 }
-// TG-01: guard times on the remote side. If remote bytes ever reached the escape detector,
+// Guard times on the remote side. If remote bytes ever reached the escape detector,
 // "data", 1.2 s of silence, "+++", 1.2 s of silence would drop the call into command mode.
 void test_remote_escape_with_guard_times_stays_data_on_every_answer_port() {
     using modemcfg::AnswerPort;
@@ -498,7 +498,7 @@ void test_remote_escape_with_guard_times_stays_data_on_every_answer_port() {
         TEST_ASSERT_EQUAL(std::string::npos, r.socket.output.find("OK"));  // no reply to caller
     }
 }
-// TG-04: Telnet commands from a caller are consumed by the Telnet layer, before and after
+// Telnet commands from a caller are consumed by the Telnet layer, before and after
 // ATA. They never become data and never reach an AT parser.
 void test_iac_from_a_caller_never_becomes_data_or_commands() {
     Rig r;
@@ -648,7 +648,7 @@ void test_numeric_and_quiet_results() {
     TEST_ASSERT_TRUE(r.output.text.empty());
 }
 void test_ring_is_unsolicited_and_replies_are_not() {
-    // STA-01: RING is output nobody asked for, so the port's sink may drop it when the
+    // RING is output nobody asked for, so the port's sink may drop it when the
     // computer is not reading. Command replies (ATA's CONNECT) are not.
     Rig r;
     r.usbDtr = true;

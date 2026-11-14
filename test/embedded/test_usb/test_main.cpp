@@ -1,4 +1,4 @@
-// On-board checks for the USB modem port driver (v2.0, lib/hw/src/usb_port.h):
+// On-board checks for the USB modem port driver (lib/hw/src/usb_port.h):
 //   pio test -e s3 -f embedded/test_usb
 // Results come back over the UART console port. Plug a PC into the rear USB-C socket (or
 // the S3's own native USB-C) with nothing opening the new COM port; if a program opens it

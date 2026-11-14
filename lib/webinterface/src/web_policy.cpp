@@ -274,7 +274,7 @@ std::string jsonString(const char *value) {
             result += '\\';
             result += static_cast<char>(*p);
         } else if (*p >= 0xC2) {
-            // Valid UTF-8 passes through, so a network named "Café" is readable (5.5-16).
+            // Valid UTF-8 passes through, so a network named "Café" is readable.
             // utf8Length() reads at most three bytes ahead; a NUL ends the string safely
             // because it is never a continuation byte.
             const size_t n = utf8Length(p);

@@ -21,7 +21,7 @@ namespace {
 
 // Written by the Wi-Fi event task (core 0) and by loop() (core 1). The state and its reason
 // change together under linkLock, and the event handler only makes the moves that make sense
-// from the state loop() left (5.5-02): a late "got IP" from a connection that leave() or
+// from the state loop() left: a late "got IP" from a connection that leave() or
 // off() has already ended can no longer bring the link back up.
 portMUX_TYPE linkLock = portMUX_INITIALIZER_UNLOCKED;
 LinkState linkState = LinkState::kOff;  // guarded by linkLock
@@ -221,7 +221,7 @@ bool EspRadio::scanStart() {
     if (scanning) {
         // A scan the caller gave up on (a cancelled AT*WIFISCAN) is still running: join it
         // rather than stop it. Stopping posts a "scan done" event which could arrive after
-        // the new scan began and end it at once with a short list (5.5-03).
+        // the new scan began and end it at once with a short list.
         scanStartedAt = millis();
         return true;
     }

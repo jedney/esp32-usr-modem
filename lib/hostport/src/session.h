@@ -68,7 +68,7 @@ public:
     uint32_t payloadReceived() const { return payloadReceived_; }
     bool startLocal(Connection &connection);
 
-    // Starts a call on `conn` (AT*TESTCALL now, ATD from v0.8): sends CONNECT and goes
+    // Starts a call on `conn` (AT*TESTCALL, ATD): sends CONNECT and goes
     // online. False if this or another port already has a call.
     bool startCall(Connection &conn, uint32_t operationalSpeed = 0, uint32_t reportSpeed = 0,
                    const void *reservation = nullptr, bool answered = false);

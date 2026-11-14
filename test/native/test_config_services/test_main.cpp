@@ -427,7 +427,7 @@ void test_menu_export_retains_complete_replayable_lines_across_pages() {
     feed("\r");
     TEST_ASSERT_NOT_EQUAL(std::string::npos, drain().find("Configuration"));
 }
-// TG-16: these stores could not fail, so a refused write was never tested. Each command says
+// These stores could not fail, so a refused write was never tested. Each command says
 // ERROR and leaves the live setting as it was; with the store working again it succeeds.
 void test_store_write_failures_are_reported_and_change_nothing() {
     Rig r;
@@ -467,7 +467,7 @@ void test_store_write_failures_are_reported_and_change_nothing() {
     TEST_ASSERT_NOT_EQUAL(0, strcmp(digest.c_str(), r.device.digestHash()));
 }
 
-// 5.5-05: a join, a scan or an address change would drop the call, so each is refused.
+// A join, a scan or an address change would drop the call, so each is refused.
 void test_wifi_join_scan_and_address_change_are_refused_during_a_call() {
     Rig r;
     callIsUp = true;
@@ -493,7 +493,7 @@ void test_wifi_join_scan_and_address_change_are_refused_during_a_call() {
     r.session.port().cancelPrompt();
 }
 
-// --- TG-02: neither password nor any stored form of it appears in any output ---------------
+// --- Neither password nor any stored form of it appears in any output ---------------
 struct Services : config::UiServices {
     calls::Phonebook *book;
     explicit Services(calls::Phonebook &b) : book(&b) {}

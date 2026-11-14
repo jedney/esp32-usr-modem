@@ -467,7 +467,7 @@ def test_ppp_reply_pressure_preserves_every_serial_request(ports):
 
 
 def test_stack_headroom_after_internet_traffic(console):
-    """5.5-08: the lwIP task copies packets on its 6 KB stack, and the loop task runs the PPP
+    """The lwIP task copies packets on its 6 KB stack, and the loop task runs the PPP
     engine. Run after the tests above (without a restart between), so the high-water mark
     (the least free stack since boot) includes their traffic."""
     status = '\n'.join(console.command('AT*STATUS'))
@@ -475,5 +475,5 @@ def test_stack_headroom_after_internet_traffic(console):
     assert match, 'AT*STATUS has no stack headroom line'
     loop, lwip, web = (int(value) for value in match.groups())
     print(f'Stack headroom: loop {loop} B, lwIP {lwip} B, web {web} B')
-    assert lwip >= 1024, f'lwIP stack headroom {lwip} B is under 1 KB (5.5-08)'
+    assert lwip >= 1024, f'lwIP stack headroom {lwip} B is under 1 KB'
     assert loop >= 1024, f'loop task stack headroom {loop} B is under 1 KB'

@@ -47,7 +47,7 @@ bool parseOnOff(const char *s, bool *on);
 // --- Time-out and call rules -------------------------------------------------------------
 
 // An interactive test ("any key stops", prompts, bridge) ends after this long with no key,
-// so a closed terminal or a forgotten test can't hold the modem for ever (WP-03, STA-03).
+// so a closed terminal or a forgotten test can't hold the modem for ever.
 constexpr uint32_t kIdleTimeoutMs = 5u * 60u * 1000u;
 
 // True when `timeoutMs` or more has passed since `lastMs`. Safe when millis() wraps.

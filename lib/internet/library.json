@@ -1,1 +1,1 @@
-{"name":"internet","version":"0.13.0","frameworks":"*","platforms":"*","dependencies":[{"name":"calls"},{"name":"netcfg"}]}
+{"name":"internet","frameworks":"*","platforms":"*","dependencies":[{"name":"calls"},{"name":"netcfg"}]}

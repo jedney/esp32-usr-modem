@@ -20,7 +20,7 @@ void test_idle_menus_do_not_repaint_but_input_and_resize_do() {
         TEST_ASSERT_FALSE(r.drain().empty());
     }
 }
-// The screen sends only changes (PERF-01), so the refresh shows through a changed link.
+// The screen sends only changes, so the refresh shows through a changed link.
 struct LinkServices : UiServices {
     char link[16] = "Idle";
     calls::Phonebook *phonebook() override { return nullptr; }

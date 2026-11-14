@@ -5,8 +5,7 @@
 // The radio itself is behind Radio (the board's is hw::EspRadio in lib/hw; the unit
 // tests use a fake). No Arduino dependencies: unit-tested on the PC.
 //
-// Front ARQ LED (decided by Jon, 24 Oct; the S3 board's RGB LED is not used from v3.0,
-// Jon, 13 Nov 2026: it can't be seen in the case):
+// Front ARQ LED (the S3 board's own RGB LED is not used: it can't be seen in the case):
 //   no network set up                    off
 //   network saved, connecting/retrying   blinking
 //   connected                            on

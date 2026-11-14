@@ -1,4 +1,4 @@
-"""v0.8 calls through a local PC server; no RS232 wiring needed.
+"""Calls through a local PC server; no RS232 wiring needed.
 
 Set --call-server-ip to the PC address reachable from the modem. These tests do
 not change firewall settings. --live-bbs additionally checks ATDT1 against the BBS.

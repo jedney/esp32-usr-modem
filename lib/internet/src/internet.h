@@ -59,7 +59,7 @@ private:
     calls::ByteQueue<16384> tx_;
     uint8_t rx_[kMtu + 8] = {}, ip_[kMtu] = {};
     // Replies are built here, not on the stack: the Arduino loop task, which runs the engine,
-    // had 420 bytes of its 8 KB left after the PPP tests (v2.17 bench). control() copies
+    // had 420 bytes of its 8 KB left after the PPP tests. control() copies
     // reply_ or nak_ into packet_, so the three never overlap.
     uint8_t packet_[kMtu] = {}, reply_[kMtu] = {}, nak_[kMtu] = {};
     size_t rxLength_ = 0;

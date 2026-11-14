@@ -15,7 +15,7 @@ public:
           slot_(slot),
           sound_(sound),
           clock_(clock) {}
-    // The USB modem port's session and menu (v2.0).
+    // The USB modem port's session and menu.
     void setUsb(hostport::Session *usb, Terminal *usbMenu) {
         usb_ = usb;
         usbMenu_ = usbMenu;

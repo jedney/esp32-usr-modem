@@ -157,7 +157,7 @@ void Engine::control(uint16_t protocol, uint8_t code, uint8_t id, const uint8_t 
         ++dropped_;
         return;
     }
-    uint8_t *packet = packet_;  // a member: the loop task's stack is small (v2.17)
+    uint8_t *packet = packet_;  // a member: the loop task's stack is small
     packet[0] = code;
     packet[1] = id;
     packet[2] = uint8_t((length + 4) >> 8);
@@ -386,7 +386,7 @@ void Engine::ipcp(const uint8_t *p, size_t n) {
     } else if (p[0] == 5) {
         control(kIpcp, 6, p[1], data, length);
         // Only a link that was up gets a fresh deadline to renegotiate. Before that, the
-        // 30 s run from the start, so a peer cannot keep a half-open link for ever (5.5-09).
+        // 30 s run from the start, so a peer cannot keep a half-open link for ever.
         const bool wasUp = ready_;
         closeNetwork();
         if (wasUp) {

@@ -3,7 +3,7 @@
 
 namespace webinterface {
 
-// Browser upload hand-shake between the HTTP server task and the modem loop (STA-07).
+// Browser upload hand-shake between the HTTP server task and the modem loop.
 // No locking here: the web service calls every method under its own mutex, so each
 // call is one atomic step. Each side only acts while the other is still waiting:
 //

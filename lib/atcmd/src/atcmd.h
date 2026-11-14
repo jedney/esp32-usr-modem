@@ -30,7 +30,7 @@ public:
     virtual ~Sink() = default;
     virtual void write(const char *data, size_t len) = 0;
     // Output nobody on this port asked for (RING). A serial port drops it at once when it
-    // has no room (STA-01); by default it is written like any other output.
+    // has no room; by default it is written like any other output.
     virtual void writeUnsolicited(const char *data, size_t len) { write(data, len); }
 };
 

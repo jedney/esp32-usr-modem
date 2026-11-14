@@ -1,5 +1,5 @@
-"""End-to-end checks of the RS232 host port (v0.5, brief 6.2) through the Unitek
-adapter. Roadmap v0.5 "done when": these pass at 300-115200 baud.
+"""End-to-end checks of the RS232 host port (brief 6.2) through the Unitek
+adapter. These pass at 300-115200 baud.
 
 Needs both ports and the RS232 section wired (MAX3232s and the bench DB9 or the DB25):
     python -m pytest test/e2e --console-port COM15 --rs232-port COMy

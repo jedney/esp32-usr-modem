@@ -1,4 +1,4 @@
-// Review row 5.5-14: paging on tall screens, Alt+letter, and the "input too long" flag.
+// Paging on tall screens, Alt+letter, and the "input too long" flag.
 #pragma once
 
 // Writes `count` numbered lines as command output and returns the screen after it.

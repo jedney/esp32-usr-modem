@@ -302,7 +302,7 @@ void Service::byte(uint8_t b) {
         input_[length_++] = b;
         input_[length_] = 0;
         // Look at every ESC [ in the buffer: a terminal that echoes our query puts an
-        // "ESC [ 6 n" in front of the real reply (5.5-11).
+        // "ESC [ 6 n" in front of the real reply.
         for (char *reply = strstr(input_, "\x1b["); reply; reply = strstr(reply + 1, "\x1b[")) {
             unsigned rows, cols;
             int used = 0;

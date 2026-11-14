@@ -62,7 +62,7 @@ bool fromBrowser() {
 void testDelay(uint32_t ms) {
     uint32_t start = millis();
     do {
-        hw::feedWatchdog();  // a test can run for minutes inside one loop pass (STA-06)
+        hw::feedWatchdog();  // a test can run for minutes inside one loop pass
         term->service();
         ::delay(ms < 5 ? ms : 5);
     } while (millis() - start < ms);
@@ -87,7 +87,7 @@ int readKey() {
 }
 
 // True when the running test must end: the terminal has gone, or no key came for
-// hwtest::kIdleTimeoutMs. Every "any key" loop checks this (STA-03).
+// hwtest::kIdleTimeoutMs. Every "any key" loop checks this.
 bool mustStop() {
     if (!term->connected()) {
         return true;
@@ -112,7 +112,7 @@ bool keyPressed() {
     return true;
 }
 
-// The RS232 line, loopback and bridge tests use the port itself (Q79): they run only on
+// The RS232 line, loopback and bridge tests use the port itself: they run only on
 // the USB console, with no call up, and the RS232 session is suspended meanwhile.
 bool canTakePort(const char *what) {
     if (term->isRs232()) {
@@ -212,7 +212,7 @@ bool play(tones::Source &src) {
 // --- Pin map -----------------------------------------------------------------------------
 
 void printPins() {
-    out().print("GPIO pin map (lib/hw/src/pins.h) - confirmed (rev B)\r\n");
+    out().print("GPIO pin map (lib/hw/src/pins.h) - confirmed\r\n");
     out().print("RS232 (DCE; asserted = LOW at the GPIO):\r\n");
     out().printf("  RXD out  GPIO%-2d  DB9 2   UART1 TX\r\n", pins::kRxd);
     out().printf("  TXD in   GPIO%-2d  DB9 3   UART1 RX\r\n", pins::kTxd);

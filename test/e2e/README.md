@@ -78,8 +78,7 @@ may need an inbound rule for the test Python: `scripts/allow_call_tests.ps1
 private networks. Remove it with
 `Remove-NetFirewallRule -DisplayName 'USR modem local call tests TCP 32321'`. The tests
 never change firewall settings themselves. Refusal (BUSY) uses conditional accept, so it
-works with that rule; `scripts/test_refusal.ps1 -ServerAddress <PC IP> -ConsolePort COM15`
-runs just the refusal and DNS checks.
+works with that rule.
 
 ```powershell
 python -m pytest test/e2e/test_calls.py --console-port COM15 --call-server-ip 10.0.0.208 --live-bbs

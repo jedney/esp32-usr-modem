@@ -1,4 +1,4 @@
-// On-board Wi-Fi and clock checks (v0.6, brief 6.6). They use the network saved on the
+// On-board Wi-Fi and clock checks (brief 6.6). They use the network saved on the
 // modem with AT*WIFIJOIN (NVS namespace "net"); with none saved they are skipped. The
 // saved settings are only read, never changed.
 // Run with: pio test -e s3 -f embedded/test_wifi   (then upload the firmware again)

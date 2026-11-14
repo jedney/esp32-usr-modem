@@ -88,7 +88,7 @@ void test_digest_reports_stale_nonce_and_wrong_password() {
     TEST_ASSERT_TRUE(Check::kOk ==
                      auth.check(digest(n, "00000003"), "GET", "/api/session", ha1, 1005));
 }
-// SEC-02: after a wrong response the next second is answered at once, without
+// After a wrong response the next second is answered at once, without
 // checking the password, instead of the server task sleeping for a second.
 void test_wrong_response_locks_out_for_one_second_without_blocking() {
     FakeCrypto crypto;
@@ -244,7 +244,7 @@ void test_image_identity_header_length_and_chunk_boundaries() {
 void test_json_escapes_untrusted_strings() {
     TEST_ASSERT_EQUAL_STRING("\"a\\\"\\\\\\u001b\\u000a\"", jsonString("a\"\\\x1b\n").c_str());
 }
-// 5.5-16: a network named "Caf\u00e9" reaches the page as the letters, not as mojibake. Bytes
+// A network named "Caf\u00e9" reaches the page as the letters, not as mojibake. Bytes
 // that are not valid UTF-8 are still escaped one by one so they cannot break the JSON.
 void test_json_passes_valid_utf8_and_escapes_invalid_bytes() {
     TEST_ASSERT_EQUAL_STRING("\"caf\xc3\xa9\"", jsonString("caf\xc3\xa9").c_str());    // 2 bytes
@@ -342,7 +342,7 @@ void test_terminal_geometry_is_bounded_and_cannot_be_terminal_input() {
         TEST_ASSERT_EQUAL(50, rows);
     }
 }
-// STA-07: each side acts only while the other is still waiting.
+// Each side acts only while the other is still waiting.
 void test_upload_handshake_grant_and_refuse_on_time() {
     UploadHandshake h;
     uint32_t client = 0;
@@ -440,7 +440,7 @@ void test_upload_handshake_late_unmount_is_ignored() {
     h.giveUpUnmount();
     TEST_ASSERT_TRUE(h.unmountReady());
 }
-// --- TG-05: Authorization parser limits, nonce table, real MD5, filesystem images -----------
+// --- Authorization parser limits, nonce table, real MD5, filesystem images -----------
 std::string nonceOf(const std::string &challenge) {
     return challenge.substr(challenge.find("nonce=\"") + 7, 32);
 }

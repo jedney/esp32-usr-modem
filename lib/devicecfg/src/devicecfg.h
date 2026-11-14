@@ -1,4 +1,4 @@
-// Device password and OTA policy (brief 6.6, Q15/Q62/Q69/Q70). No hardware calls.
+// Device password and OTA policy (brief 6.6). No hardware calls.
 #pragma once
 
 #include <cstddef>

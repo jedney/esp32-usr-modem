@@ -20,7 +20,7 @@ public:
         : path_(path), temporary_(temporary), backup_(backup) {}
     size_t load(uint8_t *out, size_t cap) override {
         // The file, then the temporary file (the newest blob if power was lost between the two
-        // renames of save()), then the backup. Each must be complete and CRC-valid (5.5-06).
+        // renames of save()), then the backup. Each must be complete and CRC-valid.
         modemcfg::Slot used = modemcfg::Slot::kFile;
         size_t n = modemcfg::recoverBlob(readSlot, this, out, cap, &used);
         primaryGood_ = n != 0 && used == modemcfg::Slot::kFile;

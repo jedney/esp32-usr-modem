@@ -1,4 +1,4 @@
-"""End-to-end checks of the port sessions on the USB console (v0.5, brief 6.2):
+"""End-to-end checks of the port sessions on the USB console (brief 6.2):
 AT*TESTCALL, the +++ escape with guard time, ATO, ATH, NO CARRIER, AT*BAUD, the boot
 banner and the LED / line hand-back commands. They need only the console.
 

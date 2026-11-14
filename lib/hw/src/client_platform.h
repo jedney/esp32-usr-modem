@@ -10,7 +10,7 @@
 namespace hw {
 class ClientPlatform : public clienttest::Platform, public clienttest::Source {
 public:
-    // rs232: the RS232 port (signals, UART1). usb: the USB modem port (v2.0). Neither: the
+    // rs232: the RS232 port (signals, UART1). usb: the USB modem port. Neither: the
     // console (UART0).
     ClientPlatform(config::Log &log, bool rs232, bool usb = false)
         : log_(log), rs232_(rs232), usb_(usb) {}

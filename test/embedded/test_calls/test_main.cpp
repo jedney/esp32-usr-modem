@@ -60,7 +60,7 @@ void test_phonebook_in_scratch_nvs() {
     delete book;
     TEST_ASSERT_TRUE(store.erase());
 }
-// STA-08: a full phonebook (64 entries, 5,321 bytes in one blob) must save, change and
+// A full phonebook (64 entries, 5,321 bytes in one blob) must save, change and
 // shrink with the modem's other settings in NVS too. NVS writes the new blob before it
 // frees the old one, so a change needs room for both. The NVS figures are printed for
 // the decisions log.

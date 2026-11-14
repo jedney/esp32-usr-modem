@@ -480,7 +480,7 @@ def test_application_heartbeat_does_not_reach_terminal_input(web):
         require(b"ping" not in text, "Heartbeat reached terminal input")
 
 
-# --- TG-15: limits and abuse. Opt-in: --flood-tests, --upload-tests ---------------------------
+# --- Limits and abuse. Opt-in: --flood-tests, --upload-tests ---------------------------
 
 
 def flood_only(request):

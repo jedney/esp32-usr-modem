@@ -1,4 +1,4 @@
-// ATI0-ATI7, ATI9 and settings screens: selectable Sportster series (Jon, v0.8).
+// ATI0-ATI7, ATI9 and settings screens: selectable Sportster series.
 // Commands and selectable speeds retain the later USR capabilities through 56000.
 //
 // Sources (credits/LICENSES.md):

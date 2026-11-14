@@ -36,7 +36,7 @@ void test_dialstring_runs_on_target() {
     TEST_ASSERT_EQUAL_INT(static_cast<int>(dialstring::Kind::IpAddress), static_cast<int>(r.kind));
 }
 
-// NVS keeps the modem settings across a restart (v0.4). This uses a scratch namespace, so
+// NVS keeps the modem settings across a restart. This uses a scratch namespace, so
 // the modem's own saved settings are never touched, even if the test fails half way.
 void test_settings_survive_in_nvs() {
     hw::NvsStore store("test_board", "cfg");
@@ -63,7 +63,7 @@ void test_settings_survive_in_nvs() {
                       static_cast<int>(modemcfg::loadNvram(store, &out)));
 }
 
-// STA-06: the watchdog panics after 15 s, and hw::feedWatchdog() keeps a watched loop task
+// The watchdog panics after 15 s, and hw::feedWatchdog() keeps a watched loop task
 // alive for longer than that. If feeding failed, the board would reset here.
 void test_fed_loop_watchdog_outlasts_its_timeout() {
     TEST_ASSERT_TRUE(CONFIG_ESP_TASK_WDT_PANIC);

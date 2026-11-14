@@ -1,4 +1,4 @@
-// The USB modem port (v2.0, brief Q25): an AT session on the S3's native USB, which the
+// The USB modem port: an AT session on the S3's native USB, which the
 // rear USB-C socket also carries. A PC sees a USB serial port that works like the RS232
 // port: AT commands, calls, +++ and ATO, the configuration screen, Client Tests.
 //

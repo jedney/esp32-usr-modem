@@ -351,7 +351,7 @@ void test_batch_lost_ack_keeps_counts_and_crc_stable() {
         TEST_ASSERT_EQUAL_HEX32(sender.statistics().crc, receiver.statistics().crc);
     }
 }
-// --- TG-03: hostile X/Y/ZMODEM input, table driven ----------------------------------------------
+// --- Hostile X/Y/ZMODEM input, table driven ----------------------------------------------
 using Bytes = std::vector<uint8_t>;
 // A receiver under test. send() puts bytes in and collects what the receiver says back,
 // letting it speak between writes (it holds input while its output is not yet read).
@@ -811,7 +811,7 @@ void test_zmodem_hostile_headers_are_nakked_ignored_or_cancel() {
             TEST_ASSERT_FALSE_MESSAGE(rx.t.running(), c.name);
     }
 }
-// --- 5.5-10: only real progress keeps a transfer alive; ZFIN without "OO" is a success ---------
+// --- Only real progress keeps a transfer alive; ZFIN without "OO" is a success ---------
 void test_noise_from_the_peer_does_not_postpone_the_retry_budget() {
     for (Protocol protocol : {Protocol::Xcrc, Protocol::Y, Protocol::Z}) {
         Rx rx(protocol);
@@ -854,7 +854,7 @@ void test_zmodem_receiver_finishes_when_oo_after_zfin_is_missing() {
     quick.send(Bytes{'O', 'O'});
     TEST_ASSERT_EQUAL(int(Outcome::Success), int(quick.t.statistics().outcome));
 }
-// --- 5.5-11: the size probe finds its reply after an echoed query ------------------------------
+// --- The size probe finds its reply after an echoed query ------------------------------
 void test_size_probe_finds_the_reply_after_an_echoed_query() {
     Memory memory;
     Settings settings(memory);

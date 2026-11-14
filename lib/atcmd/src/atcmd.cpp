@@ -907,7 +907,7 @@ bool Port::runAmpersand(const char *&p, bool *stop) {
 }
 
 bool Port::runPlus(const char *&p) {
-    // Only +FCLASS: data mode (0) is the only class; fax classes give ERROR (brief 6.6, Q32).
+    // Only +FCLASS: data mode (0) is the only class; fax classes give ERROR (brief 6.6).
     if (!startsWith(p, "FCLASS")) {
         return false;
     }

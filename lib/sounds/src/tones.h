@@ -33,7 +33,7 @@ struct ToneSpec {
     Cadence cadence;
 };
 
-// UK tones (decided, Q39).
+// UK tones.
 extern const ToneSpec kUkDialTone;  // 350 + 450 Hz, continuous
 extern const ToneSpec kUkBusyTone;  // 400 Hz, 0.375 s on / 0.375 s off
 extern const ToneSpec kUkRingTone;  // 400 + 450 Hz, 0.4 on, 0.2 off, 0.4 on, 2.0 off

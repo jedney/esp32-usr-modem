@@ -18,7 +18,7 @@ uint32_t baud();       // the port's current speed
 bool detecting();      // speed from "AT" (AT*BAUD=AUTO)
 void applyHostBaud();  // after AT*BAUD changes
 
-// The hardware tests take the port over (brief 6.14, Q79): suspend stops the session and
+// The hardware tests take the port over (brief 6.14): suspend stops the session and
 // frees UART1 and the handshake lines; resume starts them again.
 void suspend();
 void resume();
