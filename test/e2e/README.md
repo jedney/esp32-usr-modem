@@ -8,10 +8,7 @@ python -m pytest test/e2e --console-port COM15                      # USB consol
 python -m pytest test/e2e --console-port COM15 --rs232-port COM18   # + RS232 port
 ```
 
-Find the COM ports in Device Manager → Ports (COM & LPT). The S3 board's USB-serial chip
-shows as "USB-SERIAL CH340" (or similar); the Unitek adapter as "Prolific USB-to-Serial".
-Tests that need a port or option you didn't give are skipped. Close the VS Code serial
-monitor and any terminal (PuTTY) first: only one program can open a COM port.
+Find the COM ports in Device Manager → Ports (COM & LPT). The S3 board's USB-serial chip shows as "USB-SERIAL CH340" (or similar); the Unitek adapter as "Prolific USB-to-Serial". Tests that need a port or option you didn't give are skipped. Close the VS Code serial monitor and any terminal (PuTTY) first: only one program can open a COM port.
 
 ## Options
 
@@ -35,17 +32,9 @@ monitor and any terminal (PuTTY) first: only one program can open a COM port.
 | `--ota-upload` | Real OTA uploads (with `--device-tests`) |
 | `--save-password` | Save the final device password to `.env` as `USR_MODEM_PASSWORD` |
 
-Secrets come from the git-ignored `.env` at the repository root (`USR_MODEM_WIFI_SSID`,
-`USR_MODEM_WIFI_PASS`, `USR_MODEM_PASSWORD`); never put them on the command line. Test
-arguments and locals hold credentials, so `conftest.py` always uses short tracebacks
-without them (`--tb=long` and `--showlocals` are overridden). Failure messages leave out boot
-banners and upload output.
+Secrets come from the git-ignored `.env` at the repository root (`USR_MODEM_WIFI_SSID`, `USR_MODEM_WIFI_PASS`, `USR_MODEM_PASSWORD`); never put them on the command line. Test arguments and locals hold credentials, so `conftest.py` always uses short tracebacks without them (`--tb=long` and `--showlocals` are overridden). Failure messages leave out boot banners and upload output.
 
-Every test has a 300 s time-out (`pytest.ini`, plugin `pytest-timeout`; install with
-`pip install -r test/e2e/requirements.txt`) and the serial ports have a 5 s write time-out,
-so a silent modem or a missing CTS fails the test instead of hanging the run. A slow test
-can raise its own limit with `@pytest.mark.timeout(600)`. `--device-tests` refuses to run
-without a valid `USR_MODEM_PASSWORD` in `.env` unless `--save-password` is given.
+Every test has a 300 s time-out (`pytest.ini`, plugin `pytest-timeout`; install with `pip install -r test/e2e/requirements.txt`) and the serial ports have a 5 s write time-out, so a silent modem or a missing CTS fails the test instead of hanging the run. A slow test can raise its own limit with `@pytest.mark.timeout(600)`. `--device-tests` refuses to run without a valid `USR_MODEM_PASSWORD` in `.env` unless `--save-password` is given.
 
 ## Suites
 
@@ -66,19 +55,11 @@ without a valid `USR_MODEM_PASSWORD` in `.env` unless `--save-password` is given
 | `test_usb.py` | `--usb-port` (cross-port and AUTO answer cases: also `--rs232-port`) | USB modem port: AT session, 16 KB echo call, `+++`/`ATH`, DTR drop hangs up, 1200 baud and DTR/RTS toggles don't reboot, one call across ports, `AT*ANSWERPORT=AUTO` picks USB or RS232 by DTR, DCD, DSR and RI reach the PC |
 | `test_web.py` | Both ports, `--web-tests` | Digest login, socket tickets, one menu at a time, read-only views, CSRF, line controls |
 
-The suites restore what they change (answer port, model, styles, active settings,
-client records). The normal web suite never uploads images, changes passwords or erases
-history.
+The suites restore what they change (answer port, model, styles, active settings, client records). The normal web suite never uploads images, changes passwords or erases history.
 
 ## Outgoing calls and the Windows firewall
 
-`test_calls.py` runs a TCP server on the PC (port 32321) that the modem calls. Windows
-may need an inbound rule for the test Python: `scripts/allow_call_tests.ps1
--ModemAddress <modem IP>` (Administrator) creates one limited to that modem on
-private networks. Remove it with
-`Remove-NetFirewallRule -DisplayName 'USR modem local call tests TCP 32321'`. The tests
-never change firewall settings themselves. Refusal (BUSY) uses conditional accept, so it
-works with that rule.
+`test_calls.py` runs a TCP server on the PC (port 32321) that the modem calls. Windows may need an inbound rule for the test Python: `scripts/allow_call_tests.ps1 -ModemAddress <modem IP>` (Administrator) creates one limited to that modem on private networks. Remove it with `Remove-NetFirewallRule -DisplayName 'USR modem local call tests TCP 32321'`. The tests never change firewall settings themselves. Refusal (BUSY) uses conditional accept, so it works with that rule.
 
 ```powershell
 python -m pytest test/e2e/test_calls.py --console-port COM15 --call-server-ip 10.0.0.208 --live-bbs
@@ -90,17 +71,11 @@ python -m pytest test/e2e/test_calls.py --console-port COM15 --call-server-ip 10
 python -m pytest test/e2e/test_device.py --console-port COM15 --device-tests --factory-reset --ota-upload --save-password
 ```
 
-The factory reset erases all settings, rejoins the Wi-Fi in `.env` and leaves modem
-settings at defaults. The configured device password is restored afterwards, or a new
-one is generated (`--save-password` stores it). Uploads use `pio run -e s3_ota -t
-upload`, with the unit-test gate each time. Wrong and old passwords must fail, and the
-first successful upload stops the boot password display.
+The factory reset erases all settings, rejoins the Wi-Fi in `.env` and leaves modem settings at defaults. The configured device password is restored afterwards, or a new one is generated (`--save-password` stores it). Uploads use `pio run -e s3_ota -t upload`, with the unit-test gate each time. Wrong and old passwords must fail, and the first successful upload stops the boot password display.
 
 ## Other tools
 
 - `test/interop/serial_lrzsz.py`: real X/Y/ZMODEM transfers against lrzsz.
-- `test/interop/serial_pppd.py`: independent PPP and kernel TCP/IP (HTTP, DNS) through
-  the modem.
+- `test/interop/serial_pppd.py`: independent PPP and kernel TCP/IP (HTTP, DNS) through the modem.
 
-See `test/interop/README.md`. Real PC terminal and Amiga rendering, the loopback plug,
-the speaker and the front-panel lights need a person to check them.
+See `test/interop/README.md`. Real PC terminal and Amiga rendering, the loopback plug, the speaker and the front-panel lights need a person to check them.

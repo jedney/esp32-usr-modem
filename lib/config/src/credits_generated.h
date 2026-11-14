@@ -31,8 +31,7 @@ constexpr const char *kCredits[] = {
     "Unity test framework | Unit tests | ThrowTheSwitch.org | MIT | Keep copyright notice | Used (tests only)",
     "pppd | Independent host protocol and IP-stack test peer, separate executable | PPP project and contributors, <https://github.com/ppp-project/ppp> | Upstream BSD/GPL notices by file | No code linked into firmware; preserve package licensing if redistributing the test tool | Test peer",
     "lrzsz | Independent test peer, separate executable; no code linked into firmware | Uwe Ohse and contributors, <https://www.ohse.de/uwe/software/lrzsz.html> | GPL | Preserve package licensing when distributing the test tool; not bundled in firmware | Test peer",
-    "Concept credits (no code used): Luis Miguel Silva (WiFi2DialUp), Matt Whitted (PodSix",
-    "pimodem), Jim Brain and FozzTexx (tcpser), and caiot5 (RetroExternalModem, GPL-3.0).",
+    "Concept credits (no code used): Luis Miguel Silva (WiFi2DialUp), Matt Whitted (PodSix pimodem), Jim Brain and FozzTexx (tcpser), and caiot5 (RetroExternalModem, GPL-3.0).",
 };
 }  // namespace config
 // clang-format on

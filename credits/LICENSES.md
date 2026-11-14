@@ -1,9 +1,6 @@
 # Licensing record
 
-The repository is **private**. This record lists every third-party component that is in the
-v3.0 build or the repository, so that publication can be revisited later. Update it
-whenever a file, library or recording from someone else is added or removed. The firmware's
-About screen is generated from the same list (`scripts/generate_credits.py`).
+The repository is **private**. This record lists every third-party component that is in the v3.0 build or the repository, so that publication can be revisited later. Update it whenever a file, library or recording from someone else is added or removed. The firmware's About screen is generated from the same list (`scripts/generate_credits.py`).
 
 | Component | Used for | Author / source | Licence | Obligations | Status |
 |---|---|---|---|---|---|
@@ -37,37 +34,18 @@ About screen is generated from the same list (`scripts/generate_credits.py`).
 | pppd | Independent host protocol and IP-stack test peer, separate executable | PPP project and contributors, <https://github.com/ppp-project/ppp> | Upstream BSD/GPL notices by file | No code linked into firmware; preserve package licensing if redistributing the test tool | Test peer |
 | lrzsz | Independent test peer, separate executable; no code linked into firmware | Uwe Ohse and contributors, <https://www.ohse.de/uwe/software/lrzsz.html> | GPL | Preserve package licensing when distributing the test tool; not bundled in firmware | Test peer |
 
-Concept credits (no code used): Luis Miguel Silva (WiFi2DialUp), Matt Whitted (PodSix
-pimodem), Jim Brain and FozzTexx (tcpser), and caiot5 (RetroExternalModem, GPL-3.0).
+Concept credits (no code used): Luis Miguel Silva (WiFi2DialUp), Matt Whitted (PodSix pimodem), Jim Brain and FozzTexx (tcpser), and caiot5 (RetroExternalModem, GPL-3.0).
 
 ## Notes
 
 ### Handshake recordings
 
-Jon supplied the seven WAVs in `sound/` and identified Gough Lui's collection as their
-source. Keep that attribution with the recordings. The linked article does not state an
-audio reuse licence; no CC0 or public-domain claim is made. All seven are mono 8000 Hz
-signed 16-bit PCM. The 1200/2400, 9600/14400 and 28800/33600 pairs are byte-identical, and
-the filenames describe the playback assignment, not independently verified negotiated
-rates. `python scripts/build_handshakes.py` validates the inputs and copies them unchanged
-to `data/sounds/handshake-<rate>.wav`. Intermediate operational rates use the nearest
-lower file and 300 uses 1200; the selected model does not change this mapping.
+Jon supplied the seven WAVs in `sound/` and identified Gough Lui's collection as their source. Keep that attribution with the recordings. The linked article does not state an audio reuse licence; no CC0 or public-domain claim is made. All seven are mono 8000 Hz signed 16-bit PCM. The 1200/2400, 9600/14400 and 28800/33600 pairs are byte-identical, and the filenames describe the playback assignment, not independently verified negotiated rates. `python scripts/build_handshakes.py` validates the inputs and copies them unchanged to `data/sounds/handshake-<rate>.wav`. Intermediate operational rates use the nearest lower file and 300 uses 1200; the selected model does not change this mapping.
 
 ### Identity and speed references
 
-The Sportster identity is modelled from the USR product name and inquiry semantics in the
-[USR Sportster High Speed Modems Technical Reference Guide](https://www.rigacci.org/docs/biblio/online/usr/sportster_guide.txt)
-(manufacturer-authored, mirrored). The 33600 capture is the source for the settings-screen
-layout. No verified complete ROM capture is used for the four selectable series: the product
-codes `1441`, `2881`, `3361`, `5601` and checksum `0000` are emulator placeholders,
-`ATI3` and `ATI9` return the selected series label, and `ATI7` marks physical ROM and DSP
-information as emulated or unavailable. Speed indexes `&N1`-`&N38` and `&U1`-`&U38`, and
-the numeric CONNECT results, follow the V.90 Technical Quick Reference (printed pages 10-11
-and 15-18); they are factual command mappings reimplemented in this project, with no code or
-manual pages bundled.
+The Sportster identity is modelled from the USR product name and inquiry semantics in the [USR Sportster High Speed Modems Technical Reference Guide](https://www.rigacci.org/docs/biblio/online/usr/sportster_guide.txt) (manufacturer-authored, mirrored). The 33600 capture is the source for the settings-screen layout. No verified complete ROM capture is used for the four selectable series: the product codes `1441`, `2881`, `3361`, `5601` and checksum `0000` are emulator placeholders, `ATI3` and `ATI9` return the selected series label, and `ATI7` marks physical ROM and DSP information as emulated or unavailable. Speed indexes `&N1`-`&N38` and `&U1`-`&U38`, and the numeric CONNECT results, follow the V.90 Technical Quick Reference (printed pages 10-11 and 15-18); they are factual command mappings reimplemented in this project, with no code or manual pages bundled.
 
 ### If the repository is made public
 
-The mixed licences need a decision first: CC BY-NC (case) forbids commercial use, the
-`electronics/` datasheets are the manufacturers' copyright, the recordings' redistribution
-terms are unspecified, and the ZMODEM code's licence is not stated.
+The mixed licences need a decision first: CC BY-NC (case) forbids commercial use, the `electronics/` datasheets are the manufacturers' copyright, the recordings' redistribution terms are unspecified, and the ZMODEM code's licence is not stated.

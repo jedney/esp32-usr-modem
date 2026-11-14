@@ -1,9 +1,6 @@
 # Decisions log
 
-The decisions that shape the firmware as it is now, one row each, grouped by topic.
-Superseded decisions are not kept. Append a row for every new decision or spec change made
-while coding here, and keep [project-brief.md](project-brief.md) (the firmware spec) in
-step. Mark items that affect the electronics or the case **[Electronics]** or **[Case]**.
+The decisions that shape the firmware as it is now, one row each, grouped by topic. Superseded decisions are not kept. Append a row for every new decision or spec change made while coding here, and keep [project-brief.md](project-brief.md) (the firmware spec) in step. Mark items that affect the electronics or the case **[Electronics]** or **[Case]**.
 
 Columns: date, topic, decision, why, who decided.
 

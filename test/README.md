@@ -11,27 +11,11 @@ Every modem feature has tests, at these levels:
 | **End-to-end** (`test/e2e/`) | PC driving the modem's serial ports and Wi-Fi | `python -m pytest test/e2e --console-port COMx [--rs232-port COMy] [--usb-port COMz]` (`--console-port socket://usr-modem.local:2001` uses the network console; `--net-console <host>` runs `test_net_console.py`) | Before each release |
 | **Interoperability** (`test/interop/`) | PC with lrzsz / pppd | see `test/interop/README.md` | Before releases that touch transfers or PPP |
 
-Shared fakes for the unit tests live in `test/native/support/fakes.h`: `fakes::MemoryStore`
-(`failSave`, `failLoad`, `failErase`, `failNextSaves`, counters), `fakes::TextSink` and
-`fakes::RecordingSound` (`fail`, `broken`). A suite includes it as `"../support/fakes.h"`
-after `#define FAKES_STORE`, `FAKES_SINK` and/or `FAKES_SOUND`. Suites still on their own
-copies: the `MemStore` in `test_atcmd`, `test_hostport`, `test_netcfg` and `test_modemcfg`,
-the `Memory` in `test_devicecfg`, the `Store` in `test_web`, the radios in `test_netcfg`,
-`test_config_services` and `test_internet`, and the sockets in `test_answer` and `test_calls`.
+Shared fakes for the unit tests live in `test/native/support/fakes.h`: `fakes::MemoryStore` (`failSave`, `failLoad`, `failErase`, `failNextSaves`, counters), `fakes::TextSink` and `fakes::RecordingSound` (`fail`, `broken`). A suite includes it as `"../support/fakes.h"` after `#define FAKES_STORE`, `FAKES_SINK` and/or `FAKES_SOUND`. Suites still on their own copies: the `MemStore` in `test_atcmd`, `test_hostport`, `test_netcfg` and `test_modemcfg`, the `Memory` in `test_devicecfg`, the `Store` in `test_web`, the radios in `test_netcfg`, `test_config_services` and `test_internet`, and the sockets in `test_answer` and `test_calls`.
 
-Feature logic lives in `lib/` with no hardware calls, so most of it is unit-tested on
-the PC. On-board tests cover the hardware layer (`lib/hw`); end-to-end tests cover
-behaviour as a user sees it. Running the on-board tests replaces the firmware with a
-test program: upload the firmware again afterwards. End-to-end options are in
-`test/e2e/README.md`.
+Feature logic lives in `lib/` with no hardware calls, so most of it is unit-tested on the PC. On-board tests cover the hardware layer (`lib/hw`); end-to-end tests cover behaviour as a user sees it. Running the on-board tests replaces the firmware with a test program: upload the firmware again afterwards. End-to-end options are in `test/e2e/README.md`.
 
-On the fitted board the RS232 receivers drive the UART pins, so the internal-loopback
-cases in `embedded/test_rs232` skip; `e2e/test_rs232.py` covers the port through the
-Unitek adapter instead. All nine `embedded/test_rs232` cases are ignored on the fitted
-board (no loopback plug), so the `test_rs232` entries in the matrix below mean "present, but
-skipped on the bench". `embedded/test_board` writes only the scratch namespace `test_board`, and keeps the
-watchdog fed for 17 s (a failure resets the board). `embedded/test_calls` writes its full
-phonebook to scratch namespaces (`scratch_book`, `scratch_o0`-`scratch_o7`) and removes them.
+On the fitted board the RS232 receivers drive the UART pins, so the internal-loopback cases in `embedded/test_rs232` skip; `e2e/test_rs232.py` covers the port through the Unitek adapter instead. All nine `embedded/test_rs232` cases are ignored on the fitted board (no loopback plug), so the `test_rs232` entries in the matrix below mean "present, but skipped on the bench". `embedded/test_board` writes only the scratch namespace `test_board`, and keeps the watchdog fed for 17 s (a failure resets the board). `embedded/test_calls` writes its full phonebook to scratch namespaces (`scratch_book`, `scratch_o0`-`scratch_o7`) and removes them.
 
 ## Feature matrix
 
@@ -93,5 +77,4 @@ Section numbers refer to the firmware spec (`docs/project-brief.md`).
 | Repo: `.gitignore` keeps build output, downloads, generated files and `.env` out of git | `scripts/test_gitignore.py` | — | — |
 | Build: compiler warnings apply to the project's own code only (`lib/`, `src/`), the two lists agree, a deprecated API is an error | `scripts/test_project_warnings.py` | — | — |
 
-Checks that need a person (sound, LEDs, loopback plug, Amiga and Windows 9x clients)
-are listed in `docs/ROADMAP.md`.
+Checks that need a person (sound, LEDs, loopback plug, Amiga and Windows 9x clients) are listed in `docs/ROADMAP.md`.

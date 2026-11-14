@@ -1,12 +1,6 @@
 # Sportster configuration screen design
 
-This folder is the design contract for the configuration screen: four model themes, the
-canonical 80x25 layout and the wider layout for larger terminals. The firmware renders
-it in `lib/config/src/`, and `scripts/generate_ui.py` builds the firmware catalogue and
-the browser demo data from `menu-definition.json`. Main menu keys A-D are About,
-Hardware Tests, Client Tests and Command Reference; Client Tests run on serial only and
-the browser lists them for reference. The text previews are layout references, never
-application screens.
+This folder is the design contract for the configuration screen: four model themes, the canonical 80x25 layout and the wider layout for larger terminals. The firmware renders it in `lib/config/src/`, and `scripts/generate_ui.py` builds the firmware catalogue and the browser demo data from `menu-definition.json`. Main menu keys A-D are About, Hardware Tests, Client Tests and Command Reference; Client Tests run on serial only and the browser lists them for reference. The text previews are layout references, never application screens.
 
 ## Files
 

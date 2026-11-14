@@ -1,53 +1,20 @@
 # Command reference
 
-Every command the USR Modem Emulator accepts, on the USB maintenance console (115200 8N1),
-the RS232 host port and the USB modem port. The modem also lists them itself:
-`AT*HELP` (project commands), `AT*HW?` (hardware tests) and `AT*REFERENCE` (everything).
+Every command the USR Modem Emulator accepts, on the USB maintenance console (115200 8N1), the RS232 host port and the USB modem port. The modem also lists them itself: `AT*HELP` (project commands), `AT*HW?` (hardware tests) and `AT*REFERENCE` (everything).
 
-The **USB modem port** is the S3's native USB, carried by the rear USB-C socket. A PC sees
-it as a USB serial port (a new COM port on Windows). It works like the RS232 port, with
-its own session, configuration screen and Client Tests settings. Only one port can have a
-call at a time. Differences: it has no line speed (the speed the PC sets is shown but not
-used) and USB does the flow control. DTR is the PC program's DTR: closing the port drops
-DTR, and `&D` applies. The modem sends DCD, DSR and RI to the PC as USB serial-state
-notifications, by the same rules as on RS232: DCD follows `&C`, DSR is always on and RI
-follows an incoming call's rings. On Windows (`usbser.sys`) programs see all three as
-modem-status lines (pyserial `.cd`, `.dsr`, `.ri`; RI as a level, on and off with each
-ring), and CTS shows as on. The PC sees the device as the selected model: product name
-and serial-port name "US Robotics Sportster 14.4k" (or the model `AT*MODEL` chose), maker
-"US Robotics", serial number the Wi-Fi MAC address as 12 hex digits (the `MAC:` line of
-`AT*WIFI?` without the colons). The serial number keeps the same COM port for the modem
-across firmware versions and gives each modem its own. The names are read when the modem
-starts, so a new model shows after `AT*RESTART`.
+The **USB modem port** is the S3's native USB, carried by the rear USB-C socket. A PC sees it as a USB serial port (a new COM port on Windows). It works like the RS232 port, with its own session, configuration screen and Client Tests settings. Only one port can have a call at a time. Differences: it has no line speed (the speed the PC sets is shown but not used) and USB does the flow control. DTR is the PC program's DTR: closing the port drops DTR, and `&D` applies. The modem sends DCD, DSR and RI to the PC as USB serial-state notifications, by the same rules as on RS232: DCD follows `&C`, DSR is always on and RI follows an incoming call's rings. On Windows (`usbser.sys`) programs see all three as modem-status lines (pyserial `.cd`, `.dsr`, `.ri`; RI as a level, on and off with each ring), and CTS shows as on. The PC sees the device as the selected model: product name and serial-port name "US Robotics Sportster 14.4k" (or the model `AT*MODEL` chose), maker "US Robotics", serial number the Wi-Fi MAC address as 12 hex digits (the `MAC:` line of `AT*WIFI?` without the colons). The serial number keeps the same COM port for the modem across firmware versions and gives each modem its own. The names are read when the modem starts, so a new model shows after `AT*RESTART`.
 
-- Commands start with `AT` and end with Enter (CR, `S3`). Several standard commands can
-  share a line: `ATE1V1X4`. A project command (`AT*...`) takes the rest of the line.
+- Commands start with `AT` and end with Enter (CR, `S3`). Several standard commands can share a line: `ATE1V1X4`. A project command (`AT*...`) takes the rest of the line.
 - `A/` (no Enter) repeats the last command line. Lines with a password are not repeated.
 - Upper or lower case both work, but `AT` must be `AT` or `at`.
 - `?` after a command shows its value; `=?` shows the allowed values where supported.
-- A remote caller (someone who dialled in on port 23) can never reach command mode, any
-  `AT*` command or the configuration screen.
+- A remote caller (someone who dialled in on port 23) can never reach command mode, any `AT*` command or the configuration screen.
 
-The **network console** is the USB maintenance console over Wi-Fi, on TCP port 2001
-(raw bytes, no Telnet negotiation): `socket://usr-modem.local:2001` in `pio device
-monitor`, pyserial or the end-to-end tests' `--console-port`, or any raw TCP client. It
-shows the selected model and the modem's status (for example "US Robotics Sportster
-14.4k" and "Idle") on two lines, then asks for the device password (no echo; three wrong
-ones close the connection, and after a wrong one every log-in is refused for a
-second). Then it shows the console's
-recent output (the last 16 KB, so the boot messages if they still fit) and works as the
-same console session as the cable: commands, the configuration screen and the hardware
-tests, with the same rules, including the device password lines. One logged-in client
-at a time: a new connection gets its own password prompt, and when it logs in the earlier
-client is told and closed, so a hung connection never keeps you out. If no prompt shows,
-press Enter.
-Not over the network: flashing after a full erase, on-board tests, crash output as it
-happens (`AT*RESETINFO` shows the record afterwards) and a modem that hasn't joined Wi-Fi.
+The **network console** is the USB maintenance console over Wi-Fi, on TCP port 2001 (raw bytes, no Telnet negotiation): `socket://usr-modem.local:2001` in `pio device monitor`, pyserial or the end-to-end tests' `--console-port`, or any raw TCP client. It shows the selected model and the modem's status (for example "US Robotics Sportster 14.4k" and "Idle") on two lines, then asks for the device password (no echo; three wrong ones close the connection, and after a wrong one every log-in is refused for a second). Then it shows the console's recent output (the last 16 KB, so the boot messages if they still fit) and works as the same console session as the cable: commands, the configuration screen and the hardware tests, with the same rules, including the device password lines. One logged-in client at a time: a new connection gets its own password prompt, and when it logs in the earlier client is told and closed, so a hung connection never keeps you out. If no prompt shows, press Enter. Not over the network: flashing after a full erase, on-board tests, crash output as it happens (`AT*RESETINFO` shows the record afterwards) and a modem that hasn't joined Wi-Fi.
 
 ## Standard commands
 
-These follow the US Robotics Sportster. "Profile" means the setting is part of the active
-profile: `AT&W` saves it, `ATZ` reloads it.
+These follow the US Robotics Sportster. "Profile" means the setting is part of the active profile: `AT&W` saves it, `ATZ` reloads it.
 
 ### Calls
 
@@ -95,20 +62,13 @@ Factory values are for `&F1`, the power-on default.
 | `&U` | Lowest line speed, as an `&N` index: 0 none. A call slower than this gives NO CARRIER | 0 |
 | `&Y` | Break handling (stored for compatibility) | 1 |
 
-`&N` speeds: 1 300, 2 1200, 3 2400, 4 4800, 5 7200, 6 9600, 7 12000, 8 14400, 9 16800,
-10 19200, 11 21600, 12 24000, 13 26400, 14 28800, 15 31200, 16 33600, 17 28000, 18 29333,
-19 30666, 20 32000, 21 33333, 22 34666, 23 36000, 24 37333, 25 38666, 26 40000, 27 41333,
-28 42666, 29 44000, 30 45333, 31 46666, 32 48000, 33 49333, 34 50666, 35 52000, 36 53333,
-37 54666, 38 56000.
+`&N` speeds: 1 300, 2 1200, 3 2400, 4 4800, 5 7200, 6 9600, 7 12000, 8 14400, 9 16800, 10 19200, 11 21600, 12 24000, 13 26400, 14 28800, 15 31200, 16 33600, 17 28000, 18 29333, 19 30666, 20 32000, 21 33333, 22 34666, 23 36000, 24 37333, 25 38666, 26 40000, 27 41333, 28 42666, 29 44000, 30 45333, 31 46666, 32 48000, 33 49333, 34 50666, 35 52000, 36 53333, 37 54666, 38 56000.
 
-If no `&N` was typed since `&F`, CONNECT reports the speed of the selected model
-(`AT*MODEL`). A phonebook entry's own speed wins over both.
+If no `&N` was typed since `&F`, CONNECT reports the speed of the selected model (`AT*MODEL`). A phonebook entry's own speed wins over both.
 
 ### S-registers
 
-`ATS<r>?` reads a register, `ATS<r>=<n>` sets it (0-255), `ATS<r>.<bit>=<0|1>` sets one bit,
-and `ATS<r>` selects it for a following `?` or `=`. Registers 0-63 exist; those not listed
-are stored for compatibility only.
+`ATS<r>?` reads a register, `ATS<r>=<n>` sets it (0-255), `ATS<r>.<bit>=<0|1>` sets one bit, and `ATS<r>` selects it for a following `?` or `=`. Registers 0-63 exist; those not listed are stored for compatibility only.
 
 | Register | Meaning | Factory |
 |---|---|---|
@@ -153,24 +113,16 @@ are stored for compatibility only.
 
 ### Result codes
 
-`OK`, `CONNECT [speed]`, `RING`, `NO CARRIER`, `ERROR`, `NO DIAL TONE`, `BUSY`,
-`NO ANSWER`, with numeric forms under `ATV0`. For calls:
+`OK`, `CONNECT [speed]`, `RING`, `NO CARRIER`, `ERROR`, `NO DIAL TONE`, `BUSY`, `NO ANSWER`, with numeric forms under `ATV0`. For calls:
 
 - `BUSY`: the remote host refused the connection.
-- `NO ANSWER`: no connection within `S7` seconds. `S7` counts only the wait for the network
-  connection; once it is open, the handshake sound is not cut short.
+- `NO ANSWER`: no connection within `S7` seconds. `S7` counts only the wait for the network connection; once it is open, the handshake sound is not cut short.
 - `NO DIAL TONE`: no Wi-Fi, or the host name could not be looked up.
-- `NO CARRIER`: the call ended, a key was pressed while dialling, or a sound file is missing.
-  It also follows when the other end vanishes without hanging up: the modem sends TCP
-  keepalive probes (idle 60 s, then 6 probes 10 s apart), so a dead peer ends the call
-  after about 2 minutes. This applies to outgoing and incoming calls.
+- `NO CARRIER`: the call ended, a key was pressed while dialling, or a sound file is missing. It also follows when the other end vanishes without hanging up: the modem sends TCP keepalive probes (idle 60 s, then 6 probes 10 s apart), so a dead peer ends the call after about 2 minutes. This applies to outgoing and incoming calls.
 
 ### Incoming calls
 
-A call on port 23 rings every 3 s (`RING` on every port, RI and the ring sound). Nobody
-answering is not the end of the line: after **8 rings** (about 24 s) the modem hangs up on
-the caller, frees the line and records it in the call log. The limit is fixed: it has no
-`AT*` command. `S0` above 8 counts as 8. `ATA` before the 8th ring answers as usual.
+A call on port 23 rings every 3 s (`RING` on every port, RI and the ring sound). Nobody answering is not the end of the line: after **8 rings** (about 24 s) the modem hangs up on the caller, frees the line and records it in the call log. The limit is fixed: it has no `AT*` command. `S0` above 8 counts as 8. `ATA` before the 8th ring answers as usual.
 
 ## Dialling
 
@@ -188,20 +140,13 @@ What follows `ATDT`/`ATDP`:
 | `666` or `5517546` | Internet by PPP |
 | `667` or `5517545` | Internet by SLIP |
 
-In numbers, spaces, `-`, brackets and the modifiers `, W @ ! ;` are ignored. Invalid strings
-give ERROR without any sound. `AT*DIALTEST <string>` shows how a string would be dialled.
+In numbers, spaces, `-`, brackets and the modifiers `, W @ ! ;` are ignored. Invalid strings give ERROR without any sound. `AT*DIALTEST <string>` shows how a string would be dialled.
 
-With the speaker on (`M1`-`M3`) an outgoing call plays: dial tone (`S6`), the digits
-(DTMF or pulse), ringing (`AT*RINGDELAY`), the handshake for the line speed, a pause
-(`AT*CONNECTDELAY`), then `CONNECT`. For a host name the name is looked up during the dial
-tone and the digits of its IP address are played. `ATM0` connects without sounds or
-pauses. Pressing a key before `CONNECT` cancels the call. Telnet entries negotiate binary
-mode, ANSI terminal type and an 80x24 window; RAW entries pass bytes unchanged.
+With the speaker on (`M1`-`M3`) an outgoing call plays: dial tone (`S6`), the digits (DTMF or pulse), ringing (`AT*RINGDELAY`), the handshake for the line speed, a pause (`AT*CONNECTDELAY`), then `CONNECT`. For a host name the name is looked up during the dial tone and the digits of its IP address are played. `ATM0` connects without sounds or pauses. Pressing a key before `CONNECT` cancels the call. Telnet entries negotiate binary mode, ANSI terminal type and an 80x24 window; RAW entries pass bytes unchanged.
 
 ## Project commands (`AT*`)
 
-"Saved" means stored at once and kept after a restart, `ATZ` and `AT&F`; `AT*FACTORY`
-resets it. "This boot" means it lasts until the next restart.
+"Saved" means stored at once and kept after a restart, `ATZ` and `AT&F`; `AT*FACTORY` resets it. "This boot" means it lasts until the next restart.
 
 ### Modem and calls
 
@@ -255,10 +200,7 @@ resets it. "This boot" means it lasts until the next restart.
 | `AT*RESTART` | Restart, after Y/N |
 | `AT*VER` | Firmware version and commit |
 
-The device password (user `admin`) protects the web interface, the network console and
-OTA uploads. A new one
-is made at first boot and printed on the USB console at each boot until it is first used
-or changed.
+The device password (user `admin`) protects the web interface, the network console and OTA uploads. A new one is made at first boot and printed on the USB console at each boot until it is first used or changed.
 
 ### Configuration screen and terminal
 
@@ -288,16 +230,11 @@ or changed.
 | `AT*RESETINFO` | Why the modem last restarted, and any crash summary. "task watchdog" means the main loop stopped for 15 s and the watchdog restarted the modem |
 | `AT*EXPORT` | Print commands that restore this configuration, without passwords |
 
-To restore an export, paste it in command mode with no call or menu open; join Wi-Fi and
-set the device password separately. Export uses these restore commands, which you don't
-normally type yourself: `AT*BOOKCLEAR`, `AT*PROFILE=<slot>,<baud>`,
-`AT*PROFILECTL=<slot>,<cr>,<lf>,<q>,<v>`, `AT*EXPLICIT=<0|1>` and
-`AT*RESTOREEND=<baud>,<q>,<v>,<cr>,<lf>`.
+To restore an export, paste it in command mode with no call or menu open; join Wi-Fi and set the device password separately. Export uses these restore commands, which you don't normally type yourself: `AT*BOOKCLEAR`, `AT*PROFILE=<slot>,<baud>`, `AT*PROFILECTL=<slot>,<cr>,<lf>,<q>,<v>`, `AT*EXPLICIT=<0|1>` and `AT*RESTOREEND=<baud>,<q>,<v>,<cr>,<lf>`.
 
 ### Client Tests and file transfers
 
-Run on the USB console, RS232 port or USB modem port, not in the browser. Each port keeps
-its own client settings (three: console, RS232 and USB).
+Run on the USB console, RS232 port or USB modem port, not in the browser. Each port keeps its own client settings (three: console, RS232 and USB).
 
 | Command | What it does |
 |---|---|
@@ -315,15 +252,11 @@ its own client settings (three: console, RS232 and USB).
 | `AT*SZ=<source\|ALL>[,bytes]` | Send by ZMODEM |
 | `AT*RX[=SUM\|CRC\|1K]` / `AT*RY` / `AT*RZ` | Receive by XMODEM / YMODEM / ZMODEM, check and discard |
 
-Sources: `TEST` (generated, 1 byte to 16 MB), `LOG`, `HS1200.WAV`, `HS2400.WAV`,
-`HS9600.WAV`, `HS14400.WAV`, `HS28800.WAV`, `HS33600.WAV`, `HS56000.WAV`. Received files are
-never stored. Cancel a transfer with the protocol's own cancel (Ctrl-X several times).
+Sources: `TEST` (generated, 1 byte to 16 MB), `LOG`, `HS1200.WAV`, `HS2400.WAV`, `HS9600.WAV`, `HS14400.WAV`, `HS28800.WAV`, `HS33600.WAV`, `HS56000.WAV`. Received files are never stored. Cancel a transfer with the protocol's own cancel (Ctrl-X several times).
 
 ### Hardware tests (`AT*HW...`)
 
-On the USB console, the USB modem port and in the browser all tests run. On the RS232 port the line, loopback
-and bridge tests are not available. Remote callers can't run any. Audio tests need the
-modem idle.
+On the USB console, the USB modem port and in the browser all tests run. On the RS232 port the line, loopback and bridge tests are not available. Remote callers can't run any. Audio tests need the modem idle.
 
 | Command | What it does |
 |---|---|
@@ -345,16 +278,9 @@ modem idle.
 
 **Hardware tests cannot freeze the modem:**
 
-- A test that waits for a key (`AT*HWLED` patterns, `AT*HWTONE`, `AT*HWDTMF`, `AT*HWPULSE`,
-  `AT*HWPOT`, `AT*HWLINES`, `AT*HWBRIDGE`, the `AT*HWTEST` prompts) stops by itself after
-  **5 minutes with no key**, printing `Stopped: no key for 5 minutes`.
-- It also stops when its terminal goes away: DTR drops on the RS232 or USB port, or the
-  browser closes or leaves. The console UART has no DTR, so only the time-out applies there.
-- During a call on another port, `AT*HWLED=CHASE`, `=WALK` and `AT*HWLED` with no argument
-  are refused (`ERROR`, "LED patterns are not available during a call."). Lighting one LED,
-  `ALL`, `OFF`, `NONE` and `AUTO` still work. Tones, volume and the other audio tests are
-  refused during a call, as before.
-- When the browser leaves, it gives back only the LEDs, amp mode and RS232 outputs it set
-  itself. Holds made from the console, USB or RS232 stay until `AUTO`.
+- A test that waits for a key (`AT*HWLED` patterns, `AT*HWTONE`, `AT*HWDTMF`, `AT*HWPULSE`, `AT*HWPOT`, `AT*HWLINES`, `AT*HWBRIDGE`, the `AT*HWTEST` prompts) stops by itself after **5 minutes with no key**, printing `Stopped: no key for 5 minutes`.
+- It also stops when its terminal goes away: DTR drops on the RS232 or USB port, or the browser closes or leaves. The console UART has no DTR, so only the time-out applies there.
+- During a call on another port, `AT*HWLED=CHASE`, `=WALK` and `AT*HWLED` with no argument are refused (`ERROR`, "LED patterns are not available during a call."). Lighting one LED, `ALL`, `OFF`, `NONE` and `AUTO` still work. Tones, volume and the other audio tests are refused during a call, as before.
+- When the browser leaves, it gives back only the LEDs, amp mode and RS232 outputs it set itself. Holds made from the console, USB or RS232 stay until `AUTO`.
 
 There is no volume cap: full volume is full scale, which the 2 W speaker can take.

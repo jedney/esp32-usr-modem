@@ -1,7 +1,6 @@
 # USRobotics Sportster — ANSI/BBS configuration UI
 
-C opens Client Tests on serial; the browser lists them without execution. The catalogue
-has 78 nested actions.
+C opens Client Tests on serial; the browser lists them without execution. The catalogue has 78 nested actions.
 
 **80×25-first, four runtime models**
 
