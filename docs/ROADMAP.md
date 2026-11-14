@@ -6,18 +6,17 @@ What is left to do after v3.0. The firmware itself is feature-complete against [
 
 Automated tests can't cover these. Do them once on the finished unit.
 
-Part of the v3.0 bench run (`docs/plans/wp-26-bench-run.md`, which goes when v3.0 merges):
+Left from the v3.0 bench run:
 
-- Listen to the dial tone, DTMF, pulse, ringing, handshake sounds and the volume knob. The generated call tones should be as loud as the handshake recordings; tune `volume::kCallToneDb` if not.
-- Watch every front-panel LED during a call (ARQ shows Wi-Fi).
 - `AT*HWLOOP` with a loopback plug.
+- DCD, DSR and RI on the USB modem port in a terminal program that shows them (`test_usb.py` covers them automatically).
+- The TR light flashes for a few seconds when the rear USB lead is plugged in (bench, 14 Nov 2026). Probably Windows opening and closing the port; confirm by logging DTR on the USB port while plugging in.
 
 Needs kit that is not on the bench; do it when it is:
 
 - The configuration screen and Client Tests on a real Amiga terminal, and the PuTTY visual check.
 - Web browsing from Windows 9x or an Amiga TCP stack over PPP and SLIP.
 - The final build in the case with the DB25 connector (the bench uses a DB9).
-- A real crash record in `AT*RESETINFO` (the board shows "none available" after a clean boot).
 
 ## Follow-ups
 
