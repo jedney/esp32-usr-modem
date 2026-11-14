@@ -214,4 +214,4 @@ A Client Tests section of the configuration screen (and `AT*TEST`, `AT*SX/SY/SZ`
 
 ## 5. Open points
 
-No firmware questions are open. Items found on the way and left for a later change are the "Open follow-ups" at the end of [decisions-log.md](decisions-log.md). Checks that need a person (listening to the sounds, watching every LED during a call, `AT*HWLOOP` with a plug, the configuration screen and Client Tests on a real Amiga, web browsing from Windows 9x or an Amiga TCP stack over PPP and SLIP, and the final build in the case with the DB25) are listed in [ROADMAP.md](ROADMAP.md).
+No firmware questions are open. Checks that need kit that is not on the bench (the configuration screen and Client Tests on a real Amiga, web browsing from Windows 9x or an Amiga TCP stack over PPP and SLIP, and the final build in the case with the DB25) are listed in [ROADMAP.md](ROADMAP.md).

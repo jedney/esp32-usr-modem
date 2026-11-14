@@ -137,12 +137,3 @@ Columns: date, topic, decision, why.
 | 2026-10-27 | Loop watchdog | The task watchdog restarts the modem (panic, with a core dump) when a watched task stops for 15 s. Watched: the Arduino loop task from the end of `setup()` and the CPU 0 idle task. Fed during interactive hardware tests and ArduinoOTA uploads (`hw::feedWatchdog()`). `src/main.cpp` refuses to build if the setting is missing. `AT*RESETINFO` says "task watchdog (the modem stopped for 15 s and restarted)". `setup()` is not watched | Nothing restarted the modem when the loop stopped |
 | 2026-11-13 | Stack headroom | The PPP engine's packet buffers are members of the engine (heap), not stack arrays, so the loop task keeps its stack. `AT*STATUS` shows the least free stack of the loop, lwIP (`tcpip`) and web server (`httpd`) tasks; the e2e Internet test fails if lwIP or the loop has under 1 KB left | The loop task once had 420 bytes left |
 | 2026-11-13 | Hostile input | PPP and transfer tests run without a sanitizer (the Windows MinGW toolchain has none); guards are checked by deleting them and watching tests fail. An IPCP Terminate-Request starts a new 30 s negotiation time-out only if PPP was up | A babbling peer must not hold a link |
-
-## Open follow-ups
-
-Found on the way, not changeable in this firmware, and waiting on something outside the repo. Each row says what to check and when. Checks that need a person are in [ROADMAP.md](ROADMAP.md).
-
-| Date | Item |
-|---|---|
-| 2026-11-14 | IDF 6.1's queued least-recently-used purge in `httpd_accept_conn()` can still close a just-accepted connection when a flood of idle connections fills all six slots. The flood tests pass. On 14 Nov IDF 6.1.1 was not out, and neither `release/v6.1` nor `master` had changed the purge. Look again when IDF 6.1.1 or later is taken. `CONFIG_HTTPD_QUEUE_WORK_BLOCKING` is not a fix, because the modem's sends to the browser must not block |
-| 2026-11-14 | Arduino core 4.0.0 is at RC1 (23 Sep 2026); 3.3.12 is the newest stable release. A new minor or major framework version needs the owner's say-so, so take 4.0.x only once it is stable and the owner agrees |

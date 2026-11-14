@@ -1,6 +1,6 @@
 # Roadmap
 
-What is left to do after v3.0. The firmware itself is feature-complete against [project-brief.md](project-brief.md) (the firmware spec); the work that remains is checking it on the finished unit and a few follow-ups. One version per branch, tests first, and a row in [decisions-log.md](decisions-log.md) for each decision.
+What is left to do after v3.0. The firmware itself is feature-complete against [project-brief.md](project-brief.md) (the firmware spec); the work that remains is checking it on the finished unit. One version per branch, tests first, and a row in [decisions-log.md](decisions-log.md) for each decision.
 
 ## Checks that need a person
 
@@ -11,13 +11,6 @@ Needs kit that is not on the bench; do it when it is:
 - The configuration screen and Client Tests on a real Amiga terminal, and the PuTTY visual check.
 - Web browsing from Windows 9x or an Amiga TCP stack over PPP and SLIP.
 - The final build in the case with the DB25 connector (the bench uses a DB9).
-
-## Follow-ups
-
-These wait on upstream releases (see the open follow-ups in the decisions log):
-
-- **IDF 6.1.1 or later:** check upstream `httpd_accept_conn()` for the queued least-recently-used purge that can close a just-accepted connection when idle connections fill all twelve slots. With that fixed upstream, the server could close each finished connection itself again (`httpd_sess_trigger_close` after the response); today that close hits the next connection that reuses the slot. Not changed in `release/v6.1` or `master` on 14 Nov 2026.
-- **Arduino 4.0:** at RC1 on 14 Nov 2026. IDF 6.x will need it later. Move when 4.0.0 is stable; a new minor or major framework version needs the owner's say-so.
 
 ## Rules for new work
 
