@@ -7,8 +7,9 @@
 // DCD (&C), DSR (always on) and RI (the incoming call's ring cadence) go to the PC as CDC
 // serial-state notifications, by the same rules as the RS232 lines.
 //
-// The PC sees the selected model as the USB product name ("US Robotics Sportster 14.4k"),
-// "US Robotics" as the maker and the firmware version as the serial number.
+// The PC sees the selected model as the USB product and serial-port name ("US Robotics
+// Sportster 14.4k"), "US Robotics" as the maker and the Wi-Fi MAC address as the serial
+// number (hostport/usb_names.h).
 #pragma once
 
 #include <cstdint>
@@ -18,9 +19,8 @@
 
 namespace usbport {
 
-// Starts the USB device too, named for the selected model, with `version` as its serial
-// number.
-void begin(atcmd::Modem &modem, hostport::CallSlot &slot, const char *version);
+// Starts the USB device too, named for the selected model.
+void begin(atcmd::Modem &modem, hostport::CallSlot &slot);
 // Every loop. `ri`: the RI line as it should be now (the incoming call's ring cadence).
 void poll(uint32_t nowMs, bool ri);
 

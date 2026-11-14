@@ -1396,7 +1396,7 @@ void pollBrowser() {
 void createPorts() {
     console = new hostport::Session(*modem, consoleSink, kConsoleBaud, callSlot);
     rs232::begin(*modem, callSlot);
-    usbport::begin(*modem, callSlot, FW_VERSION);
+    usbport::begin(*modem, callSlot);
     auto makeMenu = [](hostport::Session &session, bool rs232Port) {
         void *memory = ps_malloc(sizeof(config::Terminal));
         return memory ? new (memory) config::Terminal(session, rs232Port)

@@ -14,10 +14,11 @@ notifications, by the same rules as on RS232: DCD follows `&C`, DSR is always on
 follows an incoming call's rings. On Windows (`usbser.sys`) programs see all three as
 modem-status lines (pyserial `.cd`, `.dsr`, `.ri`; RI as a level, on and off with each
 ring), and CTS shows as on. The PC sees the device as the selected model: product name
-"US Robotics Sportster 14.4k" (or the model `AT*MODEL` chose), maker "US Robotics",
-serial number the firmware version. The names are read when the modem starts, so a new
-model shows after `AT*RESTART`, and Windows may give each firmware version its own COM
-port number.
+and serial-port name "US Robotics Sportster 14.4k" (or the model `AT*MODEL` chose), maker
+"US Robotics", serial number the Wi-Fi MAC address as 12 hex digits (the `MAC:` line of
+`AT*WIFI?` without the colons). The serial number keeps the same COM port for the modem
+across firmware versions and gives each modem its own. The names are read when the modem
+starts, so a new model shows after `AT*RESTART`.
 
 - Commands start with `AT` and end with Enter (CR, `S3`). Several standard commands can
   share a line: `ATE1V1X4`. A project command (`AT*...`) takes the rest of the line.

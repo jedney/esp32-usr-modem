@@ -16,6 +16,7 @@
 #include "serial_state.h"
 #include "session.h"
 #include "sink_gate.h"
+#include "usb_names.h"
 
 using autobaud::Run;
 using modemcfg::Profile;
@@ -1137,6 +1138,15 @@ void test_serial_state_short_ring_still_reaches_the_computer() {
     TEST_ASSERT_EQUAL(3, port.sent.size());
 }
 
+// The USB serial number is the Wi-Fi MAC as 12 upper-case hex digits, no separators.
+void test_usb_serial_number_is_the_mac_in_hex() {
+    const uint8_t mac[6] = {0x0A, 0xB1, 0x00, 0xFF, 0x3C, 0x7d};
+    char out[hostport::kUsbSerialLength + 1];
+    memset(out, 'x', sizeof out);
+    hostport::usbSerialNumber(mac, out);
+    TEST_ASSERT_EQUAL_STRING("0AB100FF3C7D", out);
+}
+
 void test_serial_state_ring_cadence_sends_each_edge() {
     FakeStatePort port;
     SerialStateSender sender;
@@ -1220,5 +1230,6 @@ int main() {
     RUN_TEST(test_serial_state_busy_endpoint_keeps_the_newest_state);
     RUN_TEST(test_serial_state_short_ring_still_reaches_the_computer);
     RUN_TEST(test_serial_state_ring_cadence_sends_each_edge);
+    RUN_TEST(test_usb_serial_number_is_the_mac_in_hex);
     return UNITY_END();
 }

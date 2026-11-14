@@ -64,6 +64,20 @@ def test_usb_port_answers_at_commands(usb_idle):
     assert usb.command("AT*ANSWERPORT=?")[0] == "RS232,USB,CONSOLE,AUTO"
 
 
+def test_usb_serial_number_is_the_wifi_mac(usb_idle):
+    """The PC sees the Wi-Fi MAC (as AT*WIFI? shows it) as the USB serial number."""
+    from serial.tools import list_ports
+
+    usb = usb_idle
+    macs = [line.split(":", 1)[1].strip() for line in usb.command("AT*WIFI?")
+            if line.startswith("MAC:")]
+    require(len(macs) == 1 and re.fullmatch(r"([0-9A-F]{2}:){5}[0-9A-F]{2}", macs[0]),
+            "AT*WIFI? shows no MAC line")
+    ports = [p for p in list_ports.comports() if p.device == usb.ser.port]
+    require(len(ports) == 1, "The USB port is not in the PC's port list")
+    assert ports[0].serial_number == macs[0].replace(":", "")
+
+
 def test_usb_echo_call_carries_a_large_block_and_escapes(usb_idle):
     usb = usb_idle
     usb.ser.write(b"AT*TESTCALL\r")

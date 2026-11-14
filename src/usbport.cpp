@@ -7,7 +7,9 @@
 #include "modemcfg.h"
 #include "serial_state.h"
 #include "sink_gate.h"
+#include "usb_names.h"
 #include "usb_port.h"
+#include "wifi_radio.h"
 
 namespace usbport {
 
@@ -104,8 +106,12 @@ void writeOutput() {
 
 }  // namespace
 
-void begin(atcmd::Modem &modem, hostport::CallSlot &slot, const char *version) {
-    hw::usbBegin(modemcfg::productName(modem.model()), "US Robotics", version);
+void begin(atcmd::Modem &modem, hostport::CallSlot &slot) {
+    uint8_t mac[6];
+    hw::wifiMac(mac);
+    char serial[hostport::kUsbSerialLength + 1];
+    hostport::usbSerialNumber(mac, serial);
+    hw::usbBegin(modemcfg::productName(modem.model()), "US Robotics", serial);
     sess = new hostport::Session(modem, sink, kDefaultBaud, slot);
     reportedBaud = kDefaultBaud;
 }

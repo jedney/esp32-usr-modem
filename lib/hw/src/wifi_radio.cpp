@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <ESPmDNS.h>
 #include <WiFi.h>
+#include <esp_mac.h>
 #include <esp_netif_sntp.h>
 #include <esp_wifi.h>
 #include <sys/time.h>
@@ -291,6 +292,12 @@ int64_t EspRadio::lastSync() {
 
 void EspRadio::mac(uint8_t out[6]) {
     WiFi.macAddress(out);
+}
+
+void wifiMac(uint8_t out[6]) {
+    if (esp_read_mac(out, ESP_MAC_WIFI_STA) != ESP_OK) {
+        memset(out, 0, 6);
+    }
 }
 
 }  // namespace hw

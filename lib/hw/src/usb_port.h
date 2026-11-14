@@ -7,9 +7,10 @@
 //     the PC is held off, so there is end-to-end flow control and nothing is lost.
 //   - DCD, DSR and RI go to the PC as CDC SERIAL_STATE notifications on the interrupt
 //     endpoint (usbSendSerialState); hostport::SerialStateSender decides when.
-//   - The PC sees the device as the selected model: product "US Robotics Sportster 14.4k"
-//     (or the model chosen), maker "US Robotics", serial number the firmware version. The
-//     names are fixed when the USB device starts, so a model change shows after a restart.
+//   - The PC sees the device as the selected model: product and serial-port (CDC interface)
+//     name "US Robotics Sportster 14.4k" (or the model chosen), maker "US Robotics", serial
+//     number the Wi-Fi MAC address. The names are fixed when the USB device starts, so a
+//     model change shows after a restart.
 #pragma once
 
 #include <cstddef>
@@ -18,7 +19,8 @@
 namespace hw {
 
 // Starts the USB device with these descriptor strings; false if the driver couldn't start.
-// Call once at boot.
+// Call once at boot. `product` also names the serial port (CDC interface) and must stay
+// valid while the device runs (a string constant); the other two are copied.
 bool usbBegin(const char *product, const char *manufacturer, const char *serial);
 bool usbStarted();   // usbBegin succeeded
 bool usbMounted();   // a PC has enumerated the port and it isn't suspended

@@ -25,4 +25,8 @@ public:
     void mac(uint8_t out[6]) override;
 };
 
+// The Wi-Fi station MAC address (the one AT*HWINFO shows), read from eFuse: works before
+// Wi-Fi starts and with Wi-Fi off.
+void wifiMac(uint8_t out[6]);
+
 }  // namespace hw

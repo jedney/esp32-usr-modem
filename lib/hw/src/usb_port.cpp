@@ -19,6 +19,10 @@ namespace {
 
 constexpr uint8_t kItf = 0;
 bool started = false;
+// The CDC interface's name: the product name, so the COM port carries the model's name too
+// (Windows shows it as the port's bus-reported description). Arduino keeps the pointer, not
+// a copy, so it must stay valid while the device runs; usbBegin's caller passes a constant.
+const char *interfaceName = "USB modem";
 
 // The CDC-ACM interface pair (endpoints 0x03 out, 0x84 in; tinyusb_enable_interface()
 // reserves them for USB_INTERFACE_CDC). The notification endpoint is not Arduino's 0x85:
@@ -31,7 +35,7 @@ bool started = false;
 constexpr uint8_t kNotifySize = 16;  // one SERIAL_STATE notification is 10 bytes
 
 uint16_t loadDescriptor(uint8_t *dst, uint8_t *itf) {
-    uint8_t name = tinyusb_add_string_descriptor("USR Modem");
+    uint8_t name = tinyusb_add_string_descriptor(interfaceName);
     uint8_t notify = tinyusb_get_free_in_endpoint();
     notify = notify ? (0x80 | notify) : 0x85;  // none free: DCD, DSR and RI don't reach the PC
     uint8_t descriptor[TUD_CDC_DESC_LEN] = {
@@ -46,6 +50,9 @@ uint16_t loadDescriptor(uint8_t *dst, uint8_t *itf) {
 bool usbBegin(const char *product, const char *manufacturer, const char *serial) {
     if (started) {
         return true;
+    }
+    if (product != nullptr) {
+        interfaceName = product;
     }
     if (tinyusb_enable_interface(USB_INTERFACE_CDC, TUD_CDC_DESC_LEN, loadDescriptor) != ESP_OK) {
         return false;
