@@ -1,15 +1,13 @@
 # USRobotics Sportster — ANSI/BBS configuration UI
 
-v0.12 integration: C opens Client Tests on serial; the browser lists them without
-execution. The catalogue now has 72 nested actions (57 original plus 15 client
-actions). This supersedes the original disabled-placeholder instructions below.
+C opens Client Tests on serial; the browser lists them without execution. The catalogue
+has 78 nested actions.
 
-
-**Design handoff v2.0 — 80×25-first, four runtime models**
+**80×25-first, four runtime models**
 
 **Primary target:** 80 columns × 25 rows (including outer border and footer).
 
-**Enhanced target:** 120–132 columns and sufficient rows for the original concept's richer two-column cards.
+**Enhanced target:** 120–132 columns and sufficient rows for the richer two-column cards.
 
 This document specifies the visual, keyboard, layout, safety and service-binding contract for an implementation in the **existing application**. It does **not** prescribe a programming language, a web framework, an AT command format or a device API that has not been inspected in the repository.
 
@@ -18,12 +16,9 @@ This document specifies the visual, keyboard, layout, safety and service-binding
 1. The user's latest requirements and this specification, including exact 80×25 geometry, four models and **Client Tests**.
 2. `menu-definition.json`: stable IDs, exact option labels, menu tree, UI hotkeys and disabled status.
 3. `theme-tokens.json`: palette and exact model accents.
-4. `previews/*.txt` / `previews/*.ans`: **measured** 80-cell × 25-row terminal exemplars. These are **layouts only**, not operational menus.
-5. `previews/*.png`: faithful raster renderings of those terminal exemplars.
-6. `assets/reference-main-menu.png` and `assets/reference-phonebook.png`: **wide-layout visual inspiration**, not deployable UI or literal 80×25 geometry.
-7. `assets/us-robotics-logo-original.svg`: original red branding source; for HTML/SVG renderers, usable directly after fitting its actual artwork within the viewBox. A real ANSI screen requires a cell-art approximation.
+4. `previews/*.txt`: **measured** 80-cell × 25-row terminal exemplars. These are **layouts only**, not operational menus.
 
-When illustrations disagree with real modem state, **real device values prevail**; if values are missing, show `--`, `Unknown`, or `Unavailable`. Screenshot values such as numbers, dates, serials, COM ports, modem flags, and rates are *not* production defaults.
+When a preview disagrees with real modem state, **real device values prevail**; if values are missing, show `--`, `Unknown`, or `Unavailable`. Screenshot values such as numbers, dates, serials, COM ports, modem flags, and rates are *not* production defaults.
 
 ## 2. Brand and runtime model selection
 
@@ -48,7 +43,7 @@ Use a **true fixed-width cell grid**. No proportional fonts, emojis (ambiguous d
 | --- | --- |
 | **80×25** | Canonical compact design. Exactly 25 rows and max 80 display cells per row; no automatic line wrapping, horizontal scrolling or footer loss. All 13 main entries fit in two **text-only** columns. |
 | 81–119 cols | Choose the compact design or gradually allocate extra width; never assume a 120-column layout. |
-| ≥120 cols, adequate height | Enhanced rendition closely resembling original 28.8k artwork: mirrored modem art, prominent header, item descriptions, separate Phonebook entries + actions/details panes, fuller status strip. |
+| ≥120 cols, adequate height | Enhanced rendition: mirrored modem art, prominent header, item descriptions, separate Phonebook entries + actions/details panes, fuller status strip. |
 | Fewer than 80 cols or 25 rows | Gracefully degrade to a single-column/paged minimal menu and a one-line warning, or use the application's established viewport/scrolling convention. Keep key actions reachable and never emit overlong lines. |
 
 **Terminal safety:** width means terminal **cell width**, not Unicode code point count or UTF-8 byte count. Validate by display width (`wcwidth` or platform equivalent). Avoid placing combining / double-width glyphs across cell boundaries. When printing at physical `(80,25)`, account for terminal automatic-wrap/scroll behaviour: use positioned/cell-buffer output and do not append a newline that scrolls the last row. Hide the cursor during redraw and restore it safely. Detect resize and invalidate only necessary layout regions if available.
@@ -67,7 +62,7 @@ The canonical screen is in `previews/main-sportster-28.8k.txt` (and one per mode
 | 16 | Optional breathing row. |
 | 17 | Thin separating rule. |
 | 18 | Navigation hint. |
-| 19 | Disabled-state text for Client Tests v0.12. |
+| 19 | Client Tests status text. |
 | 20 | Help/status separator. |
 | 21 | Contextual function key hints. |
 | 22 | Dynamic model/profile/link summary, with placeholders for missing values. |
@@ -85,13 +80,13 @@ All top-level IDs and UI keys are defined in `menu-definition.json`: `1` Status,
 
 In compact submenus, use a **single-line red `USRobotics` brand plus colour-coded active model** rather than the five-row logo. Keep breadcrumb `MAIN > [SECTION]` near the top. Use a single-pane list, short labels, visible selection cursor, and fixed bottom controls.
 
-The largest supplied list is **Hardware Tests (15 items)**; Settings has 13 and Wi-Fi and Clock has 12. All three can be shown in **one row per action** between rows 6 and 20, with the compact header/footer, as demonstrated in `previews/settings-28.8k.txt` and `previews/hardware-tests-28.8k.txt`. For future additions, scroll or paginate without moving the footer; preserve selected ID and scroll offset when returning from a child screen.
+The largest list is **Hardware Tests (15 items)**; Settings has 13 and Wi-Fi and Clock has 12. All three can be shown in **one row per action** between rows 6 and 20, with the compact header/footer, as demonstrated in `previews/settings-28.8k.txt` and `previews/hardware-tests-28.8k.txt`. For future additions, scroll or paginate without moving the footer; preserve selected ID and scroll offset when returning from a child screen.
 
 Use a stable UI-local key sequence `1`–`9`, `A`–`F` for submenu actions where appropriate. Do not use `Q`, `Esc` or a conflicting form entry as an action shortcut. User-facing text and stable machine IDs remain in `menu-definition.json`, including separately listed `Load stored/factory profile` **and** `Load factory profile`.
 
 ### 3.3 Compact Phonebook
 
-The enhanced/wide screen should echo `assets/reference-phonebook.png`: entries table at left, four actions and dynamic selected-entry details on right. **Do not attempt both full-sized panes on 80×25.** Instead the compact reference `previews/phonebook-28.8k.txt` uses:
+The enhanced/wide screen has the entries table at left, four actions and dynamic selected-entry details on right. **Do not attempt both full-sized panes on 80×25.** Instead the compact reference `previews/phonebook-28.8k.txt` uses:
 
 - Rows 1–3: compact red brand, accent subtitle and breadcrumb.
 - Rows 4–6: Phonebook title and fixed-cell columns `#`, `NAME`, `PHONE NUMBER`, `RATE`.
@@ -103,7 +98,7 @@ Empty-list state says `No saved entries` if the service genuinely returns zero r
 
 ## 4. Complete menu inventory
 
-**`menu-definition.json` is authoritative for exact IDs, labels, order and nested items.** All 13 top-level options and all **72** nested entries from the supplied requirements are present. In particular:
+**`menu-definition.json` is authoritative for exact IDs, labels, order and nested items.** All 13 top-level options and all **78** nested entries are present. In particular:
 
 - **Phonebook (4):** List entries; Add / edit entry; Delete entry; Dial.
 - **Settings (13):** Current and stored profiles; Edit profile / registers; Model; Auto-answer rings (S0); Auto-answer destination; Host baud; Data throttle; Save active profile; Load stored/factory profile; Load factory profile; Power-on profile; Stored number; Terminal style.
@@ -113,7 +108,7 @@ Empty-list state says `No saved entries` if the service genuinely returns zero r
 - **Updates and Reset (7):** Firmware version; OTA status; OTA policy / window; Change device password; Restart; Factory reset; Web interface.
 - **Hardware Tests (15):** Guided tests; Pin map; Board information; Files; LEDs; Amplifier; Test volume; Tone / sweep; DTMF; Pulse; Potentiometer; RS232 lines; Loopback; Bridge; Output signal.
 
-Status, Call History, Export Configuration, Command Reference and About have their own screens without nested inventories in the supplied list. Avoid creating fictitious additional operations for them.
+Status, Call History, Export Configuration, Command Reference and About have their own screens without nested inventories in the catalogue. Avoid creating fictitious additional operations for them.
 
 ## 5. Interaction contract
 
@@ -166,11 +161,11 @@ Sensitive actions:
 2. Four model previews show the required exact subtitle colours; active model reflects existing `AT*MODEL` state, and unknown model is not mislabeled as 28.8k.
 3. 80×25 Settings (13) and Hardware Tests (15) fit within the single-pane layout; Wi-Fi and Clock (12) also fits. Future longer lists paginate/scroll cleanly.
 4. Phonebook displays real entries, paging, selection, details and four contextual actions. Empty/unsupported states are clear; disabled delete/dial cannot run without selection.
-5. Client Tests label and message say **v0.12**, displayed disabled, never actioned by keyboard.
-6. On wide displays (120–132 cols with enough height), use the reference-inspired two-column design; 80×25 is not simply a shrunken screenshot.
+5. Client Tests are listed in the browser but never run there; on a serial session `C` opens them.
+6. On wide displays (120–132 cols with enough height), use the two-column design; 80×25 is not simply a shrunken screenshot.
 7. Keyboard + focus tests include Up/Down/Left/Right, hotkeys, Esc/Q/Enter, selection on Back, disabled item, and input fields.
 8. Device footer uses real reported values; no fabricated sample data in production. No false success or password leakage.
 9. Layout and smoke tests run at 80×25, 80×24, 79×25, 100×25, 120×45 and 132×50; test resize and no auto-wrap.
 10. Existing project tests pass; report both supported and unsupported service-backed actions and how to run them.
 
-The included `tools/preview_80x25.py` and `tests/test_layout_contract.py` test the **handoff's own static specimens**, not the application's implemented renderer. Codex should add equivalent tests to the repository's real screen components.
+`tools/preview_80x25.py` and `tests/test_layout_contract.py` check the static layout specimens; `native/test_config` and the end-to-end `test_config.py` test the real renderer.

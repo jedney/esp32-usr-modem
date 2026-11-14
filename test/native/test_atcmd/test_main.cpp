@@ -1,5 +1,5 @@
-// Unit tests for the AT command parser, result codes and ATI screens (brief 6.2, 6.5,
-// 6.6, 6.7, 6.8). Run with: pio test -e native
+// Unit tests for the AT command parser, result codes and ATI screens (spec 3.2, 3.5,
+// 3.6, 3.7, 3.8). Run with: pio test -e native
 #include <unity.h>
 
 #include <cstring>

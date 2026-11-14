@@ -6,7 +6,7 @@ Faxmodem. It has a real RS232 port (DB25, wired as a modem), speaks the Hayes AT
 set of the Sportster, plays dial, DTMF, ringing and handshake sounds, and connects your
 retro computer to Telnet BBSes and the Internet over Wi-Fi.
 
-**Version 2.0**: adds the USB modem port. What it does:
+What it does:
 
 - Outgoing Telnet and raw TCP calls, from a 64-entry phonebook or by host name or IP.
 - Incoming calls on Telnet port 23, with UK ringing, RI, `ATA` and auto-answer.
@@ -24,7 +24,7 @@ Every command is listed in **[docs/COMMANDS.md](docs/COMMANDS.md)**.
 | Port | Use |
 |---|---|
 | RS232 (DB25) | The computer. Speed is detected from each "AT" (300-115200), or fixed with `AT*BAUD`. RTS/CTS, DTR, DCD and RI work as on a real modem; DSR is always on |
-| Rear USB-C (the S3's native USB) | **USB modem port** (v2.0): a PC sees a USB serial port that works like the RS232 port, with its own AT session. No line speed, USB flow control, DTR from the PC program; DCD, DSR and RI reach the PC program as on RS232. The PC sees it as "US Robotics Sportster" and the selected model, with the Wi-Fi MAC address as its serial number. The same socket powers the modem |
+| Rear USB-C (the S3's native USB) | **USB modem port**: a PC sees a USB serial port that works like the RS232 port, with its own AT session. No line speed, USB flow control, DTR from the PC program; DCD, DSR and RI reach the PC program as on RS232. The PC sees it as "US Robotics Sportster" and the selected model, with the Wi-Fi MAC address as its serial number. The same socket powers the modem |
 | USB-C "UART" on the S3 board | Maintenance console, 115200 8N1. Same commands as the RS232 port, plus the boot messages. Inside the case only |
 | Wi-Fi | Calls, the web interface (`http://usr-modem.local`), the network console (TCP port 2001) and OTA updates |
 
@@ -180,7 +180,7 @@ without storing it.
 
 `AT*HWTEST` walks through the electronics (LEDs, speaker, volume, knob, RS232
 lines, loopback) and prints a summary; `AT*HW?` lists the single tests. The GPIO map is
-in `lib/hw/src/pins.h` (confirmed by Electronics, rev B) and `AT*HWPINS`
+in `lib/hw/src/pins.h` (confirmed by Electronics, board rev B) and `AT*HWPINS`
 prints it. Loopback plug for `AT*HWLOOP`: join RXD-TXD, CTS-RTS and DCD-DTR (DB25 pins
 3-2, 5-4, 8-20; bench DB9 pins 2-3, 8-7, 1-4).
 
@@ -193,7 +193,8 @@ prints it. Loopback plug for `AT*HWLOOP`: join RXD-TXD, CTS-RTS and DCD-DTR (DB2
    (`winget install BrechtSanders.WinLibs.POSIX.UCRT.LLVM`, which also has clang-format)
    or MSYS2 (`pacman -S mingw-w64-ucrt-x86_64-gcc`, then add `C:\msys64\ucrt64\bin` to
    your user Path). Check that `gcc --version` works in a new terminal.
-3. Optional: Node.js 20+ for the web tests, Python 3.12 for the end-to-end tests.
+3. Optional: Node.js 26 for the web tests, Python 3.14 for the end-to-end tests
+   (`pip install -r test/e2e/requirements.txt`).
 4. Clone: `git clone https://github.com/jedney/esp32-usr-modem.git C:\repo\esp32-usr-modem`
 5. In VS Code open the folder, choose **Trust** and install the recommended extensions
    (PlatformIO IDE). Restart when asked.
@@ -202,8 +203,9 @@ prints it. Loopback plug for `AT*HWLOOP`: join RXD-TXD, CTS-RTS and DCD-DTR (DB2
 
 Use **Terminal → Run Task…**:
 
-1. **Modem: build firmware.** The first build downloads the toolchain and builds the
-   Arduino core and ESP-IDF together (this enables NAT), so it takes a while.
+1. **Modem: build firmware.** The first build downloads the toolchain (Arduino core 3.3.12
+   on ESP-IDF 6.1) and the managed components, so it takes a while; a clean build is about
+   3 minutes.
 2. Plug a USB-C cable into the S3 board's **UART** port (not **USB**). It appears as a
    CH34x COM port.
 3. **Modem: upload over USB (tests first).** The PC unit tests run first and a failure
@@ -282,7 +284,7 @@ Wi-Fi.
 
 ### Debugging
 
-From v2.0 the native USB port (GPIO19/20) is the USB modem port, so the built-in USB-JTAG
+The native USB port (GPIO19/20) is the USB modem port, so the built-in USB-JTAG
 debugger is not available while the firmware runs. Flash over the UART USB-C port or OTA.
 To reach the ROM bootloader on the native port, hold BOOT and tap RST.
 
@@ -310,17 +312,17 @@ release. [test/README.md](test/README.md) maps every feature to its tests.
 
 | Path | Contents |
 |---|---|
-| `src/` | Firmware entry point, RS232 port, hardware-test console |
+| `src/` | Firmware entry point, RS232 and USB ports, console output, web service, hardware-test console |
 | `lib/` | Firmware modules; `lib/hw` is the only one that touches hardware (pin map in `lib/hw/src/pins.h`) |
 | `test/` | Unit (`native/`), on-board (`embedded/`), end-to-end (`e2e/`), interoperability (`interop/`) and script tests |
 | `web/` | Web page (`src/`), third-party files (`vendor/`), tests and `PROTOCOL.md` |
 | `ui/` | Configuration screen design data shared by firmware and browser |
-| `sound/` | Handshake recordings |
-| `scripts/` | Build helpers: versioning, test gate, web bundle, OTA |
-| `case/`, `images/` | Case parts (STL), print projects, build photos, screw list and label art |
+| `sound/` | Handshake recordings (`scripts/build_handshakes.py` copies them to `data/sounds/`) |
+| `scripts/` | Build helpers: versioning, pins, warnings, test gate, web bundle, credits, OTA upload |
+| `case/` | Case parts (STL), print projects, build photos, screw list and label art |
 | `electronics/` | Datasheets, pinout and models of the bought-in parts |
 | `credits/` | Attribution and the licensing record (`LICENSES.md`) |
-| `docs/` | `COMMANDS.md`, project brief, roadmap, decisions log; `history/` holds earlier version plans |
+| `docs/` | `COMMANDS.md`, the firmware spec (`project-brief.md`), roadmap, decisions log |
 | `.github/workflows/` | CI and release |
 
 ## Credits

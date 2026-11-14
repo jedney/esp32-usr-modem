@@ -1,4 +1,4 @@
-// Device password and OTA policy (brief 6.6). No hardware calls.
+// Device password and OTA policy (spec 3.6). No hardware calls.
 #pragma once
 
 #include <cstddef>

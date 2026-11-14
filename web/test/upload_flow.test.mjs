@@ -85,7 +85,7 @@ test('read-only page, no CSRF token, no file or an upload under way are ignored'
     assert.equal(await rig().flow(null), 'ignored');
 });
 
-test('a second press during the preflight starts nothing (5.5-17)', async () => {
+test('a second press during the preflight starts nothing', async () => {
     const r = rig();
     r.hold();
     const first = r.flow(file(firmware()));

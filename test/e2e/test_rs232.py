@@ -1,4 +1,4 @@
-"""End-to-end checks of the RS232 host port (brief 6.2) through the Unitek
+"""End-to-end checks of the RS232 host port (spec 3.2) through the Unitek
 adapter. These pass at 300-115200 baud.
 
 Needs both ports and the RS232 section wired (MAX3232s and the bench DB9 or the DB25):

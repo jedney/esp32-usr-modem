@@ -1,5 +1,5 @@
 """End-to-end checks of the AT command parser and stored settings on the USB console
-(brief 6.2, 6.5, 6.6, 6.7).
+(spec 3.2, 3.5, 3.6, 3.7).
 
 These tests change settings. Each one starts and ends with ATZ (back to the stored
 template). The restart test saves the factory &F1 template to Y0 when it finishes.

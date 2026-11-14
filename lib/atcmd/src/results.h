@@ -1,4 +1,4 @@
-// Result codes (project brief 6.5), numbered and worded as on the USR Sportster 33.6.
+// Result codes (spec 3.5), numbered and worded as on the USR Sportster 33.6.
 
 #pragma once
 

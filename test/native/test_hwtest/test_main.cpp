@@ -1,5 +1,5 @@
 // Unit tests for the hardware-test helpers, generated tones and volume scaling
-// (project brief 5.3, 6.4, 6.14). Run with: pio test -e native
+// (spec 2.3, 3.4, 3.13). Run with: pio test -e native
 #include <unity.h>
 
 #include <cmath>

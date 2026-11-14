@@ -1,4 +1,4 @@
-// Hardware-test helpers (project brief 6.14): LED names, test patterns and the argument
+// Hardware-test helpers (spec 3.13): LED names, test patterns and the argument
 // parsing shared by the AT*HW... console commands.
 //
 // No Arduino dependencies: this module is unit-tested on the PC.
@@ -23,7 +23,7 @@ int parseLed(const char *s);
 // LED mask for one step of a back-and-forth sweep: AA, CD ... ARQ, CS ... CD, AA, ...
 uint8_t chaseMask(uint32_t step);
 
-// RS232 handshake outputs the tests can drive (DSR is hard-wired on, brief 5.1).
+// RS232 handshake outputs the tests can drive (DSR is hard-wired on, spec 2.2).
 enum class OutSignal : uint8_t { kDCD, kRI, kCTS };
 const char *outSignalName(OutSignal s);
 bool parseOutSignal(const char *s, OutSignal *out);

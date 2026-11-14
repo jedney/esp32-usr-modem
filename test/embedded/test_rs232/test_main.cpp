@@ -1,4 +1,4 @@
-// On-board checks of the RS232 host port (brief 6.2) with NO wires: UART2 plays
+// On-board checks of the RS232 host port (spec 3.2) with NO wires: UART2 plays
 // the computer, connected inside the chip through the GPIO matrix:
 //   UART2 TX  -> TXD-in pin (UART1 RX and the RMT speed capture)
 //   UART1 TX  -> UART2 RX

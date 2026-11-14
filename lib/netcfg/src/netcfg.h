@@ -1,4 +1,4 @@
-// Wi-Fi and clock controller (project brief 5.4, 6.6, 6.7): keeps the modem on the saved
+// Wi-Fi and clock controller (spec 2.4, 3.6, 3.7): keeps the modem on the saved
 // network, retries when it drops, runs AT*WIFIJOIN and AT*WIFISCAN, starts mDNS and NTP
 // once connected, and decides the Wi-Fi lights and the console notices.
 //

@@ -76,7 +76,7 @@ const OtherSetting kOtherSettings[] = {
     {"clients", 64},
     {"internet", 160},
     {"diagnostics", 3},
-    {"phy", 1904},  // the radio's calibration data (ESP32-S3, ESP-IDF 4.4)
+    {"phy", 1904},  // the radio's calibration data
 };
 constexpr size_t kOtherCount = sizeof kOtherSettings / sizeof kOtherSettings[0];
 

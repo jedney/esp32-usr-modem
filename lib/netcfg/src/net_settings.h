@@ -1,8 +1,8 @@
-// Saved Wi-Fi and clock settings (project brief 6.6): one network, DHCP
+// Saved Wi-Fi and clock settings (spec 3.6): one network, DHCP
 // or a static IP, the mDNS name, the NTP server and the time zone.
 //
 // Kept apart from the modem templates (modemcfg), so AT&F, ATZ and &W never touch them
-// (brief 6.7). The board stores the blob in NVS namespace "net" (hw::NvsStore).
+// (spec 3.7). The board stores the blob in NVS namespace "net" (hw::NvsStore).
 //
 // The Wi-Fi password is kept here and in the blob only (NVS without flash encryption). Nothing in
 // this module or the AT* commands prints it.

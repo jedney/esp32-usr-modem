@@ -1,4 +1,4 @@
-// AT*HW... hardware-test commands (project brief 6.14). They run on any local port: the
+// AT*HW... hardware-test commands (spec 3.13). They run on any local port: the
 // maintenance console, the USB modem port, the RS232 host port, or the browser terminal.
 // A test prints and reads keys on the port the command came from. Every "any key" test
 // ends by itself when that terminal closes (DTR drops, the browser leaves) or when no key

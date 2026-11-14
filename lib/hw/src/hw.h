@@ -42,7 +42,7 @@ constexpr uint16_t kPotMax = 4095;
 uint16_t potRaw();  // 0..4095, average of 16 readings
 uint32_t potMillivolts();
 
-// --- RS232 handshake lines (active-low at the GPIO, brief 6.2) --------------------------
+// --- RS232 handshake lines (active-low at the GPIO, spec 3.2) --------------------------
 void linesBegin();  // outputs deasserted, inputs with pull-ups
 bool dtrAsserted();
 bool rtsAsserted();

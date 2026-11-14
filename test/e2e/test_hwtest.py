@@ -1,4 +1,4 @@
-"""End-to-end checks of the AT*HW hardware-test commands (brief 6.14).
+"""End-to-end checks of the AT*HW hardware-test commands (spec 3.13).
 
 These need only the USB console; nothing has to be wired to the S3 (the commands drive
 the pins whether or not anything is connected). The bridge test also needs the RS232

@@ -1,6 +1,6 @@
 {
   "name": "hostport",
-  "description": "USR Modem Emulator host serial port logic: speed detection from \"AT\", 8N1 decoding of captured waveforms, command/online modes, +++ escape, DTR/DCD rules, flow control, the AT*TESTCALL echo call and the front-panel LED rules (brief 5.4, 6.2)",
+  "description": "USR Modem Emulator host serial port logic: speed detection from \"AT\", 8N1 decoding of captured waveforms, command/online modes, +++ escape, DTR/DCD rules, flow control, the AT*TESTCALL echo call and the front-panel LED rules (spec 2.4, 3.2)",
   "frameworks": "*",
   "platforms": "*",
   "dependencies": [{"name": "atcmd"}, {"name": "modemcfg"}, {"name": "hwtest"}]

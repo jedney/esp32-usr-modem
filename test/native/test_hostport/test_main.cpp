@@ -1,4 +1,4 @@
-// Unit tests for the host port logic (brief 5.4, 6.2): speed detection from "AT", 8N1
+// Unit tests for the host port logic (spec 2.4, 3.2): speed detection from "AT", 8N1
 // decoding of captured waveforms, the +++ escape, DTR/DCD rules, flow control, the
 // session modes and the front-panel LED rules. Run with: pio test -e native
 #include <unity.h>

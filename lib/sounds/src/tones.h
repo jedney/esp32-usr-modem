@@ -1,4 +1,4 @@
-// Generated tones (project brief 6.4): UK dial, busy and ring tones, DTMF, UK pulse-dial
+// Generated tones (spec 3.4): UK dial, busy and ring tones, DTMF, UK pulse-dial
 // clicks, plain test tones and a frequency sweep. Each is a Source that fills a buffer
 // of 16-bit mono samples at full scale; the caller applies the volume (volume.h).
 //

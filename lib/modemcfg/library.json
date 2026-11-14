@@ -1,6 +1,6 @@
 {
   "name": "modemcfg",
-  "description": "Modem settings for the USR Modem Emulator: Sportster settings table, factory templates, stored (NVRAM) templates and their saved format (brief 6.2, 6.6, 6.7)",
+  "description": "Modem settings for the USR Modem Emulator: Sportster settings table, factory templates, stored (NVRAM) templates and their saved format (spec 3.2, 3.6, 3.7)",
   "frameworks": "*",
   "platforms": "*"
 }

@@ -1,4 +1,4 @@
-// Front-panel LED rules (project brief 5.4). Returns the LED mask in hwtest::Led bit
+// Front-panel LED rules (spec 2.4). Returns the LED mask in hwtest::Led bit
 // order (AA bit 0 ... ARQ bit 6, as in web/PROTOCOL.md); the board shows it with
 // hw::ledsSet().
 //   AA   on when S0 >= 1; flashes while a call rings (answer mode)

@@ -1,4 +1,4 @@
-// Unit tests for Wi-Fi and clock (lib/netcfg, brief 5.4, 6.6, 6.7): saved settings and
+// Unit tests for Wi-Fi and clock (lib/netcfg, spec 2.4, 3.6, 3.7): saved settings and
 // their checks, time zones, the connect/retry rules, the Wi-Fi lights, AT*WIFIJOIN and
 // AT*WIFISCAN, and the AT* commands with a fake radio. The canary test checks that the
 // Wi-Fi password never appears in any output.
@@ -1001,7 +1001,7 @@ void test_help_lists_wifi_and_clock_commands() {
     }
 }
 
-// The Wi-Fi password never appears in any output (brief 6.6).
+// The Wi-Fi password never appears in any output (spec 3.6).
 void test_password_never_shown() {
     const char *kCanary = "Canary-pw-9f3K";
     Settings s = saved("HomeNet", kCanary);

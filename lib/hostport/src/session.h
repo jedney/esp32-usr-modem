@@ -1,4 +1,4 @@
-// One serial port's session (project brief 6.2): the RS232 port and the USB console each
+// One serial port's session (spec 3.2): the RS232 port and the USB console each
 // have one. It owns the port's AT parser and moves between three modes:
 //   command        -> bytes from the computer go to the AT parser
 //   online         -> bytes go to the call; "+++" with guard time escapes

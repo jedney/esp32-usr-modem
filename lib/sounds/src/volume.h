@@ -1,4 +1,4 @@
-// Volume scaling (project brief 5.3, 6.4).
+// Volume scaling (spec 2.3, 3.4).
 //
 // There is no firmware volume cap. The CLS0361 speaker (8 ohm, 2 W) can take everything
 // the MAX98357A can give it: at its default 9 dB gain (GAIN pin unconnected) and 5 V,

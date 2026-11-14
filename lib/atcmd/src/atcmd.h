@@ -1,4 +1,4 @@
-// AT command parser (project brief 6.2, 6.6, 6.7, 6.8), following USR Sportster 33.6
+// AT command parser (spec 3.2, 3.6, 3.7, 3.8), following USR Sportster 33.6
 // behaviour:
 //   - "AT" or "at" (not mixed) starts a command line; S3 ends it, S5 deletes a character
 //     (DEL works too); E sets echo. "A/" repeats the last line at once, with no Enter.

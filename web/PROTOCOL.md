@@ -44,7 +44,7 @@ generated `ui-data.js` catalogue for the explicitly synthetic browser demo.
 | `GET /`, `GET /<file>` | Digest (`admin`, realm `usr-modem`) | Page files from LittleFS |
 | `GET /api/session` | Digest | `{"token": "<random>"}`: a single-use token for the WebSocket, valid 30 s |
 | `GET /ws?token=<token>` | Token | WebSocket upgrade |
-| `POST /api/update` | Digest + CSRF token | Firmware or LittleFS image upload (brief 6.11) |
+| `POST /api/update` | Digest + CSRF token | Firmware or LittleFS image upload (spec 3.11) |
 
 Every request: check the `Host` header is the modem's mDNS name or IP (blocks DNS
 rebinding). Changes need a CSRF token (sent to the page on the WebSocket).
@@ -126,7 +126,7 @@ leading zeroes and trailing bytes are refused. Geometry is never terminal input.
 The server task coalesces dimensions per client under its queue mutex; only the
 modem task applies them, and only to that client's owned terminal. An observer
 cannot resize another owner's UI. The page debounces resize and resends dimensions
-on ownership/reconnect; old firmware without the capability keeps fixed 80x25.
+on ownership/reconnect; a `hello` without `size` keeps fixed 80x25.
 Compact applies below 120x45, with the richer layout enabled only when both limits
 are met. Terminal output is streamed in bounded rows and redraws are coalesced;
 rendering a full wide frame never requires pushing it all into the socket queue.

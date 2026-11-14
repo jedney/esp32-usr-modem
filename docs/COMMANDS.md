@@ -1,7 +1,7 @@
 # Command reference
 
 Every command the USR Modem Emulator accepts, on the USB maintenance console (115200 8N1),
-the RS232 host port and the USB modem port (v2.0). The modem also lists them itself:
+the RS232 host port and the USB modem port. The modem also lists them itself:
 `AT*HELP` (project commands), `AT*HW?` (hardware tests) and `AT*REFERENCE` (everything).
 
 The **USB modem port** is the S3's native USB, carried by the rear USB-C socket. A PC sees
@@ -211,7 +211,7 @@ resets it. "This boot" means it lasts until the next restart.
 | `AT*THROTTLE[?]` / `=<ON\|OFF>` | Limit data in both directions to the line speed. Saved; factory OFF |
 | `AT*RINGDELAY[?]` / `=?` / `=<0-60000>` | Ringing before an outgoing call connects, in ms (0 skips it). Saved; factory 1500 |
 | `AT*CONNECTDELAY[?]` / `=?` / `=<0-60000>` | Pause after the handshake sound, before CONNECT, in ms. Saved; factory 250 |
-| `AT*ANSWERPORT[?]` / `=?` / `=<RS232\|USB\|CONSOLE\|AUTO>` | Which port auto-answers (`S0`). AUTO uses the first port with DTR on, in the order RS232, USB, console (the console has no DTR, so it is the fallback). Not during a call. Saved; factory AUTO (RS232 before v2.0; a saved choice is kept) |
+| `AT*ANSWERPORT[?]` / `=?` / `=<RS232\|USB\|CONSOLE\|AUTO>` | Which port auto-answers (`S0`). AUTO uses the first port with DTR on, in the order RS232, USB, console (the console has no DTR, so it is the fallback). Not during a call. Saved; factory AUTO |
 | `AT*BAUD[?]` / `=AUTO` / `=<rate>` | RS232 speed: AUTO detects it from each "AT"; or fixed at 300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600 or 115200. Saved; factory AUTO (starting at 38400). Setting it from the console, USB or browser is refused (`ERROR`) while a call is up on the RS232 port; change it from the RS232 port, or hang up first |
 | `AT*PHONEBOOK[?]` | List the phonebook (64 entries) |
 | `AT*PHONEBOOK=<number>,<host>,<port>,<TELNET\|RAW>[,<speed>]` | Add or replace an entry. Number 1-11 digits (leading zeros count, special numbers refused); host up to 63 characters; port 1-65535; speed 0 or omitted = no override |
@@ -297,8 +297,7 @@ normally type yourself: `AT*BOOKCLEAR`, `AT*PROFILE=<slot>,<baud>`,
 ### Client Tests and file transfers
 
 Run on the USB console, RS232 port or USB modem port, not in the browser. Each port keeps
-its own client settings (from v2.0 there are three; settings saved before v2.0 go back to
-defaults once).
+its own client settings (three: console, RS232 and USB).
 
 | Command | What it does |
 |---|---|
@@ -322,7 +321,7 @@ never stored. Cancel a transfer with the protocol's own cancel (Ctrl-X several t
 
 ### Hardware tests (`AT*HW...`)
 
-On the USB console and in the browser all tests run. On the RS232 port the line, loopback
+On the USB console, the USB modem port and in the browser all tests run. On the RS232 port the line, loopback
 and bridge tests are not available. Remote callers can't run any. Audio tests need the
 modem idle.
 
@@ -344,7 +343,7 @@ modem idle.
 | `AT*HWLOOP[=<baud>\|ALL]` | Loopback test; needs a plug joining RXD-TXD, CTS-RTS, DCD-DTR (DB25 3-2, 5-4, 8-20) |
 | `AT*HWBRIDGE[=<baud>]` | Pass bytes between the console and RS232 (default 38400; Ctrl-X ends) |
 
-**Hardware tests cannot freeze the modem** (v2.3):
+**Hardware tests cannot freeze the modem:**
 
 - A test that waits for a key (`AT*HWLED` patterns, `AT*HWTONE`, `AT*HWDTMF`, `AT*HWPULSE`,
   `AT*HWPOT`, `AT*HWLINES`, `AT*HWBRIDGE`, the `AT*HWTEST` prompts) stops by itself after

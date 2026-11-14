@@ -5,7 +5,7 @@ Usage:
   python scripts/bump_version.py minor "Fixed DTR hang-up timing"
   python scripts/bump_version.py major "Added USB CDC serial (hardware change)"
 
-Rules (project brief 6.9):
+Rules (spec 3.9):
   minor  +0.1  small enhancement or bug fix  (0.9 -> 0.10, never 0.9 -> 1.0)
   major  +1.0  major feature or hardware change (resets the minor number to 0)
 """

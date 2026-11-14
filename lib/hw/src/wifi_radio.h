@@ -1,4 +1,4 @@
-// The S3's Wi-Fi, mDNS and NTP behind netcfg::Radio (project brief 6.6), using the
+// The S3's Wi-Fi, mDNS and NTP behind netcfg::Radio (spec 3.6), using the
 // Arduino core's WiFi, ESPmDNS and SNTP. All decisions (when to join, retry, scan) are
 // made by netcfg::Net; this only does what it is told and reports what happened.
 //

@@ -1,4 +1,4 @@
-// AT*HW... hardware-test commands (project brief 6.14). They exist to check the
+// AT*HW... hardware-test commands (spec 3.13). They exist to check the
 // electronics as they are built: each LED, the amplifier and speaker, the volume pot,
 // the RS232 handshake lines and data path. Pins come from lib/hw/src/pins.h.
 #include "hwconsole.h"

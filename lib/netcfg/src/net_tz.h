@@ -1,4 +1,4 @@
-// Time zones for the clock (project brief 6.8): Pacific/Auckland by default,
+// Time zones for the clock (spec 3.8): Pacific/Auckland by default,
 // configurable with AT*TZ.
 //
 // The ESP32 has no time-zone database, so zones are POSIX rules (as in the TZ variable):

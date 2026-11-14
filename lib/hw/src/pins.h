@@ -1,4 +1,4 @@
-// GPIO pin map (project brief 5.2, 6.14).
+// GPIO pin map (spec 2.5, 3.13).
 //
 // The pin NUMBERS are not in the source: scripts/pin_config.py reads USR_MODEM_PIN_* from
 // .env.example (the defaults), then .env, then the environment, and passes them to the
@@ -27,7 +27,7 @@
 // are given beside each signal below.
 //
 // Polarity: the RS232 Pals invert both ways, so on the TTL side an RS232 signal that is
-// asserted (ON, +V on the cable) is LOW at the GPIO (brief 6.2).
+// asserted (ON, +V on the cable) is LOW at the GPIO (spec 3.2).
 
 #pragma once
 
@@ -51,7 +51,7 @@ constexpr int kRts = USR_MODEM_PIN_RTS;  // DB9 7, request to send              
 constexpr int kDtr = USR_MODEM_PIN_DTR;  // DB9 4, data terminal ready            (GPIO)
 // DSR (DB9 6) is hard-wired on from U2 V+ through 1 k: no pin.
 
-// --- Audio: MAX98357A (brief 5.3) --------------------------------------------------------
+// --- Audio: MAX98357A (spec 2.3) --------------------------------------------------------
 constexpr int kI2sLrc = USR_MODEM_PIN_I2S_LRC;
 constexpr int kI2sBclk = USR_MODEM_PIN_I2S_BCLK;
 constexpr int kI2sDin = USR_MODEM_PIN_I2S_DIN;

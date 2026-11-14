@@ -11,7 +11,7 @@
 // One call at a time (hostport::CallSlot): outgoing Telnet/TCP (calls::Outgoing),
 // incoming on port 23 (calls::Incoming), PPP/SLIP Internet dial-up (lib/internet) and the
 // AT*TESTCALL echo. Wi-Fi, mDNS and the NTP clock are in lib/netcfg; device credentials,
-// OTA and factory reset in lib/devicecfg. The front-panel LEDs follow brief table 5.4.
+// OTA and factory reset in lib/devicecfg. The front-panel LEDs follow spec 2.4.
 // Project commands are in lib/config (registry.cpp) with the hooks below; AT*HW... are
 // the hardware tests (hwconsole.cpp), run on the port they were typed on.
 #include <Arduino.h>
@@ -925,7 +925,7 @@ void printSettings(modemcfg::LoadResult loaded) {
         static_cast<unsigned>(p.get(modemcfg::kV)), static_cast<unsigned>(p.get(modemcfg::kX)));
 }
 
-// Wi-Fi, network name and clock (brief 6.7). Never the Wi-Fi password.
+// Wi-Fi, network name and clock (spec 3.7). Never the Wi-Fi password.
 void printNetwork(netcfg::LoadResult netLoaded) {
     const netcfg::Settings &s = net.settings();
     if (netLoaded == netcfg::LoadResult::kDamaged) {

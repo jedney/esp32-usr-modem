@@ -1,5 +1,5 @@
 // Checks the GPIO pin map (lib/hw/src/pins.h): it is the map Electronics confirmed, and it
-// avoids the S3 board's reserved pins (project brief 5.2), so a pin change, by accident or
+// avoids the S3 board's reserved pins (spec 2.5), so a pin change, by accident or
 // one that would break the board, fails before upload.
 // Run with: pio test -e native
 #include <unity.h>
@@ -46,7 +46,7 @@ void test_pin_map_is_the_confirmed_one() {
 }
 
 void test_pin_map_avoids_reserved_pins() {
-    // Strapping 0/3/45/46, PSRAM 35-37, USB 19/20, console 43/44, board RGB LED 47 (brief 5.2)
+    // Strapping 0/3/45/46, PSRAM 35-37, USB 19/20, console 43/44, board RGB LED 47 (spec 2.5)
     const int reserved[] = {0, 3, 45, 46, 35, 36, 37, 19, 20, 43, 44, 47};
     int used[] = {pins::kRxd,     pins::kTxd,     pins::kCts,     pins::kRts,     pins::kDtr,
                   pins::kDcd,     pins::kRi,      pins::kI2sBclk, pins::kI2sLrc,  pins::kI2sDin,

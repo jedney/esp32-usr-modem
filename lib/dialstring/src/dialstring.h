@@ -1,4 +1,4 @@
-// Dial-string classifier (project brief 6.3).
+// Dial-string classifier (spec 3.3).
 //
 // Takes the part of an ATD command after the optional T or P, e.g. for
 // "ATDT001002003004789" the input is "001002003004789", and works out what it means:

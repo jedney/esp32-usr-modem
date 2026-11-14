@@ -48,22 +48,6 @@ class Frame:
         return [''.join(c.ch for c in row) for row in self.cells]
     def txt(self):
         return '\n'.join(self.lines())+'\n'
-    def ans(self):
-        def seq(fg,bg):
-            def rgb(c):
-                return tuple(int(c[i:i+2],16) for i in (1,3,5))
-            return '\x1b[38;2;{};{};{};48;2;{};{};{}m'.format(*(rgb(fg)+rgb(bg)))
-        out=['\x1b[0m\x1b[2J\x1b[H']
-        for y,row in enumerate(self.cells):
-            out.append(f'\x1b[{y+1};1H')
-            prev=None
-            for c in row:
-                key=(c.fg,c.bg)
-                if key!=prev:
-                    out.append(seq(*key));prev=key
-                out.append(c.ch)
-        out.append('\x1b[0m')
-        return ''.join(out)
 
 # Compact, cell-width-safe 5x5 USRobotics character art. Red wordmark, 59 cols.
 LOGO = {
@@ -173,7 +157,6 @@ def phonebook(f):
 
 def write(name,f):
     (ROOT/'previews'/f'{name}.txt').write_text(f.txt(),encoding='utf-8')
-    (ROOT/'previews'/f'{name}.ans').write_text(f.ans(),encoding='utf-8')
     return f
 
 def generate():
@@ -192,5 +175,5 @@ if __name__=='__main__':
         lines=f.lines()
         assert len(lines)==25 and all(len(x)==80 for x in lines),label
         assert all(unicodedata.east_asian_width(c) not in ['W','F'] for line in lines for c in line),label
-    print('Generated',len(frames),'80x25 TXT/ANSI preview pairs.')
+    print('Generated',len(frames),'80x25 text previews.')
     print(frames['sportster-28.8k'].txt())

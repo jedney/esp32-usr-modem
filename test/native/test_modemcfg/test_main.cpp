@@ -1,4 +1,4 @@
-// Unit tests for the modem settings and their saved format (brief 6.2, 6.6, 6.7).
+// Unit tests for the modem settings and their saved format (spec 3.2, 3.6, 3.7).
 // Run with: pio test -e native
 #include <unity.h>
 
@@ -69,7 +69,7 @@ void test_factory_s_registers() {
     TEST_ASSERT_EQUAL(10, p.s[4]);
     TEST_ASSERT_EQUAL(8, p.s[5]);
     TEST_ASSERT_EQUAL(60, p.s[7]);
-    TEST_ASSERT_EQUAL(50, p.s[12]);  // 1 s guard time (brief 6.2)
+    TEST_ASSERT_EQUAL(50, p.s[12]);  // 1 s guard time (spec 3.2)
 }
 
 void test_factory_f0_and_f2_differ_only_in_flow_control_and_results() {

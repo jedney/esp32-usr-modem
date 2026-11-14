@@ -40,7 +40,7 @@ enum Setting : uint8_t {
     kAmpN,  // &N  line speed: 0 = highest (56000), 1-38 fixed; factory = 8 (14400)
     kAmpP,  // &P  pulse make/break ratio (1 = UK)
     kAmpR,  // &R  receive hardware flow control: 1 ignore RTS, 2 RTS
-    kAmpS,  // &S  DSR: fixed at 0, DSR is hard-wired on (brief 6.2)
+    kAmpS,  // &S  DSR: fixed at 0, DSR is hard-wired on (spec 3.2)
     kAmpT,  // &T  remote digital loopback: 4 allowed, 5 refused
     kAmpU,  // &U  lowest line speed
     kAmpY,  // &Y  break handling
