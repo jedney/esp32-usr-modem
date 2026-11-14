@@ -1,4 +1,4 @@
-// Checks the GPIO pin map (lib/hw/src/pins.h): it is the map Electronics confirmed, and it
+// Checks the GPIO pin map (lib/hw/src/pins.h): it is the current map, and it
 // avoids the S3 board's reserved pins (spec 2.5), so a pin change, by accident or
 // one that would break the board, fails before upload.
 // Run with: pio test -e native
@@ -12,10 +12,10 @@
 void setUp() {}
 void tearDown() {}
 
-// The confirmed map. The numbers come from .env.example
+// The current map. The numbers come from .env.example
 // (scripts/pin_config.py); a changed map fails this test unless USR_MODEM_PINS_OVERRIDDEN=1 says it
-// is on purpose. If Electronics changes the board, change .env.example and these numbers together.
-void test_pin_map_is_the_confirmed_one() {
+// is on purpose. If the board changes, change .env.example and these numbers together.
+void test_pin_map_is_the_current_one() {
 #if !USR_MODEM_PINS_DEFAULT
 #if USR_MODEM_PINS_OVERRIDE_OK
     TEST_IGNORE_MESSAGE("pins overridden on purpose (USR_MODEM_PINS_OVERRIDDEN=1)");
@@ -82,7 +82,7 @@ void test_pin_map_avoids_reserved_pins() {
 
 int main(int, char **) {
     UNITY_BEGIN();
-    RUN_TEST(test_pin_map_is_the_confirmed_one);
+    RUN_TEST(test_pin_map_is_the_current_one);
     RUN_TEST(test_pin_map_avoids_reserved_pins);
     return UNITY_END();
 }

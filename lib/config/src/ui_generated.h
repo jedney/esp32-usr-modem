@@ -65,7 +65,7 @@ constexpr Action kActions[] = {
     {Screen::Updates, "Web interface", "*WEB=", "ON|OFF; OFF closes browser sessions", Screen::Updates, true, false, false, false, "updates-reset.web-interface", '7', true, "ON|OFF; OFF closes browser sessions"},
     {Screen::Updates, "Network console", "*NETCONSOLE=", "ON|OFF; TCP port 2001; OFF closes the client", Screen::Updates, true, false, false, false, "updates-reset.network-console", '8', true, "ON|OFF; TCP port 2001; OFF closes the client"},
     {Screen::Hardware, "Guided tests", "*HWTEST", "RS232 skips line/loopback steps", Screen::Hardware, false, false, false, false, "hardware-tests.guided-tests", '1', true, "RS232 skips line/loopback steps"},
-    {Screen::Hardware, "Pin map", "*HWPINS", "Confirmed pin map", Screen::Hardware, false, false, false, false, "hardware-tests.pin-map", '2', true, "Confirmed pin map"},
+    {Screen::Hardware, "Pin map", "*HWPINS", "GPIO pin map", Screen::Hardware, false, false, false, false, "hardware-tests.pin-map", '2', true, "GPIO pin map"},
     {Screen::Hardware, "Board information", "*HWINFO", "Chip, memory, firmware and filesystem", Screen::Hardware, false, false, false, false, "hardware-tests.board-information", '3', true, "Chip, memory, firmware and filesystem"},
     {Screen::Hardware, "Files", "*HWFILES", "LittleFS files", Screen::Hardware, false, false, false, false, "hardware-tests.files", '4', true, "LittleFS files"},
     {Screen::Hardware, "LEDs", "*HWLED=", "AA|CD|RD|SD|TR|CS|ARQ|ALL|OFF|AUTO|CHASE|WALK", Screen::Hardware, true, false, false, false, "hardware-tests.leds", '5', true, "AA|CD|RD|SD|TR|CS|ARQ|ALL|OFF|AUTO|CHASE|WALK"},

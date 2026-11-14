@@ -212,7 +212,7 @@ bool play(tones::Source &src) {
 // --- Pin map -----------------------------------------------------------------------------
 
 void printPins() {
-    out().print("GPIO pin map (lib/hw/src/pins.h) - confirmed\r\n");
+    out().print("GPIO pin map (lib/hw/src/pins.h)\r\n");
     out().print("RS232 (DCE; asserted = LOW at the GPIO):\r\n");
     out().printf("  RXD out  GPIO%-2d  DB9 2   UART1 TX\r\n", pins::kRxd);
     out().printf("  TXD in   GPIO%-2d  DB9 3   UART1 RX\r\n", pins::kTxd);

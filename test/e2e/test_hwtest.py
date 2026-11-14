@@ -29,10 +29,10 @@ def test_pins_are_shown(console):
     assert any("DB9 4" in line for line in lines)
 
 
-def test_pins_are_the_confirmed_map(console):
-    """The map Electronics confirmed."""
+def test_pins_are_the_current_map(console):
+    """AT*HWPINS prints the pin map."""
     text = "\n".join(console.command("AT*HWPINS"))
-    assert "confirmed" in text
+    assert "GPIO pin map" in text
     assert re.search(r"\bAA=GPIO4\b", text)
     assert re.search(r"\bARQ=GPIO17\b", text)
     assert "pot wiper: GPIO10" in text

@@ -407,7 +407,7 @@
   "hardware-tests.pin-map": {
     "screen": "Hardware",
     "command": "*HWPINS",
-    "help": "Confirmed pin map",
+    "help": "GPIO pin map",
     "target": "Hardware"
   },
   "hardware-tests.board-information": {

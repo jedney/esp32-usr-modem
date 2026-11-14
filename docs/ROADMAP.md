@@ -22,5 +22,5 @@ Automated tests can't cover these. Do them once on the finished unit:
 
 ## Rules for new work
 
-- A change to `lib/hw/src/pins.h` and the values locked in by `test/native/test_pins` goes together, and only when Electronics changes the board.
+- A change to `lib/hw/src/pins.h` and the values locked in by `test/native/test_pins` goes together, and only when the board changes.
 - The native USB port (GPIO19/20) is the USB modem port, so the built-in USB-JTAG debugger is not available while the firmware runs.

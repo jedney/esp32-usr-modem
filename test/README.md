@@ -24,7 +24,7 @@ Section numbers refer to the firmware spec (`docs/project-brief.md`).
 | Feature (spec §) | Unit | On-board | End-to-end |
 |---|---|---|---|
 | Board: 16 MB flash, 8 MB PSRAM, partitions (2.1); task watchdog set to panic after 15 s and kept fed past it | — | `test_board` | — |
-| Pin map as confirmed by Electronics, no reserved or shared pins, pot on ADC1 (2.5); numbers come from `.env.example`; the lock test fails if `.env` overrides them unless `USR_MODEM_PINS_OVERRIDDEN=1`; script rules reject absent, flash/PSRAM and USB GPIOs | `test_pins`; `test/scripts/test_pin_rules.py` | — | `test_hwtest.py` |
+| Pin map, no reserved or shared pins, pot on ADC1 (2.5); numbers come from `.env.example`; the lock test fails if `.env` overrides them unless `USR_MODEM_PINS_OVERRIDDEN=1`; script rules reject absent, flash/PSRAM and USB GPIOs | `test_pins`; `test/scripts/test_pin_rules.py` | — | `test_hwtest.py` |
 | Dial strings: IP + port, host names, phonebook, special numbers, invalid → ERROR (3.3) | `test_dialstring` | `test_board` | `test_console.py` |
 | Version in banner and `AT*VER` (3.9) | — | — | `test_console.py` |
 | AT parser: several commands per line, `A/`, echo, S3/S5, S-registers, `&F &W &V &Z`, `Y`, `Z` (3.2, 3.6) | `test_atcmd` | — | `test_settings.py` |
