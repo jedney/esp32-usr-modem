@@ -8,7 +8,7 @@ What the firmware does and the hardware it drives, as the code behaves now. Keep
 - The page protocol is in [../web/PROTOCOL.md](../web/PROTOCOL.md); the test matrix is in [../test/README.md](../test/README.md).
 - The case and the electronics keep their own files in `case/` and `electronics/`.
 
-Owner: Jon Edney. Repository: `C:\repo\esp32-usr-modem` (private; `origin` is `https://github.com/jedney/esp32-usr-modem`).
+Repository: `C:\repo\esp32-usr-modem` (private; `origin` is `https://github.com/jedney/esp32-usr-modem`).
 
 ## 1. Goal
 
@@ -58,7 +58,7 @@ CD, TR, RD and SD follow either host port (RS232 or USB); CS follows RS232 only.
 
 ### 2.5 Pin map
 
-The pin numbers live in **`lib/hw/src/pins.h`** (which reads `USR_MODEM_PIN_*` values from `.env.example`, then `.env`, then the environment) and are locked by `test/native/test_pins`. They follow Electronics' schematic (board rev B). `AT*HWPINS` prints the map in use.
+The pin numbers live in **`lib/hw/src/pins.h`** (which reads `USR_MODEM_PIN_*` values from `.env.example`, then `.env`, then the environment) and are locked by `test/native/test_pins`. They follow Electronics' schematic. `AT*HWPINS` prints the map in use.
 
 | Function | GPIO |
 |---|---|
@@ -207,7 +207,7 @@ A Client Tests section of the configuration screen (and `AT*TEST`, `AT*SX/SY/SZ`
 ## 4. Attribution
 
 - Case model: **luizpacheco** (Luiz Pacheco), Thingiverse thing:7063155, **CC BY-NC**. Modified versions keep the attribution and stay non-commercial.
-- Firmware base: **Zimodem** by Bo Zimmerman, **Apache-2.0**. Keep its LICENSE and NOTICE and mark every ported or changed file as changed. Its ZMODEM code derives from the Synchronet/SyncTERM code (licence not stated in the file; accepted by Jon).
+- Firmware base: **Zimodem** by Bo Zimmerman, **Apache-2.0**. Keep its LICENSE and NOTICE and mark every ported or changed file as changed. Its ZMODEM code derives from the Synchronet/SyncTERM code (licence not stated in the file; accepted).
 - Concept: **RetroExternalModem** by caiot5 (GPL-3.0), which builds on WiFi2DialUp (Luis Miguel Silva), PodSix pimodem (Matt Whitted) and tcpser (Jim Brain / FozzTexx).
 - Handshake recordings: Gough Lui's 2016 modem sound collection.
 - The repository stays private. The licensing record is **`credits/LICENSES.md`**: every third-party component, file and library with its source, licence and obligations. The same list feeds the About screen (`scripts/generate_credits.py`).

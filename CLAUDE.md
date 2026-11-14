@@ -1,17 +1,17 @@
 # USR Modem Emulator: notes for Claude
 
-ESP32-S3 Wi-Fi "modem" in a 3D-printed US Robotics Sportster replica, with a DB25 RS232 port, a USB modem port, the Hayes AT command set, dial/DTMF/handshake sounds and Telnet to BBSes. Owner: Jon Edney. Windows 11 PC, VS Code + PlatformIO, repo at `C:\repo\esp32-usr-modem`.
+ESP32-S3 Wi-Fi "modem" in a 3D-printed US Robotics Sportster replica, with a DB25 RS232 port, a USB modem port, the Hayes AT command set, dial/DTMF/handshake sounds and Telnet to BBSes. Windows 11 PC, VS Code + PlatformIO, repo at `C:\repo\esp32-usr-modem`.
 
 ## Where the requirements are
 
 - **`docs/project-brief.md`**: the firmware spec: what the firmware does and the hardware it drives (pin map, interfaces, open points). Keep it current with the code: change it in the same branch as the behaviour.
 - **`docs/ROADMAP.md`**: what is left to do. Work on one item per branch.
-- **`docs/decisions-log.md`**: the current decisions, one row each. Append every new decision or spec change made while coding here (date, what, why, who); replace a row when a decision changes rather than keeping the old one.
+- **`docs/decisions-log.md`**: the current decisions, one row each. Append every new decision or spec change made while coding here (date, what, why); replace a row when a decision changes rather than keeping the old one.
 - `docs/COMMANDS.md`: the complete command reference. Update it with every command or option change, together with `AT*HELP` and the README.
 - `test/README.md`: feature-to-test matrix. `web/PROTOCOL.md`: web page ↔ firmware protocol. `ui/DESIGN_SPEC.md`: the configuration screen design.
 - `credits/LICENSES.md`: licensing record. Update it whenever third-party code, a library or a sound file is added or removed (`python scripts/generate_credits.py` rebuilds the About screen's list).
 
-## Rules (decided by Jon)
+## Rules
 
 - **Versioning.** Every branch bumps the version once: `python scripts/bump_version.py minor "summary"` (+0.1; 0.9 → 0.10), or `major` (+1.0) only for a major feature or a hardware change. Then rewrite the generated `CHANGES.md` entry properly (Keep a Changelog: Added / Changed / Fixed). Commit messages start with the version: `v3.1: Add something`.
 - **Keep only what is material.** Code, comments and docs describe the current design: no version tags, review-finding IDs, "from vX" notes, migration code or superseded decisions. Stored layouts are number 1; anything else loads factory settings.
@@ -19,18 +19,18 @@ ESP32-S3 Wi-Fi "modem" in a 3D-printed US Robotics Sportster replica, with a DB2
   - Logic lives in `lib/` with **no Arduino or hardware calls**, so it can be unit-tested on the PC in `test/native/` (Unity). Hardware access goes through `lib/hw`.
   - Add or extend on-board tests in `test/embedded/` and end-to-end tests in `test/e2e/` (pytest + pyserial, `--console-port COMx [--rs232-port COMy]`).
   - Update the matrix in `test/README.md`.
-  - Uploads run the native tests first and stop if any fail. Don't bypass this (`USR_MODEM_SKIP_TESTS=1`) unless Jon asks.
-- **Pins only in `lib/hw/src/pins.h`** (numbers come from `.env.example`, board rev B, confirmed by Electronics). `test_pins` locks the values in, so change both together and only when Electronics changes the board. A bench `.env` that changes pins must also set `USR_MODEM_PINS_OVERRIDDEN=1`, or the pin test fails and uploads stop. TTL side of the RS232 Pal modules is inverted: asserted = LOW. DSR is hard-wired on.
+  - Uploads run the native tests first and stop if any fail. Don't bypass this (`USR_MODEM_SKIP_TESTS=1`) unless the user asks.
+- **Pins only in `lib/hw/src/pins.h`** (numbers come from `.env.example`, confirmed by Electronics). `test_pins` locks the values in, so change both together and only when Electronics changes the board. A bench `.env` that changes pins must also set `USR_MODEM_PINS_OVERRIDDEN=1`, or the pin test fails and uploads stop. TTL side of the RS232 Pal modules is inverted: asserted = LOW. DSR is hard-wired on.
 - **No volume cap**: the CLS0361 2 W speaker takes the amp's full output (MAX98357A GAIN pin unconnected = 9 dB). Every sound still goes through `volume::outputGain()` (`lib/sounds/src/volume.h`). A smaller speaker or a higher amp gain needs a cap there again.
 - **Secrets.** The Wi-Fi password is never printed, logged, exported or sent to the web page. The device password is shown in the boot banner until first use, and once on the requesting local serial port when `AT*PASS` generates a new one. It is never shown to the browser, never logged, exported or sent to the web page, and never shown on a remote (port 23) session. A remote caller (answer mode, port 23) can never reach command mode, `AT*` commands or the configuration screen. The network console (TCP 2001, behind the device password) counts as a local console and shows what the cable shows, password lines included. Never print or echo `.env`; scripts that touch it print key names only.
 - **Commands.** Standard commands follow USR Sportster behaviour; project commands use `AT*`. Everything in the configuration screen also has an `AT*` command (parity rule, spec 3.8) and appears in `AT*HELP`.
-- **Framework.** Use what Arduino 3.3 and ESP-IDF 6.1 recommend; no shims for old APIs and no deprecated APIs in project code (`-Werror=deprecated-declarations`; IDF's warnings-as-errors apply to project code too). Read the current docs online rather than working from memory. Pins and versions are pinned in `platformio.ini`; a patch release of the same line is fine, a new minor or major is a question for Jon.
+- **Framework.** Use what Arduino 3.3 and ESP-IDF 6.1 recommend; no shims for old APIs and no deprecated APIs in project code (`-Werror=deprecated-declarations`; IDF's warnings-as-errors apply to project code too). Read the current docs online rather than working from memory. Pins and versions are pinned in `platformio.ini`; a patch release of the same line is fine, a new minor or major needs the user's say-so.
 - **Zimodem code** (Apache-2.0): keep its licence headers and mark every ported or changed file as changed (spec 4).
 - **Style.** clang-format (`.clang-format`, 100 columns) and cppcheck must pass (CI checks both). LF line endings. Plain, short English in docs and console messages. In Markdown, write each paragraph or list item as one line and let the editor wrap it: no hard line breaks mid-sentence.
 
 ## Build, test, upload
 
-PlatformIO's `pio` is on the PATH inside VS Code tasks and the PlatformIO terminal. In a plain PowerShell terminal use `$env:USERPROFILE\.platformio\penv\Scripts\pio.exe`; in the Bash tool neither `pio`, Python nor Node is on the PATH (`PATH="$PATH:$USERPROFILE/.platformio/penv/Scripts"`, Python in `"$LOCALAPPDATA/Python/bin/python.exe"`). The PC unit tests need GCC: WinLibs (winget `BrechtSanders.WinLibs.POSIX.UCRT.LLVM`, which also has clang-format) is installed for Jon's user and on the user PATH. End-to-end tests use the Python in `%LOCALAPPDATA%\Python\bin` (pytest and pyserial installed); the web tests need Node 26.
+PlatformIO's `pio` is on the PATH inside VS Code tasks and the PlatformIO terminal. In a plain PowerShell terminal use `$env:USERPROFILE\.platformio\penv\Scripts\pio.exe`; in the Bash tool neither `pio`, Python nor Node is on the PATH (`PATH="$PATH:$USERPROFILE/.platformio/penv/Scripts"`, Python in `"$LOCALAPPDATA/Python/bin/python.exe"`). The PC unit tests need GCC: WinLibs (winget `BrechtSanders.WinLibs.POSIX.UCRT.LLVM`, which also has clang-format) is installed for the current user and on the user PATH. End-to-end tests use the Python in `%LOCALAPPDATA%\Python\bin` (pytest and pyserial installed); the web tests need Node 26.
 
 | What | Command | VS Code task |
 |---|---|---|
@@ -53,7 +53,7 @@ PlatformIO's `pio` is on the PATH inside VS Code tasks and the PlatformIO termin
 - On-board tests replace the firmware with a test program. Re-upload the firmware after.
 - If an upload stalls at "Connecting…": hold BOOT, tap RST, release BOOT, retry. On the S3 board use the **UART** USB-C port; the native USB port is the modem's USB port.
 - The first flash after a full erase is over USB. Wi-Fi tests that cut the connection (`AT*WIFI=OFF`, a join) need the cable, not the network console.
-- Ask Jon for the COM port numbers (console = the S3's UART USB-C port; RS232 = the Unitek PL2303 adapter; the USB modem port is its own COM port) and for what is wired on the bench before testing hardware. Things a person must see or hear (sound, LEDs, cables) are for Jon.
+- Ask the user for the COM port numbers (console = the S3's UART USB-C port; RS232 = the Unitek PL2303 adapter; the USB modem port is its own COM port) and for what is wired on the bench before testing hardware. Things a person must see or hear (sound, LEDs, cables) are for the user.
 - Setup credentials are in `.env`: `USR_MODEM_WIFI_SSID`, `USR_MODEM_WIFI_PASS` and `USR_MODEM_PASSWORD`. Use them only through the project's scripts and test fixtures (`scripts/load_env.py`, `scripts/ota_upload.py`, the e2e `conftest.py`).
 
 ### Build tips
@@ -72,7 +72,7 @@ PlatformIO's `pio` is on the PATH inside VS Code tasks and the PlatformIO termin
 ## Git workflow
 
 - Branch from `main`: `firmware/vX.Y-short-name`.
-- Commit when the native tests, build and lint pass. Push and open a pull request (`gh pr create`) unless Jon says otherwise. CI runs on every push; merging to `main` tags `vX.Y` and publishes a GitHub release with the binaries.
+- Commit when the native tests, build and lint pass. Push and open a pull request (`gh pr create`) unless the user says otherwise. CI runs on every push; merging to `main` tags `vX.Y` and publishes a GitHub release with the binaries.
 - Never force-push `main`. Don't commit `.pio/`, `data/www/` or `web/preview.html`.
 
 ## Hardware summary

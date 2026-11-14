@@ -29,7 +29,7 @@ The existing Ubuntu pppd 2.4.9 runs as root in a temporary network namespace, co
 
 Linux CI builds `internet_peer.cpp` against the portable core and runs `sudo python3 test/interop/run_pppd.py --peer .pio/internet-peer`. The real pppd/kernel stack sends full binary UDP through PPP and negotiates LCP hang-up inside a disposable namespace. This tests protocol interoperability separately from physical NAPT; it does not simulate the ESP network stack. Required packages are g++ 14 or newer (the peers are C++26), Python, iproute2 and ppp, with kernel PPP support and `/dev/ppp`.
 
-Real Windows 9x/Amiga stack/browser acceptance remains deferred by Jon because neither client is available. Automated modern-stack results do not close it.
+Real Windows 9x/Amiga stack/browser acceptance remains deferred because neither client is available. Automated modern-stack results do not close it.
 
 Complete packaged-sound batch regression:
 

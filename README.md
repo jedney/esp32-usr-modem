@@ -114,7 +114,7 @@ On either serial port (not the browser), menu **C** or `AT*TEST ...` checks the 
 
 ## Hardware tests
 
-`AT*HWTEST` walks through the electronics (LEDs, speaker, volume, knob, RS232 lines, loopback) and prints a summary; `AT*HW?` lists the single tests. The GPIO map is in `lib/hw/src/pins.h` (confirmed by Electronics, board rev B) and `AT*HWPINS` prints it. Loopback plug for `AT*HWLOOP`: join RXD-TXD, CTS-RTS and DCD-DTR (DB25 pins 3-2, 5-4, 8-20; bench DB9 pins 2-3, 8-7, 1-4).
+`AT*HWTEST` walks through the electronics (LEDs, speaker, volume, knob, RS232 lines, loopback) and prints a summary; `AT*HW?` lists the single tests. The GPIO map is in `lib/hw/src/pins.h` (confirmed by Electronics) and `AT*HWPINS` prints it. Loopback plug for `AT*HWLOOP`: join RXD-TXD, CTS-RTS and DCD-DTR (DB25 pins 3-2, 5-4, 8-20; bench DB9 pins 2-3, 8-7, 1-4).
 
 ## Building the firmware (Windows, VS Code)
 
@@ -157,7 +157,7 @@ For an emergency upload without the unit tests, set `USR_MODEM_SKIP_TESTS=1` in 
 
 Copy `.env.example` to `.env` (git-ignored) and fill in `USR_MODEM_WIFI_SSID` and `USR_MODEM_WIFI_PASS` (end-to-end Wi-Fi tests) and `USR_MODEM_PASSWORD` (device password for OTA and the web tests). Environment variables of the same names win over the file.
 
-The same file holds the GPIO pin map as `USR_MODEM_PIN_*` lines. `.env.example` has the rev B values and is always read first; a line in `.env` or a real environment variable overrides one pin. The build stops on a duplicate pin or a number that is not an ESP32-S3 GPIO. Change the pins only when the board changes. `AT*HWPINS` shows the map in use.
+The same file holds the GPIO pin map as `USR_MODEM_PIN_*` lines. `.env.example` has the default values and is always read first; a line in `.env` or a real environment variable overrides one pin. The build stops on a duplicate pin or a number that is not an ESP32-S3 GPIO. Change the pins only when the board changes. `AT*HWPINS` shows the map in use.
 
 ### Over-the-air updates
 
@@ -208,4 +208,4 @@ Logic lives in `lib/` with no hardware calls, so it is unit-tested on the PC; th
 
 ## Credits
 
-See `credits/LICENSES.md` (also `AT*ABOUT`). In short: case model by luizpacheco (CC BY-NC), firmware modules ported from Zimodem by Bo Zimmerman (Apache-2.0), concept from RetroExternalModem by caiot5, and modem recordings from [Gough Lui's modem sound collection](https://goughlui.com/2016/05/03/project-the-definitive-collection-of-v-90v-92-modem-sounds/).
+Firmware and project by Jon Edney. See `credits/LICENSES.md` (also `AT*ABOUT`). In short: case model by luizpacheco (CC BY-NC), firmware modules ported from Zimodem by Bo Zimmerman (Apache-2.0), concept from RetroExternalModem by caiot5, and modem recordings from [Gough Lui's modem sound collection](https://goughlui.com/2016/05/03/project-the-definitive-collection-of-v-90v-92-modem-sounds/).

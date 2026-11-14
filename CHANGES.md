@@ -21,4 +21,4 @@ Every change that is pushed bumps `VERSION` and adds an entry here (`python scri
 
 ## [1.x]
 
-- v1.0, the first production release (Hayes commands, Telnet and Internet calls, answer mode, configuration screen, web interface, Client Tests); v1.1 moved to the rev B pin map and the CLS0361 speaker with no volume cap.
+- v1.0, the first production release (Hayes commands, Telnet and Internet calls, answer mode, configuration screen, web interface, Client Tests); v1.1 changed the pin map and the CLS0361 speaker with no volume cap.

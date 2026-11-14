@@ -17,8 +17,8 @@ Automated tests can't cover these. Do them once on the finished unit:
 ## Follow-ups
 
 - **IDF 6.1.1 or later:** check upstream `httpd_accept_conn()` for the queued least-recently-used purge that can close a just-accepted connection when idle connections fill all six slots (see the open follow-ups in the decisions log).
-- **Arduino 4.0:** IDF 6.x will need it later. Move when 4.0.0 is stable; a new minor or major framework version is a question for Jon.
-- **Small clean-ups for Jon to decide:** the `FAX` spelling of the ARQ LED in the `AT*HW` LED tests, and the web `hello` message's always-true `size` flag.
+- **Arduino 4.0:** IDF 6.x will need it later. Move when 4.0.0 is stable; a new minor or major framework version needs the owner's say-so.
+- **Small clean-ups to decide:** the `FAX` spelling of the ARQ LED in the `AT*HW` LED tests, and the web `hello` message's always-true `size` flag.
 
 ## Rules for new work
 
