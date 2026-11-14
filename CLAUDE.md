@@ -4,7 +4,7 @@ ESP32-S3 Wi-Fi "modem" in a 3D-printed US Robotics Sportster replica, with a DB2
 
 ## Where the requirements are
 
-- **`docs/project-brief.md`**: the firmware spec: what the firmware does and the hardware it drives (pin map, interfaces, open points). Keep it current with the code: change it in the same branch as the behaviour.
+- **`docs/project-brief.md`**: the firmware spec: what the firmware does and the hardware it drives (pin map, interfaces). Keep it current with the code: change it in the same branch as the behaviour.
 - **`docs/ROADMAP.md`**: what is left to do. Work on one item per branch.
 - **`docs/decisions-log.md`**: the current decisions, one row each. Append every new decision or spec change made while coding here (date, what, why); replace a row when a decision changes rather than keeping the old one.
 - `docs/COMMANDS.md`: the complete command reference. Update it with every command or option change, together with `AT*HELP` and the README.

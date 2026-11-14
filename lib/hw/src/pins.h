@@ -55,8 +55,7 @@ constexpr int kDtr = USR_MODEM_PIN_DTR;  // DB9 4, data terminal ready          
 constexpr int kI2sLrc = USR_MODEM_PIN_I2S_LRC;
 constexpr int kI2sBclk = USR_MODEM_PIN_I2S_BCLK;
 constexpr int kI2sDin = USR_MODEM_PIN_I2S_DIN;
-constexpr int kAmpSd =
-    USR_MODEM_PIN_AMP_SD;  // HIGH = on (left channel), LOW = shutdown (10 k pull-down)
+constexpr int kAmpSd = USR_MODEM_PIN_AMP_SD;  // HIGH = on (left channel), LOW = shutdown
 
 // --- Volume pot wiper, must be ADC1 (GPIO1-10) because ADC2 can't be used with Wi-Fi ---
 constexpr int kPot = USR_MODEM_PIN_POT;

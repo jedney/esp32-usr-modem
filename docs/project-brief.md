@@ -23,7 +23,7 @@ Design priority: stay future-proof (current framework, spare memory and GPIO).
 ### 2.1 Board
 
 - **ESP32-S3 N16R8 DevKitC-1 clone** (ePartners ST8002): dual-core 240 MHz, 16 MB flash, 8 MB octal PSRAM, 57 x 28 mm, no mounting holes, two USB-C ports.
-- **UART0** (GPIO43/44) goes to the board's USB-serial chip: the maintenance console (3.7). **UART1** is the host RS232 port. The **native USB** (GPIO19/20) is the USB modem port (3.2); it is also wired to the rear USB-C socket's D-/D+.
+- **UART0** (GPIO43/44) goes to the board's USB-serial chip: the maintenance console (3.7). **UART1** is the host RS232 port. The **native USB** (GPIO19/20) is the USB modem port (3.2); it is also wired to the rear USB-C socket's D-/D+. The board's own USB-C port, the one on the UART side (console and flashing), is the right-hand USB port seen from the back of the modem, behind the blanking plate.
 - The on-board RGB LED (GPIO47) is not used and the pin stays reserved.
 - Flash holds two 4 MB OTA app slots, about 7.9 MB of LittleFS (sounds, web files, call history) and a 64 KB core dump (`partitions_16mb.csv`). NVS holds the settings.
 - Reserved GPIOs: strapping 0, 3, 45, 46; octal PSRAM 35-37 (and flash 26-32); native USB 19/20; UART0 43/44; the RGB LED 47.
@@ -74,7 +74,7 @@ GPIO18 and 8 are also the nominal pins of the UART2 used by `test/embedded/test_
 
 ### 2.6 Boot-state resistors
 
-From reset until the firmware sets the pins (and throughout flashing) the S3's GPIOs float. The board has 10 kΩ pull-ups to 3.3 V on the four RS232 driver inputs (RXD, CTS, DCD, RI) so the computer sees idle, and a 10 kΩ pull-down on the amp SD pin so the amp stays off until the firmware turns it on.
+From reset until the firmware sets the pins (and throughout flashing) the S3's GPIOs float. The board has 10 kΩ pull-ups to 3.3 V on the four RS232 driver inputs (RXD, CTS, DCD, RI) so the computer sees idle. The amp SD pin has no resistor: it floats until the firmware drives it low.
 
 ## 3. Firmware
 
@@ -142,7 +142,7 @@ The factory result set is `X4` (all codes). Numeric and verbal results follow th
 
 ### 3.7 Maintenance console and factory reset
 
-- **Console:** UART0 through the board's USB-serial chip, fixed 115200 8N1, independent of every host-serial setting. The boot banner shows the version, reset reason, Wi-Fi state and IP, OTA state, the host-serial settings and, until first use, the device password (never on the RS232 or USB port). It accepts the full AT and `AT*` set, on the same stored configuration, and the configuration screen. There is no console password: access needs the case open.
+- **Console:** UART0 through the board's USB-serial chip (the USB port behind the blanking plate, on the right seen from the back), fixed 115200 8N1, independent of every host-serial setting. The boot banner shows the version, reset reason, Wi-Fi state and IP, OTA state, the host-serial settings and, until first use, the device password (never on the RS232 or USB port). It accepts the full AT and `AT*` set, on the same stored configuration, and the configuration screen. There is no console password: access needs the case open.
 - **Network console:** the same console over Wi-Fi on TCP port 2001 (raw bytes, plain TCP), factory ON, `AT*NETCONSOLE=ON|OFF`. It asks for the device password first; then it replays the last 16 KB of console output and is the same session as the cable, a local console that shows what the cable shows. One logged-in client at a time: a new log-in closes the earlier client. It never holds up the modem.
 - **Factory reset:** `AT&F` loads modem settings (Wi-Fi, phonebook and device password are kept); `AT*FACTORY` erases every store after a Y/N confirmation and restarts with a new device password. Both are accepted on the local ports.
 - **Debug:** `AT*LOG`, `AT*STATUS`, `AT*RESETINFO` and the Debug screen.
@@ -211,7 +211,3 @@ A Client Tests section of the configuration screen (and `AT*TEST`, `AT*SX/SY/SZ`
 - Concept: **RetroExternalModem** by caiot5 (GPL-3.0), which builds on WiFi2DialUp (Luis Miguel Silva), PodSix pimodem (Matt Whitted) and tcpser (Jim Brain / FozzTexx).
 - Handshake recordings: Gough Lui's 2016 modem sound collection.
 - The repository stays private. The licensing record is **`credits/LICENSES.md`**: every third-party component, file and library with its source, licence and obligations. The same list feeds the About screen (`scripts/generate_credits.py`).
-
-## 5. Open points
-
-No firmware questions are open. Checks that need kit that is not on the bench (the configuration screen and Client Tests on a real Amiga, web browsing from Windows 9x or an Amiga TCP stack over PPP and SLIP, and the final build in the case with the DB25) are listed in [ROADMAP.md](ROADMAP.md).
