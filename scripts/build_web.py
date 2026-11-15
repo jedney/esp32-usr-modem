@@ -32,6 +32,7 @@ def web_files(root: pathlib.Path) -> dict:
         "link.js": src / "link.js",
         "geometry.js": src / "geometry.js",
         "ui-data.js": src / "ui-data.js",
+        "ui-commands.js": src / "ui-commands.js",
         "xterm.mjs": vendor / "xterm.mjs",
         "xterm.css": vendor / "xterm.css",
         "ibm-plex-mono-400.woff2": vendor / "ibm-plex-mono-400.woff2",

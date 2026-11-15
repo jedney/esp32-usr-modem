@@ -6,6 +6,19 @@ menu=json.loads((ROOT/'menu-definition.json').read_text(encoding="utf-8"))
 theme=json.loads((ROOT/'theme-tokens.json').read_text(encoding="utf-8"))
 
 class HandoffContract(unittest.TestCase):
+    def test_typed_metadata_covers_the_whole_inventory(self):
+        bindings = json.loads((ROOT.parent/'lib/config/ui-bindings.json').read_text(encoding='utf-8'))
+        items = menu['main_menu'] + [i for m in menu['main_menu'] for i in m['items']]
+        self.assertEqual(set(bindings), {i['id'] for i in items})
+        for item in items:
+            with self.subTest(id=item['id']):
+                binding = bindings[item['id']]
+                self.assertTrue(binding['friendly'].strip())
+                self.assertTrue(binding['help'].strip())
+                self.assertIn(binding['type'], {'enum', 'int', 'string', 'bool', 'ip', 'action', 'secret'})
+                self.assertIn('template', binding)
+                if item.get('items'):
+                    self.assertEqual(binding['type'], 'action')
     def test_grid_dimensions_and_widths(self):
         import unicodedata
         files=list((ROOT/'previews').glob('*.txt'))

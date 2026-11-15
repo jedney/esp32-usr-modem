@@ -337,6 +337,7 @@ esp_err_t WebService::serve(httpd_req_t *req) {
                                    {"/link.js", "text/javascript"},
                                    {"/geometry.js", "text/javascript"},
                                    {"/ui-data.js", "text/javascript"},
+                                   {"/ui-commands.js", "text/javascript"},
                                    {"/xterm.mjs", "text/javascript"},
                                    {"/xterm.css", "text/css"},
                                    {"/ibm-plex-mono-400.woff2", "font/woff2"},

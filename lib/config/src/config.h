@@ -20,6 +20,31 @@ enum class Screen : uint8_t {
     Hardware,
     Client
 };
+enum class UiType : uint8_t { Enum, Int, String, Bool, Ip, Action, Secret };
+struct UiValue {
+    const char *value;
+    const char *label;
+    const char *description;
+};
+struct UiMetadata {
+    const char *id;
+    const char *friendly;
+    const char *help;
+    UiType type;
+    const char *unit;
+    int min, max, minLength, maxLength;  // -1 means unspecified; lengths are UTF-8 bytes.
+    const char *pattern;                 // Portable regular expression; full-string match.
+    const UiValue *values;
+    size_t valueCount;
+    const char *commandTemplate;  // Raw command without AT; named {placeholders}.
+    const UiMetadata *fields;
+    size_t fieldCount;
+    const UiMetadata *variants;
+    size_t variantCount;
+    bool optional, allowCustom, readOnly;
+    const char *displayUnit;
+    double displayScale;  // Multiply the wire value for display (ms -> seconds: 0.001).
+};
 struct Action {
     Screen screen;
     const char *label;
@@ -34,6 +59,7 @@ struct Action {
     char key = 0;
     bool available = true;
     const char *summary = "";
+    const UiMetadata *metadata = nullptr;
 };
 const Action *actions(size_t &count);
 const char *screenName(Screen screen);

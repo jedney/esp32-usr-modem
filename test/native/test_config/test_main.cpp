@@ -94,12 +94,16 @@ struct BookServices : UiServices {
         TEST_ASSERT_TRUE(book.put(entry));
     }
 };
+#include "metadata_cases.h"
 void test_menu_actions_have_production_at_star_handlers() {
     Rig r;
     size_t n;
     const auto *a = actions(n);
-    TEST_ASSERT_GREATER_THAN(50, n);
+    TEST_ASSERT_EQUAL(91, n);
     for (size_t i = 0; i < n; ++i) {
+        TEST_ASSERT_NOT_NULL(a[i].metadata);
+        TEST_ASSERT_TRUE(*a[i].metadata->friendly);
+        checkTemplates(*a[i].metadata, r.modem);
         if (!*a[i].command) {
             continue;
         }
@@ -426,6 +430,10 @@ void test_binary_service_has_no_geometry_or_redraw_bytes() {
 }
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_metadata_json_matches_the_generated_source);
+    RUN_TEST(test_metadata_enumerations_match_firmware_tables);
+    RUN_TEST(test_metadata_profile_values_and_registers_match_firmware);
+    RUN_TEST(test_metadata_limits_match_firmware);
     RUN_TEST(test_idle_menus_do_not_repaint_but_input_and_resize_do);
     RUN_TEST(test_status_view_keeps_its_explicit_live_refresh);
     RUN_TEST(test_browser_lists_serial_diagnostics_without_dispatch);

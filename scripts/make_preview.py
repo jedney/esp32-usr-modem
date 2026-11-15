@@ -43,6 +43,7 @@ def main(out: pathlib.Path) -> None:
         "usr-xterm": strip_source_map((VENDOR / "xterm.mjs").read_text(encoding="utf-8")),
         "usr-status": (SRC / "status.js").read_text(encoding="utf-8"),
         "usr-ui-data": (SRC / "ui-data.js").read_text(encoding="utf-8"),
+        "usr-ui-commands": (SRC / "ui-commands.js").read_text(encoding="utf-8"),
         "usr-demo": (SRC / "demo.js").read_text(encoding="utf-8").replace("'./ui-data.js'", "'usr-ui-data'"),
         "usr-upload": (SRC / "upload.js").read_text(encoding="utf-8"),
         "usr-upload-flow": (SRC / "upload_flow.js").read_text(encoding="utf-8").replace("'./upload.js'", "'usr-upload'"),
@@ -62,6 +63,10 @@ def main(out: pathlib.Path) -> None:
     html = html.replace('<link rel="stylesheet" href="xterm.css">',
                         f"<style>{(VENDOR / 'xterm.css').read_text(encoding='utf-8')}</style>")
     html = html.replace('<link rel="stylesheet" href="style.css">', f"<style>{style}</style>")
+    html = html.replace(
+        '<script type="module" src="ui-commands.js"></script>',
+        '<script type="module">import "usr-ui-commands";</script>',
+    )
     html = html.replace(
         '<script type="module" src="app.js"></script>',
         f'<script type="importmap">{json.dumps(import_map)}</script>\n'

@@ -16,8 +16,34 @@ This document specifies the visual, keyboard, layout, safety and service-binding
 2. `menu-definition.json`: stable IDs, exact option labels, menu tree, UI hotkeys and disabled status.
 3. `theme-tokens.json`: palette and exact model accents.
 4. `previews/*.txt`: **measured** 80-cell × 25-row terminal exemplars. These are **layouts only**, not operational menus.
+5. `../lib/config/ui-bindings.json`: command bindings and typed, friendly metadata for every menu ID; `../scripts/generate_ui.py` emits the C++ catalogue and `../web/src/ui-commands.js`.
 
 When a preview disagrees with real modem state, **real device values prevail**; if values are missing, show `--`, `Unknown`, or `Unavailable`. Screenshot values such as numbers, dates, serials, COM ports, modem flags, and rates are *not* production defaults.
+
+### 1.1 Typed command metadata
+
+Every one of the 13 top-level entries and 78 nested items has a binding keyed by the stable menu ID. `menu-definition.json` owns the tree, ordering, hotkeys and compact layout labels; `ui-bindings.json` owns the friendly names, help, command syntax and input constraints. Friendly text is authored in this binding source and emitted unchanged to both languages. C++ exposes it through `Action::metadata` (`UiMetadata`); JavaScript imports the default array from `ui-commands.js` and indexes entries by `id`. The synthetic demo's separate `ui-data.js` keeps its layout and theme catalogue.
+
+| Field | Meaning |
+|---|---|
+| `friendly`, `help` | Plain name and one or two sentences explaining the choice and any saving, disconnection or confirmation behaviour. |
+| `type` | `enum`, `int`, `string`, `bool`, `ip`, `action` or `secret`. An action runs without a value or opens a route; a string may also describe a multi-field form. |
+| `unit`, `min`, `max` | Unit and inclusive integer limits in command units. Enumerations can also have a unit, such as bits per second. |
+| `minLength`, `maxLength`, `pattern` | UTF-8 byte limits and a portable Python/JavaScript regular expression matched against the entire value. Device passwords use printable ASCII, so bytes equal characters. These limits apply to canonical field values; normalise a hostname to lower case and remove a trailing `.local` before checking its 1–32 byte label. |
+| `values` | An ordered array of `{value, label, description}` choices. Values are command strings, including numbers expressed as strings; labels and descriptions explain each choice. Booleans use the handler's two wire tokens, such as `ON` and `OFF`. |
+| `template` | A raw command without `AT`, with `{value}` for a scalar or named placeholders matching `fields[].id`. Prefix `AT` once when sending through terminal input. Routes and read-only fields have an empty template. |
+| `fields` | Typed fields with their own `id`, friendly text and constraints. Composite commands substitute these fields; the profile route instead gives each editable field its own template. |
+| `variants` | Alternative complete command forms, each with an ID, friendly text, template and any typed fields. The first variant is also the binding's default template and fields. For example, static addressing and DHCP are separate forms. |
+| `optional`, `readOnly` | An optional trailing field may be omitted along with its preceding separator; it uses the handler's default. A read-only field is displayed without an edit command. |
+| `allowCustom` | An enumeration also accepts a custom value validated by the firmware, such as a POSIX time-zone rule. |
+| `displayUnit`, `displayScale` | Multiply the wire value by this scale for display, and divide when sending. Ring and connection delays store 0–60000 milliseconds and display 0–60 seconds with scale `0.001`. |
+| `screen`, `target`, `command`, `input`, `secret`, `leave`, `rs232Unavailable` | Existing dispatch and session flags. `command` remains the text form's literal prefix. The generated JavaScript adds `id`, `key` and `available` from the menu inventory. |
+
+For example, the phonebook template is `*PHONEBOOK={num},{host},{port},{proto},{speed}`. Its fields constrain the number to 1–11 digits excluding reserved built-in numbers, the host to 63 bytes, the port to 1–65535, the protocol to Telnet or raw TCP, and the optional speed to the supported line-speed table. Omitting speed also omits the final comma. The maximum complete command remains 128 bytes after `AT`; field limits do not override that parser limit.
+
+The profile route describes all 25 settings and 64 S-registers. Reserved setting values are excluded, S1 is read-only, S3 permits only non-printing codes in 0–127, and S4/S5 permit 0–127. Auto-answer accepts 0–255 rings, although values above eight answer on ring eight. Time zones list all 16 built-in names and permit custom POSIX rules. Cross-field rules such as a valid static subnet or a private dial-up /30 remain firmware checks and are explained in the form help.
+
+The generator rejects missing text, invalid types, reversed ranges, invalid patterns, duplicate choices and unknown placeholders. `python scripts/generate_ui.py --check` checks all three generated outputs. Native `test_config` checks the JSON source fingerprint, verifies every nested template against the production registry and compares choices and limits with the C++ tables and validators. Python and browser tests cover schema failures and portable validation patterns.
 
 ## 2. Brand and runtime model selection
 

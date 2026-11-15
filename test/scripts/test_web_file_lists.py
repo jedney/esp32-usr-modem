@@ -92,3 +92,4 @@ def test_end_to_end_asset_check_names_only_files_that_are_served():
     assert named, "no assets found in the end-to-end test"
     assert named <= served_files()
     assert "upload_flow.js" in named
+    assert "ui-commands.js" in named

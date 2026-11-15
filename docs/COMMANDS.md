@@ -14,6 +14,8 @@ The **network console** is the USB maintenance console over Wi-Fi, on TCP port 2
 
 ## Standard commands
 
+The menu's friendly names, input types, units, ranges and choices are defined in `lib/config/ui-bindings.json` and generated for C++ and the browser in `web/src/ui-commands.js`. Templates omit the leading `AT`; callers add it once when sending a complete command. `ui/DESIGN_SPEC.md` documents composite forms, optional fields and validation. The metadata describes the command set below; `AT*HELP` continues to list the production registry.
+
 These follow the US Robotics Sportster. "Profile" means the setting is part of the active profile: `AT&W` saves it, `ATZ` reloads it.
 
 ### Calls

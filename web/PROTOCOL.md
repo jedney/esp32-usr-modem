@@ -20,7 +20,7 @@ The shared terminal displays the selected Sportster 14.4k, 28.8k, 33.6k or 56k S
 
 `web/src/` holds the page; `web/vendor/` holds third-party files (xterm.js 6.0.0, MIT; IBM Plex Mono, OFL-1.1). `scripts/build_web.py` gzips both into `data/www/` when the LittleFS image is built (`pio run -e s3 -t buildfs` or `-t uploadfs`). The firmware serves `data/www/<file>.gz` with `Content-Encoding: gzip`.
 
-Assets are compressed into the existing LittleFS image, including the small generated `ui-data.js` catalogue for the explicitly synthetic browser demo.
+Assets are compressed into the existing LittleFS image, including the generated `ui-data.js` catalogue for the explicitly synthetic browser demo and `ui-commands.js` for typed command metadata. Both JavaScript catalogues are static assets behind the same login as the page. `ui-commands.js` exports the 91 menu bindings with friendly text, types, ranges, choices and raw command templates generated from `lib/config/ui-bindings.json`; it contains no live setting values or credentials. `ui/DESIGN_SPEC.md` defines the schema and unit conversion. These assets add no WebSocket messages or ownership changes.
 
 ## HTTP endpoints
 

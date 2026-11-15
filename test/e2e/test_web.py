@@ -168,7 +168,7 @@ def web(request, console):
 
 
 def test_assets_require_digest_and_have_correct_gzip_mime(web):
-    for path in ("/", "/app.js", "/upload.js", "/upload_flow.js", "/link.js", "/geometry.js", "/ui-data.js", "/api/session"):
+    for path in ("/", "/app.js", "/upload.js", "/upload_flow.js", "/link.js", "/geometry.js", "/ui-data.js", "/ui-commands.js", "/api/session"):
         code, _, _ = web.request(path, auth=False)
         require(code == 401, "Unauthenticated resource exposed")
     code, headers, body = web.request("/app.js")
@@ -182,7 +182,7 @@ def test_assets_require_digest_and_have_correct_gzip_mime(web):
 def test_parallel_page_load_has_no_connection_resets(web):
     """A browser loads a dozen files at once, each on its own connection."""
     paths = ["/", "/app.js", "/upload.js", "/upload_flow.js", "/link.js", "/geometry.js",
-             "/ui-data.js", "/api/session"] * 2
+             "/ui-data.js", "/ui-commands.js", "/api/session"] * 2
 
     def fetch(path):
         try:

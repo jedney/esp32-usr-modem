@@ -70,6 +70,8 @@ Use a fixed speed and hardware flow control, for example `AT&B1&H1&R2&I0&D2&C1M0
 
 ## Configuration screen
 
+The menu inventory has shared typed metadata in `lib/config/ui-bindings.json`: friendly names, help, units, limits, choices and command templates. `python scripts/generate_ui.py` generates the C++ catalogue and browser `ui-commands.js`; `--check` detects stale output. See [the schema](ui/DESIGN_SPEC.md#11-typed-command-metadata).
+
 `AT*CONFIG` opens it at once; `ATDT123` plays dial sounds first. It works on the USB console, the RS232 port and in the browser, but only one at a time. While it is open, incoming calls are turned away. A screen with no key for 5 minutes closes itself, so a forgotten one does not hold the line.
 
 - Arrow keys and Enter, or press the hotkey shown. **F1** is help, **Esc/Q** goes back, **Q/F10** leaves from the main menu, **Ctrl-C** leaves a form, **Ctrl-L** draws the whole screen again.
