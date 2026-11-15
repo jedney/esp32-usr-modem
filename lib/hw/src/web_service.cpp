@@ -143,8 +143,12 @@ bool WebCrypto::md5(const std::string &text, char out[33]) {
     devicecfg::wipe(bytes, sizeof bytes);
     return ok;
 }
-WebService::WebService(devicecfg::Device &device)
-    : device_(device), auth_(crypto_), tickets_(auth_), mutex_(xSemaphoreCreateMutex()) {}
+WebService::WebService(devicecfg::Device &device, const netconsole::ConsoleLog &console)
+    : device_(device),
+      console_(console),
+      auth_(crypto_),
+      tickets_(auth_),
+      mutex_(xSemaphoreCreateMutex()) {}
 WebService::Client *WebService::find(uint32_t id) {
     for (auto &c : clients_) {
         if (c.active && c.id == id) {
@@ -345,6 +349,29 @@ esp_err_t WebService::serve(httpd_req_t *req) {
     headers(req);
     std::string path = req->uri;
     path.resize(path.find('?') == std::string::npos ? path.size() : path.find('?'));
+    if (path == "/api/boot") {
+        httpd_resp_set_type(req, "text/plain; charset=utf-8");
+        // Each read holds the log's lock only while copying. Never hold the spinlock
+        // during a socket write, and stop at the captured end even if output continues.
+        const uint64_t end = console_.end();
+        uint64_t from = end > console_.capacity() ? end - console_.capacity() : 0;
+        uint8_t buffer[512];
+        while (from < end) {
+            uint64_t skipped;
+            size_t n = console_.read(from, buffer, sizeof buffer, skipped);
+            const uint64_t start = from - n;
+            if (!n || start >= end)
+                break;
+            if (n > end - start)
+                n = static_cast<size_t>(end - start);
+            esp_err_t result = httpd_resp_send_chunk(req, reinterpret_cast<char *>(buffer), n);
+            devicecfg::wipe(buffer, sizeof buffer);
+            if (result != ESP_OK)
+                return result;
+        }
+        devicecfg::wipe(buffer, sizeof buffer);
+        return httpd_resp_send_chunk(req, nullptr, 0);
+    }
     if (path == "/api/session") {
         std::string ticket;
         {

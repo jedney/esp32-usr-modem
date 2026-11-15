@@ -21,7 +21,7 @@ test('bar follows the generated configuration layout and omits serial-only clien
 
 test('bar explains offline, read-only, upload and busy states', () => {
     assert.match(menuDisabledReason({}), /connect/i);
-    assert.match(menuDisabledReason({online: true}), /open the terminal/i);
+    assert.match(menuDisabledReason({online: true}), /reconnect/i);
     assert.match(menuDisabledReason({online: true, edit: true, upload: true}), /upload/i);
     assert.match(menuDisabledReason({online: true, edit: true, busy: true}), /finish/i);
     assert.match(menuDisabledReason({online: true, edit: true, call: {state: 'connected'}}), /hang up/i);

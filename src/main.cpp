@@ -130,7 +130,7 @@ dialup::Settings internetSettings(internetStore);
 hw::InternetNetwork internetNetwork;
 dialup::Dialer *internetDialer = nullptr;
 webinterface::Settings webSettings(webStore);
-hw::WebService webServer(device);
+hw::WebService webServer(device, consoleout::log());
 hw::EspRadio radio;
 netcfg::Net net(netStore, radio);
 SerialSink consoleSink;
@@ -390,6 +390,7 @@ atcmd::Reply cmdHelp(atcmd::Port &port, const char *args) {
     withTerm(port, [](hwconsole::Term &t) { hwconsole::printHelp(t); });
     if (port.browser()) {
         port.line("The browser menus send these commands; answer prompts in the terminal.");
+        port.line("Diagnostics has recent console history. Hang up appears during calls.");
     }
     return atcmd::Reply::kOk;
 }
@@ -1257,7 +1258,10 @@ void publishCall(uint32_t now, bool force) {
         }
     }
     call += std::string(",\"browser\":") +
-            (journal.active() && journal.session() == browserSession ? "true" : "false");
+            (journal.active() &&
+                     (journal.session() == browserSession || callSlot.heldBy(browserSession))
+                 ? "true"
+                 : "false");
     webServer.snapshot(3, call + "}");
 }
 

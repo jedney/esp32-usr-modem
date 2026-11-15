@@ -17,7 +17,7 @@ export function menuSections() {
 
 export function menuDisabledReason(state) {
     if (!state.online) return 'Connect to the modem to use these controls.';
-    if (!state.edit) return 'Open the terminal to use these controls.';
+    if (!state.edit) return 'Click the terminal or select a menu item to reconnect.';
     if (state.upload) return 'Wait for the image upload to finish.';
     if (state.call && ['connected','dialling','ringing','ppp','slip'].includes(state.call.state)) return 'Hang up the call to change modem settings.';
     if (state.hardware?.active || (state.call && ['test','config'].includes(state.call.state)))

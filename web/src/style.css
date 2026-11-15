@@ -13,7 +13,7 @@
     font-display: block;
 }
 
-#screen { flex: 1; min-height: 0; min-width: 0; display: grid; place-items: center;
+#screen { position: relative; flex: 1; min-height: 0; min-width: 0; display: grid; place-items: center;
     padding: 10px 16px; overflow: hidden; }
 #term .xterm-viewport { overflow-y: hidden; }
 #term { min-width: 0; }
@@ -39,3 +39,10 @@
     display: flex; flex-direction: column; gap: 8px; width: min(360px, calc(100vw - 24px)); pointer-events: none; }
 @media (max-width: 850px) { #remote, #uptime-label { display: none; } }
 @media (max-width: 580px) { #screen { padding: 8px; } }
+#session-disconnected { position: absolute; z-index: 2; left: 50%; top: 50%;
+    transform: translate(-50%, -50%); width: max-content; max-width: calc(100% - 32px);
+    padding: 22px 26px; border: 1px solid #65766b; border-radius: 8px;
+    background: #1d2925f5; color: #e4ece6; text-align: center; box-shadow: 0 8px 32px #0008; }
+#session-disconnected strong, #session-disconnected span { display: block; }
+#session-disconnected strong { font-size: 18px; margin-bottom: 8px; }
+#session-disconnected span { font-size: 13px; }

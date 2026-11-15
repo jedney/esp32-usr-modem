@@ -190,6 +190,21 @@ def test_assets_require_digest_and_have_correct_gzip_mime(web):
         require(web.request(path)[0] == 404, "Non-web file exposed")
 
 
+def test_recent_console_history_requires_auth_and_replays_banner(web, console):
+    # A ring is not a permanent boot transcript: make the banner recent for this assertion.
+    console.restart()
+    code, _, _ = web.request('/api/boot', headers={'Host': 'attacker.invalid'}, auth=False)
+    require(code == 403, 'Console history accepted a foreign Host')
+    code, _, _ = web.request('/api/boot', auth=False)
+    require(code == 401, 'Console history exposed without authentication')
+    code, headers, body = web.request('/api/boot')
+    require(code == 200, 'Console history unavailable')
+    require(headers.get_content_type() == 'text/plain', 'Wrong console history type')
+    require(headers.get('Cache-Control') == 'no-store', 'Console history may be cached')
+    require(0 < len(body) <= 16384, 'Console history exceeded ring capacity')
+    require(b'USR Modem Emulator v' in body, 'Recent console history missing boot banner')
+
+
 def test_parallel_page_load_has_no_connection_resets(web):
     """A browser loads a dozen files at once, each on its own connection."""
     paths = ["/", "/app.js", "/upload.js", "/upload_flow.js", "/link.js", "/geometry.js", "/idle.js", "/toast.js",
@@ -452,6 +467,9 @@ def test_incoming_rs232_call_keeps_browser_read_only_and_signals_follow(web, con
         with web.ws() as peer:
             text, _ = peer.collect(0.4)
             require(b"Read-only" in text, "Incoming call did not reserve browser access")
+            peer.send(b'{"t":"open"}', opcode=1)
+            _, messages = peer.collect(0.3)
+            require(not any(m.get('edit') for m in messages), 'Terminal open stole incoming RS232 call')
             require(b"CONNECT" in rs232.raw(b"ATA\r", wait=0.5), "RS232 ATA failed")
             require(rs232.ser.cd, "DCD did not follow the incoming carrier")
             caller.sendall(b"network-to-host")
@@ -870,6 +888,45 @@ def terminal_bbs(port):
         worker.join(timeout=2)
         listener.close()
         require(not errors, "Local Telnet peer failed")
+
+
+@pytest.mark.parametrize('command_mode', [False, True])
+def test_hangup_control_ends_only_owner_call_and_keeps_terminal(web, console, request, command_mode):
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as route:
+        route.connect((web.host, 80))
+        address = route.getsockname()[0]
+    profile = ' '.join(console.command('ATI4'))
+    old_m = re.search(r'(?<!\S)M(\d+)', profile)
+    require(console.command('ATM0')[-1] == 'OK', 'Cannot mute test dial')
+    try:
+        with terminal_bbs(request.config.getoption('--call-server-port')) as (port, _, _, ready, closed, _):
+            with web.ws() as owner:
+                owner.open_terminal()
+                owner.send(f'ATD{address}:{port}\r'.encode())
+                text, messages = owner.collect(3)
+                require(ready.is_set() and b'CONNECT' in text, 'Local browser dial failed')
+                require(any(m.get('state') == 'connected' and m.get('browser') for m in messages),
+                        'Browser call ownership missing')
+                with web.ws() as observer:
+                    observer.collect(0.2)
+                    observer.send(b'{"t":"hangup"}', opcode=1)
+                    observer.collect(0.2)
+                    require(not closed.is_set(), 'Observer hung up owner call')
+                if command_mode:
+                    time.sleep(1.1)
+                    owner.send(b'+++')
+                    owner.collect(1.4)
+                owner.send(b'{"t":"hangup"}', opcode=1)
+                _, messages = owner.collect(0.5)
+                require(closed.wait(1), 'Hang-up control did not close call')
+                require(any(m.get('t') == 'ready' and m.get('idle') and m.get('rx') == 0 for m in messages),
+                        'Hang-up did not restore idle terminal readiness')
+                owner.send(b'AT\r')
+                text, _ = owner.collect(0.3)
+                require(b'OK' in text, 'Hang-up lost terminal ownership')
+    finally:
+        if old_m:
+            console.command('ATM' + old_m.group(1))
 
 
 def test_terminal_dials_telnet_paste_resize_escape_and_disconnect(web, console, request):

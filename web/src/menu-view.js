@@ -2,9 +2,13 @@
 import commands from './ui-commands.js';
 import {menuSections, menuDisabledReason, visibleMenuCount, commandForm, buildCommand, parsePhonebook, parseNetworks} from './menubar.js';
 
-export function createMenuBar({state, run, focus, notify}) {
+export function createMenuBar({state, run, focus, notify, ensureTerminal = action => action()}) {
 
 const $ = id => document.getElementById(id);
+const withTerminal = action => {
+    if (state().edit) action();
+    else ensureTerminal(action);
+};
 const paths = {
     activity: '<path d="M3 12h4l3-7 4 14 3-7h4"/>',
     book: '<path d="M5 3h14v18H5zM8 3v18M11 8h5M11 12h5"/>',
@@ -292,6 +296,15 @@ for (const section of menuSections()) {
             upload.append(copy);
             popup.append(upload);
         }
+        if (section.id === 'debug') {
+            const history = element('button', 'menu-item'); history.id = 'recent-console-history'; history.type = 'button';
+            history.title = 'Show the newest console output since boot, up to 16 KB (1 KB if PSRAM is short).';
+            history.innerHTML = icon('history');
+            const copy = element('span', 'menu-copy');
+            copy.append(element('span', 'menu-name', 'Recent console history'));
+            history.append(copy);
+            popup.append(history);
+        }
         if (section.id === 'hardware-tests') {
             const lines = element('div', 'line-controls'); lines.id = 'line-controls'; lines.hidden = true;
             for (const [id, name] of [['dcd','Toggle DCD'], ['ri','Toggle RI'], ['cts','Toggle CTS']]) {
@@ -307,13 +320,15 @@ for (const section of menuSections()) {
             popup.append(stop);
         }
         trigger.onclick = () => {
-            if (section.id === 'phonebook') { showPhonebook(); return; }
-            openPopup(popup, trigger);
+            withTerminal(() => {
+                if (section.id === 'phonebook') { showPhonebook(); return; }
+                openPopup(popup, trigger);
+            });
         };
         document.body.append(popup);
         menuEntries.push({section, host, trigger, popup});
     } else {
-        trigger.onclick = () => choose(section, section);
+        trigger.onclick = () => withTerminal(() => choose(section, section));
         menuEntries.push({section, host, trigger});
     }
     $('menu').append(host);
@@ -353,7 +368,7 @@ function layoutMenu() {
         if (popup && section.id !== 'phonebook') {
             button.append(element('span', 'menu-tag', '›'));
             button.onclick = () => {
-                openPopup(popup, moreTrigger);
+                withTerminal(() => openPopup(popup, moreTrigger));
             };
         } else button.onclick = () => trigger.click();
         morePopup.append(button);
@@ -372,13 +387,16 @@ document.addEventListener('keydown', event => {
 function updateState() {
     const current = state(), reason = menuDisabledReason(current);
     const controls = current.online && current.edit && current.hardware?.active && !current.upload;
-    const canOpen = section => !reason || (controls && section === 'hardware-tests');
+    const canOpen = section => (!current.edit && !current.upload && !current.opening) || !reason || (controls && section === 'hardware-tests');
     for (const {section, trigger} of menuEntries) trigger.disabled = !canOpen(section.id);
     for (const button of document.querySelectorAll('.menu-popup .menu-item')) {
         button.disabled = button.id === 'stop-test' ? !controls
             : button.dataset.section ? !canOpen(button.dataset.section) : !!reason;
     }
     for (const button of document.querySelectorAll('.requires-idle')) button.disabled = !!reason;
+    $('line-controls').hidden = !controls || current.hardware.mode !== 'lines';
+    $('stop-test').hidden = !controls;
+    for (const button of $('line-controls').querySelectorAll('button')) button.disabled = !controls;
     $('dialog-apply').disabled = !!reason;
     moreTrigger.disabled = !menuEntries.some(entry => entry.host.hidden && canOpen(entry.section.id));
     if (!current.edit || !current.online) {

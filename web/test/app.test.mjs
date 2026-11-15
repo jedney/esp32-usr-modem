@@ -12,9 +12,10 @@ class Element {
     querySelector() { return {offsetWidth: 960, offsetHeight: 500}; }
 }
 
-test('page wires ownership, keys, paste, terminal-mode resize, idle hangup and close', async t => {
+test('page auto-opens once, gates input, reconnects on demand and disconnects idle calls', async t => {
     const elements = new Map(), listeners = new Map(), intervals = [], timers = new Map(), sockets = [];
-    let time = 0, term, menuOptions;
+    let time = 0, term, menuOptions, historyOk = true;
+    const fetches = [];
     const element = id => {
         if (!elements.has(id)) elements.set(id, new Element());
         return elements.get(id);
@@ -41,7 +42,11 @@ test('page wires ownership, keys, paste, terminal-mode resize, idle hangup and c
         location: {host: 'modem.local', protocol: 'http:', search: ''},
         getComputedStyle: () => ({paddingLeft: '0', paddingRight: '0', paddingTop: '0', paddingBottom: '0'}),
         requestAnimationFrame: fn => fn(), WebSocket: Socket,
-        fetch: async () => ({ok: true, json: async () => ({token: 'ticket'})}),
+        fetch: async (path, options) => {
+            fetches.push({path,options});
+            return {ok: path === 'api/boot' ? historyOk : true,
+                json: async () => ({token: 'ticket'}), text: async () => 'Recent console output\r\n'};
+        },
         setTimeout: (fn, ms) => { timers.set(fn, ms); return fn; },
         clearTimeout: fn => timers.delete(fn),
         setInterval: (fn, ms) => { intervals.push({fn, ms}); return fn; },
@@ -65,14 +70,32 @@ test('page wires ownership, keys, paste, terminal-mode resize, idle hangup and c
     for (let n = 0; n < 10; n++) await Promise.resolve();
     const ws = sockets[0]; ws.open();
     assert.equal(term.options.disableStdin, true);
-    element('open-terminal').onclick();
+    ws.message({t:'access', edit:false, state:'read-only'});
     assert.deepEqual(ws.sent, ['{"t":"open"}']);
+    assert.equal(element('session-disconnected').hidden, false);
+    element('screen').onclick(); // Repeated clicks while opening must not queue an automatic retry.
+    assert.deepEqual(ws.sent, ['{"t":"open"}']);
+    ws.message({t:'access',edit:false,state:'read-only'});
+    assert.deepEqual(ws.sent, ['{"t":"open"}']); // A refusal must never loop or steal another session.
+    element('screen').onclick();
+    assert.equal(ws.sent.filter(s => s === '{"t":"open"}').length, 2);
     ws.message({t: 'access', edit: true, state: 'terminal'});
     assert.equal(term.options.disableStdin, false);
-    assert.equal(element('close-terminal').disabled, false);
+    assert.equal(element('session-disconnected').hidden, true);
+    assert.equal(element('no-call').hidden, false);
+    assert.equal(element('hangup').hidden, true);
     assert.equal(menuOptions.state().busy, true);
     ws.message({t:'ready', idle:true, rx:0});
     assert.equal(menuOptions.state().busy, false);
+    const beforeHistory = ws.sent.length;
+    await element('recent-console-history').onclick();
+    assert.equal(term.writes.at(-1), 'Recent console output\r\n');
+    assert.equal(fetches.at(-1).path, 'api/boot');
+    assert.equal(fetches.at(-1).options.cache, 'no-store');
+    assert.equal(ws.sent.length, beforeHistory);
+    historyOk = false;
+    await element('recent-console-history').onclick();
+    assert.ok(element('toasts').children.some(el => el.textContent.includes('Could not read recent console history')));
     assert.equal(menuOptions.run('AT*MODEL=28800\r'), true);
     assert.deepEqual(ws.sent.at(-1), new TextEncoder().encode('AT*MODEL=28800\r'));
     assert.equal(menuOptions.state().busy, true);
@@ -99,20 +122,49 @@ test('page wires ownership, keys, paste, terminal-mode resize, idle hangup and c
     time = 900000; pollIdle();
     assert.ok(!ws.sent.includes('{"t":"hangup"}'));
     ws.message({t: 'call', state: 'connected', browser: false});
+    assert.equal(element('no-call').hidden, true);
+    assert.equal(element('hangup').hidden, false);
+    assert.equal(element('hangup').disabled, true);
     time = 1800000; pollIdle(); assert.ok(!ws.sent.includes('{"t":"hangup"}'));
     ws.message({t: 'call', state: 'connected', browser: true, host: 'Demo BBS'});
+    assert.equal(element('hangup').disabled, false);
     time += 240000; pollIdle(); assert.equal(element('idle-guard').hidden, false);
     listeners.get('pointermove')(); assert.equal(element('idle-guard').hidden, true);
     time += 240000; pollIdle(); assert.equal(element('idle-guard').hidden, false);
     // BBS output is deliberately absent from the activity sources.
     ws.onmessage({data: new TextEncoder().encode('Still here from the BBS').buffer});
     time += 60000; pollIdle();
-    assert.equal(ws.sent.at(-1), '{"t":"hangup"}');
-    assert.equal(term.options.disableStdin, false);
-    ws.message({t: 'call', state: 'idle', browser: false});
-    assert.ok(element('toasts').children.some(el => el.textContent.includes('because you were away')));
-    await element('close-terminal').onclick();
+    assert.ok(ws.sent.includes('{"t":"hangup"}'));
     assert.equal(ws.readyState, 3);
     assert.equal(term.options.disableStdin, true);
+    assert.equal(element('session-disconnected').hidden, false);
     assert.ok(element('toasts').children.some(el => el.textContent === 'Terminal closed'));
+    for (let n = 0; n < 10; n++) await Promise.resolve();
+    const next = sockets[1]; next.open();
+    next.message({t:'access',edit:false,state:'read-only'});
+    assert.deepEqual(next.sent, []); // A restored transport must not reclaim the terminal.
+    element('screen').onclick();
+    assert.deepEqual(next.sent, ['{"t":"open"}']);
+    next.message({t:'access',edit:false,state:'read-only'});
+    assert.equal(element('session-disconnected').hidden, false);
+    let resumed = false;
+    menuOptions.ensureTerminal(() => { resumed = true; });
+    next.message({t:'access',edit:true,state:'terminal'});
+    assert.equal(resumed, false);
+    next.message({t:'ready',idle:true,rx:0});
+    assert.equal(resumed, true);
+    assert.equal(element('session-disconnected').hidden, true);
+    next.onclose(); // Reboot/link loss disables input and keeps terminal bytes unreplayed.
+    assert.equal(element('session-disconnected').hidden, false);
+    assert.equal(term.options.disableStdin,true);
+    resumed = false;
+    menuOptions.ensureTerminal(() => { resumed = true; });
+    runTimers(1000);
+    for (let n = 0; n < 10; n++) await Promise.resolve();
+    const restored = sockets[2]; restored.open();
+    restored.message({t:'access',edit:false,state:'read-only'});
+    assert.deepEqual(restored.sent,['{"t":"open"}']); // The offline click requested this retry.
+    restored.message({t:'access',edit:true,state:'terminal'});
+    restored.message({t:'ready',idle:true,rx:0});
+    assert.equal(resumed,true);
 });

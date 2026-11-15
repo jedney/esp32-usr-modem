@@ -1,4 +1,4 @@
-// Browser modem terminal with explicit ownership, live sizing and a passive status bar.
+// Browser modem terminal with automatic initial access, live sizing and a passive status bar.
 //
 // Talks to the modem over one WebSocket (see web/PROTOCOL.md):
 //   binary frames = terminal bytes (UTF-8, ANSI) in both directions
@@ -59,12 +59,42 @@ const state = {
     hardware: null, busy: true,
 };
 let menus = null;
+let initialOpen = true, requestedOpen = false, pendingMenu = null;
+
+function ensureTerminal(continuation = null) {
+    if (state.upload) return;
+    if (state.edit) { continuation?.(); term.focus(); return; }
+    pendingMenu = continuation;
+    if (state.opening) return;
+    requestedOpen = true;
+    if (state.online) requestTerminal();
+}
+
+function requestTerminal() {
+    if (state.opening) return;
+    requestedOpen = false;
+    state.opening = true;
+    updateControls();
+    if (!openTerminal()) {
+        state.opening = false;
+        pendingMenu = null;
+        updateControls();
+        toasts.show('Could not open the terminal: the modem link is unavailable');
+    }
+}
+
+function resumeMenu() {
+    if (!state.edit || state.busy || !pendingMenu) return;
+    const action = pendingMenu;
+    pendingMenu = null;
+    action();
+}
 
 const toasts = createToasts({container: $('toasts')});
 const events = S.createStatusEvents(text => toasts.show(text));
 const channel = createCommandChannel({
     send: bytes => send(bytes),
-    changed: () => { state.busy = channel.busy(); updateControls(); },
+    changed: () => { state.busy = channel.busy(); updateControls(); resumeMenu(); },
     show: text => toasts.show(text),
 });
 const idle = createIdleGuard({
@@ -78,18 +108,22 @@ const idle = createIdleGuard({
         if (!hangupCall()) {
             events.away(false);
             toasts.show('Could not hang up: the modem link is unavailable');
+        } else {
+            toasts.show('Session disconnected because you were away');
+            closeTerminal();
         }
     },
 });
 
 function updateControls(showOperation = true) {
-    $('open-terminal').disabled = !state.online || state.edit || state.opening || state.upload;
-    $('close-terminal').disabled = !state.edit || state.upload;
-    $('open-terminal').hidden = state.edit;
-    $('close-terminal').hidden = !state.edit;
+    $('session-disconnected').hidden = state.edit;
+    $('session-disconnected').disabled = state.opening || state.upload;
+    const calling = ['dialling','ringing','connected','ppp','slip'].includes(state.call.state);
+    $('no-call').hidden = calling;
+    $('hangup').hidden = !calling;
     if ($('upload')) $('upload').disabled = !!menuDisabledReason(state);
     $('hangup').disabled = !state.edit || !state.online || !state.call.browser ||
-        !['dialling','ringing','connected','ppp','slip'].includes(state.call.state) || state.upload;
+        !calling || state.upload;
     term.options.disableStdin = !state.edit || state.upload;
     if (showOperation && !state.upload) {
         const reason = state.opening ? 'Opening terminal…' : menuDisabledReason(state);
@@ -97,7 +131,7 @@ function updateControls(showOperation = true) {
         $('menu-reason').title = guidance;
         $('menu-reason').querySelector('.guidance-long').textContent = guidance;
         $('menu-reason').querySelector('.guidance-short').textContent = !state.online ? 'Offline'
-            : !state.edit ? 'Open terminal' : reason ? 'Finish in terminal' : 'AT*HELP';
+            : !state.edit ? 'Click terminal to reconnect' : reason ? 'Finish in terminal' : 'AT*HELP';
     }
     menus?.update();
     idle.connected(S.browserCallConnected(state.call, state.edit) && state.online);
@@ -133,6 +167,7 @@ function showCall() {
     const d = S.describeCall(state.call);
     const el = $('call');
     el.className = `session-state ${d.cls}`;
+    el.hidden = state.call.state === 'idle';
     $('call-label').textContent = state.call.state === 'idle' ? 'No call' : d.label;
     $('remote-label').textContent = S.describeRemote(state.call);
     $('remote').title = state.call.number ? `Remote host (dialled ${state.call.number})` : 'Remote host';
@@ -193,6 +228,7 @@ function handleMessage(msg) {
             requestAnimationFrame(fitTerminal);
             break;
         case 'access':
+            if (!S.terminalAccess(msg) && state.opening) pendingMenu = null;
             events.access(msg, state.opening);
             state.edit = S.terminalAccess(msg);
             state.opening = false;
@@ -203,6 +239,11 @@ function handleMessage(msg) {
                 requestAnimationFrame(fitTerminal);
                 term.focus();
             } else clearTimeout(sizeTimer);
+            if (initialOpen || requestedOpen) {
+                initialOpen = false;
+                requestedOpen = false;
+                if (!state.edit) requestTerminal();
+            }
             break;
         case 'hardware':
             state.hardware = msg;
@@ -331,13 +372,15 @@ function connectModem() {
             state.edit = false;
             state.opening = false;
             state.hardware = null;
+            pendingMenu = null;
+            state.call = {state:'idle'};
             channel.reset();
             reportedSize = null;
             clearTimeout(sizeTimer);
             $('upload').disabled = true;
             $('line-controls').hidden = true;
             $('stop-test').hidden = true;
-            updateControls();
+            showCall();
         },
     });
     send = bytes => !state.upload && link.send(bytes);
@@ -354,6 +397,7 @@ function connectModem() {
 }
 
 async function startDemo() {
+    initialOpen = false;
     setLink('demo');
     const { startDemoModem } = await import('./demo.js');
     const modem = startDemoModem({
@@ -372,6 +416,7 @@ async function startDemo() {
     openTerminal = () => { modem.receive('{"t":"open"}'); return true; };
     closeTerminal = () => modem.close();
     hangupCall = () => { channel.reset(); modem.receive('{"t":"hangup"}'); return true; };
+    requestTerminal();
     term.focus();
 }
 
@@ -379,17 +424,9 @@ async function startDemo() {
 
 async function main() {
     menus = createMenuBar({state: () => state, run: (line, done) => channel.request(line, done),
-        focus: () => term.focus(), notify: text => toasts.show(text)});
-    $('open-terminal').onclick = () => {
-        state.opening = true;
-        updateControls();
-        if (!openTerminal()) {
-            state.opening = false;
-            updateControls();
-            toasts.show('Could not open the terminal: the modem link is unavailable');
-        }
-    };
-    $('close-terminal').onclick = () => closeTerminal();
+        focus: () => term.focus(), notify: text => toasts.show(text), ensureTerminal});
+    $('screen').onclick = () => { ensureTerminal(); };
+    $('session-disconnected').onclick = event => { event.stopPropagation(); ensureTerminal(); };
     $('here').onclick = () => { idle.activity(); term.focus(); };
     $('hangup').onclick = () => { if (!hangupCall()) toasts.show('Could not hang up. Check the modem link.'); };
     $('dcd').onclick = () => channel.input(encoder.encode('d'));
@@ -397,6 +434,19 @@ async function main() {
     $('cts').onclick = () => channel.input(encoder.encode('c'));
     $('stop-test').onclick = () => { channel.input(new Uint8Array([0x18])); term.focus(); };
     $('upload').onclick = () => $('image').click();
+    $('recent-console-history').onclick = async () => {
+        try {
+            const demo = new URLSearchParams(location.search).has('demo') || location.protocol === 'file:' || window.USR_MODEM_DEMO;
+            const text = demo ? 'DEMO: synthetic recent console history. No device services connected.\r\n'
+                : await (async () => {
+                    const reply = await fetch('api/boot', {cache:'no-store', signal:AbortSignal.timeout(5000)});
+                    if (!reply.ok) throw new Error('History unavailable');
+                    return reply.text();
+                })();
+            if (state.edit && state.online && !state.upload) term.write(text);
+            term.focus();
+        } catch { toasts.show('Could not read recent console history. Check the modem link and try again.'); }
+    };
     const uploadFlow = createUploadFlow({
         state,
         show: text => {
@@ -441,7 +491,7 @@ async function main() {
         idle.activity();
         if (!channel.input(bytes)) toasts.show(state.edit
             ? 'Input could not be sent. Wait for the modem before pasting again.'
-            : 'Open the terminal before typing');
+            : 'Click the terminal to reconnect before typing');
     };
     // xterm maps Enter to CR, Backspace to DEL (Ctrl-H sends BS), and arrows /
     // function keys to ANSI sequences. Preserve those bytes, including paste.

@@ -62,6 +62,19 @@ void test_digest_checks_exact_uri_method_replay_and_expiry() {
     auth.reset();
     TEST_ASSERT_FALSE(auth.verify(digest(nonce, "00000003"), "GET", "/api/session", ha1, 8));
 }
+void test_console_history_digest_is_bound_to_read_only_route() {
+    FakeCrypto crypto;
+    Auth auth(crypto);
+    auto challenge = auth.challenge(0);
+    auto nonce = challenge.substr(challenge.find("nonce=\"") + 7, 32);
+    auto authorization = digest(nonce);
+    authorization.replace(authorization.find("/api/session"), strlen("/api/session"), "/api/boot");
+    const char *ha1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    TEST_ASSERT_FALSE(auth.verify("", "GET", "/api/boot", ha1, 1));
+    TEST_ASSERT_FALSE(auth.verify(authorization, "GET", "/api/session", ha1, 1));
+    TEST_ASSERT_TRUE(auth.verify(authorization, "GET", "/api/boot", ha1, 2));
+    TEST_ASSERT_FALSE(auth.verify(authorization, "GET", "/api/boot", ha1, 3));
+}
 void test_digest_reports_stale_nonce_and_wrong_password() {
     FakeCrypto crypto;
     Auth auth(crypto);
@@ -769,6 +782,7 @@ int main() {
     RUN_TEST(test_browser_cp437_is_utf8_and_serial_source_bytes_are_unchanged);
     RUN_TEST(test_host_and_origin_do_not_accept_rebinding_authorities);
     RUN_TEST(test_digest_checks_exact_uri_method_replay_and_expiry);
+    RUN_TEST(test_console_history_digest_is_bound_to_read_only_route);
     RUN_TEST(test_digest_reports_stale_nonce_and_wrong_password);
     RUN_TEST(test_wrong_response_locks_out_for_one_second_without_blocking);
     RUN_TEST(test_upload_handshake_grant_and_refuse_on_time);

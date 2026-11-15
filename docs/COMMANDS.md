@@ -208,7 +208,7 @@ The device password (user `admin`) protects the web interface, the network conso
 
 ### Configuration screen and terminal
 
-In the browser, **Open terminal** grants one authenticated tab its own AT session; **Close terminal** hangs up and reconnects read-only. Keyboard and menu commands use that terminal's bytes. A connected browser call warns after four minutes without user activity and hangs up after five, keeping the terminal open; activity cancels the warning and incoming BBS data does not count. This page policy adds no AT command and never applies to serial calls. See [the web protocol](../web/PROTOCOL.md#idle-guard-and-notifications) for the owner-only hang-up control and event toasts.
+The browser automatically requests one authenticated AT terminal on page open, respecting existing modem reservations and browser ownership. Terminal loss shows a centred reconnect overlay; click the terminal or select a menu item to request access again. Close the tab to release the terminal. Keyboard and menu commands use that terminal's bytes. A connected browser call warns after four minutes without user activity and hangs up and closes the terminal after five; activity cancels the warning and incoming BBS data does not count. This page policy adds no AT command and never applies to serial calls. Diagnostics → Recent console history reads the newest 16 KB of maintenance-console output (1 KB fallback without PSRAM), including device-password lines if still present. No AT command is added. See [the web protocol](../web/PROTOCOL.md#idle-guard-and-notifications) for the owner-only hang-up control and event toasts.
 
 | Command | What it does |
 |---|---|

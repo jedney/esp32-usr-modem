@@ -20,17 +20,17 @@
   <header class="masthead">
     <div class="brand-mark" aria-label="USR">usr</div>
     <div><div class="brand-title">Sportster</div><div class="eyebrow">Modem terminal</div></div>
-    <div class="masthead-actions"><span class="badge" id="link"><i class="dot"></i><span id="link-label">Connecting</span></span><button class="button" id="open-terminal" disabled>Open terminal</button><button class="button" id="close-terminal" hidden disabled>Close terminal</button></div>
+    <div class="masthead-actions"><span class="badge" id="link"><i class="dot"></i><span id="link-label">Connecting</span></span></div>
   </header>
   <div class="workspace">
     <nav class="menubar" id="menu" aria-label="Modem controls"></nav>
-    <main class="terminal-frame" aria-label="Modem terminal preview">
+    <main class="terminal-frame" aria-label="Modem terminal">
       <div class="terminal-header">
         <span class="session-name">Browser terminal</span>
         <span class="terminal-geometry" id="terminal-geometry">UTF-8 · 80 × 25</span>
-        <div class="session-actions"><span class="session-state" id="call" title="Call status"><i class="dot"></i><span id="call-label">No call</span></span><span id="remote" hidden><span id="remote-label"></span></span><span id="uptime-label" hidden></span><button class="button danger" disabled id="hangup">Hang up</button></div>
+        <div class="session-actions"><span class="session-state" id="call" title="Call status" hidden><i class="dot"></i><span id="call-label"></span></span><span id="remote" hidden><span id="remote-label"></span></span><span id="uptime-label" hidden></span><button class="button" type="button" id="no-call" disabled>No call</button><button class="button danger" type="button" hidden disabled id="hangup"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13a14 14 0 0118 0v5h-5v-5a12 12 0 00-8 0v5H3z"/></svg>Hang up</button></div>
       </div>
-      <div id="screen"><div id="term" aria-label="Modem terminal"></div></div>
+      <div id="screen"><div id="term" aria-label="Modem terminal"></div><button id="session-disconnected" type="button"><strong>Session Disconnected</strong><span>Click the Terminal area, or select a menu item to reconnect</span></button></div>
     </main>
     <footer class="statusbar">
       <div class="leds" id="leds" aria-label="Front panel lights"></div>

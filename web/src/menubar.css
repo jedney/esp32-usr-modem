@@ -97,6 +97,9 @@ button:disabled { cursor: default; color: var(--muted); }
     background: #293630; border-color: #65766b; color: #ffaaa1; white-space: nowrap; }
 .terminal-header .button:hover { background: #35433c; }
 .terminal-header .button:disabled { color: #a7b8ad; border-color: #46574c; background: transparent; }
+.terminal-header .button.danger { background: #781f24; border-color: #a44248; color: #fff; }
+.terminal-header .button.danger:hover { background: #942a30; }
+.terminal-header .button.danger:disabled { background: #591c20; color: #d3afb1; }
 .mock-terminal { margin: 0; padding: 16px 20px; min-height: 0; flex: 1; overflow: auto;
     font: 13px/1.65 var(--font); white-space: pre-wrap; overflow-wrap: anywhere; }
 .terminal-brand { color: #edcda3; font-weight: 700; }

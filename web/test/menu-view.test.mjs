@@ -62,10 +62,10 @@ function setup(t) {
     }
     t.after(() => { for (const [name, value] of previous) value ? Object.defineProperty(globalThis,name,value) : delete globalThis[name]; });
     const state = {online:true,edit:true,call:{state:'idle'},busy:false};
-    const sent = [], notices = [];
-    const menu = createMenuBar({state:() => state, run:(line, done) => {sent.push({line,done}); return true;}, focus() {}, notify:text => notices.push(text)});
+    const sent = [], notices = [], reconnects = [];
+    const menu = createMenuBar({state:() => state, run:(line, done) => {sent.push({line,done}); return true;}, focus() {}, notify:text => notices.push(text), ensureTerminal:action => reconnects.push(action)});
     const clickItem = name => doc.querySelectorAll('.menu-item').find(n => n.textContent.startsWith(name)).click();
-    return {doc,state,sent,notices,menu,clickItem};
+    return {doc,state,sent,notices,menu,clickItem,reconnects};
 }
 
 test('model dialog validates input and sends exactly the reviewed command', t => {
@@ -131,4 +131,32 @@ test('hardware stop stays reachable while new commands are disabled', async t =>
     assert.equal(doc.getElementById('stop-test').disabled,false);
     assert.equal(doc.querySelectorAll('.menu-trigger').find(n => n.textContent.startsWith('Phonebook')).disabled,true);
     assert.equal(doc.querySelectorAll('.menu-trigger').find(n => n.textContent.startsWith('Hardware Tests')).disabled,false);
+});
+
+test('terminal-only actions live in Debug, Updates and Hardware Tests', t => {
+    const {doc,state,menu} = setup(t);
+    assert.equal(doc.getElementById('recent-console-history').parent.id, 'popup-debug');
+    assert.equal(doc.getElementById('upload').parent.id, 'popup-updates-reset');
+    assert.equal(doc.getElementById('line-controls').parent.id, 'popup-hardware-tests');
+    assert.equal(doc.getElementById('stop-test').parent.id, 'popup-hardware-tests');
+    state.hardware = {active:true,mode:'lines'}; state.busy = true; menu.update();
+    assert.equal(doc.getElementById('line-controls').hidden,false);
+    assert.equal(doc.getElementById('dcd').disabled,false);
+    assert.equal(doc.getElementById('recent-console-history').disabled,true);
+    state.hardware = {active:false}; menu.update();
+    assert.equal(doc.getElementById('line-controls').hidden,true);
+    assert.equal(doc.getElementById('stop-test').hidden,true);
+});
+
+test('disconnected menu selection requests access before opening the chosen menu', t => {
+    const {doc,state,menu,reconnects} = setup(t);
+    state.edit = false; state.online = false; state.busy = true; menu.update();
+    const trigger = doc.querySelectorAll('.menu-trigger').find(n => n.textContent.startsWith('Settings'));
+    assert.equal(trigger.disabled,false);
+    trigger.click();
+    assert.equal(reconnects.length,1);
+    assert.equal(doc.getElementById('popup-settings').hidden,true);
+    state.edit = true; state.online = true; state.busy = false; menu.update();
+    reconnects[0]();
+    assert.equal(doc.getElementById('popup-settings').hidden,false);
 });

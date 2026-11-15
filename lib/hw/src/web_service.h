@@ -5,6 +5,7 @@
 #include <esp_http_server.h>
 #include <freertos/semphr.h>
 #include <string>
+#include "console_log.h"
 #include "devicecfg.h"
 #include "upload_handshake.h"
 #include "web_policy.h"
@@ -18,7 +19,7 @@ public:
 class WebService {
 public:
     static constexpr unsigned kClients = 3;
-    explicit WebService(devicecfg::Device &device);
+    WebService(devicecfg::Device &device, const netconsole::ConsoleLog &console);
     void poll(bool enabled, bool up, const char *name, const char *ip);
     uint32_t clientId(unsigned index);
     bool connected(uint32_t id);
@@ -83,6 +84,7 @@ private:
     Client *find(uint32_t id);
     void stop();
     devicecfg::Device &device_;
+    const netconsole::ConsoleLog &console_;
     WebCrypto crypto_;
     webinterface::Auth auth_;
     webinterface::Tickets tickets_;
