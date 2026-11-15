@@ -1230,7 +1230,8 @@ void publishCall(uint32_t now, bool force) {
         return;
     }
     at = now;
-    std::string call = std::string("{\"t\":\"call\",\"state\":\"") + webCallState() + '"';
+    std::string call = std::string("{\"t\":\"call\",\"state\":\"") + webCallState() +
+                       "\",\"model\":" + webinterface::jsonString(selectedModel());
     if (journal.active()) {
         const auto &r = journal.current();
         const bool internet = r.kind == calls::Kind::Ppp || r.kind == calls::Kind::Slip;

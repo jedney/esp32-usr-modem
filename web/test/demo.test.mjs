@@ -29,7 +29,7 @@ test('demo ignores arrows and sizes, and Client Tests stay serial only', () => {
     assert.equal(output, root);
     demo.receive(new TextEncoder().encode('la'));
     assert.match(output, /Client Tests run on serial only/);
-    assert.deepEqual(messages.filter(m => m.t === 'call'), [{t: 'call', state: 'idle'}]);
+    assert.deepEqual(messages.filter(m => m.t === 'call'), [{t: 'call', state: 'idle', model: 'US Robotics Sportster 14.4k'}]);
 });
 
 test('demo starts read-only, opens explicitly, dials synthetic data and hangs up without closing', () => {
@@ -61,6 +61,7 @@ test('demo menu commands publish readiness, phonebook data and terminal-only fol
     const send = text => demo.receive(new TextEncoder().encode(text));
     demo.receive('{"t":"open"}');
     send('AT*MODEL=28800\r'); assert.match(output, /synthetic command accepted/);
+    assert.equal(messages.findLast(m => m.t === 'call').model,'US Robotics Sportster 28.8k');
     assert.equal(messages.at(-1).idle, true);
     send('AT*PHONEBOOK?\r'); assert.match(output, /1,bbs.example.net,23,TELNET,0/);
     send('AT*WIFISCAN\r'); assert.equal(messages.at(-1).idle, false);

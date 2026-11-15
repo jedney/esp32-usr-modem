@@ -58,7 +58,7 @@ export function startDemoModem({message, write}) {
     };
     message({t: 'hello', name: 'Sportster DEMO', ver: 'DEMO'});
     message({t: 'clock', epoch: Math.floor(Date.now() / 1000), tzo: 0});
-    message({t: 'wifi', state: 'up', ssid:'Demo Wi-Fi', rssi:-48}); message({t: 'led', m: 112}); message({t: 'call', state: 'idle'});
+    message({t: 'wifi', state: 'up', ssid:'Demo Wi-Fi', rssi:-48}); message({t: 'led', m: 112}); message({t: 'call', state: 'idle', model:'US Robotics Sportster 14.4k'});
     access();
     const command = () => {
         const original = line.trim();
@@ -74,6 +74,11 @@ export function startDemoModem({message, write}) {
                 + 'Your keys are echoed here. No network call is made.\r\n'
                 + 'Type +++ on its own, then ATH to hang up.\r\n');
         } else if (text === 'AT*SIZE?') write(`\r\n${cols},${rows}\r\nOK\r\n`);
+        else if (/^AT\*MODEL=(14400|28800|33600|56000)$/.test(text)) {
+            const selected = commands.find(c => c.id === 'settings.model').values.find(v => v.value === text.split('=')[1]);
+            message({t:'call',state:'idle',model:selected.label});
+            write('\r\nDEMO: synthetic command accepted; no device settings changed.\r\nOK\r\n');
+        }
         else if (text === 'AT*HELP') write('\r\nDEMO: AT*CONFIG, ATDT1, ATH. No device services connected.\r\nOK\r\n');
         else if (text === 'ATH') { hangup(); write('\r\nOK\r\n'); }
         else if (text === 'ATO' && call) { onlineCommand = false; write('\r\nCONNECT 14400\r\n'); }

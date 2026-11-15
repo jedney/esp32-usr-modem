@@ -262,6 +262,10 @@ function handleMessage(msg) {
             showTimes();
             break;
         case 'call':
+            if (typeof msg.model === 'string' && msg.model && $('model-name').textContent !== msg.model) {
+                $('model-name').textContent = msg.model;
+                requestAnimationFrame(fitTerminal);
+            }
             events.call(msg);
             state.call = msg;
             showCall();

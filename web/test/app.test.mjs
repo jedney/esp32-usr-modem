@@ -69,6 +69,8 @@ test('page auto-opens once, gates input, reconnects on demand and disconnects id
     await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
     for (let n = 0; n < 10; n++) await Promise.resolve();
     const ws = sockets[0]; ws.open();
+    ws.message({t:'call',state:'idle',model:'US Robotics Sportster 14.4k'});
+    assert.equal(element('model-name').textContent,'US Robotics Sportster 14.4k');
     assert.equal(term.options.disableStdin, true);
     ws.message({t:'access', edit:false, state:'read-only'});
     assert.deepEqual(ws.sent, ['{"t":"open"}']);
@@ -87,6 +89,8 @@ test('page auto-opens once, gates input, reconnects on demand and disconnects id
     assert.equal(menuOptions.state().busy, true);
     ws.message({t:'ready', idle:true, rx:0});
     assert.equal(menuOptions.state().busy, false);
+    ws.message({t:'call',state:'idle',model:'US Robotics Sportster 28.8k'});
+    assert.equal(element('model-name').textContent,'US Robotics Sportster 28.8k');
     const beforeHistory = ws.sent.length;
     await element('recent-console-history').onclick();
     assert.equal(term.writes.at(-1), 'Recent console output\r\n');

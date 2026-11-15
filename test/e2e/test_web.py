@@ -716,6 +716,30 @@ def test_menu_readiness_tracks_partial_commands_and_terminal_prompts(web):
                 "An idle hang-up did not acknowledge the reset input count")
 
 
+def test_selected_model_name_updates_status_observers(web, console):
+    original = console.command('AT*MODEL?')[0].split()[0]
+    models = {'14400': 'US Robotics Sportster 14.4k', '28800': 'US Robotics Sportster 28.8k',
+              '33600': 'US Robotics Sportster 33.6k', '56000': 'US Robotics Sportster 56k'}
+    require(original in models, 'Unknown current model')
+    try:
+        with web.ws() as first, web.ws() as second:
+            _, initial = first.collect(0.3)
+            require(any(m.get('model') == models[original] for m in initial), 'Initial model name missing')
+            second.collect(0.2)
+            previous = original
+            for speed, name in models.items():
+                require(console.command('AT*MODEL=' + speed)[-1] == 'OK', 'Model change failed')
+                # Re-selecting the current model produces no changed snapshot.
+                if speed == previous:
+                    continue
+                for peer in (first, second):
+                    _, messages = peer.collect(0.4)
+                    require(any(m.get('model') == name for m in messages), 'Live model name not published')
+                previous = speed
+    finally:
+        require(console.command('AT*MODEL=' + original)[-1] == 'OK', 'Original model restore failed')
+
+
 def test_terminal_at_commands_config_exit_and_serial_only_services(web):
     with web.ws() as peer:
         _, messages = peer.open_terminal()
