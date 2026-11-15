@@ -107,7 +107,7 @@ def test_missing_binding_fails_generation(tmp_path):
         ui.generate(tmp_path)
 
 
-@pytest.mark.parametrize("key", ["AB", "", "0"])
+@pytest.mark.parametrize("key", ["AB", "", "0", "1", "P", "Q", "R", "X", "O"])
 def test_hotkey_must_be_one_valid_character(tmp_path, key):
     for relative in ("ui/menu-definition.json", "ui/theme-tokens.json", "lib/config/ui-bindings.json"):
         destination = tmp_path / relative

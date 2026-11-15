@@ -11,6 +11,44 @@
 #define FW_COMMIT "test"
 #endif
 namespace config {
+bool Commands::value(const char *id, char *out, size_t cap) const {
+    const auto &s = net_.settings();
+    const char *value = nullptr;
+    if (!strcmp(id, "wifi-clock.wifi-toggle"))
+        value = s.enabled ? "ON" : "OFF";
+    else if (!strcmp(id, "wifi-clock.join"))
+        value = *s.ssid ? s.ssid : "not set";
+    else if (!strcmp(id, "wifi-clock.network-status"))
+        value = net_.stateText();
+    else if (!strcmp(id, "wifi-clock.network-name"))
+        value = s.host;
+    else if (!strcmp(id, "wifi-clock.ntp-server"))
+        value = s.ntp;
+    else if (!strcmp(id, "wifi-clock.time-zone"))
+        value = s.tz;
+    else if (!strcmp(id, "wifi-clock.ip-configuration")) {
+        if (s.dhcp)
+            value = "DHCP";
+        else {
+            char ip[16], mask[16], gateway[16], dns[16];
+            netcfg::formatIp(s.ip, ip, sizeof ip);
+            netcfg::formatIp(s.mask, mask, sizeof mask);
+            netcfg::formatIp(s.gateway, gateway, sizeof gateway);
+            netcfg::formatIp(s.dns, dns, sizeof dns);
+            snprintf(out, cap, "%s, %s, %s, %s", ip, mask, gateway, dns);
+            return true;
+        }
+    } else if (!strcmp(id, "updates-reset.ota-policy-window"))
+        value = device_.policy() == devicecfg::Policy::kAlways ? "ALWAYS" : "DEMAND";
+    else if (!strcmp(id, "debug.verbosity")) {
+        snprintf(out, cap, "%u", log_.level);
+        return true;
+    }
+    if (!value)
+        return false;
+    snprintf(out, cap, "%s", value);
+    return true;
+}
 namespace {
 Commands *attached = nullptr;
 bool query(const char *s) {

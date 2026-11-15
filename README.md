@@ -74,11 +74,10 @@ The menu inventory has shared typed metadata in `lib/config/ui-bindings.json`: f
 
 `AT*CONFIG` opens it at once; `ATDT123` plays dial sounds first. It works on the USB console, the RS232 port and in the browser, but only one at a time. While it is open, incoming calls are turned away. A screen with no key for 5 minutes closes itself, so a forgotten one does not hold the line.
 
-- Arrow keys and Enter, or press the hotkey shown. **F1** is help, **Esc/Q** goes back, **Q/F10** leaves from the main menu, **Ctrl-C** leaves a form, **Ctrl-L** draws the whole screen again.
-- After the first frame a key sends only what changed on the screen: an arrow key is about 70 bytes (100 in RGB colour) at 80x25, so the screen is usable at 2400 bit/s. The first frame is 3-5 KB (12-22 s at 2400). `AT*STYLE=PLAIN` has no cursor control, so it sends the whole screen (about 2 KB) on every key.
-- Screens: status, phonebook, all modem settings with help, Wi-Fi and clock, Internet, sounds, updates, logs, A About, B Hardware Tests, C Client Tests, D Command Reference.
-- 80x25 is the standard size; larger terminals (up to 132x50) get a wider layout. The modem asks the terminal for its size; `AT*SIZE` sets it and `AT*STYLE` picks ANSI, CP437 or plain text, for this boot.
-- Everything on the screen also has an `AT*` command ([docs/COMMANDS.md](docs/COMMANDS.md)).
+- Choose items by letter, A, B, C. X or Esc goes back; Q exits at the main menu. Ctrl-C exits immediately and Ctrl-L prints the current list again. Arrow and function keys are ignored.
+- Each option shows a friendly name, help, units and the current value where available. Enumerations have lettered friendly choices; press Enter to confirm a selection. Text fields use Enter, Backspace and Ctrl-U. Multi-field commands prompt for each value in turn; secret input is masked.
+- P and R switch long lists and command output pages; Enter advances output. Changes that need review keep their Y/N confirmation, including delete/dial checks and the Wi-Fi join flow. Client Tests run on serial only.
+- `AT*STYLE=ANSI` adds colour; `AT*STYLE=PLAIN` uses plain text. Both print scrolling lines that wrap at any terminal width, without cursor positioning, box drawing or periodic redraws. `AT*SIZE` and browser size reports retain transport dimensions independently of the menu.
 
 ## Web interface
 

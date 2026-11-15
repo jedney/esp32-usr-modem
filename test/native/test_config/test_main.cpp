@@ -7,7 +7,6 @@
 #include "../support/fakes.h"
 #include "config.h"
 #include "registry.h"
-#include "screen.h"
 using namespace config;
 void setUp() {}
 void tearDown() {}
@@ -119,99 +118,6 @@ void test_menu_actions_have_production_at_star_handlers() {
         TEST_ASSERT_NOT_NULL(registry.data()[i].fn);
     }
 }
-void test_direct_menu_reserves_without_carrier_and_releases() {
-    Rig r;
-    TEST_ASSERT_TRUE(r.terminal.open());
-    TEST_ASSERT_TRUE(r.session.startLocal(r.terminal));
-    TEST_ASSERT_TRUE(r.slot.busy());
-    TEST_ASSERT_FALSE(r.session.callUp());
-    TEST_ASSERT_FALSE(r.session.dcd());
-    Sink other;
-    hostport::Session session(r.modem, other, 38400, r.slot);
-    hostport::EchoConnection echo;
-    echo.open(0, 0);
-    TEST_ASSERT_FALSE(session.startCall(echo));
-    r.drain();
-    r.feed("q\r\n");
-    r.session.tick(10, true);
-    TEST_ASSERT_FALSE(r.slot.busy());
-    TEST_ASSERT_FALSE(r.session.localOpen());
-    TEST_ASSERT_TRUE(session.startCall(echo));
-}
-void test_renderers_and_paging_work_with_one_byte_output() {
-    Rig r;
-    r.terminal.setStyle("PLAIN");
-    r.terminal.open();
-    auto out = r.drain();
-    TEST_ASSERT_EQUAL(std::string::npos, out.find('\x1b'));
-    TEST_ASSERT_NOT_EQUAL(std::string::npos, out.find("14.4"));
-    TEST_ASSERT_NOT_EQUAL(std::string::npos, out.find("Client Tests"));
-    r.terminal.close();
-    r.terminal.setStyle("CP437");
-    r.terminal.open();
-    out = r.drain();
-    TEST_ASSERT_NOT_EQUAL(std::string::npos, out.find(char(0xc9)));
-    ScreenView screen;
-    screen.accept(out);
-    TEST_ASSERT_EQUAL(0, screen.outside);
-    TEST_ASSERT_EQUAL(0, screen.scrolls);
-    TEST_ASSERT_TRUE(screen.wrap && screen.cursor);
-}
-// An information reply starts with S3 S4 (beginInfo); the screen doesn't show that as an
-// empty first line.
-void test_reply_line_break_at_the_start_is_not_shown() {
-    Rig plain, info;
-    plain.terminal.open();
-    info.terminal.open();
-    ScreenView a, b;
-    a.accept(plain.drain());
-    b.accept(info.drain());
-    plain.terminal.write("first\r\nsecond\r\n", 15);
-    info.terminal.write("\r\nfirst\r\nsecond\r\n", 17);
-    a.accept(plain.drain());
-    b.accept(info.drain());
-    TEST_ASSERT_TRUE(a.has("first"));
-    for (unsigned row = 0; row < 25; ++row) {
-        TEST_ASSERT_EQUAL_STRING(a.row(row).c_str(), b.row(row).c_str());
-    }
-}
-void test_response_pagination_does_not_leak_next_page() {
-    Rig r;
-    r.terminal.open();
-    ScreenView view;  // one terminal for the whole test: later frames send only changes
-    view.accept(r.drain());
-    for (unsigned i = 0; i < 60; ++i) {
-        char row[24];
-        snprintf(row, sizeof row, "row%02u\n", i);
-        r.terminal.write(row, strlen(row));
-    }
-    view.accept(r.drain());
-    TEST_ASSERT_TRUE(view.has("More:"));
-    TEST_ASSERT_FALSE(view.has("row15"));
-    TEST_ASSERT_TRUE(r.drain().empty());
-    r.feed("\r");
-    view.accept(r.drain());
-    TEST_ASSERT_TRUE(view.has("row15"));
-    TEST_ASSERT_FALSE(view.has("row30"));
-    TEST_ASSERT_FALSE(view.has("row14"));
-}
-void test_menu_secret_input_is_wiped_and_never_echoed() {
-    Rig r;
-    r.terminal.open();
-    r.drain();
-    r.feed("8\r4\rSecretCanary123");
-    auto out = r.drain();
-    TEST_ASSERT_EQUAL(std::string::npos, out.find("SecretCanary"));
-    TEST_ASSERT_NOT_EQUAL(std::string::npos, out.find("***"));
-    r.feed("\r");
-    out = r.drain();
-    TEST_ASSERT_EQUAL(std::string::npos, out.find("SecretCanary"));
-    r.feed("\x1b");
-    r.terminal.poll(61);
-    out = r.drain();
-    TEST_ASSERT_EQUAL(std::string::npos, out.find("SecretCanary"));
-    TEST_ASSERT_NOT_EQUAL(std::string::npos, out.find("cancelled"));
-}
 void test_ring_wrap_has_only_structured_events_and_can_disable() {
     Log log;
     char data[42];
@@ -300,92 +206,7 @@ void test_history_rejects_corruption_without_overwriting_flash() {
     TEST_ASSERT_EQUAL(0, loaded.size());
     TEST_ASSERT_TRUE(before == store.bytes);
 }
-void test_display_sanitizes_untrusted_escape_sequences() {
-    Rig r;
-    r.terminal.open();
-    r.drain();
-    r.terminal.write("\x1b[2Jhello", 10);
-    ScreenView view;
-    view.accept(r.drain());
-    TEST_ASSERT_TRUE(view.has("?[2Jhello"));
-    TEST_ASSERT_EQUAL(0, view.outside);
-    TEST_ASSERT_EQUAL(0, view.scrolls);
-}
-void test_direct_menu_dtr_drop_closes_and_releases_reservation() {
-    Rig r;
-    r.terminal.open();
-    r.session.startLocal(r.terminal);
-    r.session.tick(0, true);
-    r.session.tick(10, false);
-    r.session.tick(1000, false);
-    TEST_ASSERT_FALSE(r.terminal.isOpen());
-    TEST_ASSERT_FALSE(r.slot.busy());
-}
-void test_overlong_output_is_bounded_and_reported() {
-    Rig r;
-    r.terminal.open();
-    r.drain();
-    std::string huge(100000, 'x');
-    r.terminal.write(huge.data(), huge.size());
-    for (unsigned page = 0; page < 50; ++page) {
-        auto out = r.drain(64);
-        TEST_ASSERT_LESS_THAN(10000, out.size());
-        ScreenView view;
-        view.accept(out);
-        TEST_ASSERT_EQUAL(0, view.outside);
-        if (!view.has("More:"))
-            return;
-        r.feed("\r");
-    }
-    TEST_FAIL_MESSAGE("Output exceeded the bounded response buffer");
-}
-void test_rs232_menu_lists_and_blocks_takeover_actions() {
-    Rig r(true);
-    r.terminal.open();
-    r.drain();
-    r.feed("b\r");
-    ScreenView screen;
-    screen.accept(r.drain());
-    TEST_ASSERT_TRUE(screen.has("RS232 lines"));
-    TEST_ASSERT_TRUE(screen.has("unavailable: takes over RS232"));
-    stubCalls = 0;
-    r.feed("c\r");
-    screen.accept(r.drain());
-    TEST_ASSERT_TRUE(screen.has("Unavailable: hardware hook"));
-    TEST_ASSERT_EQUAL(0, stubCalls);
-    r.feed("\x1b[B");
-    screen.accept(r.drain());
-    TEST_ASSERT_FALSE(screen.has("> [C]"));
-}
-void test_oversized_input_is_rejected_without_dispatching_prefix() {
-    Rig r;
-    r.terminal.open();
-    r.drain();
-    r.feed("3\r3\r");
-    r.drain();
-    std::string input(200, '1');
-    input += '\r';
-    r.feed(input.c_str());
-    auto out = r.drain();
-    TEST_ASSERT_NOT_EQUAL(std::string::npos, out.find("Input too long"));
-    TEST_ASSERT_EQUAL(14400, r.modem.model());
-    TEST_ASSERT_TRUE(r.terminal.isOpen());
-}
-#include "repaint_cases.h"
-#include "review_cases.h"
-#include "ui_cases.h"
-void test_browser_lists_serial_diagnostics_without_dispatch() {
-    Rig r;
-    r.session.port().setBrowser(true);
-    r.terminal.open();
-    r.drain();
-    stubCalls = 0;
-    r.feed("c1");
-    ScreenView view;
-    view.accept(r.drain());
-    TEST_ASSERT_TRUE(view.has("Client Tests run on the USB console"));
-    TEST_ASSERT_EQUAL(0, stubCalls);
-}
+
 void test_client_key_alias_preserves_standard_s5() {
     Rig r;
     r.modem.active().s[5] = 21;
@@ -398,80 +219,31 @@ void test_client_key_alias_preserves_standard_s5() {
     TEST_ASSERT_EQUAL(0, r.modem.active().get(modemcfg::kE));
     TEST_ASSERT_TRUE(r.sink.text.find("OK") != std::string::npos);
 }
-void test_binary_service_has_no_geometry_or_redraw_bytes() {
-    class Raw : public hostport::Connection {
-    public:
-        bool active = true;
-        unsigned position = 0;
-        size_t space() const override { return 256; }
-        size_t write(const uint8_t *, size_t len) override { return len; }
-        size_t read(uint8_t *out, size_t cap) override {
-            size_t n = std::min<size_t>(cap, 256 - position);
-            for (size_t i = 0; i < n; ++i)
-                out[i] = position++;
-            return n;
-        }
-        bool isOpen() const override { return active; }
-        void close() override { active = false; }
-        bool binaryService() const override { return true; }
-    } raw;
-    Rig r;
-    r.terminal.open();
-    r.drain();
-    r.terminal.diagnostic(raw);
-    r.terminal.poll(10000);
-    auto bytes = r.drain(1);
-    TEST_ASSERT_EQUAL(256, bytes.size());
-    for (unsigned i = 0; i < 256; ++i)
-        TEST_ASSERT_EQUAL_HEX8(i, uint8_t(bytes[i]));
-    raw.close();
-    r.terminal.poll(10001);
-    TEST_ASSERT_FALSE(r.drain().empty());
-}
+#include "list_cases.h"
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_metadata_json_matches_the_generated_source);
     RUN_TEST(test_metadata_enumerations_match_firmware_tables);
     RUN_TEST(test_metadata_profile_values_and_registers_match_firmware);
     RUN_TEST(test_metadata_limits_match_firmware);
-    RUN_TEST(test_idle_menus_do_not_repaint_but_input_and_resize_do);
-    RUN_TEST(test_status_view_keeps_its_explicit_live_refresh);
-    RUN_TEST(test_browser_lists_serial_diagnostics_without_dispatch);
-    RUN_TEST(test_client_key_alias_preserves_standard_s5);
-    RUN_TEST(test_binary_service_has_no_geometry_or_redraw_bytes);
-    RUN_TEST(test_serial_reports_and_async_prompts_keep_input_isolated);
-    RUN_TEST(test_phonebook_capacity_boundaries_and_wide_actions);
-    RUN_TEST(test_geometry_inventory_and_compact_submenus);
-    RUN_TEST(test_four_themes_unknown_live_refresh_and_failed_save);
-    RUN_TEST(test_disabled_navigation_back_stack_and_form_focus);
-    RUN_TEST(test_phonebook_paging_details_selection_and_storage_failure);
-    RUN_TEST(test_phonebook_empty_missing_hook_and_changed_entry_confirmation);
-    RUN_TEST(test_resize_mid_escape_and_secret_confirmation_timeout);
-    RUN_TEST(test_esc_cancels_a_waiting_command_started_from_the_screen);
-    RUN_TEST(test_idle_screen_closes_after_five_minutes_and_a_key_resets_it);
-    RUN_TEST(test_idle_timeout_survives_the_clock_wrap);
-    RUN_TEST(test_cell_text_has_fixed_width_and_cannot_inject_controls);
     RUN_TEST(test_menu_actions_have_production_at_star_handlers);
-    RUN_TEST(test_direct_menu_reserves_without_carrier_and_releases);
-    RUN_TEST(test_renderers_and_paging_work_with_one_byte_output);
-    RUN_TEST(test_reply_line_break_at_the_start_is_not_shown);
-    RUN_TEST(test_response_pagination_does_not_leak_next_page);
-    RUN_TEST(test_menu_secret_input_is_wiped_and_never_echoed);
     RUN_TEST(test_ring_wrap_has_only_structured_events_and_can_disable);
     RUN_TEST(test_history_eviction_reload_and_atomic_rollback);
     RUN_TEST(test_history_persists_every_kind_and_refuses_another_layout);
     RUN_TEST(test_history_rejects_corruption_without_overwriting_flash);
-    RUN_TEST(test_display_sanitizes_untrusted_escape_sequences);
-    RUN_TEST(test_direct_menu_dtr_drop_closes_and_releases_reservation);
-    RUN_TEST(test_overlong_output_is_bounded_and_reported);
-    RUN_TEST(test_rs232_menu_lists_and_blocks_takeover_actions);
-    RUN_TEST(test_oversized_input_is_rejected_without_dispatching_prefix);
-    RUN_TEST(test_measure_one_arrow_key_at_80x25);
-    RUN_TEST(test_every_main_menu_move_sends_only_the_change);
-    RUN_TEST(test_resize_refresh_style_colour_and_port_output_send_a_full_frame);
-    RUN_TEST(test_changes_only_screen_matches_a_full_repaint);
-    RUN_TEST(test_output_pages_step_by_the_lines_shown);
-    RUN_TEST(test_alt_letter_neither_cancels_a_form_nor_runs_a_hotkey);
-    RUN_TEST(test_input_too_long_is_shown_at_once_and_kept_until_cleared);
+    RUN_TEST(test_lists_use_only_letters_and_sgr_at_every_size);
+    RUN_TEST(test_every_section_and_profile_page_is_reachable);
+    RUN_TEST(test_enum_choices_show_friendly_labels_and_confirm);
+    RUN_TEST(test_forms_echo_only_new_text_and_mask_secrets);
+    RUN_TEST(test_async_password_and_geometry_are_isolated);
+    RUN_TEST(test_output_pages_are_complete_and_sanitized);
+    RUN_TEST(test_disabled_actions_and_browser_diagnostics);
+    RUN_TEST(test_idle_cancel_timeout_and_reservation);
+    RUN_TEST(test_structured_phonebook_edit_and_confirmation);
+    RUN_TEST(test_metadata_units_ranges_and_current_values);
+    RUN_TEST(test_binary_diagnostics_have_no_menu_bytes);
+    RUN_TEST(test_client_key_alias_preserves_standard_s5);
+    RUN_TEST(test_optional_fields_variants_and_register_edits);
+    RUN_TEST(test_invalid_numbers_and_terminal_reports_cannot_change_state);
     return UNITY_END();
 }

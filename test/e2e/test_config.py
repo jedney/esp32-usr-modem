@@ -52,36 +52,36 @@ def local(console):
         console.raw(restore.encode() + b"\r", wait=0.2)
 
 
-@pytest.mark.parametrize("style", ["ANSI", "CP437", "PLAIN"])
+@pytest.mark.parametrize("style", ["ANSI", "PLAIN"])
 def test_direct_configuration_styles_and_quit(local, style):
     local.command("AT*STYLE=" + style)
     data = local.raw(b"AT*CONFIG\r")
-    require(b"MODEM CONFIGURATION" in data and b"Phonebook" in data, "Missing root menu")
+    require(b"Configuration" in data and b"Phonebook" in data, "Missing root menu")
     positions = [data.find(label) for label in (b"About", b"Hardware Tests", b"Client Tests", b"Command Reference")]
-    require(all(position >= 0 for position in positions) and positions == sorted(positions), "Wrong A-D menu order")
+    require(all(position >= 0 for position in positions) and positions == sorted(positions), "Wrong J-M menu order")
     require(b"CONNECT" not in data, "Direct configuration emitted CONNECT")
     if style == "PLAIN":
         require(b"\x1b" not in data, "Plain mode emitted terminal escapes")
-    elif style == "CP437":
-        require(b"\xc9\xcd" in data, "Missing serial CP437 line drawing")
+    else:
+        require(not re.sub(rb"\x1b\[[0-9;]*m", b"", data).count(b"\x1b"), "Menu emitted non-colour escapes")
     send(local, b"q\r")
     require(local.command("AT")[-1] == "OK", "Quit did not restore AT mode")
 
 
-@pytest.mark.parametrize("style", ["ANSI", "CP437", "PLAIN"])
+@pytest.mark.parametrize("style", ["ANSI", "PLAIN"])
 def test_idle_menu_does_not_repaint(local, style):
     local.command("AT*STYLE=" + style)
     data = local.raw(b"AT*CONFIG\r", wait=1)
-    require(b"MODEM CONFIGURATION" in data, "Missing root menu")
+    require(b"Configuration" in data, "Missing root menu")
     data = read(local, 6)
-    require(not data.replace(b"\x1b[18t", b""), "Idle menu emitted display output")
-    data = send(local, b"3\r", 1)
+    require(not data, "Idle menu emitted display output")
+    data = send(local, b"c\r", 1)
     require(b"Settings" in data, "Menu stopped responding to input")
 
 
 def test_reserved_dial_escape_resume_and_hangup(local):
     data = local.raw(b"ATDT123\r")
-    require(data.count(b"CONNECT") == 1 and b"MODEM CONFIGURATION" in data, "Reserved dial did not connect once")
+    require(data.count(b"CONNECT") == 1 and b"Configuration" in data, "Reserved dial did not connect once")
     time.sleep(1.1)
     send(local, b"+++", 1.2)
     require(b"CONNECT" in local.raw(b"ATO\r"), "ATO did not resume")
@@ -91,16 +91,46 @@ def test_reserved_dial_escape_resume_and_hangup(local):
 
 def test_submenus_help_and_hardware_availability(local):
     local.raw(b"AT*CONFIG\r")
-    data = send(local, b"3\r")
-    require(b"Auto-answer rings" in data and b"destination" in data and b"Model" in data, "Missing settings")
-    data = send(local, b"4\r")
-    require(b"0 disables auto-answer" in data, "Missing setting help")
+    data = send(local, b"c\r")
+    require(b"Rings before answering" in data and b"Answer incoming calls on" in data and b"Modem model" in data, "Missing settings")
+    data = send(local, b"d\r")
+    require(b"rings" in data and b"Range: 0-255" in data, "Missing setting help or units")
     send(local, b"\x1b")
     send(local, b"\x1b")
-    data = send(local, b"B\r")
+    data = send(local, b"k\r")
     require(b"Hardware Tests" in data and b"Guided tests" in data, "Missing hardware screen")
     data += read(local, 0.1)
-    require(b"RS232 lines" in data and b"Loopback" in data and b"Bridge" in data, "Missing console port tests")
+    require(b"RS232 control lines" in data and b"loopback" in data and b"bridge" in data, "Missing console port tests")
+
+
+@pytest.mark.parametrize("style", ["ANSI", "PLAIN"])
+def test_letter_tour_and_masked_entry_at_multiple_widths(local, style):
+    original_size = local.command("AT*SIZE?")[0]
+    local.command("AT*STYLE=" + style)
+    try:
+        for width in (20, 40, 80, 132):
+            local.command(f"AT*SIZE={width},25")
+            root = local.raw(b"AT*CONFIG\r")
+            require(b"A. Status" in root and b"M. Command Reference" in root, "Incomplete letter menu")
+            for letter, title in ((b"b", b"Phonebook"), (b"c", b"Settings"), (b"d", b"Sounds"),
+                                  (b"e", b"Debug"), (b"g", b"Wi-Fi and Clock"),
+                                  (b"h", b"Updates and Reset"), (b"k", b"Hardware Tests"), (b"l", b"Client Tests")):
+                require(title in send(local, letter, 0.2), "Letter tour did not reach a section")
+                send(local, b"x", 0.2)
+            send(local, b"cc", 0.2)
+            choices = send(local, b"\x0c", 0.2)
+            require(b"A. US Robotics Sportster 14.4k" in choices, "Friendly model choices missing")
+            send(local, b"\x1b", 0.2)
+            send(local, b"xhd", 0.2)
+            masked = send(local, b"MenuCanary123", 0.2)
+            require(b"MenuCanary123" not in masked and b"***" in masked, "Secret entry was not masked")
+            cancelled = send(local, b"\x1b", 0.2)
+            require(b"MenuCanary123" not in cancelled, "Cancelled secret leaked")
+            send(local, b"\x03", 0.2)
+    finally:
+        local.ser.write(b"\x03")
+        read(local, 0.2)
+        local.command("AT*SIZE=" + original_size)
 
 
 def test_menu_rejects_incoming_caller(local):
@@ -157,10 +187,26 @@ def test_rs232_hardware_takeover_tests_are_unavailable(rs232):
     rs232.command("AT*STYLE=PLAIN")
     try:
         rs232.raw(b"AT*CONFIG\r")
-        data = send(rs232, b"B\r", 1)
+        data = send(rs232, b"k\r", 1)
         require(b"unavailable: takes over RS232" in data, "RS232 test restriction is absent")
-        data = send(rs232, b"C\r", 1)
+        data = send(rs232, b"l\r", 1)
         require(b"DTR=" not in data, "Unavailable line test took over RS232")
     finally:
         send(rs232, b"\x03", 0.3)
         rs232.command("AT*STYLE=" + previous_style)
+
+
+def test_usb_modem_letter_menu(usb):
+    previous_style = usb.command("AT*STYLE?")[0]
+    try:
+        for style in ("PLAIN", "ANSI"):
+            usb.command("AT*STYLE=" + style)
+            root = usb.raw(b"AT*CONFIG\r")
+            require(b"A. Status" in root and b"M. Command Reference" in root, "USB menu missing")
+            choices = send(usb, b"cc")
+            require(b"A. US Robotics Sportster 14.4k" in choices, "USB letter navigation failed")
+            send(usb, b"\x03")
+            require(usb.command("AT")[-1] == "OK", "USB menu did not release the port")
+    finally:
+        send(usb, b"\x03")
+        usb.command("AT*STYLE=" + previous_style)

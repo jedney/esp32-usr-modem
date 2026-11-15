@@ -208,9 +208,9 @@ The device password (user `admin`) protects the web interface, the network conso
 
 | Command | What it does |
 |---|---|
-| `AT*CONFIG` | Open the configuration screen now (`ATDT123` opens it after dial sounds). A screen with no key for 5 minutes closes itself ("Screen closed after 5 minutes idle."), drops unsaved edits and frees the line. A running test or command is not cut off; the 5 minutes start again when it ends |
-| `AT*STYLE[?]` / `=<ANSI\|CP437\|PLAIN>` | Screen style for this port. This boot |
-| `AT*SIZE[?]` / `=<cols>,<rows>` | Screen size for this port, 1-132 by 1-50. This boot |
+| `AT*CONFIG` | Open the wrapping letter menu now (`ATDT123` opens it after dial sounds). Letters open items, Enter confirms text/choices, X/Esc goes back, P/R pages, Q exits at the root. Friendly help, units and current values appear inline. A screen with no key for 5 minutes closes itself ("Screen closed after 5 minutes idle."), drops unsaved edits and frees the line. A running test or command is not cut off; the 5 minutes start again when it ends |
+| `AT*STYLE[?]` / `=<ANSI\|PLAIN>` | Wrapping configuration list: ANSI colour or plain text, without cursor positioning. This port, this boot |
+| `AT*SIZE[?]` / `=<cols>,<rows>` | Transport dimensions for this port, 1-132 by 1-50. Independent of menu layout; this boot |
 | `AT*STATUS` | Model, front panel, ports, call, Wi-Fi, the network console's client, and the least free stack so far of the main loop, the network (lwIP) task and the web server, in bytes (-1: task not running) |
 | `AT*SETTING[?]` / `=<modem command>` | Show the profiles, or change a setting through the normal checks (`AT*SETTING=S0=2`). Exactly one setting command is accepted (`E0`, `&N8`, `S7=45`, `S7.1=1`, `&Z2=host`); anything after it, such as `E0DT555`, gives `ERROR` |
 | `AT*HELP` / `AT*?` | List project commands and hardware tests |

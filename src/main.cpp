@@ -511,6 +511,8 @@ const char *selectedModel() {
     return modemcfg::productName(modem ? modem->model() : 0);
 }
 
+extern config::Commands configCommands;
+
 class ConfigHardware : public config::Hardware, public config::UiServices {
 public:
     calls::Phonebook *phonebook() override { return &::phonebook; }
@@ -521,6 +523,19 @@ public:
             result.reportedRate = journal.session()->reportedSpeed();
         snprintf(result.link, sizeof result.link, "%s", linkStatus());
         return result;
+    }
+    bool value(const char *id, char *out, size_t cap) const override {
+        if (configCommands.value(id, out, cap))
+            return true;
+        const char *value = nullptr;
+        if (!strcmp(id, "updates-reset.web-interface"))
+            value = webSettings.enabled() ? "ON" : "OFF";
+        else if (!strcmp(id, "updates-reset.network-console"))
+            value = netConsoleSettings.enabled() ? "ON" : "OFF";
+        if (!value)
+            return false;
+        snprintf(out, cap, "%s", value);
+        return true;
     }
     // The project commands lib/config hands to the firmware (registry.cpp names them).
     atcmd::Reply command(atcmd::Port &port, const char *name, const char *args) override {
@@ -700,9 +715,7 @@ private:
         if (isQuery(args)) {
             auto style = menuOf(port).style();
             port.beginInfo();
-            port.line(style == config::Style::Plain   ? "PLAIN"
-                      : style == config::Style::Cp437 ? "CP437"
-                                                      : "ANSI");
+            port.line(style == config::Style::Plain ? "PLAIN" : "ANSI");
             return Reply::kOk;
         }
         return *args == '=' && menuOf(port).setStyle(args + 1) ? Reply::kOk : Reply::kError;
@@ -1344,9 +1357,8 @@ void serveConfigBrowser(uint32_t id) {
     size_t room = webServer.space(id) / 3;
     size_t n = browserSession->toHost(bytes, room < sizeof bytes ? room : sizeof bytes);
     if (n) {
-        // Menu CP437 is converted at this transport only; serial stays CP437.
-        std::string output =
-            webinterface::terminalUtf8(bytes, n, browserMenu->style() == config::Style::Cp437);
+        // Configuration output uses ASCII and optional ANSI colour.
+        std::string output = webinterface::terminalUtf8(bytes, n, false);
         webServer.write(id, reinterpret_cast<const uint8_t *>(output.data()), output.size());
     }
     runBrowserDeparture();
@@ -1408,7 +1420,7 @@ void createPorts() {
     hostMenu->services(&configHardware);
     usbMenu->services(&configHardware);
     browserMenu->services(&configHardware);
-    browserMenu->setStyle("CP437");
+    browserMenu->setStyle("ANSI");
     browserMenu->color(config::Color::Rgb);
     consoleClient =
         new clienttest::Service(clientSettings, clienttest::kConsolePort, consoleClientPlatform);

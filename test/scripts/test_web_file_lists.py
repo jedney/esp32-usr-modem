@@ -93,3 +93,18 @@ def test_end_to_end_asset_check_names_only_files_that_are_served():
     assert named <= served_files()
     assert "upload_flow.js" in named
     assert "ui-commands.js" in named
+
+
+def test_preview_modules_have_no_unresolved_relative_imports(tmp_path):
+    import base64
+    import json
+    import runpy
+    preview = tmp_path / "preview.html"
+    runpy.run_path(str(ROOT / "scripts/make_preview.py"))["main"](preview)
+    html = preview.read_text(encoding="utf-8")
+    match = re.search(r'<script type="importmap">(.*?)</script>', html)
+    imports = json.loads(match[1])["imports"]
+    assert "usr-ui-commands" in imports
+    for name, url in imports.items():
+        source = base64.b64decode(url.split(",", 1)[1]).decode()
+        assert not re.search(r"(?:from|import)\s*['\"]\./", source), name

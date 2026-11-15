@@ -44,7 +44,7 @@ def main(out: pathlib.Path) -> None:
         "usr-status": (SRC / "status.js").read_text(encoding="utf-8"),
         "usr-ui-data": (SRC / "ui-data.js").read_text(encoding="utf-8"),
         "usr-ui-commands": (SRC / "ui-commands.js").read_text(encoding="utf-8"),
-        "usr-demo": (SRC / "demo.js").read_text(encoding="utf-8").replace("'./ui-data.js'", "'usr-ui-data'"),
+        "usr-demo": (SRC / "demo.js").read_text(encoding="utf-8").replace("'./ui-data.js'", "'usr-ui-data'").replace("'./ui-commands.js'", "'usr-ui-commands'"),
         "usr-upload": (SRC / "upload.js").read_text(encoding="utf-8"),
         "usr-upload-flow": (SRC / "upload_flow.js").read_text(encoding="utf-8").replace("'./upload.js'", "'usr-upload'"),
         "usr-geometry": (SRC / "geometry.js").read_text(encoding="utf-8"),
@@ -75,7 +75,7 @@ def main(out: pathlib.Path) -> None:
     )
     html = html.replace("<title>USR Modem</title>", "<title>USR Modem (preview)</title>")
     out.write_text(html, encoding="utf-8")
-    print(f"Preview: {out} ({out.stat().st_size / 1024:.0f} KB). Phonebook 4 simulates a call; D stays unavailable.")
+    print(f"Preview: {out} ({out.stat().st_size / 1024:.0f} KB). Letter menu preview; no device services connected.")
 
 
 if __name__ == "__main__":

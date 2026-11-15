@@ -9,7 +9,7 @@ export default [
     "type": "action",
     "template": "*STATUS",
     "id": "status",
-    "key": "1",
+    "key": "A",
     "available": true
   },
   {
@@ -21,7 +21,7 @@ export default [
     "type": "action",
     "template": "",
     "id": "phonebook",
-    "key": "2",
+    "key": "B",
     "available": true
   },
   {
@@ -33,7 +33,7 @@ export default [
     "type": "action",
     "template": "",
     "id": "settings",
-    "key": "3",
+    "key": "C",
     "available": true
   },
   {
@@ -45,7 +45,7 @@ export default [
     "type": "action",
     "template": "",
     "id": "sounds",
-    "key": "4",
+    "key": "D",
     "available": true
   },
   {
@@ -57,7 +57,7 @@ export default [
     "type": "action",
     "template": "",
     "id": "debug",
-    "key": "5",
+    "key": "E",
     "available": true
   },
   {
@@ -69,7 +69,7 @@ export default [
     "type": "action",
     "template": "*CALLLOG",
     "id": "call-history",
-    "key": "6",
+    "key": "F",
     "available": true
   },
   {
@@ -81,7 +81,7 @@ export default [
     "type": "action",
     "template": "",
     "id": "wifi-clock",
-    "key": "7",
+    "key": "G",
     "available": true
   },
   {
@@ -93,7 +93,7 @@ export default [
     "type": "action",
     "template": "",
     "id": "updates-reset",
-    "key": "8",
+    "key": "H",
     "available": true
   },
   {
@@ -105,7 +105,7 @@ export default [
     "type": "action",
     "template": "*EXPORT",
     "id": "export-configuration",
-    "key": "9",
+    "key": "I",
     "available": true
   },
   {
@@ -117,7 +117,7 @@ export default [
     "type": "action",
     "template": "*ABOUT",
     "id": "about",
-    "key": "A",
+    "key": "J",
     "available": true
   },
   {
@@ -129,7 +129,7 @@ export default [
     "type": "action",
     "template": "",
     "id": "hardware-tests",
-    "key": "B",
+    "key": "K",
     "available": true
   },
   {
@@ -141,7 +141,7 @@ export default [
     "type": "action",
     "template": "",
     "id": "client-tests",
-    "key": "C",
+    "key": "L",
     "available": true
   },
   {
@@ -153,7 +153,7 @@ export default [
     "type": "action",
     "template": "*REFERENCE",
     "id": "command-reference",
-    "key": "D",
+    "key": "M",
     "available": true
   },
   {
@@ -165,7 +165,7 @@ export default [
     "type": "action",
     "template": "*PHONEBOOK?",
     "id": "phonebook.list-entries",
-    "key": "1",
+    "key": "A",
     "available": true
   },
   {
@@ -432,7 +432,7 @@ export default [
       }
     ],
     "id": "phonebook.add-edit-entry",
-    "key": "2",
+    "key": "B",
     "available": true
   },
   {
@@ -449,7 +449,7 @@ export default [
     "unit": "digits",
     "pattern": "(?!(?:123|666|667|5517545|5517546)$)[0-9]{1,11}",
     "id": "phonebook.delete-entry",
-    "key": "3",
+    "key": "C",
     "available": true
   },
   {
@@ -467,7 +467,7 @@ export default [
     "maxLength": 71,
     "unit": "characters",
     "id": "phonebook.dial",
-    "key": "4",
+    "key": "D",
     "available": true
   },
   {
@@ -479,7 +479,7 @@ export default [
     "type": "action",
     "template": "*SETTING?",
     "id": "settings.current-stored-profiles",
-    "key": "1",
+    "key": "A",
     "available": true
   },
   {
@@ -2311,7 +2311,7 @@ export default [
       }
     ],
     "id": "settings.edit-profile-registers",
-    "key": "2",
+    "key": "B",
     "available": true
   },
   {
@@ -2347,7 +2347,7 @@ export default [
     ],
     "unit": "bits per second",
     "id": "settings.model",
-    "key": "3",
+    "key": "C",
     "available": true
   },
   {
@@ -2363,7 +2363,7 @@ export default [
     "max": 255,
     "unit": "rings",
     "id": "settings.auto-answer-rings",
-    "key": "4",
+    "key": "D",
     "available": true
   },
   {
@@ -2398,7 +2398,7 @@ export default [
       }
     ],
     "id": "settings.auto-answer-destination",
-    "key": "5",
+    "key": "E",
     "available": true
   },
   {
@@ -2472,7 +2472,7 @@ export default [
     ],
     "unit": "bits per second",
     "id": "settings.host-baud",
-    "key": "6",
+    "key": "F",
     "available": true
   },
   {
@@ -2497,7 +2497,7 @@ export default [
       }
     ],
     "id": "settings.data-throttle",
-    "key": "7",
+    "key": "G",
     "available": true
   },
   {
@@ -2522,7 +2522,7 @@ export default [
       }
     ],
     "id": "settings.save-active-profile",
-    "key": "8",
+    "key": "H",
     "available": true
   },
   {
@@ -2570,7 +2570,7 @@ export default [
       }
     ],
     "id": "settings.load-stored-factory-profile",
-    "key": "9",
+    "key": "I",
     "available": true
   },
   {
@@ -2600,7 +2600,7 @@ export default [
       }
     ],
     "id": "settings.load-factory-profile",
-    "key": "A",
+    "key": "J",
     "available": true
   },
   {
@@ -2640,7 +2640,7 @@ export default [
       }
     ],
     "id": "settings.power-on-profile",
-    "key": "B",
+    "key": "K",
     "available": true
   },
   {
@@ -2672,13 +2672,13 @@ export default [
       }
     ],
     "id": "settings.stored-number",
-    "key": "C",
+    "key": "L",
     "available": true
   },
   {
     "screen": "Settings",
     "command": "*STYLE=",
-    "help": "Choose how this terminal session draws its menus.",
+    "help": "Choose plain text or ANSI colour for the wrapping configuration list.",
     "target": "Settings",
     "input": true,
     "friendly": "Terminal style",
@@ -2691,18 +2691,13 @@ export default [
         "description": "Use ANSI colours and line drawing."
       },
       {
-        "value": "CP437",
-        "label": "PC line drawing",
-        "description": "Use the PC character set for borders."
-      },
-      {
         "value": "PLAIN",
         "label": "Plain text",
         "description": "Use plain ASCII characters."
       }
     ],
     "id": "settings.terminal-style",
-    "key": "D",
+    "key": "M",
     "available": true
   },
   {
@@ -2714,7 +2709,7 @@ export default [
     "type": "action",
     "template": "*SOUNDS",
     "id": "sounds.list-sounds",
-    "key": "1",
+    "key": "A",
     "available": true
   },
   {
@@ -2949,7 +2944,7 @@ export default [
       }
     ],
     "id": "sounds.play-sound",
-    "key": "2",
+    "key": "B",
     "available": true
   },
   {
@@ -2967,7 +2962,7 @@ export default [
     "displayUnit": "seconds",
     "displayScale": 0.001,
     "id": "sounds.ring-delay",
-    "key": "3",
+    "key": "C",
     "available": true
   },
   {
@@ -2985,7 +2980,7 @@ export default [
     "displayUnit": "seconds",
     "displayScale": 0.001,
     "id": "sounds.connect-delay",
-    "key": "4",
+    "key": "D",
     "available": true
   },
   {
@@ -2997,7 +2992,7 @@ export default [
     "type": "action",
     "template": "*LOG",
     "id": "debug.view-log",
-    "key": "1",
+    "key": "A",
     "available": true
   },
   {
@@ -3027,7 +3022,7 @@ export default [
       }
     ],
     "id": "debug.verbosity",
-    "key": "2",
+    "key": "B",
     "available": true
   },
   {
@@ -3039,7 +3034,7 @@ export default [
     "type": "action",
     "template": "*LOG=CLEAR",
     "id": "debug.clear-debug-log",
-    "key": "3",
+    "key": "C",
     "available": true
   },
   {
@@ -3051,7 +3046,7 @@ export default [
     "type": "action",
     "template": "*RESETINFO",
     "id": "debug.reset-crash-information",
-    "key": "4",
+    "key": "D",
     "available": true
   },
   {
@@ -3063,7 +3058,7 @@ export default [
     "type": "action",
     "template": "*WIFI?",
     "id": "wifi-clock.network-status",
-    "key": "1",
+    "key": "A",
     "available": true
   },
   {
@@ -3075,7 +3070,7 @@ export default [
     "type": "action",
     "template": "*WIFISCAN",
     "id": "wifi-clock.scan",
-    "key": "2",
+    "key": "B",
     "available": true
   },
   {
@@ -3139,7 +3134,7 @@ export default [
       }
     ],
     "id": "wifi-clock.join",
-    "key": "3",
+    "key": "C",
     "available": true
   },
   {
@@ -3164,7 +3159,7 @@ export default [
       }
     ],
     "id": "wifi-clock.wifi-toggle",
-    "key": "4",
+    "key": "D",
     "available": true
   },
   {
@@ -3176,7 +3171,7 @@ export default [
     "type": "action",
     "template": "*WIFIFORGET",
     "id": "wifi-clock.forget-network",
-    "key": "5",
+    "key": "E",
     "available": true
   },
   {
@@ -3233,7 +3228,7 @@ export default [
       }
     ],
     "id": "wifi-clock.ip-configuration",
-    "key": "6",
+    "key": "F",
     "available": true
   },
   {
@@ -3250,7 +3245,7 @@ export default [
     "unit": "characters",
     "pattern": "[A-Za-z0-9](?:[A-Za-z0-9-]{0,30}[A-Za-z0-9])?",
     "id": "wifi-clock.network-name",
-    "key": "7",
+    "key": "G",
     "available": true
   },
   {
@@ -3262,7 +3257,7 @@ export default [
     "type": "action",
     "template": "*TIME",
     "id": "wifi-clock.time",
-    "key": "8",
+    "key": "H",
     "available": true
   },
   {
@@ -3360,7 +3355,7 @@ export default [
     "maxLength": 63,
     "unit": "characters",
     "id": "wifi-clock.time-zone",
-    "key": "9",
+    "key": "I",
     "available": true
   },
   {
@@ -3377,7 +3372,7 @@ export default [
     "unit": "characters",
     "pattern": "(?![.-])(?!.*\\.\\.)(?!.*\\.$)[A-Za-z0-9.-]+",
     "id": "wifi-clock.ntp-server",
-    "key": "A",
+    "key": "J",
     "available": true
   },
   {
@@ -3394,7 +3389,7 @@ export default [
     "unit": "characters",
     "pattern": "(?![.-])(?!.*\\.$)[A-Za-z0-9._-]+",
     "id": "wifi-clock.dns-lookup",
-    "key": "B",
+    "key": "K",
     "available": true
   },
   {
@@ -3411,7 +3406,7 @@ export default [
     "unit": "characters",
     "pattern": "(?![.-])(?!.*\\.$)[A-Za-z0-9._-]+",
     "id": "wifi-clock.ping",
-    "key": "C",
+    "key": "L",
     "available": true
   },
   {
@@ -3423,7 +3418,7 @@ export default [
     "type": "action",
     "template": "*INTERNET?",
     "id": "wifi-clock.internet-status",
-    "key": "D",
+    "key": "M",
     "available": true
   },
   {
@@ -3495,7 +3490,7 @@ export default [
       }
     ],
     "id": "wifi-clock.internet-settings",
-    "key": "E",
+    "key": "N",
     "available": true
   },
   {
@@ -3521,7 +3516,7 @@ export default [
       }
     ],
     "id": "wifi-clock.internet-dial",
-    "key": "F",
+    "key": "O",
     "available": true
   },
   {
@@ -3533,7 +3528,7 @@ export default [
     "type": "action",
     "template": "*VER",
     "id": "updates-reset.firmware-version",
-    "key": "1",
+    "key": "A",
     "available": true
   },
   {
@@ -3545,7 +3540,7 @@ export default [
     "type": "action",
     "template": "*OTA?",
     "id": "updates-reset.ota-status",
-    "key": "2",
+    "key": "B",
     "available": true
   },
   {
@@ -3580,7 +3575,7 @@ export default [
       }
     ],
     "id": "updates-reset.ota-policy-window",
-    "key": "3",
+    "key": "C",
     "available": true
   },
   {
@@ -3598,7 +3593,7 @@ export default [
     "unit": "characters",
     "pattern": "[\\x20-\\x7e]{8,32}",
     "id": "updates-reset.change-device-password",
-    "key": "4",
+    "key": "D",
     "available": true
   },
   {
@@ -3614,7 +3609,7 @@ export default [
     "type": "action",
     "template": "*RESTART",
     "id": "updates-reset.restart",
-    "key": "5",
+    "key": "E",
     "available": true
   },
   {
@@ -3630,7 +3625,7 @@ export default [
     "type": "action",
     "template": "*FACTORY",
     "id": "updates-reset.factory-reset",
-    "key": "6",
+    "key": "F",
     "available": true
   },
   {
@@ -3655,7 +3650,7 @@ export default [
       }
     ],
     "id": "updates-reset.web-interface",
-    "key": "7",
+    "key": "G",
     "available": true
   },
   {
@@ -3680,7 +3675,7 @@ export default [
       }
     ],
     "id": "updates-reset.network-console",
-    "key": "8",
+    "key": "H",
     "available": true
   },
   {
@@ -3692,7 +3687,7 @@ export default [
     "type": "action",
     "template": "*HWTEST",
     "id": "hardware-tests.guided-tests",
-    "key": "1",
+    "key": "A",
     "available": true
   },
   {
@@ -3704,7 +3699,7 @@ export default [
     "type": "action",
     "template": "*HWPINS",
     "id": "hardware-tests.pin-map",
-    "key": "2",
+    "key": "B",
     "available": true
   },
   {
@@ -3716,7 +3711,7 @@ export default [
     "type": "action",
     "template": "*HWINFO",
     "id": "hardware-tests.board-information",
-    "key": "3",
+    "key": "C",
     "available": true
   },
   {
@@ -3728,7 +3723,7 @@ export default [
     "type": "action",
     "template": "*HWFILES",
     "id": "hardware-tests.files",
-    "key": "4",
+    "key": "D",
     "available": true
   },
   {
@@ -3803,7 +3798,7 @@ export default [
       }
     ],
     "id": "hardware-tests.leds",
-    "key": "5",
+    "key": "E",
     "available": true
   },
   {
@@ -3833,7 +3828,7 @@ export default [
       }
     ],
     "id": "hardware-tests.amplifier",
-    "key": "6",
+    "key": "F",
     "available": true
   },
   {
@@ -3884,7 +3879,7 @@ export default [
       }
     ],
     "id": "hardware-tests.test-volume",
-    "key": "7",
+    "key": "G",
     "available": true
   },
   {
@@ -3985,7 +3980,7 @@ export default [
       }
     ],
     "id": "hardware-tests.tone-sweep",
-    "key": "8",
+    "key": "H",
     "available": true
   },
   {
@@ -4001,7 +3996,7 @@ export default [
     "maxLength": 120,
     "unit": "characters",
     "id": "hardware-tests.dtmf",
-    "key": "9",
+    "key": "I",
     "available": true
   },
   {
@@ -4017,7 +4012,7 @@ export default [
     "maxLength": 119,
     "unit": "characters",
     "id": "hardware-tests.pulse",
-    "key": "A",
+    "key": "J",
     "available": true
   },
   {
@@ -4029,7 +4024,7 @@ export default [
     "type": "action",
     "template": "*HWPOT",
     "id": "hardware-tests.potentiometer",
-    "key": "B",
+    "key": "K",
     "available": true
   },
   {
@@ -4044,7 +4039,7 @@ export default [
     "type": "action",
     "template": "*HWLINES",
     "id": "hardware-tests.rs232-lines",
-    "key": "C",
+    "key": "L",
     "available": true
   },
   {
@@ -4059,7 +4054,7 @@ export default [
     "type": "action",
     "template": "*HWLOOP=ALL",
     "id": "hardware-tests.loopback",
-    "key": "D",
+    "key": "M",
     "available": true
   },
   {
@@ -4074,7 +4069,7 @@ export default [
     "type": "action",
     "template": "*HWBRIDGE",
     "id": "hardware-tests.bridge",
-    "key": "E",
+    "key": "N",
     "available": true
   },
   {
@@ -4132,7 +4127,7 @@ export default [
       }
     ],
     "id": "hardware-tests.output-signal",
-    "key": "F",
+    "key": "O",
     "available": true
   },
   {
@@ -4167,7 +4162,7 @@ export default [
       }
     ],
     "id": "client-tests.display",
-    "key": "1",
+    "key": "A",
     "available": true
   },
   {
@@ -4180,7 +4175,7 @@ export default [
     "type": "action",
     "template": "*TEST SIZE",
     "id": "client-tests.size",
-    "key": "2",
+    "key": "B",
     "available": true
   },
   {
@@ -4193,7 +4188,7 @@ export default [
     "type": "action",
     "template": "*TEST KEYS",
     "id": "client-tests.keys",
-    "key": "3",
+    "key": "C",
     "available": true
   },
   {
@@ -4206,7 +4201,7 @@ export default [
     "type": "action",
     "template": "*TEST ID",
     "id": "client-tests.id",
-    "key": "4",
+    "key": "D",
     "available": true
   },
   {
@@ -4219,7 +4214,7 @@ export default [
     "type": "action",
     "template": "*TEST ECHO",
     "id": "client-tests.echo",
-    "key": "5",
+    "key": "E",
     "available": true
   },
   {
@@ -4235,7 +4230,7 @@ export default [
     "max": 30,
     "unit": "seconds",
     "id": "client-tests.tx",
-    "key": "6",
+    "key": "F",
     "available": true
   },
   {
@@ -4251,7 +4246,7 @@ export default [
     "max": 30,
     "unit": "seconds",
     "id": "client-tests.rx",
-    "key": "7",
+    "key": "G",
     "available": true
   },
   {
@@ -4264,7 +4259,7 @@ export default [
     "type": "action",
     "template": "*TEST CABLE",
     "id": "client-tests.cable",
-    "key": "8",
+    "key": "H",
     "available": true
   },
   {
@@ -4277,7 +4272,7 @@ export default [
     "type": "action",
     "template": "*TEST BELL",
     "id": "client-tests.bell",
-    "key": "9",
+    "key": "I",
     "available": true
   },
   {
@@ -4290,7 +4285,7 @@ export default [
     "type": "action",
     "template": "*TEST FORMAT",
     "id": "client-tests.format",
-    "key": "A",
+    "key": "J",
     "available": true
   },
   {
@@ -4305,7 +4300,7 @@ export default [
     "maxLength": 113,
     "unit": "characters",
     "id": "client-tests.transfer",
-    "key": "B",
+    "key": "K",
     "available": true
   },
   {
@@ -4318,7 +4313,7 @@ export default [
     "type": "action",
     "template": "*TEST SUMMARY",
     "id": "client-tests.summary",
-    "key": "C",
+    "key": "L",
     "available": true
   },
   {
@@ -4397,7 +4392,7 @@ export default [
       }
     ],
     "id": "client-tests.edit",
-    "key": "D",
+    "key": "M",
     "available": true
   },
   {
@@ -4410,7 +4405,7 @@ export default [
     "type": "action",
     "template": "*TEST APPLY",
     "id": "client-tests.apply",
-    "key": "E",
+    "key": "N",
     "available": true
   },
   {
@@ -4423,7 +4418,7 @@ export default [
     "type": "action",
     "template": "*TEST RESET",
     "id": "client-tests.reset",
-    "key": "F",
+    "key": "O",
     "available": true
   }
 ];

@@ -19,20 +19,17 @@ class HandoffContract(unittest.TestCase):
                 self.assertIn('template', binding)
                 if item.get('items'):
                     self.assertEqual(binding['type'], 'action')
-    def test_grid_dimensions_and_widths(self):
-        import unicodedata
-        files=list((ROOT/'previews').glob('*.txt'))
-        self.assertEqual(len(files),7)
-        for p in files:
-            with self.subTest(file=p.name):
-                lines=p.read_text(encoding="utf-8").splitlines()
-                self.assertEqual(len(lines),25)
-                self.assertTrue(all(len(line)==80 for line in lines))
-                self.assertTrue(all(unicodedata.east_asian_width(c) not in ('W','F') for line in lines for c in line))
+    def test_previews_are_wrapping_ascii_lists(self):
+        for p in (ROOT/'previews').glob('*.txt'):
+            text=p.read_text(encoding='utf-8')
+            self.assertTrue(text.isascii())
+            self.assertNotIn('ARROWS',text)
+            self.assertIn('X. Back',text)
+            self.assertIn('A. ',text)
     def test_four_exact_models(self):
         expected={'sportster-14.4k':'#6f327f','sportster-28.8k':'#448FA1','sportster-33.6k':'#349b67','sportster-56k':'#3F668E'}
         self.assertEqual({m['id']:m['accent'] for m in theme['models']},expected)
-        self.assertEqual(theme['active_model_source'].split(' ')[0],'AT*MODEL')
+        self.assertEqual(theme['active_model_source'].split('=')[0],'AT*MODEL')
         for m in theme['models']:
             s=(ROOT/'previews'/f"main-{m['id']}.txt").read_text(encoding="utf-8")
             self.assertIn(m['label'],s)
@@ -40,7 +37,7 @@ class HandoffContract(unittest.TestCase):
         items=menu['main_menu']
         self.assertEqual(len(items),13)
         self.assertEqual(sum(len(m['items']) for m in items),78)
-        self.assertEqual([m['key'] for m in items],list('123456789ABCD'))
+        self.assertEqual([m['key'] for m in items],list('ABCDEFGHIJKLM'))
         self.assertEqual([m['label'] for m in items[-4:]],
                          ['About','Hardware Tests','Client Tests','Command Reference'])
         self.assertEqual(len(set(m['id'] for m in items)),13)
@@ -56,7 +53,7 @@ class HandoffContract(unittest.TestCase):
         for m in menu['main_menu']:
             keys=[i['key'] for i in m['items']]
             self.assertEqual(len(keys),len(set(keys)))
-            self.assertTrue(all(k not in ['Q','I'] for k in keys))
+            self.assertEqual(keys,list('ABCDEFGHIJKLMNO')[:len(keys)])
             self.assertLessEqual(len(keys),15)
 
 if __name__=='__main__': unittest.main()

@@ -26,7 +26,7 @@ void test_idle_menu_has_no_periodic_display_output() {
     hostport::CallSlot slot;
     hostport::Session session(modem, sink, 115200, slot);
     uint8_t bytes[256];
-    for (const char *style : {"ANSI", "CP437", "PLAIN"}) {
+    for (const char *style : {"ANSI", "PLAIN"}) {
         // A new screen per style: its clock starts at 0, as the polls below assume.
         auto *terminal = new config::Terminal(session, false);
         TEST_ASSERT_TRUE(terminal->setStyle(style));
@@ -42,17 +42,33 @@ void test_idle_menu_has_no_periodic_display_output() {
             TEST_ASSERT_NOT_EQUAL(std::string::npos, position);
             position += strlen(label);
         }
-        // Under five seconds: no serial geometry probe is due.
+        // An idle list never polls terminal geometry or repaints.
         terminal->poll(2100);
         TEST_ASSERT_EQUAL(0, terminal->read(bytes, sizeof bytes));
         terminal->poll(4200);
         TEST_ASSERT_EQUAL(0, terminal->read(bytes, sizeof bytes));
-        const uint8_t down[] = {27, '[', 'B'};
-        for (uint8_t c : down)
-            terminal->write(&c, 1);
+        const uint8_t settings = 'c';
+        terminal->write(&settings, 1);
         TEST_ASSERT_GREATER_THAN(0, terminal->read(bytes, sizeof bytes));
         while (terminal->read(bytes, sizeof bytes)) {
         }
+        terminal->poll(6000);
+        TEST_ASSERT_EQUAL(0, terminal->read(bytes, sizeof bytes));
+        TEST_ASSERT_TRUE(terminal->resize(20, 8));
+        TEST_ASSERT_EQUAL(0, terminal->read(bytes, sizeof bytes));
+        const uint8_t model = 'c';
+        terminal->write(&model, 1);
+        frame.clear();
+        while ((n = terminal->read(bytes, 1)))
+            frame.append(reinterpret_cast<const char *>(bytes), n);
+        TEST_ASSERT_NOT_EQUAL(std::string::npos, frame.find("A. US Robotics Sportster 14.4k"));
+        const uint8_t escape = 27;
+        terminal->write(&escape, 1);
+        terminal->poll(6100);
+        frame.clear();
+        while ((n = terminal->read(bytes, sizeof bytes)))
+            frame.append(reinterpret_cast<const char *>(bytes), n);
+        TEST_ASSERT_NOT_EQUAL(std::string::npos, frame.find("Edit cancelled"));
         terminal->close();
         delete terminal;
     }

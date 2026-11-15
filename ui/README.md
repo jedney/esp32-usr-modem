@@ -1,24 +1,5 @@
-# Sportster configuration screen design
+# Configuration list
 
-This folder is the design contract for the configuration screen: four model themes, the canonical 80x25 layout and the wider layout for larger terminals. The firmware renders it in `lib/config/src/`, and `scripts/generate_ui.py` builds the firmware catalogue and the browser demo data from `menu-definition.json`. Main menu keys A-D are About, Hardware Tests, Client Tests and Command Reference; Client Tests run on serial only and the browser lists them for reference. The text previews are layout references, never application screens.
+The configuration screen is a wrapping list in plain text or ANSI colour. `menu-definition.json` defines 13 main entries and 78 nested items, with letter keys A-M and A-O. `lib/config/ui-bindings.json` supplies typed metadata, friendly names, help, units, ranges and command templates for all 91 bindings. See `DESIGN_SPEC.md` for editing, pagination, confirmations and secret handling.
 
-## Files
-
-| Path | Description |
-| --- | --- |
-| `DESIGN_SPEC.md` | The design: layout, colour, model selection, interaction, security and acceptance rules. |
-| `theme-tokens.json` | Four exact model accent colours + shared ANSI palette, resolution targets. |
-| `menu-definition.json` | Complete 13-entry main menu, 78 nested items, UI keys, serial-only Client Tests. |
-| `previews/*.txt` | Strict 80×25 (80 display cells per line, 25 rows) layout examples; the tests and `scripts/generate_ui.py` read them. |
-| `tools/preview_80x25.py` | Regenerates the text previews, standard library only; reads the JSON theme and menu. |
-| `tools/render_runtime.py` | Optional Pillow renderer for the cell snapshots the native `test_config` writes when `USR_UI_SNAPSHOTS=1`. |
-| `tests/test_layout_contract.py` | Built-in unittest checks of static handoff grid and data. |
-
-## Static layout checks (Python 3)
-
-```sh
-python ui/tools/preview_80x25.py
-python -m unittest discover -s ui/tests -v
-```
-
-The previews deliberately use `Link: UNKNOWN`, `Profile: --`, and an unbound Phonebook. No real modem has been queried; no fake contacts or serial numbers have been inserted. For an unknown runtime model, the actual implementation should show an explicit unknown-model state instead of treating the 28.8k preview as a default.
+`python scripts/generate_ui.py` generates the firmware catalogue, browser command metadata and demo inventory. `python ui/tools/preview.py` generates the illustrative text lists in `previews/`; they contain no live modem data. `python -m unittest discover -s ui/tests` checks their contract. The firmware stream is tested in `test/native/test_config`, `test/native/test_config_services`, `test/embedded/test_config` and `test/e2e/test_config.py`.

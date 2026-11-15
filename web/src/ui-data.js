@@ -3,7 +3,7 @@ export default {
   "menu": [
     {
       "id": "status",
-      "key": "1",
+      "key": "A",
       "label": "Status",
       "group": "Connectivity",
       "icon": "signal",
@@ -12,7 +12,7 @@ export default {
     },
     {
       "id": "phonebook",
-      "key": "2",
+      "key": "B",
       "label": "Phonebook",
       "group": "Connectivity",
       "icon": "phone",
@@ -21,28 +21,28 @@ export default {
         {
           "id": "phonebook.list-entries",
           "label": "List entries",
-          "key": "1"
+          "key": "A"
         },
         {
           "id": "phonebook.add-edit-entry",
           "label": "Add / edit entry",
-          "key": "2"
+          "key": "B"
         },
         {
           "id": "phonebook.delete-entry",
           "label": "Delete entry",
-          "key": "3"
+          "key": "C"
         },
         {
           "id": "phonebook.dial",
           "label": "Dial",
-          "key": "4"
+          "key": "D"
         }
       ]
     },
     {
       "id": "settings",
-      "key": "3",
+      "key": "C",
       "label": "Settings",
       "group": "Configuration",
       "icon": "gear",
@@ -51,73 +51,73 @@ export default {
         {
           "id": "settings.current-stored-profiles",
           "label": "Current and stored profiles",
-          "key": "1"
+          "key": "A"
         },
         {
           "id": "settings.edit-profile-registers",
           "label": "Edit profile / registers",
-          "key": "2"
+          "key": "B"
         },
         {
           "id": "settings.model",
           "label": "Model",
-          "key": "3"
+          "key": "C"
         },
         {
           "id": "settings.auto-answer-rings",
           "label": "Auto-answer rings (S0)",
-          "key": "4"
+          "key": "D"
         },
         {
           "id": "settings.auto-answer-destination",
           "label": "Auto-answer destination",
-          "key": "5"
+          "key": "E"
         },
         {
           "id": "settings.host-baud",
           "label": "Host baud",
-          "key": "6"
+          "key": "F"
         },
         {
           "id": "settings.data-throttle",
           "label": "Data throttle",
-          "key": "7"
+          "key": "G"
         },
         {
           "id": "settings.save-active-profile",
           "label": "Save active profile",
-          "key": "8"
+          "key": "H"
         },
         {
           "id": "settings.load-stored-factory-profile",
           "label": "Load stored/factory profile",
-          "key": "9"
+          "key": "I"
         },
         {
           "id": "settings.load-factory-profile",
           "label": "Load factory profile",
-          "key": "A"
+          "key": "J"
         },
         {
           "id": "settings.power-on-profile",
           "label": "Power-on profile",
-          "key": "B"
+          "key": "K"
         },
         {
           "id": "settings.stored-number",
           "label": "Stored number",
-          "key": "C"
+          "key": "L"
         },
         {
           "id": "settings.terminal-style",
           "label": "Terminal style",
-          "key": "D"
+          "key": "M"
         }
       ]
     },
     {
       "id": "sounds",
-      "key": "4",
+      "key": "D",
       "label": "Sounds",
       "group": "Configuration",
       "icon": "speaker",
@@ -126,28 +126,28 @@ export default {
         {
           "id": "sounds.list-sounds",
           "label": "List sounds",
-          "key": "1"
+          "key": "A"
         },
         {
           "id": "sounds.play-sound",
           "label": "Play",
-          "key": "2"
+          "key": "B"
         },
         {
           "id": "sounds.ring-delay",
           "label": "Ringing duration",
-          "key": "3"
+          "key": "C"
         },
         {
           "id": "sounds.connect-delay",
           "label": "Delay before CONNECT",
-          "key": "4"
+          "key": "D"
         }
       ]
     },
     {
       "id": "debug",
-      "key": "5",
+      "key": "E",
       "label": "Debug",
       "group": "Tools",
       "icon": "wrench",
@@ -156,28 +156,28 @@ export default {
         {
           "id": "debug.view-log",
           "label": "View log",
-          "key": "1"
+          "key": "A"
         },
         {
           "id": "debug.verbosity",
           "label": "Verbosity",
-          "key": "2"
+          "key": "B"
         },
         {
           "id": "debug.clear-debug-log",
           "label": "Clear debug log",
-          "key": "3"
+          "key": "C"
         },
         {
           "id": "debug.reset-crash-information",
           "label": "Reset / crash information",
-          "key": "4"
+          "key": "D"
         }
       ]
     },
     {
       "id": "call-history",
-      "key": "6",
+      "key": "F",
       "label": "Call History",
       "group": "Connectivity",
       "icon": "list",
@@ -186,7 +186,7 @@ export default {
     },
     {
       "id": "wifi-clock",
-      "key": "7",
+      "key": "G",
       "label": "Wi-Fi and Clock",
       "group": "Configuration",
       "icon": "wifi",
@@ -195,83 +195,83 @@ export default {
         {
           "id": "wifi-clock.network-status",
           "label": "Network status",
-          "key": "1"
+          "key": "A"
         },
         {
           "id": "wifi-clock.scan",
           "label": "Scan",
-          "key": "2"
+          "key": "B"
         },
         {
           "id": "wifi-clock.join",
           "label": "Join",
-          "key": "3"
+          "key": "C"
         },
         {
           "id": "wifi-clock.wifi-toggle",
           "label": "Wi-Fi on / off",
-          "key": "4"
+          "key": "D"
         },
         {
           "id": "wifi-clock.forget-network",
           "label": "Forget network",
-          "key": "5"
+          "key": "E"
         },
         {
           "id": "wifi-clock.ip-configuration",
           "label": "IP configuration",
-          "key": "6"
+          "key": "F"
         },
         {
           "id": "wifi-clock.network-name",
           "label": "Network name",
-          "key": "7"
+          "key": "G"
         },
         {
           "id": "wifi-clock.time",
           "label": "Time",
-          "key": "8"
+          "key": "H"
         },
         {
           "id": "wifi-clock.time-zone",
           "label": "Time zone",
-          "key": "9"
+          "key": "I"
         },
         {
           "id": "wifi-clock.ntp-server",
           "label": "NTP server",
-          "key": "A"
+          "key": "J"
         },
         {
           "id": "wifi-clock.dns-lookup",
           "label": "DNS lookup",
-          "key": "B"
+          "key": "K"
         },
         {
           "id": "wifi-clock.ping",
           "label": "Ping",
-          "key": "C"
+          "key": "L"
         },
         {
           "id": "wifi-clock.internet-status",
           "label": "Internet dial-up status",
-          "key": "D"
+          "key": "M"
         },
         {
           "id": "wifi-clock.internet-settings",
           "label": "Internet addresses / DNS",
-          "key": "E"
+          "key": "N"
         },
         {
           "id": "wifi-clock.internet-dial",
           "label": "Dial Internet PPP / SLIP",
-          "key": "F"
+          "key": "O"
         }
       ]
     },
     {
       "id": "updates-reset",
-      "key": "8",
+      "key": "H",
       "label": "Updates and Reset",
       "group": "Maintenance",
       "icon": "download",
@@ -280,48 +280,48 @@ export default {
         {
           "id": "updates-reset.firmware-version",
           "label": "Firmware version",
-          "key": "1"
+          "key": "A"
         },
         {
           "id": "updates-reset.ota-status",
           "label": "OTA status",
-          "key": "2"
+          "key": "B"
         },
         {
           "id": "updates-reset.ota-policy-window",
           "label": "OTA policy / window",
-          "key": "3"
+          "key": "C"
         },
         {
           "id": "updates-reset.change-device-password",
           "label": "Change device password",
-          "key": "4"
+          "key": "D"
         },
         {
           "id": "updates-reset.restart",
           "label": "Restart",
-          "key": "5"
+          "key": "E"
         },
         {
           "id": "updates-reset.factory-reset",
           "label": "Factory reset",
-          "key": "6"
+          "key": "F"
         },
         {
           "id": "updates-reset.web-interface",
           "label": "Web interface",
-          "key": "7"
+          "key": "G"
         },
         {
           "id": "updates-reset.network-console",
           "label": "Network console",
-          "key": "8"
+          "key": "H"
         }
       ]
     },
     {
       "id": "export-configuration",
-      "key": "9",
+      "key": "I",
       "label": "Export Configuration",
       "group": "Maintenance",
       "icon": "upload",
@@ -330,7 +330,7 @@ export default {
     },
     {
       "id": "about",
-      "key": "A",
+      "key": "J",
       "label": "About",
       "group": "Information",
       "icon": "info",
@@ -339,7 +339,7 @@ export default {
     },
     {
       "id": "hardware-tests",
-      "key": "B",
+      "key": "K",
       "label": "Hardware Tests",
       "group": "Tools",
       "icon": "chip",
@@ -348,83 +348,83 @@ export default {
         {
           "id": "hardware-tests.guided-tests",
           "label": "Guided tests",
-          "key": "1"
+          "key": "A"
         },
         {
           "id": "hardware-tests.pin-map",
           "label": "Pin map",
-          "key": "2"
+          "key": "B"
         },
         {
           "id": "hardware-tests.board-information",
           "label": "Board information",
-          "key": "3"
+          "key": "C"
         },
         {
           "id": "hardware-tests.files",
           "label": "Files",
-          "key": "4"
+          "key": "D"
         },
         {
           "id": "hardware-tests.leds",
           "label": "LEDs",
-          "key": "5"
+          "key": "E"
         },
         {
           "id": "hardware-tests.amplifier",
           "label": "Amplifier",
-          "key": "6"
+          "key": "F"
         },
         {
           "id": "hardware-tests.test-volume",
           "label": "Test volume",
-          "key": "7"
+          "key": "G"
         },
         {
           "id": "hardware-tests.tone-sweep",
           "label": "Tone / sweep",
-          "key": "8"
+          "key": "H"
         },
         {
           "id": "hardware-tests.dtmf",
           "label": "DTMF",
-          "key": "9"
+          "key": "I"
         },
         {
           "id": "hardware-tests.pulse",
           "label": "Pulse",
-          "key": "A"
+          "key": "J"
         },
         {
           "id": "hardware-tests.potentiometer",
           "label": "Potentiometer",
-          "key": "B"
+          "key": "K"
         },
         {
           "id": "hardware-tests.rs232-lines",
           "label": "RS232 lines",
-          "key": "C"
+          "key": "L"
         },
         {
           "id": "hardware-tests.loopback",
           "label": "Loopback",
-          "key": "D"
+          "key": "M"
         },
         {
           "id": "hardware-tests.bridge",
           "label": "Bridge",
-          "key": "E"
+          "key": "N"
         },
         {
           "id": "hardware-tests.output-signal",
           "label": "Output signal",
-          "key": "F"
+          "key": "O"
         }
       ]
     },
     {
       "id": "client-tests",
-      "key": "C",
+      "key": "L",
       "label": "Client Tests",
       "group": "Tools",
       "icon": "flask",
@@ -433,84 +433,84 @@ export default {
       "items": [
         {
           "id": "client-tests.display",
-          "key": "1",
+          "key": "A",
           "label": "Display patterns"
         },
         {
           "id": "client-tests.size",
-          "key": "2",
+          "key": "B",
           "label": "Measure screen"
         },
         {
           "id": "client-tests.keys",
-          "key": "3",
+          "key": "C",
           "label": "Keyboard codes"
         },
         {
           "id": "client-tests.id",
-          "key": "4",
+          "key": "D",
           "label": "Terminal identification"
         },
         {
           "id": "client-tests.echo",
-          "key": "5",
+          "key": "E",
           "label": "Echo and line endings"
         },
         {
           "id": "client-tests.tx",
-          "key": "6",
+          "key": "F",
           "label": "Transmit and RTS"
         },
         {
           "id": "client-tests.rx",
-          "key": "7",
+          "key": "G",
           "label": "Receive and CTS"
         },
         {
           "id": "client-tests.cable",
-          "key": "8",
+          "key": "H",
           "label": "Cable and signals"
         },
         {
           "id": "client-tests.bell",
-          "key": "9",
+          "key": "I",
           "label": "Terminal bell"
         },
         {
           "id": "client-tests.format",
-          "key": "A",
+          "key": "J",
           "label": "Serial format"
         },
         {
           "id": "client-tests.transfer",
-          "key": "B",
+          "key": "K",
           "label": "File transfers"
         },
         {
           "id": "client-tests.summary",
-          "key": "C",
+          "key": "L",
           "label": "Results summary"
         },
         {
           "id": "client-tests.edit",
-          "key": "D",
+          "key": "M",
           "label": "Edit client findings"
         },
         {
           "id": "client-tests.apply",
-          "key": "E",
+          "key": "N",
           "label": "Save client findings"
         },
         {
           "id": "client-tests.reset",
-          "key": "F",
+          "key": "O",
           "label": "Reset client settings"
         }
       ]
     },
     {
       "id": "command-reference",
-      "key": "D",
+      "key": "M",
       "label": "Command Reference",
       "group": "Information",
       "icon": "book",
@@ -564,12 +564,5 @@ export default {
     "warning_yellow": "#F0DA63",
     "error_red": "#F43F4F",
     "disabled_gray": "#696E7B"
-  },
-  "logo": [
-    "\u2588   \u2588 \u2588\u2588\u2588\u2588\u2588 \u2588\u2588\u2588\u2588        \u2588             \u2588     \u2588              ",
-    "\u2588   \u2588 \u2588     \u2588   \u2588  \u2588\u2588\u2588  \u2588      \u2588\u2588\u2588  \u2588\u2588\u2588\u2588\u2588        \u2588\u2588\u2588\u2588  \u2588\u2588\u2588\u2588",
-    "\u2588   \u2588 \u2588\u2588\u2588\u2588\u2588 \u2588\u2588\u2588\u2588  \u2588   \u2588 \u2588\u2588\u2588\u2588  \u2588   \u2588   \u2588     \u2588   \u2588     \u2588\u2588   ",
-    "\u2588   \u2588     \u2588 \u2588  \u2588  \u2588   \u2588 \u2588   \u2588 \u2588   \u2588   \u2588     \u2588   \u2588        \u2588\u2588",
-    "\u2588\u2588\u2588\u2588\u2588 \u2588\u2588\u2588\u2588\u2588 \u2588   \u2588  \u2588\u2588\u2588  \u2588\u2588\u2588\u2588   \u2588\u2588\u2588    \u2588\u2588    \u2588    \u2588\u2588\u2588\u2588 \u2588\u2588\u2588\u2588 "
-  ]
+  }
 };

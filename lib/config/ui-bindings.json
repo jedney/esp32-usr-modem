@@ -2601,7 +2601,7 @@
   "settings.terminal-style": {
     "screen": "Settings",
     "command": "*STYLE=",
-    "help": "Choose how this terminal session draws its menus.",
+    "help": "Choose plain text or ANSI colour for the wrapping configuration list.",
     "target": "Settings",
     "input": true,
     "friendly": "Terminal style",
@@ -2612,11 +2612,6 @@
         "value": "ANSI",
         "label": "Colour text",
         "description": "Use ANSI colours and line drawing."
-      },
-      {
-        "value": "CP437",
-        "label": "PC line drawing",
-        "description": "Use the PC character set for borders."
       },
       {
         "value": "PLAIN",

@@ -340,9 +340,9 @@ void test_local_service_f0_never_echoes_password_and_escape_wipes_prompt() {
             r.session.fromHost(&c, 1, clockMs);
         }
     };
-    feed("8\r");
+    feed("h\r");
     drain();
-    feed("4\r");
+    feed("d\r");
     drain();
     feed("SensitiveCanary");
     auto out = drain();
@@ -407,7 +407,7 @@ void test_menu_export_retains_complete_replayable_lines_across_pages() {
         }
     };
     drain();
-    feed("9\r");
+    feed("i\r");
     std::string output;
     for (unsigned i = 0; i < 30; ++i) {
         auto page = drain();
@@ -499,6 +499,10 @@ struct Services : config::UiServices {
     explicit Services(calls::Phonebook &b) : book(&b) {}
     calls::Phonebook *phonebook() override { return book; }
     config::UiState state() const override { return {}; }
+    const Commands *commands = nullptr;
+    bool value(const char *id, char *out, size_t cap) const override {
+        return commands && commands->value(id, out, cap);
+    }
 };
 std::string upper(std::string text) {
     for (auto &c : text) {
@@ -526,44 +530,55 @@ void press(Terminal &t, const char *keys) {
 // Opens every configuration screen through the menu and returns all that was drawn.
 std::string tourScreens(Rig &r, Services &services, size_t *visited) {
     std::string all;
-    Terminal screen(r.session, false);
-    screen.services(&services);
-    screen.setStyle("PLAIN");  // no cursor moves: a secret cannot be split by them
-    screen.open();
-    all += drainScreen(screen);
+    bool seen[10] = {};
     size_t count;
     const Action *a = actions(count);
-    bool seen[10] = {true};  // Main is drawn by open()
-    for (int pass = 0; pass < 3; ++pass) {
-        for (size_t i = 0; i < count; ++i) {
-            // A navigation row has no command; its hot key opens the screen it names.
-            if (a[i].screen != Screen::Main || *a[i].command || !a[i].key) {
-                continue;
-            }
-            press(screen, std::string(1, a[i].key).c_str());
+    for (const char *style : {"PLAIN", "ANSI"}) {
+        for (unsigned width : {20u, 40u, 80u, 132u}) {
+            Terminal screen(r.session, false);
+            screen.services(&services);
+            screen.setStyle(style);
+            screen.resize(width, 25);
+            screen.open();
             all += drainScreen(screen);
-            seen[unsigned(a[i].target)] = true;
-            // Second level: rows of the opened screen that open yet another screen.
-            for (size_t j = 0; j < count; ++j) {
-                if (a[j].screen == a[i].target && !*a[j].command && a[j].key) {
+            seen[0] = true;
+            screen.close();
+            for (size_t i = 0; i < count; ++i) {
+                if (a[i].screen != Screen::Main || *a[i].command)
+                    continue;
+                screen.open();
+                drainScreen(screen);
+                press(screen, std::string(1, a[i].key).c_str());
+                auto text = drainScreen(screen);
+                TEST_ASSERT_NOT_EQUAL_MESSAGE(std::string::npos, text.find(screenName(a[i].target)),
+                                              a[i].id);
+                all += text;
+                seen[unsigned(a[i].target)] = true;
+                screen.close();
+                for (size_t j = 0; j < count; ++j) {
+                    if (a[j].screen != a[i].target)
+                        continue;
+                    screen.open();
+                    drainScreen(screen);
+                    press(screen, std::string(1, a[i].key).c_str());
+                    drainScreen(screen);
                     press(screen, std::string(1, a[j].key).c_str());
                     all += drainScreen(screen);
-                    seen[unsigned(a[j].target)] = true;
-                    press(screen, "\x1b");
-                    all += drainScreen(screen);
+                    if (!*a[j].command) {
+                        seen[unsigned(a[j].target)] = true;
+                        for (unsigned page = 0; page < 5; ++page) {
+                            press(screen, "r");
+                            all += drainScreen(screen);
+                        }
+                    }
+                    screen.close();  // cancels waiting commands and wipes incomplete edits
                 }
-            }
-            press(screen, "\x1b");
-            all += drainScreen(screen);
-        }
-        if (pass == 0) {
-            *visited = 0;
-            for (bool s : seen) {
-                *visited += s;
             }
         }
     }
-    screen.close();
+    *visited = 0;
+    for (bool s : seen)
+        *visited += s;
     return all;
 }
 void test_no_output_contains_either_password_or_its_stored_forms() {
@@ -641,9 +656,10 @@ void test_no_output_contains_either_password_or_its_stored_forms() {
     TEST_ASSERT_EQUAL_STRING(digest.c_str(), r.device.digestHash());
 
     Services services(r.phonebook);
+    services.commands = &r.commands;
     size_t visited = 0;
     const std::string drawn = tourScreens(r, services, &visited);
-    TEST_ASSERT_GREATER_THAN(3, visited);
+    TEST_ASSERT_EQUAL(10, visited);
     TEST_ASSERT_GREATER_THAN(2000, drawn.size());
     TEST_ASSERT_NOT_EQUAL(std::string::npos, drawn.find("bbs.example.com"));  // phonebook drawn
     seen += drawn;
@@ -662,8 +678,31 @@ void test_no_output_contains_either_password_or_its_stored_forms() {
                                   "upper-case form in output");
     }
 }
+void test_letter_profile_editor_dispatches_real_setting_commands() {
+    Rig r;
+    Terminal menu(r.session, false);
+    menu.open();
+    drainScreen(menu);
+    press(menu, "cbba\r");
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, drainScreen(menu).find("*SETTING=E0"));
+    press(menu, "y");
+    drainScreen(menu);
+    TEST_ASSERT_EQUAL(0, r.modem.active().get(modemcfg::kE));
+    press(menu, "xrkdummy\r");
+    drainScreen(menu);  // invalid numeric input remains in the form
+    TEST_ASSERT_EQUAL(0, r.modem.active().s[0]);
+    press(menu,
+          "\x15"
+          "4\r");
+    drainScreen(menu);
+    press(menu, "y");
+    drainScreen(menu);
+    TEST_ASSERT_EQUAL(4, r.modem.active().s[0]);
+    menu.close();
+}
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_letter_profile_editor_dispatches_real_setting_commands);
     RUN_TEST(test_menu_export_retains_complete_replayable_lines_across_pages);
     RUN_TEST(test_export_replays_nondefault_profiles_and_phonebook_without_secrets);
     RUN_TEST(test_setting_wrapper_applies_validation_and_tone_choice);

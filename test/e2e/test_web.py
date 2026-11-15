@@ -251,7 +251,7 @@ def test_web_disable_closes_owner_and_serial_can_reenable(web, console):
             require(console.command("AT*WEB=OFF")[-1] == "OK", "Web OFF failed")
             time.sleep(0.3)
             require(console.command("AT")[-1] == "OK", "Stopping web damaged modem loop")
-            require(b"MODEM CONFIGURATION" in console.raw(b"AT*CONFIG\r"), "Stopping web retained reservation")
+            require(b"A. Status" in console.raw(b"AT*CONFIG\r"), "Stopping web retained reservation")
             console.raw(b"\x03", wait=0.2)
     finally:
         console.raw(b"\x03", wait=0.1)
@@ -268,11 +268,11 @@ def test_ticket_origin_single_use_and_initial_snapshots(web):
         text, messages = peer.collect(1)
         require({"hello", "led", "wifi", "clock", "call"}.issubset({m["t"] for m in messages}),
                 "Initial status snapshot incomplete")
-        require(b"Read-only" in text and b"MODEM CONFIGURATION" not in text,
+        require(b"Read-only" in text and b"A. Status" not in text,
                 "Browser did not start read-only")
         peer.send(b"e")
         text, messages = peer.collect(0.6)
-        require(b"MODEM CONFIGURATION" in text, "Shared browser menu missing")
+        require(b"A. Status" in text, "Shared browser menu missing")
         require(any(m.get("t") == "access" and m.get("edit") for m in messages),
                 "E did not grant edit access")
     with web.ws(ticket) as peer:
@@ -283,7 +283,7 @@ def test_open_browser_claims_nothing(web, console):
     with web.ws() as peer:
         require(peer.accepted, "Browser refused")
         peer.collect(0.4)
-        require(b"MODEM CONFIGURATION" in console.raw(b"AT*CONFIG\r"), "Idle browser holds the modem")
+        require(b"A. Status" in console.raw(b"AT*CONFIG\r"), "Idle browser holds the modem")
         console.raw(b"\x03", wait=0.2)
 
 
@@ -299,12 +299,12 @@ def test_one_browser_menu_and_second_browser_read_only(web, console):
             _, messages = second.collect(0.3)
             require(not any(m.get("t") == "access" and m.get("edit") for m in messages),
                     "Second browser took the menu with E")
-            second.send(b"3\r")
+            second.send(b"c\r")
             text, _ = second.collect(0.3)
             require(b"Settings" not in text, "Read-only input invoked menu")
         first.send(b"q\r")
         first.collect(0.4)
-        require(b"MODEM CONFIGURATION" in console.raw(b"AT*CONFIG\r"), "Quit did not release slot")
+        require(b"A. Status" in console.raw(b"AT*CONFIG\r"), "Quit did not release slot")
         console.raw(b"\x03")
 
 
@@ -338,7 +338,7 @@ def test_browser_hardware_line_toggles_restore_on_disconnect(web, manual_rs232):
     rs232 = manual_rs232
     with web.ws() as peer:
         peer.enter()
-        for keys in (b"B\r", b"C\r"):
+        for keys in (b"k\r", b"l\r"):
             peer.send(keys)
             text, _ = peer.collect(0.4)
         require(b"Live RS232" in text, "Browser line test did not start")
@@ -365,7 +365,7 @@ def test_upload_rejects_missing_csrf_before_writing(web):
 def test_browser_bridge_to_com18_both_directions(web, rs232):
     with web.ws() as peer:
         peer.enter()
-        for keys in (b"B\r", b"E\r"):
+        for keys in (b"k\r", b"n\r"):
             peer.send(keys)
             text, _ = peer.collect(0.4)
         require(b"Bridge:" in text, "Browser bridge did not start")
@@ -459,9 +459,9 @@ def test_incoming_rs232_call_keeps_browser_read_only_and_signals_follow(web, con
 def test_browser_forget_requires_confirmation_and_cancel_keeps_network(web):
     with web.ws() as peer:
         peer.enter()
-        peer.send(b"7\r")
+        peer.send(b"g\r")
         peer.collect(0.3)
-        peer.send(b"5\r")
+        peer.send(b"e\r")
         text, _ = peer.collect(0.3)
         require(b"Forget network and disconnect browser?" in text, "Missing browser network warning")
         peer.send(b"n\r")
@@ -472,14 +472,14 @@ def test_browser_forget_requires_confirmation_and_cancel_keeps_network(web):
 def test_browser_guided_stop_returns_control_without_starting_leds(web, console):
     with web.ws() as peer:
         peer.enter()
-        for keys in (b"B\r", b"1\r"):
+        for keys in (b"k\r", b"a\r"):
             peer.send(keys)
             text, _ = peer.collect(0.3)
         require(b"Enter = start" in text, "Guided test did not reach its first prompt")
         peer.send(b"\x18")
         text, _ = peer.collect(0.4)
         require(b"Summary" in text and b"skipped" in text, "Stop did not cancel guided test")
-    require(b"MODEM CONFIGURATION" in console.raw(b"AT*CONFIG\r"), "Cancelled test retained reservation")
+    require(b"A. Status" in console.raw(b"AT*CONFIG\r"), "Cancelled test retained reservation")
     console.raw(b"\x03", wait=0.1)
 
 
@@ -614,5 +614,21 @@ def test_interrupted_upload_frees_the_modem(web, console, request):
         except OSError:
             pass
     require(ok, "The modem stayed busy after an interrupted upload")
-    require(b"MODEM CONFIGURATION" in console.raw(b"AT*CONFIG\r"), "Menu unavailable after upload")
+    require(b"A. Status" in console.raw(b"AT*CONFIG\r"), "Menu unavailable after upload")
     console.raw(b"\x03", wait=0.2)
+
+
+def test_browser_letter_lists_keep_geometry_separate_and_tests_serial_only(web):
+    with web.ws() as peer:
+        peer.enter()
+        peer.send(b"\x0c")
+        text, _ = peer.collect(0.4)
+        require(b"A. Status" in text and b"M. Command Reference" in text, "Incomplete browser list")
+        require(b"\x1b" not in re.sub(rb"\x1b\[[0-9;]*m", b"", text), "Browser menu emitted cursor controls")
+        for width in (20, 40, 80, 132):
+            peer.send(f'{{"t":"size","cols":{width},"rows":25}}'.encode(), opcode=1)
+            text, _ = peer.collect(0.2)
+            require(not text, "Transport size repainted the browser list")
+        peer.send(b"la")
+        text, _ = peer.collect(0.4)
+        require(b"Client Tests run on serial only" in text, "Browser ran a serial diagnostic")

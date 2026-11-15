@@ -1,25 +1,31 @@
-╔══════════════════════════════════════════════════════════════════════════════╗
-║         █   █ █████ ████        █             █     █                        ║
-║         █   █ █     █   █  ███  █      ███  █████        ████  ████          ║
-║         █   █ █████ ████  █   █ ████  █   █   █     █   █     ██             ║
-║         █   █     █ █  █  █   █ █   █ █   █   █     █   █        ██          ║
-║         █████ █████ █   █  ███  ████   ███    ██    █    ████ ████           ║
-║                        ─── Sportster 33.6k Series ───                        ║
-╠════════════════════ [ MODEM CONFIGURATION - MAIN MENU ] ═════════════════════╣
-║ > [1] Status                         │   [7] Wi-Fi and Clock                 ║
-║   [2] Phonebook                      │   [8] Updates and Reset               ║
-║   [3] Settings                       │   [9] Export Configuration            ║
-║   [4] Sounds                         │   [A] About                           ║
-║   [5] Debug                          │   [B] Hardware Tests                  ║
-║   [6] Call History                   │   [C] Client Tests                    ║
-║                                      │   [D] Command Reference               ║
-║                                                                              ║
-╠══════════════════════════════════════════════════════════════════════════════╣
-║  ARROWS: navigate / switch column    ENTER: select    Q: quit                ║
-║  [C] Client Tests - serial client diagnostics                                ║
-╠══════════════════════════ [ HELP / DEVICE STATUS ] ══════════════════════════╣
-║  F1 Help  F2 Status  F3 Phonebook  F4 Settings  F10 Exit                     ║
-║  Model: 33.6k  |  Profile: --  |  Link: UNKNOWN                              ║
-║  Reference layout only. Device information is not connected.                 ║
-║  Command > █                                                                 ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+Sportster 33.6k Series - Configuration
+Illustration only: current values appear on the modem.
+
+A. Status
+   Show the call, front lights, network and serial connection.
+B. Phonebook
+   Save, change and dial your favourite destinations.
+C. Settings
+   Choose the modem model and connection preferences.
+D. Sounds
+   Listen to dial tones and recorded modem handshakes.
+E. Diagnostics
+   View diagnostic events and restart information.
+F. Call History
+   Show the last 50 network calls, including calls before a restart.
+G. Wi-Fi and Clock
+   Connect to Wi-Fi, check the network and set the clock.
+H. Updates and Reset
+   Manage software updates, the device password and resets.
+I. Export Configuration
+   Show commands that restore your settings. Passwords are left out.
+J. About
+   Show the version, build information and software credits.
+K. Hardware Tests
+   Check the lights, speaker and serial electronics.
+L. Client Tests
+   Check a serial terminal using the maintenance console or modem port. These tests cannot run in the browser.
+M. Command Reference
+   Show the standard modem commands and the device commands.
+
+X. Back / Q. Exit; Esc goes back.
