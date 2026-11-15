@@ -112,10 +112,16 @@ private:
 NetConsoleListener netConsoleListener;
 const char *linkStatus();
 const char *selectedModel();
+// Successful logins from the loop task (network console), shown between commands. Browser
+// logins queue inside the web server; an OTA login prints at once (see onOtaLogin()).
+webinterface::LoginEvents consoleLogins;
 class NetConsoleHost : public netconsole::Host {
 public:
     bool passwordMatches(const char *password) override { return device.matches(password); }
-    void loggedIn() override { device.markUsed(); }
+    void loggedIn(const char *peer) override {
+        device.markUsed();
+        consoleLogins.push(webinterface::LoginKind::kNetConsole, peer);
+    }
     const char *modelName() override { return selectedModel(); }
     const char *status() override { return linkStatus(); }
 };
@@ -841,9 +847,9 @@ private:
                 break;
         }
         // The least free stack so far, for the bench record.
-        port.printf("Stack headroom: loop %d B, lwIP %d B, web %d B\r\n",
+        port.printf("Stack headroom: loop %d B, lwIP %d B, web %d B, upload %d B\r\n",
                     hw::stackHeadroom("loopTask"), hw::stackHeadroom("tcpip"),
-                    hw::stackHeadroom("httpd"));
+                    hw::stackHeadroom("httpd"), hw::stackHeadroom("webupload"));
         port.printf("Flow &H%u &R%u; DTR &D%u; DCD &C%u; serial &B%u\r\n",
                     modem->active().get(modemcfg::kAmpH), modem->active().get(modemcfg::kAmpR),
                     modem->active().get(modemcfg::kAmpD), modem->active().get(modemcfg::kAmpC),
@@ -1094,9 +1100,19 @@ void pollNotices() {
         return;
     }
     char text[netcfg::Net::kNoticeMax];
-    if (net.takeNotice(text, sizeof text)) {
+    if (net.takeNotice(text, sizeof text) || webServer.takeLogin(text, sizeof text) ||
+        consoleLogins.take(text, sizeof text)) {
         consoleout::printf("%s\r\n", text);
     }
+}
+
+// ArduinoOTA receives the whole image inside the loop and then restarts, so its login is
+// printed at once and sent to the network console now. Uploads start only while idle.
+void onOtaLogin() {
+    char text[40];
+    webinterface::formatLogin(webinterface::LoginKind::kOta, nullptr, text, sizeof text);
+    consoleout::printf("\r\n%s\r\n", text);
+    netConsole.flush();
 }
 
 hostport::WifiLed arqLed() {
@@ -1620,6 +1636,7 @@ void setup() {
         return console->callUp() || rs232::session().callUp() || usbport::session().callUp();
     });
     waitForNetwork();
+    ota.onAuthenticated(onOtaLogin);
     ota.poll(millis(), net.up(), true, net.settings().host, net.link().ip);
     printBanner(loaded, netLoaded);
     char skip[netcfg::Net::kNoticeMax];
@@ -1640,6 +1657,11 @@ void setup() {
 
 void loop() {
     if (restarting) {
+        static bool sessionsEnded = false;
+        if (!sessionsEnded) {
+            sessionsEnded = true;
+            webServer.revokeSessions();  // a reset or restart ends every browser login
+        }
         if (millis() - restartAt >= 500) {
             Serial.flush();
             ESP.restart();

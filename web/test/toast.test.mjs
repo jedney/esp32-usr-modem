@@ -34,3 +34,14 @@ test('a burst has a bounded visible stack and clears old timers', () => {
     assert.equal(container.children[0].textContent, '15');
     assert.equal(timers.size, 5);
 });
+
+test('clearing removes every toast and its timer', () => {
+    const container = new Element(), timers = new Map();
+    const toasts = createToasts({container, document: {createElement: () => new Element()},
+        schedule: (fn, ms) => { timers.set(fn, ms); return fn; }, cancel: fn => timers.delete(fn)});
+    toasts.show('Connected to Amiga Retro');
+    toasts.show('Wi-Fi: connected');
+    toasts.clear();
+    assert.equal(container.children.length, 0);
+    assert.equal(timers.size, 0);
+});

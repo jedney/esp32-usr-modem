@@ -25,6 +25,7 @@ Thumbs.db
 data/www/
 data/image-id.txt
 web/preview.html
+web/preview-login.html
 web/node_modules/
 
 # Local secrets: Wi-Fi and device passwords (OTA and web) for tests and uploads (see .env.example)

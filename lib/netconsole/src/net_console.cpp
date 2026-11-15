@@ -268,7 +268,7 @@ void Console::submit(Client &client, uint32_t now) {
         cursor_ = log_.start();  // all the console output still held
         noteAt_ = noteLength_ = 0;
         skipped_ = 0;
-        host_.loggedIn();
+        host_.loggedIn(client.socket->peer());
         send(client, "\r\nLogged in. Recent console output follows.\r\n");
         return;
     }

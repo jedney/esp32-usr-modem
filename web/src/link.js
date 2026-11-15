@@ -1,8 +1,10 @@
 // A device reset can leave TCP half-open. Keep transport lifecycle outside the DOM.
 import {reconnectDelay, parseMessage, terminalAccess} from './status.js';
 export const BUSY_DELAY = 30000;
+// session() throws an error with auth: true when the login has ended (HTTP 401): the link then
+// stops for good and calls authLost(); retrying could never succeed without a new login.
 export function createModemLink({session, socket, receive, status, disconnect,
-    now = () => performance.now(), schedule = setTimeout, cancel = clearTimeout}) {
+    authLost = () => {}, now = () => performance.now(), schedule = setTimeout, cancel = clearTimeout}) {
     let current = null, timer = null, attempt = 0, generation = 0, seen = 0, stopped = false;
     let owned = false, paused = false, inputTimer = null, queue = [], queued = 0, offset = 0;
     const active = ws => ws === current && !stopped;
@@ -80,7 +82,14 @@ export function createModemLink({session, socket, receive, status, disconnect,
                 retry();
             };
         } catch (error) {
-            if (!stopped && tokenGeneration === generation) retry(error?.busy === true);
+            if (stopped || tokenGeneration !== generation) return;
+            if (error?.auth === true) {
+                stopped = true;
+                reset();
+                authLost();
+                return;
+            }
+            retry(error?.busy === true);
         }
     };
     return {

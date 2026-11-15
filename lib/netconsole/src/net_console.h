@@ -51,7 +51,8 @@ public:
     virtual ~Host() = default;
     // True if `password` is the device password. Compared in constant time.
     virtual bool passwordMatches(const char *password) = 0;
-    virtual void loggedIn() = 0;  // the device password has been used
+    // The device password has been used: once per successful log-in, a takeover included.
+    virtual void loggedIn(const char *peer) = 0;
     // For the greeting before the password prompt: the selected model ("US Robotics
     // Sportster 14.4k") and the modem's status ("Idle", "Dialling", "Ringing", "Connected").
     virtual const char *modelName() = 0;

@@ -2,9 +2,11 @@
 
 - scripts/build_web.py        what goes into the LittleFS image
 - lib/hw/src/web_service.cpp  what the modem serves
-- the page itself             what index.html, the style sheets and the modules load
+- the pages themselves        what index.html, login.html, the style sheets and modules load
 - scripts/make_preview.py     the modules inlined into web/preview.html
 - test/e2e/test_web.py        the assets the end-to-end test expects behind the login
+
+Only what the login page loads may be served before login.
 """
 import importlib.util
 import re
@@ -23,11 +25,17 @@ def built_files():
     return set(module.web_files(ROOT))
 
 
-def served_files():
+def asset_table():
+    """Served name -> True if the modem serves it before login."""
     text = (ROOT / "lib" / "hw" / "src" / "web_service.cpp").read_text(encoding="utf-8")
     block = text[text.index("static const Asset assets[]"):]
     block = block[: block.index("};")]
-    return {m.group(1).lstrip("/") for m in re.finditer(r'\{"(/[^"]+)",\s*"[^"]+"\}', block)}
+    return {m.group(1).lstrip("/"): m.group(2) == "true"
+            for m in re.finditer(r'\{"(/[^"]+)",\s*"[^"]+",\s*(true|false)\}', block)}
+
+
+def served_files():
+    return set(asset_table())
 
 
 def source_for(name):
@@ -37,11 +45,11 @@ def source_for(name):
     raise AssertionError(f"{name} is not in web/src or web/vendor")
 
 
-def loaded_files():
-    """Everything the page can load, found by following index.html, style sheets and imports."""
+def loaded_files(page="index.html"):
+    """Everything a page can load, found by following its HTML, style sheets and imports."""
     found = set()
     todo = []
-    html = (SRC / "index.html").read_text(encoding="utf-8")
+    html = (SRC / page).read_text(encoding="utf-8")
     for match in re.finditer(r'(?:src|href)="([^":/][^":]*\.(?:js|mjs|css|png))"', html):
         todo.append(match.group(1))
     while todo:
@@ -72,8 +80,16 @@ def test_every_file_the_page_loads_is_built_and_served():
 
 
 def test_nothing_is_built_that_the_page_never_loads():
-    # index.html (the entry) is loaded by the browser itself.
-    assert built_files() - loaded_files() == {"index.html"}
+    # The two pages are loaded by the browser itself.
+    loaded = loaded_files() | loaded_files("login.html")
+    assert built_files() - loaded == {"index.html", "login.html"}
+
+
+def test_only_the_login_page_and_what_it_loads_are_served_before_login():
+    public = {name for name, open_ in asset_table().items() if open_}
+    assert public == loaded_files("login.html") | {"login.html"}
+    assert "login.js" in public and "usr-logo.png" in public
+    assert not {"index.html", "app.js", "ui-commands.js", "xterm.mjs"} & public
 
 
 def test_preview_inlines_every_module_the_page_imports():
@@ -86,7 +102,7 @@ def test_preview_inlines_every_module_the_page_imports():
 
 def test_end_to_end_asset_check_names_only_files_that_are_served():
     text = (ROOT / "test" / "e2e" / "test_web.py").read_text(encoding="utf-8")
-    block = text[text.index("def test_assets_require_digest"):]
+    block = text[text.index("def test_assets_require_session"):]
     block = block[: block.index("for path in", block.index("for path in") + 1)]
     named = {m.group(1).lstrip("/") for m in re.finditer(r'"(/[a-z_\-]+\.(?:js|png))"', block)}
     assert named, "no assets found in the end-to-end test"
@@ -111,3 +127,6 @@ def test_preview_modules_have_no_unresolved_relative_imports(tmp_path):
     for name, url in imports.items():
         source = base64.b64decode(url.split(",", 1)[1]).decode()
         assert not re.search(r"(?:from|import)\s*['\"]\./", source), name
+    login = (tmp_path / "preview-login.html").read_text(encoding="utf-8")
+    assert 'action="/api/login"' in login
+    assert 'src="login.js"' not in login and 'href="style.css"' not in login

@@ -57,7 +57,10 @@ const state = {
     csrf: null, version: null, edit: false, upload: false, online: false, opening: false,
     reloadWhenOnline: false, // set after a successful update: reload once the modem is back
     hardware: null, busy: true,
+    loggedOut: false, // the login ended: only an accepted upload may still be finishing
 };
+// The login session (GET api/auth): its CSRF token for logging out, and a timer at its deadline.
+const login = {csrf: null, timer: null};
 let menus = null;
 let initialOpen = true, requestedOpen = false, pendingMenu = null;
 
@@ -328,6 +331,7 @@ function fitTerminal() {
 // ---------------------------------------------------------------- transport
 
 let send = () => {};
+let stopLink = () => {};
 let reconnectModem = () => {};
 let openTerminal = () => false;
 let closeTerminal = () => {};
@@ -343,8 +347,10 @@ function connectModem() {
                 const reply = await fetch('api/session', {cache: 'no-store', signal: controller.signal});
                 if (!reply.ok) {
                     // 503 while an update is written: other tabs wait longer before asking again.
+                    // 401: this browser's login ended (logout in another tab, or expiry).
                     const error = new Error('Login unavailable');
                     error.busy = reply.status === 503;
+                    error.auth = reply.status === 401;
                     throw error;
                 }
                 return (await reply.json()).token;
@@ -386,8 +392,10 @@ function connectModem() {
             $('stop-test').hidden = true;
             showCall();
         },
+        authLost: () => authLost(),
     });
     send = bytes => !state.upload && link.send(bytes);
+    stopLink = () => link.stop();
     reconnectModem = () => link.reconnect();
     openTerminal = () => link.openTerminal();
     closeTerminal = () => link.closeTerminal();
@@ -424,6 +432,95 @@ async function startDemo() {
     term.focus();
 }
 
+// ---------------------------------------------------------------- login
+
+const demoMode = () => new URLSearchParams(location.search).has('demo') || location.protocol === 'file:' ||
+    !!window.USR_MODEM_DEMO;
+
+// 'ok', 'lost' (HTTP 401: the login ended) or 'unknown' (the modem did not answer).
+async function checkAuth() {
+    try {
+        const reply = await fetch('api/auth', {cache: 'no-store', signal: AbortSignal.timeout(5000)});
+        if (reply.status === 401) return 'lost';
+        if (!reply.ok) return 'unknown';
+        const auth = await reply.json();
+        login.csrf = auth.csrf;
+        clearTimeout(login.timer);
+        // Check again just after the deadline; the modem ends the session itself.
+        login.timer = setTimeout(recheckAuth, (auth.expires + 1) * 1000);
+        return 'ok';
+    } catch {
+        return 'unknown';
+    }
+}
+async function recheckAuth() {
+    if (state.loggedOut || demoMode()) return;
+    if (await checkAuth() === 'lost') authLost();
+}
+
+// The login ended here or in another tab. Forget everything this page showed, then show the
+// login page. An accepted upload keeps running: the page stays and reports its result.
+function authLost() {
+    if (state.loggedOut) return;
+    state.loggedOut = true;
+    clearTimeout(login.timer);
+    login.csrf = null;
+    stopLink();
+    idle.connected(false);
+    menus?.clear();
+    toasts.clear();
+    term.clear();
+    term.reset();
+    Object.assign(state, {csrf: null, call: {state: 'idle'}, wifi: null, clock: {epoch: 0, tzo: 0, at: 0},
+        hardware: null, edit: false, online: false, opening: false});
+    pendingMenu = null;
+    channel.reset();
+    $('model-name').textContent = 'USR Modem';
+    document.title = 'Web Terminal';
+    if (!state.upload) {
+        location.replace('login');
+        return;
+    }
+    document.body.classList.add('logged-out');
+    $('signed-out').hidden = false;
+    $('signed-out-status').textContent = 'Finishing update…';
+}
+
+// Shows how an upload ended after logging out, then offers the login page. After an
+// installed image the modem restarts: wait until it serves the login page again.
+async function uploadFinishedSignedOut(result, text) {
+    $('signed-out-status').textContent = result === 'installed' ? 'Update installed. The modem is restarting…' : text;
+    if (result === 'installed') {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        for (;;) {
+            try {
+                if ((await fetch('login', {cache: 'no-store', signal: AbortSignal.timeout(3000)})).ok) break;
+            } catch {
+                // still restarting
+            }
+            await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+        $('signed-out-status').textContent = 'Update installed. The modem has restarted.';
+    }
+    $('signed-out-login').hidden = false;
+}
+
+async function logout() {
+    if (demoMode()) { toasts.show('Demo: there is no login to end.'); return; }
+    if (state.loggedOut) return;
+    try {
+        if (!login.csrf && await checkAuth() === 'lost') { authLost(); return; }
+        const reply = await fetch('api/logout', {method: 'POST', cache: 'no-store',
+            headers: {'X-CSRF-Token': login.csrf ?? ''}, signal: AbortSignal.timeout(5000)});
+        if (!reply.ok) throw new Error('Logout refused');
+    } catch {
+        // The login may still be valid: stay, or the login page would send the browser back here.
+        toasts.show('Could not log out. Check the modem link and try again.');
+        return;
+    }
+    authLost();
+}
+
 // ---------------------------------------------------------------- start
 
 async function main() {
@@ -438,9 +535,10 @@ async function main() {
     $('cts').onclick = () => channel.input(encoder.encode('c'));
     $('stop-test').onclick = () => { channel.input(new Uint8Array([0x18])); term.focus(); };
     $('upload').onclick = () => $('image').click();
+    $('logout').onclick = () => logout();
     $('recent-console-history').onclick = async () => {
         try {
-            const demo = new URLSearchParams(location.search).has('demo') || location.protocol === 'file:' || window.USR_MODEM_DEMO;
+            const demo = demoMode();
             const text = demo ? 'DEMO: synthetic recent console history. No device services connected.\r\n'
                 : await (async () => {
                     const reply = await fetch('api/boot', {cache:'no-store', signal:AbortSignal.timeout(5000)});
@@ -454,6 +552,7 @@ async function main() {
     const uploadFlow = createUploadFlow({
         state,
         show: text => {
+            if (state.loggedOut) $('signed-out-status').textContent = text;
             $('menu-reason').title = text;
             $('menu-reason').querySelector('.guidance-long').textContent = text;
             $('menu-reason').querySelector('.guidance-short').textContent = 'Image upload';
@@ -465,11 +564,15 @@ async function main() {
         },
         confirm: text => window.confirm(text),
         read: async file => new Uint8Array(await file.arrayBuffer()),
-        // Refresh expired Digest credentials with a small request before streaming a large
-        // body. This does not replace the current socket.
-        login: async () => (await fetch('api/session', {cache: 'no-store'})).ok,
+        // Check the login is still valid before streaming a large body.
+        login: async () => {
+            const result = await checkAuth();
+            if (result === 'lost') setTimeout(authLost);  // after the flow has finished
+            return result === 'ok';
+        },
         send: xhrSender(),
         installed: () => {
+            if (state.loggedOut) return;
             toasts.show('Update uploaded — the modem is restarting');
             state.reloadWhenOnline = true;
             reconnectModem();
@@ -478,7 +581,9 @@ async function main() {
     $('image').onchange = async () => {
         try {
             const result = await uploadFlow($('image').files[0]);
-            if (['rejected', 'lost', 'failed'].includes(result)) toasts.show($('menu-reason').querySelector('.guidance-long').textContent);
+            const text = $('menu-reason').querySelector('.guidance-long').textContent;
+            if (state.loggedOut) uploadFinishedSignedOut(result, text);
+            else if (['rejected', 'lost', 'failed'].includes(result)) toasts.show(text);
         } finally { $('image').value = ''; }
     };
     buildLeds();
@@ -504,15 +609,19 @@ async function main() {
     for (const event of ['keydown', 'pointerdown', 'pointermove', 'click', 'wheel']) {
         document.addEventListener(event, () => idle.activity(), {passive: true});
     }
-    document.addEventListener('visibilitychange', () => idle.poll());
+    document.addEventListener('visibilitychange', () => {
+        idle.poll();
+        if (!document.hidden) recheckAuth();
+    });
     setInterval(() => idle.poll(), 1000);
     setInterval(showTimes, 1000);
     showCall();
     showWifi();
 
-    const params = new URLSearchParams(location.search);
-    if (params.has('demo') || location.protocol === 'file:' || window.USR_MODEM_DEMO) {
+    if (demoMode()) {
         startDemo();
+    } else if (await checkAuth() === 'lost') {
+        location.replace('login');
     } else {
         connectModem();
     }

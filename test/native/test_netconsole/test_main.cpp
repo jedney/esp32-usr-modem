@@ -107,7 +107,11 @@ public:
         lastPassword = text;
         return password == text;
     }
-    void loggedIn() override { ++logins; }
+    std::vector<std::string> peers;
+    void loggedIn(const char *peer) override {
+        ++logins;
+        peers.push_back(peer);
+    }
     std::string model = "US Robotics Sportster 14.4k";
     std::string state = "Idle";
     const char *modelName() override { return model.c_str(); }
@@ -494,7 +498,9 @@ void test_second_client_takes_over_when_it_logs_in() {
     r.write("live\r\n");
     r.poll();
     TEST_ASSERT_EQUAL_STRING("live\r\n", r.socket2.take().c_str());
-    TEST_ASSERT_EQUAL(2, r.host.logins);
+    TEST_ASSERT_EQUAL(2, r.host.logins);  // a takeover is a login of its own
+    TEST_ASSERT_EQUAL(2, r.host.peers.size());
+    TEST_ASSERT_EQUAL_STRING("10.0.0.5", r.host.peers[1].c_str());
 }
 
 void test_connection_without_the_password_never_throws_the_client_out() {

@@ -46,3 +46,16 @@
 #session-disconnected strong, #session-disconnected span { display: block; }
 #session-disconnected strong { font-size: 18px; margin-bottom: 8px; }
 #session-disconnected span { font-size: 13px; }
+/* Login page, and the logged-out view while an accepted upload finishes. */
+.login-page .page-shell { flex: none; }
+.login-card, .signed-out { width: min(420px, 100%); margin: 24px auto 0; padding: 24px; box-sizing: border-box;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); }
+.login-card h1, .signed-out h1 { margin: 0 0 8px; font-size: 20px; letter-spacing: -.3px; }
+.login-intro, .signed-out p { margin: 0 0 18px; color: var(--muted); }
+.login-error { margin: 0 0 18px; padding: 10px 12px; color: var(--accent); background: var(--accent-soft);
+    border-radius: var(--radius); font-weight: 600; }
+.login-form .field input { box-sizing: border-box; }
+.login-submit { width: 100%; margin-top: 22px; font-weight: 600; }
+.signed-out .button { text-decoration: none; }
+body.logged-out .workspace { display: none; }
+@media (max-width: 580px) { .login-card, .signed-out { margin-top: 12px; padding: 18px 16px; } }

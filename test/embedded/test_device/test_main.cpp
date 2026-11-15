@@ -18,7 +18,8 @@ void tearDown() {}
 void test_real_hashes_match_ota_and_fixed_digest_realm() {
     char ota[devicecfg::kOtaHashLength + 1] = {}, digest[devicecfg::kDigestHashLength + 1] = {};
     TEST_ASSERT_TRUE(crypto.hashes("password", ota, digest));
-    // SHA-256("password") for ArduinoOTA; MD5("admin:usr-modem:password") for HTTP Digest.
+    // SHA-256("password"): the OTA and login hash. MD5("admin:usr-modem:password"): the HA1 the
+    // record keeps.
     TEST_ASSERT_EQUAL_STRING("5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8",
                              ota);
     TEST_ASSERT_EQUAL_STRING("3ba84c8c9a93845740a46d37bf97bd5d", digest);

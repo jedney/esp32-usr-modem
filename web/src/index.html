@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy"
-      content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'">
+      content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; form-action 'self'">
 <title>Web Terminal</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='5' width='14' height='6' rx='1' fill='%23d8cfb8'/%3E%3Crect x='3' y='7' width='3' height='1.5' fill='%23ff3b30'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="xterm.css">
@@ -22,6 +22,11 @@
     <div><div class="brand-title" id="model-name">USR Modem</div><div class="eyebrow">Modem terminal</div></div>
     <div class="masthead-actions"><span class="badge" id="link"><i class="dot"></i><span id="link-label">Connecting</span></span></div>
   </header>
+  <section class="signed-out" id="signed-out" aria-labelledby="signed-out-title" hidden>
+    <h1 id="signed-out-title">Logged out</h1>
+    <p id="signed-out-status" role="status">Finishing update…</p>
+    <a class="button primary" id="signed-out-login" href="login" hidden>Log in</a>
+  </section>
   <div class="workspace">
     <nav class="menubar" id="menu" aria-label="Modem controls"></nav>
     <main class="terminal-frame" aria-label="Modem terminal">

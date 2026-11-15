@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Make a single-file preview of the web interface, running in demo mode.
 
-    python scripts/make_preview.py            # writes web/preview.html
+    python scripts/make_preview.py            # writes web/preview.html and web/preview-login.html
 
 Open the file in any browser: no modem or web server needed. Everything (scripts, CSS,
 fonts) is inlined; the page's JavaScript modules are loaded through an import map of
@@ -91,6 +91,23 @@ def main(out: pathlib.Path) -> None:
     html = html.replace("<title>Web Terminal</title>", "<title>Web Terminal (preview)</title>")
     out.write_text(html, encoding="utf-8")
     print(f"Preview: {out} ({out.stat().st_size / 1024:.0f} KB). Synthetic terminal; no device services connected.")
+    login_preview(out.with_name("preview-login.html"), style)
+
+
+def login_preview(out: pathlib.Path, style: str) -> None:
+    """The login page as it looks before login. Its form has nowhere to post in a preview."""
+    html = (SRC / "login.html").read_text(encoding="utf-8")
+    html = html.replace('src="usr-logo.png"',
+                        f'src="{data_url("image/png", (SRC / "usr-logo.png").read_bytes())}"')
+    html = re.sub(r'<meta http-equiv="Content-Security-Policy"[^>]*>\s*', "", html, flags=re.S)
+    html = html.replace('<link rel="stylesheet" href="style.css">', f"<style>{style}</style>")
+    html = html.replace('<link rel="stylesheet" href="menubar.css">',
+                        f"<style>{(SRC / 'menubar.css').read_text(encoding='utf-8')}</style>")
+    html = html.replace('<script type="module" src="login.js"></script>',
+                        f'<script type="module">{(SRC / "login.js").read_text(encoding="utf-8")}</script>')
+    html = html.replace("<title>Log in · Web Terminal</title>", "<title>Log in · Web Terminal (preview)</title>")
+    out.write_text(html, encoding="utf-8")
+    print(f"Preview: {out} ({out.stat().st_size / 1024:.0f} KB). Login page only.")
 
 
 if __name__ == "__main__":

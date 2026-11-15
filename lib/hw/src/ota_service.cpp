@@ -41,6 +41,8 @@ void OtaService::poll(uint32_t now, bool wifiUp, bool idle, const char *hostname
             // before writing the upload; an NVS failure must prevent installation.
             if (!device_.markUsed()) {
                 Update.abort();
+            } else if (authenticated_) {
+                authenticated_();
             }
         });
         // ArduinoOTA receives the whole image inside handle(), in the loop task: feed the

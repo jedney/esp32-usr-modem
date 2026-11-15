@@ -38,77 +38,6 @@ std::string lower(std::string value) {
     }
     return value;
 }
-bool hex(const std::string &text, size_t n) {
-    if (text.size() != n) {
-        return false;
-    }
-    for (char c : text) {
-        if (!isxdigit(static_cast<unsigned char>(c))) {
-            return false;
-        }
-    }
-    return true;
-}
-bool fields(const std::string &header, std::map<std::string, std::string> &out) {
-    if (header.size() > 900 || header.compare(0, 7, "Digest ") != 0) {
-        return false;
-    }
-    size_t i = 7;
-    while (i < header.size()) {
-        while (i < header.size() && header[i] == ' ') {
-            ++i;
-        }
-        size_t start = i;
-        while (i < header.size() && isalnum(static_cast<unsigned char>(header[i]))) {
-            ++i;
-        }
-        std::string key = header.substr(start, i - start);
-        if (key.empty() || i == header.size() || header[i++] != '=') {
-            return false;
-        }
-        std::string value;
-        if (i < header.size() && header[i] == '"') {
-            ++i;
-            bool closed = false;
-            while (i < header.size()) {
-                char c = header[i++];
-                if (c == '"') {
-                    closed = true;
-                    break;
-                }
-                if (c == '\\') {
-                    if (i == header.size()) {
-                        return false;
-                    }
-                    c = header[i++];
-                }
-                if (static_cast<unsigned char>(c) < 32 || c == 127) {
-                    return false;
-                }
-                value += c;
-            }
-            if (!closed) {
-                return false;
-            }
-        } else {
-            start = i;
-            while (i < header.size() && header[i] != ',' && header[i] != ' ') {
-                ++i;
-            }
-            value = header.substr(start, i - start);
-        }
-        if (!out.emplace(key, value).second || out.size() > 12) {
-            return false;
-        }
-        while (i < header.size() && header[i] == ' ') {
-            ++i;
-        }
-        if (i < header.size() && (header[i++] != ',' || i == header.size())) {
-            return false;
-        }
-    }
-    return true;
-}
 bool version(const std::string &s, unsigned &major, unsigned &minor) {
     size_t dot = s.find('.');
     if (dot == std::string::npos || dot == 0 || dot + 1 == s.size() || s.size() > 11) {
@@ -188,8 +117,8 @@ bool HeaderGate::accept(const uint8_t *data, size_t len) {
                 }
             }
             if (++counts[key] > 1 &&
-                (key == "host" || key == "origin" || key == "authorization" ||
-                 key == "content-length" || key == "upgrade" || key.compare(0, 2, "x-") == 0)) {
+                (key == "host" || key == "origin" || key == "cookie" || key == "content-length" ||
+                 key == "upgrade" || key.compare(0, 2, "x-") == 0)) {
                 bad_ = true;
                 return false;
             }
@@ -310,9 +239,9 @@ int compareVersions(const std::string &a, const std::string &b) {
     }
     return am == bm && an == bn ? 0 : (am < bm || (am == bm && an < bn) ? -1 : 1);
 }
-bool Auth::token(char out[33]) {
+bool makeToken(Crypto &crypto, char out[33]) {
     uint8_t bytes[16] = {};
-    if (!crypto_.random(bytes, sizeof bytes)) {
+    if (!crypto.random(bytes, sizeof bytes)) {
         out[0] = 0;
         return false;
     }
@@ -325,89 +254,39 @@ bool Auth::token(char out[33]) {
     devicecfg::wipe(bytes, sizeof bytes);
     return true;
 }
-void Auth::reset() {
-    for (auto &n : nonce_) {
-        n = {};
-    }
-    wrong_ = false;
-}
-std::string Auth::challenge(uint32_t now, bool stale) {
-    char value[33];
-    if (!token(value)) {
-        return "";
-    }
-    nonce_[next_] = {value, now, 0};
-    next_ = (next_ + 1) % 8;
-    return std::string("Digest realm=\"usr-modem\", qop=\"auth\", algorithm=MD5, nonce=\"") +
-           value + '"' + (stale ? ", stale=true" : "");
-}
-Check Auth::check(const std::string &header, const std::string &method, const std::string &uri,
-                  const char *ha1, uint32_t now) {
-    std::map<std::string, std::string> f;
-    if (!ha1 || !hex(ha1, 32) || !fields(header, f) || f["username"] != "admin" ||
-        f["realm"] != "usr-modem" || f["uri"] != uri || f["qop"] != "auth" ||
-        (f.count("algorithm") && f["algorithm"] != "MD5") || !hex(f["nc"], 8) ||
-        !hex(f["response"], 32) || f["cnonce"].empty() || f["cnonce"].size() > 128 ||
-        !hex(f["nonce"], 32)) {
-        return Check::kMissing;
-    }
-    if (lockedOut(now)) {
-        return Check::kWrong;
-    }
-    uint32_t count = 0;
-    for (char c : f["nc"]) {
-        count = (count << 4) | unsigned(c <= '9' ? c - '0' : tolower(c) - 'a' + 10);
-    }
-    // The response is checked against the nonce the browser sent. Only a fresh nonce
-    // that we issued, used with a higher count than before, logs in. A correct
-    // response for any other nonce proves the password, so it is only "stale".
-    char ha2[33] = {}, expected[33] = {};
-    bool correct = crypto_.md5(method + ':' + uri, ha2) &&
-                   crypto_.md5(std::string(ha1) + ':' + f["nonce"] + ':' + f["nc"] + ':' +
-                                   f["cnonce"] + ":auth:" + ha2,
-                               expected) &&
-                   equalSecret(lower(f["response"]), expected);
-    devicecfg::wipe(ha2, sizeof ha2);
-    devicecfg::wipe(expected, sizeof expected);
-    if (!correct) {
-        wrong_ = true;
-        wrongAt_ = now;
-        return Check::kWrong;
-    }
-    for (auto &n : nonce_) {
-        if (!n.value.empty() && equalSecret(f["nonce"], n.value) && now - n.at < 60000 &&
-            count > n.count) {
-            n.count = count;
-            return Check::kOk;
-        }
-    }
-    return Check::kStale;
-}
 void Tickets::reset() {
     for (auto &t : ticket_) {
         t = {};
     }
 }
-std::string Tickets::issue(uint32_t now) {
+std::string Tickets::issue(uint32_t session, uint32_t now) {
     char value[33];
-    if (!auth_.token(value)) {
+    if (!session || !makeToken(crypto_, value)) {
         return "";
     }
-    ticket_[next_] = {value, now};
+    ticket_[next_] = {value, now, session};
     next_ = (next_ + 1) % 4;
     return value;
 }
-bool Tickets::consume(const std::string &token, uint32_t now) {
+uint32_t Tickets::consume(const std::string &token, uint32_t now) {
     if (token.size() != 32) {
-        return false;
+        return 0;
     }
     for (auto &t : ticket_) {
         if (!t.value.empty() && equalSecret(t.value, token) && now - t.at < 30000) {
+            uint32_t session = t.session;
             t = {};
-            return true;
+            return session;
         }
     }
-    return false;
+    return 0;
+}
+void Tickets::revoke(uint32_t session) {
+    for (auto &t : ticket_) {
+        if (t.session == session) {
+            t = {};
+        }
+    }
 }
 bool Settings::begin() {
     uint8_t data[10] = {};

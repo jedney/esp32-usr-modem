@@ -26,9 +26,9 @@ import pytest
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
-# Unsolicited console lines: Wi-Fi connected/lost and clock set. Not part of a
+# Unsolicited console lines: Wi-Fi connected/lost, clock set and logins. Not part of a
 # command's response, so command() leaves them out.
-NOTICE = re.compile(r"^(Wi-Fi: (connected to|lost|can't join) |Clock: set by NTP)")
+NOTICE = re.compile(r"^(Wi-Fi: (connected to|lost|can't join) |Clock: set by NTP|Login: )")
 
 
 def load_env(path=REPO_ROOT / ".env"):

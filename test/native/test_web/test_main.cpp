@@ -1,6 +1,5 @@
 #include <unity.h>
 #include <algorithm>
-#include <cmath>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -14,24 +13,15 @@ class FakeCrypto : public Crypto {
 public:
     uint8_t sequence = 0;
     bool fail = false;
-    std::string last;
     bool random(uint8_t *out, size_t len) override {
         memset(out, ++sequence, len);
         return !fail;
     }
-    bool md5(const std::string &text, char out[33]) override {
-        last = text;
-        strcpy(out, text == "GET:/api/session" ? "f156ea5001b17ee7478625ca4f937164"
-                                               : "0123456789abcdef0123456789abcdef");
+    bool sha256(const uint8_t *, size_t, uint8_t out[32]) override {
+        memset(out, 0, 32);
         return !fail;
     }
 };
-std::string digest(const std::string &nonce, const char *nc = "00000001") {
-    return "Digest username=\"admin\", realm=\"usr-modem\", nonce=\"" + nonce +
-           "\", uri=\"/api/session\", response=\"0123456789abcdef0123456789abcdef\", "
-           "qop=auth, nc=" +
-           nc + ", cnonce=\"browser\"";
-}
 void test_host_and_origin_do_not_accept_rebinding_authorities() {
     TEST_ASSERT_TRUE(allowedHost("USR-MODEM.local:80", "usr-modem", "10.0.0.221"));
     TEST_ASSERT_TRUE(allowedHost("10.0.0.221", "usr-modem", "10.0.0.221"));
@@ -44,129 +34,43 @@ void test_host_and_origin_do_not_accept_rebinding_authorities() {
     TEST_ASSERT_FALSE(allowedOrigin("null", "usr-modem", "10.0.0.221"));
     TEST_ASSERT_FALSE(allowedOrigin("http://usr-modem.local/evil", "usr-modem", "10.0.0.221"));
 }
-void test_digest_checks_exact_uri_method_replay_and_expiry() {
-    FakeCrypto crypto;
-    Auth auth(crypto);
-    auto challenge = auth.challenge(0xfffffff0u);
-    auto nonce = challenge.substr(challenge.find("nonce=\"") + 7, 32);
-    const char *ha1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    TEST_ASSERT_TRUE(auth.verify(digest(nonce), "GET", "/api/session", ha1, 5));
-    TEST_ASSERT_EQUAL_STRING(
-        (std::string(ha1) + ':' + nonce + ":00000001:browser:auth:f156ea5001b17ee7478625ca4f937164")
-            .c_str(),
-        crypto.last.c_str());
-    TEST_ASSERT_FALSE(auth.verify(digest(nonce), "GET", "/api/session", ha1, 6));
-    TEST_ASSERT_FALSE(auth.verify(digest(nonce, "00000002"), "GET", "/elsewhere", ha1, 6));
-    TEST_ASSERT_TRUE(auth.verify(digest(nonce, "00000002"), "GET", "/api/session", ha1, 7));
-    TEST_ASSERT_FALSE(auth.verify(digest(nonce, "00000003"), "GET", "/api/session", ha1, 60000));
-    auth.reset();
-    TEST_ASSERT_FALSE(auth.verify(digest(nonce, "00000003"), "GET", "/api/session", ha1, 8));
-}
-void test_console_history_digest_is_bound_to_read_only_route() {
-    FakeCrypto crypto;
-    Auth auth(crypto);
-    auto challenge = auth.challenge(0);
-    auto nonce = challenge.substr(challenge.find("nonce=\"") + 7, 32);
-    auto authorization = digest(nonce);
-    authorization.replace(authorization.find("/api/session"), strlen("/api/session"), "/api/boot");
-    const char *ha1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    TEST_ASSERT_FALSE(auth.verify("", "GET", "/api/boot", ha1, 1));
-    TEST_ASSERT_FALSE(auth.verify(authorization, "GET", "/api/session", ha1, 1));
-    TEST_ASSERT_TRUE(auth.verify(authorization, "GET", "/api/boot", ha1, 2));
-    TEST_ASSERT_FALSE(auth.verify(authorization, "GET", "/api/boot", ha1, 3));
-}
-void test_digest_reports_stale_nonce_and_wrong_password() {
-    FakeCrypto crypto;
-    Auth auth(crypto);
-    const char *ha1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    TEST_ASSERT_TRUE(Check::kMissing == auth.check("", "GET", "/api/session", ha1, 1));
-    auto c = auth.challenge(0);
-    TEST_ASSERT_EQUAL(std::string::npos, c.find("stale"));
-    auto n = c.substr(c.find("nonce=\"") + 7, 32);
-    TEST_ASSERT_TRUE(Check::kOk == auth.check(digest(n), "GET", "/api/session", ha1, 1));
-    // Replay of the same count, an expired nonce and a nonce we never issued:
-    // the password is right, so the browser should retry without asking again.
-    TEST_ASSERT_TRUE(Check::kStale == auth.check(digest(n), "GET", "/api/session", ha1, 2));
-    TEST_ASSERT_TRUE(Check::kStale ==
-                     auth.check(digest(n, "00000002"), "GET", "/api/session", ha1, 60000));
-    TEST_ASSERT_TRUE(Check::kStale == auth.check(digest("0123456789abcdef0123456789abcdef"), "GET",
-                                                 "/api/session", ha1, 3));
-    auto s = auth.challenge(4, true);
-    TEST_ASSERT_NOT_EQUAL(std::string::npos, s.find(", stale=true"));
-    // A wrong response is never stale, even with a fresh nonce.
-    std::string wrong = digest(n, "00000003");
-    wrong.replace(wrong.find("0123456789abcdef0123456789abcdef"), 32,
-                  "ffffffffffffffffffffffffffffffff");
-    TEST_ASSERT_TRUE(Check::kWrong == auth.check(wrong, "GET", "/api/session", ha1, 5));
-    TEST_ASSERT_TRUE(Check::kOk ==
-                     auth.check(digest(n, "00000003"), "GET", "/api/session", ha1, 1005));
-}
-// After a wrong response the next second is answered at once, without
-// checking the password, instead of the server task sleeping for a second.
-void test_wrong_response_locks_out_for_one_second_without_blocking() {
-    FakeCrypto crypto;
-    Auth auth(crypto);
-    const char *ha1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    auto c = auth.challenge(0xfffffe00u);
-    auto n = c.substr(c.find("nonce=\"") + 7, 32);
-    std::string wrong = digest(n);
-    wrong.replace(wrong.find("0123456789abcdef0123456789abcdef"), 32,
-                  "ffffffffffffffffffffffffffffffff");
-    TEST_ASSERT_FALSE(auth.lockedOut(0xfffffe00u));
-    TEST_ASSERT_TRUE(Check::kWrong == auth.check(wrong, "GET", "/api/session", ha1, 0xffffff00u));
-    TEST_ASSERT_TRUE(auth.lockedOut(0xffffff00u));
-    // Inside the second (across the 2^32 ms wrap) even the right password is refused,
-    // and the password is not checked at all.
-    crypto.last.clear();
-    TEST_ASSERT_TRUE(Check::kWrong ==
-                     auth.check(digest(n, "00000002"), "GET", "/api/session", ha1, 0x000002e7u));
-    TEST_ASSERT_TRUE(crypto.last.empty());
-    // A refused attempt does not extend the lock-out, so nobody can hold it for ever.
-    TEST_ASSERT_TRUE(auth.lockedOut(0x000002e7u));
-    TEST_ASSERT_FALSE(auth.lockedOut(0x000002e8u));
-    TEST_ASSERT_TRUE(Check::kOk ==
-                     auth.check(digest(n, "00000003"), "GET", "/api/session", ha1, 0x000002e8u));
-    // No Authorization header is still just a challenge, locked out or not.
-    TEST_ASSERT_TRUE(Check::kWrong == auth.check(wrong, "GET", "/api/session", ha1, 0x1000));
-    TEST_ASSERT_TRUE(Check::kMissing == auth.check("", "GET", "/api/session", ha1, 0x1001));
-    // A password change (reset) clears the lock-out.
-    auth.reset();
-    TEST_ASSERT_FALSE(auth.lockedOut(0x1002));
-}
-void test_digest_rejects_duplicate_fields_and_non_digest_schemes() {
-    FakeCrypto crypto;
-    Auth auth(crypto);
-    auto c = auth.challenge(0);
-    auto n = c.substr(c.find("nonce=\"") + 7, 32);
-    const char *ha1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    TEST_ASSERT_FALSE(
-        auth.verify(digest(n) + ", username=\"admin\"", "GET", "/api/session", ha1, 1));
-    TEST_ASSERT_FALSE(auth.verify("Basic YWRtaW46cGFzcw==", "GET", "/api/session", ha1, 1));
-    TEST_ASSERT_FALSE(auth.verify(digest(n, "00000000"), "GET", "/api/session", ha1, 1));
-    TEST_ASSERT_FALSE(auth.verify(digest(n, "garbage!"), "GET", "/api/session", ha1, 1));
-    TEST_ASSERT_FALSE(auth.verify(digest(n), "GET", "/api/session", "", 1));
-    crypto.fail = true;
-    TEST_ASSERT_FALSE(auth.verify(digest(n), "GET", "/api/session", ha1, 1));
-}
 void test_tickets_are_single_use_bounded_and_expire_across_rollover() {
     FakeCrypto crypto;
-    Auth auth(crypto);
-    Tickets tickets(auth);
-    auto a = tickets.issue(0xfffffff0u);
-    TEST_ASSERT_TRUE(tickets.consume(a, 0));
-    TEST_ASSERT_FALSE(tickets.consume(a, 1));
-    a = tickets.issue(0xfffffff0u);
-    TEST_ASSERT_FALSE(tickets.consume(a, 30000));
-    a = tickets.issue(0);
+    Tickets tickets(crypto);
+    auto a = tickets.issue(7, 0xfffffff0u);
+    TEST_ASSERT_EQUAL_UINT32(7, tickets.consume(a, 0));
+    TEST_ASSERT_EQUAL_UINT32(0, tickets.consume(a, 1));
+    a = tickets.issue(7, 0xfffffff0u);
+    TEST_ASSERT_EQUAL_UINT32(0, tickets.consume(a, 30000));
+    a = tickets.issue(7, 0);
     for (unsigned i = 0; i < 4; ++i) {
-        tickets.issue(1);
+        tickets.issue(7, 1);
     }
-    TEST_ASSERT_FALSE(tickets.consume(a, 2));
-    a = tickets.issue(3);
+    TEST_ASSERT_EQUAL_UINT32(0, tickets.consume(a, 2));
+    a = tickets.issue(7, 3);
     tickets.reset();
-    TEST_ASSERT_FALSE(tickets.consume(a, 4));
+    TEST_ASSERT_EQUAL_UINT32(0, tickets.consume(a, 4));
+    TEST_ASSERT_TRUE(tickets.issue(0, 5).empty());  // no session, no ticket
     crypto.fail = true;
-    TEST_ASSERT_TRUE(tickets.issue(5).empty());
+    TEST_ASSERT_TRUE(tickets.issue(7, 5).empty());
+}
+void test_tickets_are_bound_to_their_session_and_die_with_it() {
+    FakeCrypto crypto;
+    Tickets tickets(crypto);
+    auto mine = tickets.issue(3, 0), theirs = tickets.issue(4, 0), later = tickets.issue(3, 0);
+    tickets.revoke(3);
+    TEST_ASSERT_EQUAL_UINT32(0, tickets.consume(mine, 1));
+    TEST_ASSERT_EQUAL_UINT32(0, tickets.consume(later, 1));
+    TEST_ASSERT_EQUAL_UINT32(4, tickets.consume(theirs, 1));
+}
+void test_tokens_are_32_lower_case_hex_from_16_random_bytes() {
+    FakeCrypto crypto;
+    char token[33];
+    TEST_ASSERT_TRUE(makeToken(crypto, token));
+    TEST_ASSERT_EQUAL_STRING("01010101010101010101010101010101", token);
+    crypto.fail = true;
+    TEST_ASSERT_FALSE(makeToken(crypto, token));
+    TEST_ASSERT_EQUAL_STRING("", token);
 }
 class Store : public modemcfg::Store {
 public:
@@ -310,7 +214,8 @@ void test_raw_headers_reject_duplicates_smuggling_and_pipelining() {
     TEST_ASSERT_FALSE(gate.accept(reinterpret_cast<const uint8_t *>(good.data()), good.size()));
     for (const char *extra :
          {"Host: evil.local\r\n", "hOsT: usr-modem.local\r\n", "Transfer-Encoding: chunked\r\n",
-          "Content-Length: 1\r\nContent-Length: 1\r\n", " Content-Length: 1\r\n"}) {
+          "Content-Length: 1\r\nContent-Length: 1\r\n", " Content-Length: 1\r\n",
+          "Cookie: usr_session=a\r\ncookie: usr_session=b\r\n"}) {
         HeaderGate bad;
         std::string input =
             "POST / HTTP/1.1\r\nHost: usr-modem.local\r\n" + std::string(extra) + "\r\n";
@@ -468,206 +373,6 @@ void test_upload_handshake_late_unmount_is_ignored() {
     h.giveUpUnmount();
     TEST_ASSERT_TRUE(h.unmountReady());
 }
-// --- Authorization parser limits, nonce table, real MD5, filesystem images -----------
-std::string nonceOf(const std::string &challenge) {
-    return challenge.substr(challenge.find("nonce=\"") + 7, 32);
-}
-void test_authorization_parser_refuses_unterminated_quote_and_too_many_parameters() {
-    FakeCrypto crypto;
-    Auth auth(crypto);
-    const char *ha1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    auto freshNonce = [&]() {
-        auth.reset();
-        return nonceOf(auth.challenge(0));
-    };
-    auto n = freshNonce();
-    TEST_ASSERT_TRUE(Check::kOk == auth.check(digest(n), "GET", "/api/session", ha1, 1));
-    // Closing quote missing at the end; a quote opened in an extra field; a quote that ends
-    // in a backslash.
-    n = freshNonce();
-    std::string open = digest(n);
-    open.pop_back();
-    TEST_ASSERT_TRUE(Check::kMissing == auth.check(open, "GET", "/api/session", ha1, 1));
-    n = freshNonce();
-    TEST_ASSERT_TRUE(Check::kMissing == auth.check(digest(n) + ", extra=\"never closed", "GET",
-                                                   "/api/session", ha1, 1));
-    n = freshNonce();
-    TEST_ASSERT_TRUE(Check::kMissing == auth.check(digest(n) + ", extra=\"ends in escape\\", "GET",
-                                                   "/api/session", ha1, 1));
-    // 12 parameters are accepted; the 13th is refused. digest() already has 8.
-    n = freshNonce();
-    TEST_ASSERT_TRUE(Check::kOk == auth.check(digest(n) + ", a1=1, a2=2, a3=3, a4=4", "GET",
-                                              "/api/session", ha1, 1));
-    n = freshNonce();
-    TEST_ASSERT_TRUE(Check::kMissing == auth.check(digest(n) + ", a1=1, a2=2, a3=3, a4=4, a5=5",
-                                                   "GET", "/api/session", ha1, 1));
-}
-void test_authorization_header_is_limited_to_900_bytes() {
-    FakeCrypto crypto;
-    Auth auth(crypto);
-    const char *ha1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    auto n = nonceOf(auth.challenge(0));
-    const std::string head = digest(n) + ", pad=";
-    std::string exact = head + std::string(900 - head.size(), 'x');
-    TEST_ASSERT_EQUAL(900, exact.size());
-    TEST_ASSERT_TRUE(Check::kOk == auth.check(exact, "GET", "/api/session", ha1, 1));
-    auth.reset();
-    n = nonceOf(auth.challenge(0));
-    const std::string head2 = digest(n) + ", pad=";
-    std::string over = head2 + std::string(901 - head2.size(), 'x');
-    TEST_ASSERT_EQUAL(901, over.size());
-    TEST_ASSERT_TRUE(Check::kMissing == auth.check(over, "GET", "/api/session", ha1, 1));
-    // A value over the limit of its own field.
-    auth.reset();
-    n = nonceOf(auth.challenge(0));
-    std::string longCnonce = digest(n);
-    longCnonce.replace(longCnonce.find("browser"), 7, std::string(129, 'c'));
-    TEST_ASSERT_TRUE(Check::kMissing == auth.check(longCnonce, "GET", "/api/session", ha1, 1));
-}
-void test_ninth_challenge_evicts_the_oldest_nonce_and_a_falling_count_is_stale() {
-    FakeCrypto crypto;
-    Auth auth(crypto);
-    const char *ha1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    std::vector<std::string> nonces;
-    for (unsigned i = 0; i < 9; ++i) {
-        nonces.push_back(nonceOf(auth.challenge(10 + i)));
-    }
-    // The ninth challenge took the place of the first (the oldest) nonce.
-    TEST_ASSERT_TRUE(Check::kStale ==
-                     auth.check(digest(nonces[0]), "GET", "/api/session", ha1, 100));
-    // The other eight still work. Attempts are 2 s apart so the lock-out never applies.
-    for (unsigned i = 1; i < 9; ++i) {
-        TEST_ASSERT_TRUE(Check::kOk ==
-                         auth.check(digest(nonces[i]), "GET", "/api/session", ha1, 100 + i * 2000));
-    }
-    // A count that goes backwards is a replay: right password, so stale, never logged in.
-    auth.reset();
-    auto n = nonceOf(auth.challenge(0));
-    TEST_ASSERT_TRUE(Check::kOk ==
-                     auth.check(digest(n, "00000005"), "GET", "/api/session", ha1, 1));
-    TEST_ASSERT_TRUE(Check::kStale ==
-                     auth.check(digest(n, "00000003"), "GET", "/api/session", ha1, 2000));
-    TEST_ASSERT_TRUE(Check::kStale ==
-                     auth.check(digest(n, "00000005"), "GET", "/api/session", ha1, 4000));
-    TEST_ASSERT_TRUE(Check::kOk ==
-                     auth.check(digest(n, "00000006"), "GET", "/api/session", ha1, 6000));
-}
-// MD5 from RFC 1321, written for this test (the firmware uses the core's routines).
-std::string md5hex(const std::string &text) {
-    static const unsigned shifts[64] = {7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
-                                        5, 9,  14, 20, 5, 9,  14, 20, 5, 9,  14, 20, 5, 9,  14, 20,
-                                        4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
-                                        6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21};
-    uint32_t k[64];
-    for (int i = 0; i < 64; ++i) {
-        k[i] = uint32_t(std::floor(std::fabs(std::sin(double(i + 1))) * 4294967296.0));
-    }
-    std::string data = text;
-    data += char(0x80);
-    while (data.size() % 64 != 56) {
-        data += char(0);
-    }
-    const uint64_t bits = uint64_t(text.size()) * 8;
-    for (int i = 0; i < 8; ++i) {
-        data += char((bits >> (8 * i)) & 0xff);
-    }
-    uint32_t a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
-    for (size_t block = 0; block < data.size(); block += 64) {
-        uint32_t m[16];
-        for (int i = 0; i < 16; ++i) {
-            m[i] = 0;
-            for (int j = 3; j >= 0; --j) {
-                m[i] = (m[i] << 8) | uint8_t(data[block + i * 4 + j]);
-            }
-        }
-        uint32_t a = a0, b = b0, c = c0, d = d0;
-        for (int i = 0; i < 64; ++i) {
-            uint32_t f;
-            int g;
-            if (i < 16) {
-                f = (b & c) | (~b & d);
-                g = i;
-            } else if (i < 32) {
-                f = (d & b) | (~d & c);
-                g = (5 * i + 1) % 16;
-            } else if (i < 48) {
-                f = b ^ c ^ d;
-                g = (3 * i + 5) % 16;
-            } else {
-                f = c ^ (b | ~d);
-                g = (7 * i) % 16;
-            }
-            f = f + a + k[i] + m[g];
-            a = d;
-            d = c;
-            c = b;
-            b = b + ((f << shifts[i]) | (f >> (32 - shifts[i])));
-        }
-        a0 += a;
-        b0 += b;
-        c0 += c;
-        d0 += d;
-    }
-    char out[33];
-    const uint32_t words[4] = {a0, b0, c0, d0};
-    for (int w = 0; w < 4; ++w) {
-        for (int i = 0; i < 4; ++i) {
-            snprintf(out + w * 8 + i * 2, 3, "%02x", unsigned((words[w] >> (8 * i)) & 0xff));
-        }
-    }
-    return out;
-}
-class RealCrypto : public FakeCrypto {
-public:
-    bool md5(const std::string &text, char out[33]) override {
-        strcpy(out, md5hex(text).c_str());
-        return !fail;
-    }
-};
-void test_md5_vectors_and_the_rfc2617_digest_formula() {
-    TEST_ASSERT_EQUAL_STRING("d41d8cd98f00b204e9800998ecf8427e", md5hex("").c_str());
-    TEST_ASSERT_EQUAL_STRING("900150983cd24fb0d6963f7d28e17f72", md5hex("abc").c_str());
-    TEST_ASSERT_EQUAL_STRING(
-        "57edf4a22be3c955ac49da2e2107b67a",
-        md5hex("12345678901234567890123456789012345678901234567890123456789012345678901234567890")
-            .c_str());
-    // RFC 2617 section 3.5 example (qop=auth): the response a browser would send.
-    const std::string ha1 = md5hex("Mufasa:testrealm@host.com:Circle Of Life");
-    const std::string ha2 = md5hex("GET:/dir/index.html");
-    TEST_ASSERT_EQUAL_STRING("939e7578ed9e3c518a452acee763bce9", ha1.c_str());
-    TEST_ASSERT_EQUAL_STRING(
-        "6629fae49393a05397450978507c4ef1",
-        md5hex(ha1 + ":dcd98b7102dd2f0e8b11d0f600bfb0c093:00000001:0a4f113b:auth:" + ha2).c_str());
-}
-void test_digest_login_works_end_to_end_with_real_md5() {
-    RealCrypto crypto;
-    Auth auth(crypto);
-    const std::string ha1 = md5hex("admin:usr-modem:CorrectHorse9");
-    auto browser = [&](const std::string &nonce, const char *nc, const std::string &password,
-                       const char *method) {
-        const std::string key = md5hex("admin:usr-modem:" + password);
-        const std::string response = md5hex(key + ':' + nonce + ':' + nc + ":browser:auth:" +
-                                            md5hex(std::string(method) + ":/api/session"));
-        return "Digest username=\"admin\", realm=\"usr-modem\", nonce=\"" + nonce +
-               "\", uri=\"/api/session\", response=\"" + response + "\", qop=auth, nc=" + nc +
-               ", cnonce=\"browser\"";
-    };
-    auto n = nonceOf(auth.challenge(0));
-    TEST_ASSERT_TRUE(Check::kWrong == auth.check(browser(n, "00000001", "WrongPassword1", "GET"),
-                                                 "GET", "/api/session", ha1.c_str(), 5));
-    // Inside the lock-out second the right answer is refused; after it, it works.
-    TEST_ASSERT_TRUE(Check::kWrong == auth.check(browser(n, "00000001", "CorrectHorse9", "GET"),
-                                                 "GET", "/api/session", ha1.c_str(), 500));
-    TEST_ASSERT_TRUE(Check::kOk == auth.check(browser(n, "00000001", "CorrectHorse9", "GET"), "GET",
-                                              "/api/session", ha1.c_str(), 1005));
-    // The same response again is a replay; a response made for GET fails for POST.
-    TEST_ASSERT_TRUE(Check::kStale == auth.check(browser(n, "00000001", "CorrectHorse9", "GET"),
-                                                 "GET", "/api/session", ha1.c_str(), 2000));
-    TEST_ASSERT_TRUE(Check::kWrong == auth.check(browser(n, "00000002", "CorrectHorse9", "GET"),
-                                                 "POST", "/api/session", ha1.c_str(), 3000));
-    TEST_ASSERT_TRUE(Check::kOk == auth.check(browser(n, "00000003", "CorrectHorse9", "GET"), "GET",
-                                              "/api/session", ha1.c_str(), 5000));
-}
 // A filesystem image has one exact size and the LITTLEFS marker; a firmware marker is not
 // enough, and neither is the right marker in the wrong-sized image.
 std::string fsImage(size_t length, const std::string &marker, size_t at) {
@@ -781,26 +486,18 @@ int main() {
     RUN_TEST(test_raw_headers_reject_duplicates_smuggling_and_pipelining);
     RUN_TEST(test_browser_cp437_is_utf8_and_serial_source_bytes_are_unchanged);
     RUN_TEST(test_host_and_origin_do_not_accept_rebinding_authorities);
-    RUN_TEST(test_digest_checks_exact_uri_method_replay_and_expiry);
-    RUN_TEST(test_console_history_digest_is_bound_to_read_only_route);
-    RUN_TEST(test_digest_reports_stale_nonce_and_wrong_password);
-    RUN_TEST(test_wrong_response_locks_out_for_one_second_without_blocking);
     RUN_TEST(test_upload_handshake_grant_and_refuse_on_time);
     RUN_TEST(test_upload_handshake_late_answer_changes_nothing);
     RUN_TEST(test_upload_handshake_late_unmount_is_ignored);
-    RUN_TEST(test_digest_rejects_duplicate_fields_and_non_digest_schemes);
     RUN_TEST(test_tickets_are_single_use_bounded_and_expire_across_rollover);
+    RUN_TEST(test_tickets_are_bound_to_their_session_and_die_with_it);
+    RUN_TEST(test_tokens_are_32_lower_case_hex_from_16_random_bytes);
     RUN_TEST(test_settings_default_persist_failure_and_corruption_fail_closed);
     RUN_TEST(test_queue_wrap_overflow_and_secret_cleanup);
     RUN_TEST(test_version_order_is_numeric_and_invalid_is_distinct);
     RUN_TEST(test_image_identity_header_length_and_chunk_boundaries);
     RUN_TEST(test_json_escapes_untrusted_strings);
     RUN_TEST(test_json_passes_valid_utf8_and_escapes_invalid_bytes);
-    RUN_TEST(test_authorization_parser_refuses_unterminated_quote_and_too_many_parameters);
-    RUN_TEST(test_authorization_header_is_limited_to_900_bytes);
-    RUN_TEST(test_ninth_challenge_evicts_the_oldest_nonce_and_a_falling_count_is_stale);
-    RUN_TEST(test_md5_vectors_and_the_rfc2617_digest_formula);
-    RUN_TEST(test_digest_login_works_end_to_end_with_real_md5);
     RUN_TEST(test_filesystem_image_needs_exact_size_and_littlefs_marker);
     return UNITY_END();
 }

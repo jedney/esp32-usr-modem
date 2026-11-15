@@ -12,7 +12,7 @@ constexpr size_t kPasswordMax = 32;
 constexpr size_t kGeneratedLength = 12;
 constexpr uint32_t kWindowMs = 10 * 60 * 1000;
 constexpr size_t kOtaHashLength = 64;     // SHA-256 of the password, lower-case hex (ArduinoOTA)
-constexpr size_t kDigestHashLength = 32;  // MD5 HA1 for HTTP Digest, lower-case hex
+constexpr size_t kDigestHashLength = 32;  // MD5 HA1, lower-case hex: kept in the record, unused
 // USRA, layout, policy, reset marker, then the password and both hashes with their
 // terminators, then a CRC-32.
 constexpr size_t kBlobSize =

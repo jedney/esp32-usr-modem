@@ -157,6 +157,11 @@ def test_second_client_takes_over_when_it_logs_in(host, password):
         second.sendall(password.encode("utf-8") + b"\r")
         data, _ = receive(second, NET_LOGGED_IN)
         assert NET_LOGGED_IN in data
+        # The takeover is a login of its own: one console line after the first's last OK.
+        more, _ = receive(second, wait=2.0)
+        since = (data + more).split(b"OK\r\n")[-1]
+        assert since.count(b"Login: network console from ") == 1
+        assert password.encode("utf-8") not in data + more
         data, closed = receive(first, wait=3.0)
         assert b"logged in from another connection; closed." in data and closed
         second.sendall(b"AT\r")

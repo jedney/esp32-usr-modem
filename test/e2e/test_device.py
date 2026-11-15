@@ -11,11 +11,12 @@ import secrets
 import shutil
 import socket
 import subprocess
+import threading
 import time
 
 import pytest
 
-from conftest import REPO_ROOT
+from conftest import REPO_ROOT, net_console_connect
 from test_wifi import _join, _read_until, _wait_connected
 
 ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz"
@@ -244,3 +245,41 @@ def test_factory_new_password_and_authenticated_first_use(managed_device, wifi, 
             _, after = _join(console, ssid, wifi_password)
             joined = b"Connected, IP " in after
             assert joined, "Wi-Fi restoration failed"
+
+
+def test_authenticated_ota_upload_logs_one_login(console, request):
+    """Uploads the current build over OTA (the modem restarts into the same firmware) and
+    checks the console shows one OTA login line and no secret."""
+    if not request.config.getoption("--ota-upload"):
+        pytest.skip("authenticated upload needs --ota-upload")
+    password = os.environ.get("USR_MODEM_PASSWORD", "")
+    if not password:
+        pytest.skip("USR_MODEM_PASSWORD not set")
+    _wait_connected(console)
+    host = _host(console)
+    received, done = [], threading.Event()
+
+    def read():
+        while not done.is_set():
+            try:
+                received.append(console.ser.read(console.ser.in_waiting or 1))
+            except Exception:  # the modem restarts and closes a network console
+                return
+
+    reader = threading.Thread(target=read, daemon=True)
+    reader.start()
+    try:
+        uploaded = _upload(password, host)
+    finally:
+        done.set()
+        reader.join(5)
+    text = b"".join(received)
+    assert uploaded, "authenticated OTA upload failed (output omitted)"
+    assert text.count(b"Login: OTA upload") == 1, "OTA login not logged exactly once"
+    assert password.encode() not in text, "OTA login line holds the password"
+    if console.url:
+        console.ser.close()
+        console.ser, _ = net_console_connect(console.url, password, 60)
+    else:
+        _read_until(console.ser, [b"hardware."], 30)
+    _wait_connected(console)

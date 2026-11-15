@@ -13,8 +13,10 @@ class Crypto {
 public:
     virtual ~Crypto() = default;
     virtual bool random(uint8_t *out, size_t len) = 0;
-    virtual bool md5(const std::string &text, char out[33]) = 0;
+    virtual bool sha256(const uint8_t *data, size_t len, uint8_t out[32]) = 0;
 };
+// 16 random bytes as 32 lower-case hex digits: session ids, CSRF tokens and tickets.
+bool makeToken(Crypto &crypto, char out[33]);
 bool equalSecret(const std::string &a, const std::string &b);
 bool allowedHost(const std::string &value, const std::string &name, const std::string &ip);
 bool allowedOrigin(const std::string &value, const std::string &name, const std::string &ip);
@@ -61,9 +63,9 @@ private:
 constexpr size_t kMaxHeader = 4096;
 // Checks the raw bytes of a connection before the HTTP server parses them; the bytes pass
 // through unchanged. One HTTP request per connection (a WebSocket upgrade is the exception:
-// its frames follow). Duplicate security headers are refused because the server's header
-// lookup returns only the first value; Transfer-Encoding and a body longer than its
-// Content-Length are refused too.
+// its frames follow). Duplicate security headers (Host, Origin, Cookie, Content-Length,
+// Upgrade, X-*) are refused because the server's header lookup returns only the first value;
+// Transfer-Encoding and a body longer than its Content-Length are refused too.
 class HeaderGate {
 public:
     bool accept(const uint8_t *data, size_t len);
@@ -76,56 +78,20 @@ private:
     size_t remaining_ = 0;
 };
 
-// Result of checking an Authorization header.
-//   kMissing: no usable Digest header (first request, or malformed)
-//   kStale:   correct password, but the nonce expired, was replaced or was replayed;
-//             the next challenge says stale=true so the browser retries silently
-//   kWrong:   wrong password or response, or any Digest attempt in the second after one
-//             (the lock-out; answered at once, the password is not checked)
-enum class Check : uint8_t { kOk, kMissing, kStale, kWrong };
-
-class Auth {
-public:
-    explicit Auth(Crypto &crypto) : crypto_(crypto) {}
-    void reset();
-    std::string challenge(uint32_t now, bool stale = false);
-    Check check(const std::string &header, const std::string &method, const std::string &uri,
-                const char *ha1, uint32_t now);
-    bool verify(const std::string &header, const std::string &method, const std::string &uri,
-                const char *ha1, uint32_t now) {
-        return check(header, method, uri, ha1, now) == Check::kOk;
-    }
-    bool token(char out[33]);
-    // True for kLockOutMs after a wrong response. Attempts in that time are refused
-    // without extending it, so a guesser gets one try a second and the server task
-    // never sleeps.
-    bool lockedOut(uint32_t now) const { return wrong_ && now - wrongAt_ < kLockOutMs; }
-    static constexpr uint32_t kLockOutMs = 1000;
-
-private:
-    struct Nonce {
-        std::string value;
-        uint32_t at = 0, count = 0;
-    };
-    Crypto &crypto_;
-    Nonce nonce_[8];
-    unsigned next_ = 0;
-    bool wrong_ = false;
-    uint32_t wrongAt_ = 0;
-};
-
+// Single-use WebSocket tickets, each bound to the login session that asked for it.
 class Tickets {
 public:
-    explicit Tickets(Auth &auth) : auth_(auth) {}
+    explicit Tickets(Crypto &crypto) : crypto_(crypto) {}
     void reset();
-    std::string issue(uint32_t now);
-    bool consume(const std::string &token, uint32_t now);
+    std::string issue(uint32_t session, uint32_t now);
+    uint32_t consume(const std::string &token, uint32_t now);  // its session, or 0
+    void revoke(uint32_t session);
 
 private:
-    Auth &auth_;
+    Crypto &crypto_;
     struct Ticket {
         std::string value;
-        uint32_t at = 0;
+        uint32_t at = 0, session = 0;
     };
     Ticket ticket_[4];
     unsigned next_ = 0;

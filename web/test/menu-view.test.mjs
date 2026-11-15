@@ -175,3 +175,27 @@ test('GitHub opens a separate tab without needing a terminal', t => {
     assert.deepEqual(opened, [['https://github.com/jedney/esp32-usr-modem','_blank','noopener,noreferrer']]);
     assert.equal(reconnects.length,0);
 });
+
+test('Log out is the last Help item and stays available in every terminal state', t => {
+    const {doc,state,menu} = setup(t);
+    const logout = doc.getElementById('logout');
+    const help = doc.getElementById('popup-help');
+    assert.equal(logout.parent, help);
+    assert.equal(help.children.at(-1), logout);
+    assert.equal(logout.textContent, 'Log out');
+    for (const change of [{}, {edit:false}, {online:false}, {busy:true}, {opening:true}, {upload:true},
+        {call:{state:'connected',browser:true}}, {hardware:{active:true,mode:'lines'}}]) {
+        Object.assign(state, {online:true,edit:true,call:{state:'idle'},busy:false,upload:false,opening:false,hardware:null}, change);
+        menu.update();
+        assert.equal(logout.disabled, false, JSON.stringify(change));
+    }
+});
+
+test('clearing the menus closes an open dialog and wipes its fields', t => {
+    const {doc,menu,clickItem} = setup(t);
+    clickItem('Modem model');
+    assert.equal(doc.getElementById('command-dialog').open, true);
+    menu.clear();
+    assert.equal(doc.getElementById('command-dialog').open, false);
+    assert.equal(doc.getElementById('dialog-body').children.length, 0);
+});

@@ -204,7 +204,7 @@ With the speaker on (`M1` or `M2`) an outgoing call plays: dial tone (`S6`), the
 | `AT*RESTART` | Restart, after Y/N |
 | `AT*VER` | Firmware version and commit |
 
-The device password (user `admin`) protects the web interface, the network console and OTA uploads. A new one is made at first boot and printed on the USB console at each boot until it is first used or changed.
+The device password (user `admin`) protects the web interface, the network console and OTA uploads. Each successful login prints a `Login:` line on the console. Changing it ends every web login. A new one is made at first boot and printed on the USB console at each boot until it is first used or changed.
 
 ### Configuration screen and terminal
 

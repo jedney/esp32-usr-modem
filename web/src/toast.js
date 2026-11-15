@@ -23,5 +23,8 @@ export function createToasts({container, document = globalThis.document,
             if (visible.length > 5) visible[0]();
             return dismiss;
         },
+        clear() {
+            while (visible.length) visible[0]();
+        },
     };
 }

@@ -1,4 +1,4 @@
-"""Real HTTP/Digest/WebSocket checks; maintenance writes require explicit flags.
+"""Real HTTP/login/WebSocket checks; maintenance writes require explicit flags.
 
 The existing USR_MODEM_PASSWORD is reused in memory. Traffic is never included
 in assertion messages. --web-tests opts in; upload acceptance is separate.
@@ -17,6 +17,7 @@ import struct
 import time
 import threading
 import urllib.error
+import urllib.parse
 import urllib.request
 
 import pytest
@@ -27,31 +28,74 @@ def require(value, message):
         pytest.fail(message + " (traffic omitted for privacy)", pytrace=False)
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Report 303s as they are: the tests check where the modem sends the browser."""
+
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+def session_cookie(headers):
+    """The usr_session value a response sets, "" if it expires the cookie, None if absent."""
+    value = headers.get("Set-Cookie") or ""
+    if not value.startswith("usr_session="):
+        return None
+    return "" if "Max-Age=0" in value else value.split(";", 1)[0].split("=", 1)[1]
+
+
 class Web:
-    def __init__(self, host):
+    """One browser: the login form, then the session cookie on every request."""
+
+    def __init__(self, host, login=True):
         self.host = host
         self.base = "http://" + host
-        passwords = urllib.request.HTTPPasswordMgrWithDefaultRealm()
-        passwords.add_password("usr-modem", self.base, "admin", os.environ["USR_MODEM_PASSWORD"])
-        self.digest = urllib.request.HTTPDigestAuthHandler(passwords)
-        self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}),
-                                                self.digest)
+        self.cookie = None
+        self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect)
+        if login:
+            code, location = self.login()
+            require(code == 303 and location == "/", "Browser login failed")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.logout()
+
+    def login(self, user="admin", password=None, origin=None, headers=None):
+        """Posts the login form. Returns (status, Location) and keeps any new cookie."""
+        if password is None:
+            password = os.environ["USR_MODEM_PASSWORD"]
+        body = urllib.parse.urlencode({"username": user, "password": password}).encode()
+        sent = {"Content-Type": "application/x-www-form-urlencoded", "Origin": origin or self.base}
+        sent.update(headers or {})
+        code, response, _ = self.request("/api/login", data=body, headers=sent)
+        cookie = session_cookie(response)
+        if cookie is not None:
+            self.cookie = cookie or None
+        return code, response.get("Location")
+
+    def auth(self):
+        code, _, body = self.request("/api/auth")
+        return json.loads(body) if code == 200 else None
+
+    def logout(self):
+        """Ends this browser's session; harmless when it has already ended."""
+        with contextlib.suppress(OSError, ValueError):
+            auth = self.auth()
+            code, response, _ = self.request("/api/logout", data=b"", headers={
+                "Origin": self.base, "X-CSRF-Token": auth["csrf"] if auth else ""})
+            if session_cookie(response) == "":
+                self.cookie = None
+            return code
+        return None
 
     def request(self, path, data=None, headers=None, auth=True, timeout=10):
-        request = urllib.request.Request(self.base + path, data=data, headers=headers or {})
-        if data is not None and auth:
-            # Large unauthenticated bodies can reset a TCP connection before a
-            # retrying client receives its 401. Supply a fresh Digest up front.
-            code, response_headers, _ = self.request("/api/session", auth=False)
-            require(code == 401, "Missing Digest challenge")
-            challenge = response_headers["WWW-Authenticate"].split(" ", 1)[1]
-            fields = urllib.request.parse_keqv_list(urllib.request.parse_http_list(challenge))
-            authorization = self.digest.get_authorization(request, fields)
-            require(authorization is not None, "Cannot construct Digest upload authorization")
-            request.add_unredirected_header("Authorization", "Digest " + authorization)
+        headers = dict(headers or {})
+        if auth and self.cookie and "Cookie" not in headers:
+            headers["Cookie"] = "usr_session=" + self.cookie
+        request = urllib.request.Request(self.base + path, data=data, headers=headers)
         try:
-            opener = self.opener if auth else urllib.request.build_opener(urllib.request.ProxyHandler({}))
-            response = opener.open(request, timeout=timeout)
+            response = self.opener.open(request, timeout=timeout)
         except urllib.error.HTTPError as error:
             response = error
         return response.code, response.headers, response.read()
@@ -175,18 +219,22 @@ def web(request, console):
     if not os.environ.get("USR_MODEM_PASSWORD"):
         pytest.skip("Device credential not configured")
     require(console.command("AT*WEB?", timeout=15)[-1] == "OK", "Web command unavailable")
-    return Web(request.config.getoption("--web-host"))
+    browser = Web(request.config.getoption("--web-host"))
+    yield browser
+    browser.logout()  # eight sessions at most: never leave one behind
 
 
-def test_assets_require_digest_and_have_correct_gzip_mime(web):
-    for path in ("/", "/app.js", "/upload.js", "/upload_flow.js", "/link.js", "/geometry.js", "/idle.js", "/toast.js", "/ui-data.js", "/ui-commands.js", "/menubar.js", "/menu-view.js", "/command-channel.js", "/menubar.css", "/usr-logo.png", "/api/session"):
+def test_assets_require_session_and_have_correct_gzip_mime(web):
+    for path in ("/app.js", "/upload.js", "/upload_flow.js", "/link.js", "/geometry.js", "/idle.js", "/toast.js", "/ui-data.js", "/ui-commands.js", "/menubar.js", "/menu-view.js", "/command-channel.js", "/xterm.mjs", "/api/session", "/api/auth", "/api/boot"):
         code, _, _ = web.request(path, auth=False)
         require(code == 401, "Unauthenticated resource exposed")
+    code, headers, _ = web.request("/", auth=False)
+    require(code == 303 and headers.get("Location") == "/login", "Page did not send the browser to log in")
     code, headers, body = web.request("/app.js")
     require(code == 200 and headers.get("Content-Encoding") == "gzip", "Missing gzip asset")
     require(b"connectModem" in gzip.decompress(body), "Wrong page asset")
     require("script-src 'self'" in headers.get("Content-Security-Policy", ""), "Missing CSP")
-    code, headers, body = web.request('/usr-logo.png')
+    code, headers, body = web.request("/usr-logo.png", auth=False)
     require(code == 200 and headers.get_content_type() == 'image/png', 'Missing logo asset')
     require(gzip.decompress(body) == (Path(__file__).resolve().parents[2] / 'web/src/usr-logo.png').read_bytes(),
             'Served logo differs from supplied artwork')
@@ -194,9 +242,101 @@ def test_assets_require_digest_and_have_correct_gzip_mime(web):
         require(web.request(path)[0] == 404, "Non-web file exposed")
 
 
+def test_login_page_and_its_presentation_files_are_public(web):
+    code, headers, body = web.request("/login", auth=False)
+    require(code == 200 and headers.get_content_type() == "text/html", "Login page unavailable")
+    page = gzip.decompress(body)
+    require(b'action="/api/login"' in page and b'autocomplete="current-password"' in page, "Wrong login page")
+    # Under no-referrer, browsers send "Origin: null" with the form, which the login refuses.
+    require(headers.get("Referrer-Policy") == "same-origin", "Login page referrer policy")
+    require(headers.get("Cache-Control") == "no-store", "Login page may be cached")
+    for path in ("/login.js", "/style.css", "/menubar.css", "/ibm-plex-mono-400.woff2", "/ibm-plex-mono-700.woff2"):
+        require(web.request(path, auth=False)[0] == 200, "Login page asset not public")
+    code, headers, _ = web.request("/login")
+    require(code == 303 and headers.get("Location") == "/", "A logged-in browser was shown the login page")
+
+
+def test_login_sets_a_strict_session_cookie_and_reports_its_deadline(web):
+    browser = Web(web.host, login=False)
+    body = urllib.parse.urlencode({"username": "admin", "password": os.environ["USR_MODEM_PASSWORD"]}).encode()
+    code, headers, _ = browser.request("/api/login", data=body, headers={
+        "Origin": web.base, "Content-Type": "application/x-www-form-urlencoded"})
+    require(code == 303 and headers.get("Location") == "/", "Login refused")
+    cookie = headers.get("Set-Cookie", "")
+    for part in ("Path=/", "HttpOnly", "SameSite=Strict", "Max-Age=43200"):
+        require(part in cookie, "Session cookie attribute missing")
+    require("Secure" not in cookie and "Domain" not in cookie, "Unexpected cookie scope")
+    browser.cookie = session_cookie(headers)
+    require(re.fullmatch(r"[0-9a-f]{32}", browser.cookie or "") is not None, "Session id is not 128 bits")
+    try:
+        auth = browser.auth()
+        require(auth is not None and auth["user"] == "admin", "Session status unavailable")
+        require(43100 < auth["expires"] <= 43200, "Session deadline is not 12 hours from login")
+        require(re.fullmatch(r"[0-9a-f]{32}", auth["csrf"]) and auth["csrf"] != browser.cookie, "Bad CSRF token")
+        require(browser.auth()["expires"] <= auth["expires"], "Using the session extended it")
+    finally:
+        browser.logout()
+
+
+def test_login_and_logout_need_this_modem_as_host_and_origin(web):
+    browser = Web(web.host, login=False)
+    for origin in ("http://attacker.invalid", "null", "http://" + web.host + ":81"):
+        require(browser.login(origin=origin)[0] == 403, "Foreign Origin could log in")
+    require(browser.login(headers={"Host": "attacker.invalid"})[0] == 403, "Foreign Host could log in")
+    require(browser.cookie is None, "A refused login set a cookie")
+    time.sleep(1.1)
+    with Web(web.host) as other:
+        csrf = other.auth()["csrf"]
+        code, _, _ = other.request("/api/logout", data=b"", headers={"Origin": "http://attacker.invalid", "X-CSRF-Token": csrf})
+        require(code == 403, "Foreign Origin could log out")
+        code, _, _ = other.request("/api/logout", data=b"", headers={"Origin": other.base})
+        require(code == 403, "Logout without the CSRF token")
+        code, _, _ = other.request("/api/logout", data=b"", headers={"Origin": other.base, "X-CSRF-Token": "0" * 32})
+        require(code == 403, "Logout with a wrong CSRF token")
+        require(other.auth() is not None, "A refused logout ended the session")
+
+
+def test_login_form_and_cookies_are_parsed_strictly(web):
+    browser = Web(web.host, login=False)
+    form = {"Origin": web.base, "Content-Type": "application/x-www-form-urlencoded"}
+    password = urllib.parse.quote(os.environ["USR_MODEM_PASSWORD"])
+
+    def refused(body, headers):
+        # The modem answers 400 and closes without reading the body: the client may see either.
+        try:
+            return browser.request("/api/login", data=body, headers=headers)[0] == 400
+        except ConnectionError:
+            return True
+
+    require(refused(b"username=admin", {**form, "Content-Type": "text/plain"}),
+            "Login accepted another content type")
+    require(refused(b"username=admin&password=" + b"x" * 300, form), "Oversized login body accepted")
+    require(browser.cookie is None, "A refused login set a cookie")
+    for body in (f"username=admin&password={password}&password={password}", f"username=admin&username=admin&password={password}",
+                 f"username=admin&password={password}&extra=1"):
+        code, headers, _ = browser.request("/api/login", data=body.encode(), headers=form)
+        require(code == 303 and headers.get("Location") == "/login?error=invalid", "Ambiguous form accepted")
+        require(session_cookie(headers) is None, "Ambiguous form set a cookie")
+        time.sleep(1.1)
+    for cookie in ("usr_session=" + "0" * 31, "usr_session=" + "A" * 32, "usr_session=" + web.cookie + "; usr_session=" + web.cookie):
+        require(web.request("/api/auth", headers={"Cookie": cookie})[0] == 400, "Ambiguous session cookie accepted")
+    require(web.request("/api/auth", headers={"Cookie": "usr_session=" + "0" * 32})[0] == 401, "Unknown session accepted")
+    # Two Cookie headers never reach a handler: the connection is closed.
+    with socket.create_connection((web.host, 80), timeout=4) as sock:
+        sock.sendall((f"GET /api/auth HTTP/1.1\r\nHost: {web.host}\r\nCookie: usr_session={web.cookie}\r\n"
+                      f"Cookie: usr_session={'0' * 32}\r\n\r\n").encode())
+        reply = b""
+        with contextlib.suppress(OSError):
+            while chunk := sock.recv(4096):
+                reply += chunk
+    require(b" 200 " not in reply.split(b"\r\n")[0], "Duplicate Cookie headers accepted")
+    require(web.auth() is not None, "Malformed requests ended the session")
+
+
 def test_recent_console_history_requires_auth_and_replays_banner(web, console):
     # A ring is not a permanent boot transcript: make the banner recent for this assertion.
     console.restart()
+    log_in_again(web)  # a restart ends every session
     code, _, _ = web.request('/api/boot', headers={'Host': 'attacker.invalid'}, auth=False)
     require(code == 403, 'Console history accepted a foreign Host')
     code, _, _ = web.request('/api/boot', auth=False)
@@ -216,7 +356,7 @@ def test_parallel_page_load_has_no_connection_resets(web):
 
     def fetch(path):
         try:
-            return Web(web.host).request(path)[0]
+            return web.request(path)[0]
         except OSError as error:
             return type(error).__name__
 
@@ -230,38 +370,21 @@ def test_parallel_page_load_has_no_connection_resets(web):
 
 
 def test_wrong_password_locks_out_for_a_second_without_stalling(web):
-    passwords = urllib.request.HTTPPasswordMgrWithDefaultRealm()
-    passwords.add_password("usr-modem", web.base, "admin", "not-the-password")
-    wrong = urllib.request.build_opener(urllib.request.ProxyHandler({}),
-                                        urllib.request.HTTPDigestAuthHandler(passwords))
-    web.request("/api/session", auth=False)  # the PC's first name lookup can take seconds
+    browser = Web(web.host, login=False)
+    browser.request("/login")  # the PC's first name lookup can take seconds
     start = time.monotonic()
-    try:
-        code = wrong.open(web.base + "/api/session", timeout=10).code
-    except urllib.error.HTTPError as error:
-        code = error.code
-    require(code == 401, "Wrong password accepted")
-    # No sleep in the server task: the 401s (and urllib's retries) come back at once.
+    code, location = browser.login(password="not-the-password")
+    require(code == 303 and location == "/login?error=invalid", "Wrong password accepted")
+    # No sleep in the server task: the refusal comes back at once.
     require(time.monotonic() - start < 0.8, "Wrong password stalled the web server")
-    # Inside the lock-out even the right password is refused: one Digest attempt, built from a
-    # fresh challenge. (urllib's own handler would retry six times on the lock-out's 401s and
-    # then refuse every later request on that opener without asking the modem.)
-    code, headers, _ = web.request("/api/session", auth=False)
-    require(code == 401, "Missing Digest challenge")
-    challenge = headers["WWW-Authenticate"].split(" ", 1)[1]
-    fields = urllib.request.parse_keqv_list(urllib.request.parse_http_list(challenge))
-    attempt = urllib.request.Request(web.base + "/api/session")
-    attempt.add_unredirected_header(
-        "Authorization", "Digest " + web.digest.get_authorization(attempt, fields))
-    try:
-        code = urllib.request.build_opener(urllib.request.ProxyHandler({})).open(
-            attempt, timeout=10).code
-    except urllib.error.HTTPError as error:
-        code = error.code
-    require(code == 401, "Lock-out did not refuse the next attempt")
+    # Inside the lock-out even the right password is refused, without being checked.
+    code, location = browser.login()
+    require(code == 303 and location == "/login?error=wait", "Lock-out did not refuse the next attempt")
+    require(browser.cookie is None, "A refused login set a cookie")
     time.sleep(1.1)
-    code = Web(web.host).request("/api/session")[0]
-    require(code == 200, "Lock-out lasted longer than a second")
+    code, location = browser.login()
+    require(code == 303 and location == "/", "Lock-out lasted longer than a second")
+    browser.logout()
 
 
 def test_wrong_host_is_rejected_before_auth(web):
@@ -652,6 +775,7 @@ def test_interrupted_upload_frees_the_modem(web, console, request):
         head = (f"POST /api/update?target=firmware&version={version} HTTP/1.1\r\n"
                 f"Host: {web.host}\r\nOrigin: http://{web.host}\r\n"
                 f"Content-Type: application/octet-stream\r\nContent-Length: {length}\r\n"
+                f"Cookie: usr_session={web.cookie}\r\n"
                 f"X-CSRF-Token: {hello['csrf']}\r\nX-Image-SHA256: {'0' * 64}\r\n\r\n")
         sock.sendall(head.encode())
         try:
@@ -850,7 +974,9 @@ def test_browser_generated_password_reaches_requesting_terminal(web, console, re
     finally:
         require(console.command("AT*PASS=" + original)[-1] == "OK", "Password restore failed")
         time.sleep(0.3)
-    require(Web(web.host).request("/api/session")[0] == 200, "Restored browser login failed")
+    with Web(web.host) as again:
+        require(again.request("/api/session")[0] == 200, "Restored browser login failed")
+    require(web.request("/api/auth")[0] == 401, "A password change left the old session logged in")
 
 
 @contextlib.contextmanager
@@ -1041,3 +1167,176 @@ def test_terminal_dials_telnet_paste_resize_escape_and_disconnect(web, console, 
         console.command("AT*THROTTLE=" + throttle)
         if old_m:
             console.command("ATM" + old_m.group(1))
+
+
+# --- Login sessions -------------------------------------------------------------------------
+
+def log_in_again(web, seconds=30):
+    """Logs the fixture's browser in again, waiting for the web server after a restart."""
+    deadline = time.monotonic() + seconds
+    while True:
+        with contextlib.suppress(OSError):
+            if web.login() == (303, "/"):
+                return
+        require(time.monotonic() < deadline, "Could not log in again")
+        time.sleep(1.1)
+
+def console_output(console, seconds):
+    """What the maintenance console prints in the next `seconds`, unfiltered."""
+    data = b""
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        data += console.ser.read(console.ser.in_waiting or 1)
+    return data
+
+
+def test_each_web_login_is_logged_once_on_the_console(web, console):
+    console_output(console, 0.5)
+    with Web(web.host) as browser:
+        text = console_output(console, 2.0)
+        require(text.count(b"Login: web admin from ") == 1, "Web login not logged exactly once")
+        require(re.search(rb"Login: web admin from \d+\.\d+\.\d+\.\d+\r\n", text), "Login line lacks the peer")
+        for secret in (browser.cookie, browser.auth()["csrf"], os.environ["USR_MODEM_PASSWORD"]):
+            require(secret.encode() not in text, "Login line holds a secret")
+        # Routine requests, a reconnecting socket and a failed login are not logins.
+        browser.request("/api/auth")
+        with browser.ws():
+            pass
+        with browser.ws():
+            pass
+        time.sleep(1.1)
+        require(Web(web.host, login=False).login(password="not-the-password")[1] == "/login?error=invalid", "Wrong password")
+        require(b"Login: web" not in console_output(console, 1.5), "A non-login was logged as a login")
+
+
+def test_logout_ends_this_browsers_tabs_and_sockets_only(web):
+    with Web(web.host) as other:
+        with web.ws() as owner, web.ws() as observer, other.ws() as elsewhere:
+            owner.open_terminal()
+            observer.collect(0.3)
+            elsewhere.collect(0.3)
+            spare = web.ticket()  # a ticket issued before the logout dies with the session
+            csrf = web.auth()["csrf"]
+            code, headers, _ = web.request("/api/logout", data=b"", headers={"Origin": web.base, "X-CSRF-Token": csrf})
+            require(code == 204 and session_cookie(headers) == "", "Logout did not expire the cookie")
+            for peer in (owner, observer):
+                peer.collect(1.0, allow_close=True)
+                require(peer.closed, "Logout left a socket of the session open")
+            elsewhere.collect(0.5)
+            require(not elsewhere.closed, "Logout closed another browser's socket")
+            require(other.request("/api/session")[0] == 200, "Logout ended another browser's session")
+            require(web.request("/api/session")[0] == 401, "The logged-out session still works")
+            late = WS(web.host, spare)
+            try:
+                require(not late.accepted, "A ticket outlived its session")
+            finally:
+                late.close()
+            code, _, _ = web.request("/api/logout", data=b"", headers={"Origin": web.base, "X-CSRF-Token": csrf})
+            require(code == 204, "A repeated logout failed")
+    code, location = web.login()
+    require(code == 303 and location == "/", "Login after logout failed")
+
+
+def test_listener_restart_keeps_sessions(web, console):
+    try:
+        require(console.command("AT*WEB=OFF")[-1] == "OK", "Web server did not stop")
+        time.sleep(1)
+    finally:
+        require(console.command("AT*WEB=ON")[-1] == "OK", "Web server did not restart")
+    deadline = time.monotonic() + 10
+    code = None
+    while time.monotonic() < deadline and code != 200:
+        with contextlib.suppress(OSError):
+            code = web.request("/api/auth", timeout=4)[0]
+        time.sleep(0.5)
+    require(code == 200, "A listener restart ended the session")
+
+
+def test_restart_ends_every_session(web, console):
+    require(web.request("/api/auth")[0] == 200, "No session to end")
+    console.restart()
+    deadline = time.monotonic() + 30
+    code = None
+    while time.monotonic() < deadline and code is None:
+        with contextlib.suppress(OSError):
+            code = web.request("/api/auth", timeout=4)[0]
+        time.sleep(0.5)
+    require(code == 401, "A session survived a restart")
+
+
+def test_a_ninth_browser_waits_without_ending_anyone(web):
+    browsers = []
+    try:
+        busy = None
+        for _ in range(9):
+            browser = Web(web.host, login=False)
+            code, location = browser.login()
+            if location == "/login?error=busy":
+                busy = browser
+                break
+            require(code == 303 and location == "/", "Login refused before the sessions were full")
+            browsers.append(browser)
+        require(busy is not None, "More than eight sessions were accepted")
+        require(busy.cookie is None, "A refused login set a cookie")
+        require(web.request("/api/auth")[0] == 200 and all(b.auth() for b in browsers),
+                "A full table ended someone else's session")
+        browsers.pop().logout()
+        code, location = busy.login()
+        require(code == 303 and location == "/", "A freed slot was not reused")
+        browsers.append(busy)
+    finally:
+        for browser in browsers:
+            browser.logout()
+
+
+def test_upload_after_logout_finishes_and_releases_the_worker(web, console, request):
+    """An admitted upload outlives its session; nothing else does. The current build is sent
+    with a wrong hash, so it streams to the end and is then rejected: nothing is installed."""
+    if not request.config.getoption("--upload-tests"):
+        pytest.skip("--upload-tests not enabled")
+    root = Path(__file__).resolve().parents[2]
+    version = (root / "VERSION").read_text(encoding="utf-8").strip()
+    image = (root / ".pio/build/s3/firmware.bin").read_bytes()
+    require(f"USRMODEM/1/FIRMWARE/{version}\n".encode() in image, "Build normal firmware first")
+    length = len(image)
+    with web.ws() as owner:
+        _, messages = owner.enter()
+        hello = next((m for m in messages if m.get("t") == "hello"), None)
+        require(hello is not None, "No CSRF token in the page snapshot")
+        sock = socket.create_connection((web.host, 80), timeout=10)
+        head = (f"POST /api/update?target=firmware&version={version} HTTP/1.1\r\n"
+                f"Host: {web.host}\r\nOrigin: http://{web.host}\r\n"
+                f"Content-Type: application/octet-stream\r\nContent-Length: {length}\r\n"
+                f"Cookie: usr_session={web.cookie}\r\n"
+                f"X-CSRF-Token: {hello['csrf']}\r\nX-Image-SHA256: {'0' * 64}\r\n\r\n")
+        sock.sendall(head.encode() + image[:65536])
+        time.sleep(1)
+        # While the upload holds the worker: a second upload is refused, logout still works.
+        code, _, _ = web.request(f"/api/update?target=firmware&version={version}", data=bytes(24), headers={
+            "Origin": web.base, "Content-Type": "application/octet-stream",
+            "X-CSRF-Token": hello["csrf"], "X-Image-SHA256": "0" * 64})
+        require(code in (403, 409), "A second upload was admitted")
+        start = time.monotonic()
+        csrf = web.auth()["csrf"]
+        code, _, _ = web.request("/api/logout", data=b"", headers={"Origin": web.base, "X-CSRF-Token": csrf})
+        require(code == 204 and time.monotonic() - start < 3, "Logout waited for the upload")
+        owner.collect(1.0, allow_close=True)
+        require(owner.closed, "Logout left the uploader's socket open")
+        sock.sendall(image[65536:])
+        sock.settimeout(30)
+        reply = b""
+        with contextlib.suppress(OSError):
+            while b"\r\n\r\n" not in reply and (chunk := sock.recv(4096)):
+                reply += chunk
+        sock.close()
+    require(b" 400 " in reply.split(b"\r\n")[0], "The admitted upload did not finish with its own reply")
+    deadline = time.monotonic() + 20
+    ok = False
+    while time.monotonic() < deadline and not ok:
+        time.sleep(1)
+        with contextlib.suppress(OSError):
+            ok = console.command("AT")[-1] == "OK"
+    require(ok, "The modem stayed busy after the upload")
+    web.login()
+    with web.ws() as again:
+        require(again.accepted, "The web server did not serve the terminal after the upload")

@@ -3,6 +3,7 @@
 #include <Update.h>
 #include <esp_ota_ops.h>
 #include <esp_system.h>
+#include <esp_timer.h>
 #include <lwip/sockets.h>
 #include <psa/crypto.h>
 #include <cstring>
@@ -77,7 +78,13 @@ std::string query(httpd_req_t *req, const char *key) {
     }
     return value;
 }
-void headers(httpd_req_t *req) {
+// Monotonic uptime for the session deadline: it never wraps and ignores the wall clock.
+uint64_t uptimeMs() {
+    return static_cast<uint64_t>(esp_timer_get_time()) / 1000;
+}
+// The login page sends its form with Referrer-Policy same-origin: under no-referrer, browsers
+// send "Origin: null" with a form POST, and the login's Origin check would refuse it.
+void headers(httpd_req_t *req, bool sameOriginReferrer = false) {
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     // One request per connection (the header gate refuses a second one). The client closes its
     // end after this response and the server then frees the slot. The server is not asked to
@@ -86,7 +93,7 @@ void headers(httpd_req_t *req) {
     httpd_resp_set_hdr(req, "Connection", "close");
     httpd_resp_set_hdr(req, "X-Content-Type-Options", "nosniff");
     httpd_resp_set_hdr(req, "X-Frame-Options", "DENY");
-    httpd_resp_set_hdr(req, "Referrer-Policy", "no-referrer");
+    httpd_resp_set_hdr(req, "Referrer-Policy", sameOriginReferrer ? "same-origin" : "no-referrer");
     httpd_resp_set_hdr(req, "Content-Security-Policy",
                        "default-src 'self'; script-src 'self'; connect-src 'self'; "
                        "style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; "
@@ -97,6 +104,38 @@ esp_err_t reply(httpd_req_t *req, const char *status, const char *text) {
     httpd_resp_set_status(req, status);
     httpd_resp_set_type(req, "text/plain; charset=utf-8");
     return httpd_resp_send(req, text, HTTPD_RESP_USE_STRLEN);
+}
+// The session cookie: host-only, never readable by scripts, never sent cross-site. No Secure
+// flag because the modem serves plain HTTP. An empty token expires the cookie.
+std::string sessionCookie(const std::string &token) {
+    return std::string(webinterface::kSessionCookie) + "=" + token +
+           "; Path=/; HttpOnly; SameSite=Strict; Max-Age=" + (token.empty() ? "0" : "43200");
+}
+esp_err_t redirect(httpd_req_t *req, const char *location, const std::string &cookie = "") {
+    headers(req);
+    httpd_resp_set_status(req, "303 See Other");
+    httpd_resp_set_hdr(req, "Location", location);
+    if (!cookie.empty()) {
+        httpd_resp_set_hdr(req, "Set-Cookie", cookie.c_str());
+    }
+    return httpd_resp_send(req, nullptr, 0);
+}
+void peerAddress(httpd_req_t *req, char out[16]) {
+    out[0] = 0;
+    sockaddr_in peer = {};
+    socklen_t len = sizeof peer;
+    if (lwip_getpeername(httpd_req_to_sockfd(req), reinterpret_cast<sockaddr *>(&peer), &len) ==
+        0) {
+        ip4addr_ntoa_r(reinterpret_cast<const ip4_addr_t *>(&peer.sin_addr), out, 16);
+    }
+}
+// The media type alone: "application/x-www-form-urlencoded; charset=UTF-8" is still a form.
+std::string mediaType(const std::string &value) {
+    std::string type = value.substr(0, value.find(';'));
+    while (!type.empty() && type.back() == ' ') {
+        type.pop_back();
+    }
+    return type;
 }
 std::string hexBytes(const uint8_t *data, size_t len) {
     const char *digits = "0123456789abcdef";
@@ -133,21 +172,16 @@ bool WebCrypto::random(uint8_t *out, size_t len) {
     esp_fill_random(out, len);
     return true;
 }
-bool WebCrypto::md5(const std::string &text, char out[33]) {
-    uint8_t bytes[16] = {};
+bool WebCrypto::sha256(const uint8_t *data, size_t len, uint8_t out[32]) {
     size_t length = 0;
-    bool ok = psa_hash_compute(PSA_ALG_MD5, reinterpret_cast<const uint8_t *>(text.data()),
-                               text.size(), bytes, sizeof bytes, &length) == PSA_SUCCESS;
-    std::string encoded = hexBytes(bytes, sizeof bytes);
-    memcpy(out, encoded.c_str(), 33);
-    devicecfg::wipe(bytes, sizeof bytes);
-    return ok;
+    return psa_hash_compute(PSA_ALG_SHA_256, data, len, out, 32, &length) == PSA_SUCCESS &&
+           length == 32;
 }
 WebService::WebService(devicecfg::Device &device, const netconsole::ConsoleLog &console)
     : device_(device),
       console_(console),
-      auth_(crypto_),
-      tickets_(auth_),
+      tickets_(crypto_),
+      sessions_(crypto_),
       mutex_(xSemaphoreCreateMutex()) {}
 WebService::Client *WebService::find(uint32_t id) {
     for (auto &c : clients_) {
@@ -192,8 +226,9 @@ void WebService::stop() {
             c.input.clear();
             c.output.clear();
             c.csrf.clear();
+            c.session = 0;
         }
-        auth_.reset();
+        // Sessions outlive the listener: Wi-Fi reconnects and AT*WEB=OFF/ON keep them.
         tickets_.reset();
     }
     // Release a receive handler waiting for modem space before waiting for the
@@ -218,14 +253,15 @@ void WebService::poll(bool enabled, bool up, const char *name, const char *ip) {
         usedAck_ = ok;
     }
     bool changed = name_ != name || ip_ != ip;
-    if (hash_ != device_.digestHash()) {
+    if (hash_ != device_.otaHash()) {
         Lock lock(mutex_);
-        hash_ = device_.digestHash();
-        auth_.reset();
+        hash_ = device_.otaHash();
+        ++credentials_;  // a login checked against the old password is not committed
+        sessions_.revokeAll();
         tickets_.reset();
         usedAck_ = false;
         // Send the requesting terminal's generated password before closing its
-        // authenticated connection. New requests already require the new hash.
+        // authenticated connection. New requests already require the new password.
         for (auto &c : clients_)
             if (c.active) {
                 c.close = true;
@@ -233,21 +269,46 @@ void WebService::poll(bool enabled, bool up, const char *name, const char *ip) {
                 c.input.clear();
             }
     }
+    {
+        // A session ends exactly 12 hours after its login, whatever the browser does.
+        uint32_t ended[webinterface::kSessionSlots];
+        Lock lock(mutex_);
+        size_t n = sessions_.expire(uptimeMs(), ended);
+        for (size_t i = 0; i < n; ++i) {
+            revokeLocked(ended[i]);
+        }
+    }
     if (uploading()) {
+        pump();  // closes revoked sockets: the loop's own pump() waits while an upload runs
         return;
+    }
+    {
+        Lock lock(mutex_);
+        if (workerBusy_) {
+            return;  // never stop the server under an upload's asynchronous request
+        }
     }
     if (!enabled || !up || !device_.ready() || changed) {
         stop();
         Lock lock(mutex_);
         name_ = name;
         ip_ = ip;
-        hash_ = device_.digestHash();
+        hash_ = device_.otaHash();
         if (changed) {
             usedAck_ = false;
         }
     }
     if (!enabled || !up || !device_.ready() || server_) {
         return;
+    }
+    if (!jobs_) {
+        // One upload worker for the life of the firmware: an admitted upload streams there,
+        // so the HTTP task keeps serving logout, login and the terminal meanwhile.
+        jobs_ = xQueueCreate(1, sizeof(Job));
+        if (!jobs_ || xTaskCreatePinnedToCore(uploadWorker, "webupload", 12288, this,
+                                              tskIDLE_PRIORITY + 5, nullptr, 0) != pdPASS) {
+            return;
+        }
     }
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
     cfg.core_id = 0;
@@ -261,6 +322,7 @@ void WebService::poll(bool enabled, bool up, const char *name, const char *ip) {
     cfg.recv_wait_timeout = 1;
     cfg.send_wait_timeout = 1;
     cfg.uri_match_fn = httpd_uri_match_wildcard;
+    cfg.max_uri_handlers = 5;
     if (httpd_start(&server_, &cfg) != ESP_OK) {
         server_ = nullptr;
         return;
@@ -279,6 +341,12 @@ void WebService::poll(bool enabled, bool up, const char *name, const char *ip) {
     route.method = HTTP_POST;
     route.handler = update;
     route.user_ctx = this;
+    httpd_register_uri_handler(server_, &route);
+    route.uri = "/api/login";
+    route.handler = loginRoute;
+    httpd_register_uri_handler(server_, &route);
+    route.uri = "/api/logout";
+    route.handler = logoutRoute;
     httpd_register_uri_handler(server_, &route);
     route.uri = "/*";
     route.method = HTTP_GET;
@@ -312,44 +380,100 @@ bool WebService::used() {
     }
     return false;
 }
-bool WebService::authorized(httpd_req_t *req) {
-    if (!host(req, false)) {
-        reply(req, "403 Forbidden", "Invalid modem host.");
-        return false;
-    }
-    std::string value = header(req, "Authorization");
-    webinterface::Check result;
-    std::string challenge;
-    {
-        Lock lock(mutex_);
-        result = auth_.check(value, req->method == HTTP_POST ? "POST" : "GET", req->uri,
-                             hash_.c_str(), millis());
-        if (result != webinterface::Check::kOk) {
-            challenge = auth_.challenge(millis(), result == webinterface::Check::kStale);
-        }
-    }
-    if (result != webinterface::Check::kOk) {
-        httpd_resp_set_hdr(req, "WWW-Authenticate", challenge.c_str());
-        reply(req, "401 Unauthorized", "Log in as admin with the device password.");
-        return false;
-    }
-    if (!used()) {
-        reply(req, "503 Service Unavailable", "Unable to record authenticated use.");
-        return false;
-    }
-    return true;
-}
 esp_err_t WebService::get(httpd_req_t *req) {
     return static_cast<WebService *>(req->user_ctx)->serve(req);
 }
-esp_err_t WebService::serve(httpd_req_t *req) {
-    if (!authorized(req)) {
-        return ESP_OK;
+webinterface::CookieResult WebService::session(httpd_req_t *req, uint32_t &serial,
+                                               std::string *token) {
+    serial = 0;
+    std::string value;
+    webinterface::CookieResult result =
+        webinterface::parseSessionCookie(header(req, "Cookie", 1024), value);
+    if (result == webinterface::CookieResult::kOk) {
+        Lock lock(mutex_);
+        serial = sessions_.find(value, uptimeMs());
     }
-    headers(req);
+    if (token) {
+        *token = value;
+    }
+    return result;
+}
+esp_err_t WebService::serve(httpd_req_t *req) {
+    if (!host(req, false)) {
+        return reply(req, "403 Forbidden", "Invalid modem host.");
+    }
     std::string path = req->uri;
     path.resize(path.find('?') == std::string::npos ? path.size() : path.find('?'));
+    if (path == "/") {
+        path = "/index.html";
+    }
+    struct Asset {
+        const char *path;
+        const char *mime;
+        bool open;  // served before login: the login page and what it shows
+    };
+    static const Asset assets[] = {{"/index.html", "text/html; charset=utf-8", false},
+                                   {"/login.html", "text/html; charset=utf-8", true},
+                                   {"/login.js", "text/javascript", true},
+                                   {"/usr-logo.png", "image/png", true},
+                                   {"/menubar.css", "text/css", true},
+                                   {"/menubar.js", "text/javascript", false},
+                                   {"/menu-view.js", "text/javascript", false},
+                                   {"/command-channel.js", "text/javascript", false},
+                                   {"/style.css", "text/css", true},
+                                   {"/app.js", "text/javascript", false},
+                                   {"/status.js", "text/javascript", false},
+                                   {"/demo.js", "text/javascript", false},
+                                   {"/upload.js", "text/javascript", false},
+                                   {"/upload_flow.js", "text/javascript", false},
+                                   {"/link.js", "text/javascript", false},
+                                   {"/geometry.js", "text/javascript", false},
+                                   {"/idle.js", "text/javascript", false},
+                                   {"/toast.js", "text/javascript", false},
+                                   {"/ui-data.js", "text/javascript", false},
+                                   {"/ui-commands.js", "text/javascript", false},
+                                   {"/xterm.mjs", "text/javascript", false},
+                                   {"/xterm.css", "text/css", false},
+                                   {"/ibm-plex-mono-400.woff2", "font/woff2", true},
+                                   {"/ibm-plex-mono-700.woff2", "font/woff2", true}};
+    uint32_t serial;
+    const webinterface::CookieResult cookie = session(req, serial, nullptr);
+    const Asset *asset = nullptr;
+    if (path == "/login") {
+        if (serial) {
+            return redirect(req, "/");
+        }
+        asset = &assets[1];
+    }
+    for (const auto &a : assets) {
+        if (!asset && path == a.path) {
+            asset = &a;
+        }
+    }
+    if (!serial && !(asset && asset->open)) {
+        if (path == "/index.html") {
+            return redirect(req, "/login");
+        }
+        return cookie == webinterface::CookieResult::kAmbiguous
+                   ? reply(req, "400 Bad Request", "Ambiguous session cookie. Log in again.")
+                   : reply(req, "401 Unauthorized", "Log in as admin with the device password.");
+    }
+    if (path == "/api/auth") {
+        std::string body;
+        {
+            Lock lock(mutex_);
+            body = "{\"user\":\"" + std::string(webinterface::kAccount) + "\",\"expires\":" +
+                   std::to_string(sessions_.remainingSeconds(serial, uptimeMs())) + ",\"csrf\":\"" +
+                   sessions_.csrf(serial) + "\"}";
+        }
+        headers(req);
+        httpd_resp_set_type(req, "application/json");
+        esp_err_t result = httpd_resp_send(req, body.c_str(), body.size());
+        devicecfg::wipe(body.data(), body.size());
+        return result;
+    }
     if (path == "/api/boot") {
+        headers(req);
         httpd_resp_set_type(req, "text/plain; charset=utf-8");
         // Each read holds the log's lock only while copying. Never hold the spinlock
         // during a socket write, and stop at the captured end even if output continues.
@@ -376,65 +500,200 @@ esp_err_t WebService::serve(httpd_req_t *req) {
         std::string ticket;
         {
             Lock lock(mutex_);
-            ticket = tickets_.issue(millis());
+            ticket = tickets_.issue(serial, millis());
         }
+        headers(req);
         httpd_resp_set_type(req, "application/json");
         std::string body = "{\"token\":\"" + ticket + "\"}";
         return httpd_resp_send(req, body.c_str(), body.size());
     }
-    struct Asset {
-        const char *path;
-        const char *mime;
-    };
-    static const Asset assets[] = {{"/index.html", "text/html; charset=utf-8"},
-                                   {"/usr-logo.png", "image/png"},
-                                   {"/menubar.css", "text/css"},
-                                   {"/menubar.js", "text/javascript"},
-                                   {"/menu-view.js", "text/javascript"},
-                                   {"/command-channel.js", "text/javascript"},
-                                   {"/style.css", "text/css"},
-                                   {"/app.js", "text/javascript"},
-                                   {"/status.js", "text/javascript"},
-                                   {"/demo.js", "text/javascript"},
-                                   {"/upload.js", "text/javascript"},
-                                   {"/upload_flow.js", "text/javascript"},
-                                   {"/link.js", "text/javascript"},
-                                   {"/geometry.js", "text/javascript"},
-                                   {"/idle.js", "text/javascript"},
-                                   {"/toast.js", "text/javascript"},
-                                   {"/ui-data.js", "text/javascript"},
-                                   {"/ui-commands.js", "text/javascript"},
-                                   {"/xterm.mjs", "text/javascript"},
-                                   {"/xterm.css", "text/css"},
-                                   {"/ibm-plex-mono-400.woff2", "font/woff2"},
-                                   {"/ibm-plex-mono-700.woff2", "font/woff2"}};
-    if (path == "/") {
-        path = "/index.html";
+    if (!asset) {
+        return reply(req, "404 Not Found", "Not found.");
     }
-    for (const auto &asset : assets) {
-        if (path != asset.path) {
+    if (uploading()) {
+        return reply(req, "503 Service Unavailable", "Update in progress.");
+    }
+    File file = LittleFS.open(("/www" + std::string(asset->path) + ".gz").c_str(), "r");
+    if (!file) {
+        return reply(req, "503 Service Unavailable",
+                     "Web files unavailable. Restore littlefs.bin using USB uploadfs.");
+    }
+    headers(req, asset == &assets[1]);
+    httpd_resp_set_type(req, asset->mime);
+    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    char buffer[1024];
+    while (file.available()) {
+        size_t n = file.readBytes(buffer, sizeof buffer);
+        if (httpd_resp_send_chunk(req, buffer, n) != ESP_OK) {
+            return ESP_FAIL;
+        }
+    }
+    return httpd_resp_send_chunk(req, nullptr, 0);
+}
+esp_err_t WebService::loginRoute(httpd_req_t *req) {
+    return static_cast<WebService *>(req->user_ctx)->login(req);
+}
+esp_err_t WebService::logoutRoute(httpd_req_t *req) {
+    return static_cast<WebService *>(req->user_ctx)->logout(req);
+}
+// A form POST. Every outcome goes back to a page: the terminal after a login, else the login
+// page with a fixed error code. Nothing submitted is echoed, logged or kept.
+esp_err_t WebService::login(httpd_req_t *req) {
+    if (!host(req, true)) {
+        return reply(req, "403 Forbidden", "Invalid modem host or origin.");
+    }
+    if (mediaType(header(req, "Content-Type")) != "application/x-www-form-urlencoded" ||
+        req->content_len > webinterface::kLoginFormBytes) {
+        reply(req, "400 Bad Request", "Invalid login form.");
+        return ESP_FAIL;  // close without reading the body
+    }
+    std::string body(req->content_len, '\0');
+    size_t received = 0;
+    const uint32_t start = millis();
+    while (received < body.size() && millis() - start < 5000) {
+        int n = httpd_req_recv(req, &body[received], body.size() - received);
+        if (n == HTTPD_SOCK_ERR_TIMEOUT) {
             continue;
         }
-        if (uploading()) {
-            return reply(req, "503 Service Unavailable", "Update in progress.");
+        if (n <= 0) {
+            break;
         }
-        File file = LittleFS.open(("/www" + path + ".gz").c_str(), "r");
-        if (!file) {
-            return reply(req, "503 Service Unavailable",
-                         "Web files unavailable. Restore littlefs.bin using USB uploadfs.");
+        received += size_t(n);
+    }
+    char user[webinterface::kLoginFieldBytes + 1], password[webinterface::kLoginFieldBytes + 1];
+    const bool parsed =
+        received == body.size() && webinterface::parseLoginForm(body, user, password);
+    devicecfg::wipe(body.data(), body.size());
+    if (!parsed) {
+        return redirect(req, "/login?error=invalid");
+    }
+    std::string hash;
+    uint32_t credentials;
+    bool allowed;
+    {
+        Lock lock(mutex_);
+        allowed = throttle_.begin(millis());
+        hash = hash_;
+        credentials = credentials_;
+    }
+    bool correct = allowed && webinterface::verifyPassword(crypto_, user, password, hash.c_str());
+    devicecfg::wipe(user, sizeof user);
+    devicecfg::wipe(password, sizeof password);
+    devicecfg::wipe(hash.data(), hash.size());
+    if (!allowed) {
+        return redirect(req, "/login?error=wait");
+    }
+    {
+        Lock lock(mutex_);
+        throttle_.finish(correct, millis());
+    }
+    if (!correct) {
+        return redirect(req, "/login?error=invalid");
+    }
+    // The boot-banner password is erased (on the modem loop) before the login counts.
+    if (!used()) {
+        return redirect(req, "/login?error=unavailable");
+    }
+    uint32_t ignored;
+    std::string previous;
+    session(req, ignored, &previous);
+    char peer[16];
+    peerAddress(req, peer);
+    std::string token;
+    webinterface::Sessions::Result result = webinterface::Sessions::Result::kFailed;
+    {
+        Lock lock(mutex_);
+        if (credentials == credentials_) {  // the password did not change meanwhile
+            uint32_t serial, replaced;
+            result = sessions_.create(previous, uptimeMs(), token, serial, replaced);
+            if (result == webinterface::Sessions::Result::kOk) {
+                if (replaced) {
+                    revokeLocked(replaced);
+                }
+                logins_.push(webinterface::LoginKind::kWeb, peer);
+            }
+        } else {
+            correct = false;
         }
-        httpd_resp_set_type(req, asset.mime);
-        httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-        char buffer[1024];
-        while (file.available()) {
-            size_t n = file.readBytes(buffer, sizeof buffer);
-            if (httpd_resp_send_chunk(req, buffer, n) != ESP_OK) {
-                return ESP_FAIL;
+    }
+    devicecfg::wipe(previous.data(), previous.size());
+    if (!correct) {
+        return redirect(req, "/login?error=invalid");
+    }
+    if (result == webinterface::Sessions::Result::kFull) {
+        return redirect(req, "/login?error=busy");
+    }
+    if (result != webinterface::Sessions::Result::kOk) {
+        return redirect(req, "/login?error=unavailable");
+    }
+    const std::string cookie = sessionCookie(token);
+    devicecfg::wipe(token.data(), token.size());
+    esp_err_t sent = redirect(req, "/", cookie);
+    return sent;
+}
+// Ends the browser's session in every tab: its tickets, its sockets and its input. Repeating
+// it is harmless. A live session needs its CSRF token, so another site cannot log anyone out.
+esp_err_t WebService::logout(httpd_req_t *req) {
+    if (!host(req, true)) {
+        return reply(req, "403 Forbidden", "Invalid modem host or origin.");
+    }
+    uint32_t serial;
+    session(req, serial, nullptr);
+    if (serial) {
+        const std::string csrf = header(req, "X-CSRF-Token", 32);
+        {
+            Lock lock(mutex_);
+            if (!sessions_.csrfMatches(serial, csrf, uptimeMs())) {
+                serial = 0;
+            } else {
+                revokeLocked(serial);
             }
         }
-        return httpd_resp_send_chunk(req, nullptr, 0);
+        if (!serial) {
+            return reply(req, "403 Forbidden", "Invalid CSRF token.");
+        }
+        sendClients();  // close the session's sockets now, from this task
     }
-    return reply(req, "404 Not Found", "Not found.");
+    // The server keeps a pointer to each header value until the response is sent.
+    const std::string expired = sessionCookie("");
+    headers(req);
+    httpd_resp_set_status(req, "204 No Content");
+    httpd_resp_set_hdr(req, "Set-Cookie", expired.c_str());
+    return httpd_resp_send(req, nullptr, 0);
+}
+void WebService::revokeLocked(uint32_t serial) {
+    sessions_.revoke(serial);
+    tickets_.revoke(serial);
+    for (auto &c : clients_) {
+        if (c.active && c.session == serial) {
+            terminalOwner_.close(c.id);
+            c.input.clear();
+            c.output.clear();  // nothing more reaches a logged-out browser
+            for (auto &m : c.messages) {
+                m.clear();
+            }
+            c.close = true;
+        }
+    }
+}
+void WebService::revokeSessions() {
+    {
+        Lock lock(mutex_);
+        sessions_.revokeAll();
+        tickets_.reset();
+        for (auto &c : clients_) {
+            if (c.active) {
+                terminalOwner_.close(c.id);
+                c.input.clear();
+                c.close = true;
+            }
+        }
+    }
+    queueSend();
+}
+bool WebService::takeLogin(char *out, size_t cap) {
+    Lock lock(mutex_);
+    return logins_.take(out, cap);
 }
 esp_err_t WebService::websocket(httpd_req_t *req) {
     return static_cast<WebService *>(req->user_ctx)->ws(req);
@@ -498,8 +757,9 @@ esp_err_t WebService::ws(httpd_req_t *req) {
                         devicecfg::wipe(data, sizeof data);
                         return ESP_FAIL;
                     }
-                    if (!terminalOwner_.owns(c->id)) {
-                        offset = n;  // observers never queue commands
+                    if (!terminalOwner_.owns(c->id) || c->close ||
+                        !sessions_.valid(c->session, uptimeMs())) {
+                        offset = n;  // observers and ended sessions never queue commands
                     } else {
                         size_t used = c->input.append(data + offset, n - offset);
                         offset += used;
@@ -552,6 +812,10 @@ esp_err_t WebService::ws(httpd_req_t *req) {
     }
     Lock lock(mutex_);
     auto *c = find(context->id);
+    if (c && (c->close || !sessions_.valid(c->session, uptimeMs()))) {
+        devicecfg::wipe(data, sizeof data);
+        return ESP_OK;  // the socket is closing: ignore what it still sends
+    }
     if (c && !c->fragmented && frame.type == HTTPD_WS_TYPE_TEXT && frame.final) {
         std::string message(reinterpret_cast<const char *>(data), frame.len);
         if (message == "{\"t\":\"open\"}") {
@@ -589,11 +853,13 @@ uint32_t WebService::prepareUpgrade(int fd, const std::string &host, const std::
             break;
         }
     }
-    if (!available || !tickets_.consume(target.substr(prefix.size()), millis())) {
+    if (!available) {
         return 0;
     }
+    const uint32_t session = tickets_.consume(target.substr(prefix.size()), millis());
     char csrf[33];
-    if (!auth_.token(csrf)) {
+    if (!session || !sessions_.valid(session, uptimeMs()) ||
+        !webinterface::makeToken(crypto_, csrf)) {
         return 0;
     }
     available->input.clear();
@@ -612,6 +878,7 @@ uint32_t WebService::prepareUpgrade(int fd, const std::string &host, const std::
     available->fd = fd;
     available->id = nextId_++;
     available->active = true;
+    available->session = session;
     available->csrf = csrf;
     available->messages[4] =
         "{\"t\":\"hello\",\"name\":" + webinterface::jsonString(name_.c_str()) +
@@ -793,8 +1060,11 @@ void WebService::pump() {
         return;
     }
     nextPump_ = millis();
+    queueSend();
+}
+void WebService::queueSend() {
     Lock lock(mutex_);
-    if (!workQueued_ && httpd_queue_work(server_, sendWork, this) == ESP_OK) {
+    if (server_ && !workQueued_ && httpd_queue_work(server_, sendWork, this) == ESP_OK) {
         workQueued_ = true;
     }
 }
@@ -825,8 +1095,14 @@ void WebService::unmounted() {
     Lock lock(mutex_);
     upload_.unmounted();
 }
+// Admission runs on the HTTP task: the session, Host, Origin, metadata and the CSRF token of
+// one of that session's terminals. An admitted upload then belongs to the upload worker, which
+// replies and completes the request; logging out or expiring after admission never stops it.
 esp_err_t WebService::upload(httpd_req_t *req) {
-    if (!authorized(req)) {
+    uint32_t serial;
+    session(req, serial, nullptr);
+    if (!serial) {
+        reply(req, "401 Unauthorized", "Log in as admin with the device password.");
         return ESP_FAIL;  // close without reading an unauthenticated body
     }
     if (!host(req, true) || header(req, "Content-Type") != "application/octet-stream") {
@@ -849,18 +1125,61 @@ esp_err_t WebService::upload(httpd_req_t *req) {
         return reply(req, "409 Conflict",
                      "Confirm this image's downgrade or filesystem replacement.");
     }
+    Job job = {};
+    job.filesystem = fs;
+    snprintf(job.version, sizeof job.version, "%s", version.c_str());
+    snprintf(job.expected, sizeof job.expected, "%s", expected.c_str());
     std::string csrf = header(req, "X-CSRF-Token", 32);
     {
         Lock lock(mutex_);
-        Client *owner = nullptr;
         for (auto &c : clients_) {
-            if (c.active && webinterface::equalSecret(c.csrf, csrf)) {
-                owner = &c;
+            if (c.active && !c.close && c.session == serial &&
+                webinterface::equalSecret(c.csrf, csrf)) {
+                job.owner = c.id;
                 break;
             }
         }
-        if (!owner || !upload_.ask(owner->id)) {
+        if (!job.owner || workerBusy_ || upload_.uploading()) {
             return reply(req, "403 Forbidden", "Invalid CSRF session or update already active.");
+        }
+        workerBusy_ = true;
+    }
+    if (httpd_req_async_handler_begin(req, &job.req) != ESP_OK ||
+        xQueueSend(jobs_, &job, 0) != pdTRUE) {
+        if (job.req) {
+            httpd_req_async_handler_complete(job.req);
+        }
+        Lock lock(mutex_);
+        workerBusy_ = false;
+        reply(req, "503 Service Unavailable", "Update worker unavailable. Try again.");
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+void WebService::uploadWorker(void *ctx) {
+    auto *self = static_cast<WebService *>(ctx);
+    Job job;
+    for (;;) {
+        if (xQueueReceive(self->jobs_, &job, portMAX_DELAY) != pdTRUE) {
+            continue;
+        }
+        self->install(job);
+        // The request is finished on every path, success or failure, before the worker is
+        // free again; only then may the server stop.
+        httpd_req_async_handler_complete(job.req);
+        Lock lock(self->mutex_);
+        self->workerBusy_ = false;
+    }
+}
+void WebService::install(const Job &job) {
+    httpd_req_t *req = job.req;
+    const bool fs = job.filesystem;
+    const std::string version = job.version, expected = job.expected;
+    {
+        Lock lock(mutex_);
+        if (!upload_.ask(job.owner)) {
+            reply(req, "403 Forbidden", "Invalid CSRF session or update already active.");
+            return;
         }
     }
     // Wait up to 2 s for the modem loop. The final check and the give-up happen under
@@ -883,7 +1202,8 @@ esp_err_t WebService::upload(httpd_req_t *req) {
         delay(2);
     }
     if (!granted) {
-        return reply(req, "409 Conflict", "Modem busy. Exit other menus, calls and tests first.");
+        reply(req, "409 Conflict", "Modem busy. Exit other menus, calls and tests first.");
+        return;
     }
     // All Update and partition writes are serialized by the modem's reservation.
     webinterface::ImageCheck check(fs, version, req->content_len);
@@ -975,10 +1295,7 @@ esp_err_t WebService::upload(httpd_req_t *req) {
     reply(req, ok ? "200 OK" : "400 Bad Request",
           ok ? "Update complete. Rebooting."
              : "Image rejected or update failed. USB recovery remains available.");
-    {
-        Lock lock(mutex_);
-        upload_.finish(ok, fs);
-    }
-    return ok ? ESP_OK : ESP_FAIL;
+    Lock lock(mutex_);
+    upload_.finish(ok, fs);
 }
 }  // namespace hw

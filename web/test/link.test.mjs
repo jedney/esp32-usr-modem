@@ -129,3 +129,21 @@ test('failed login backs off and stopping cancels retries', async () => {
     await r.retry(); assert.equal(r.timers[0].ms,2000);
     r.link.stop(); assert.equal(r.timers.length,0);
 });
+test('an ended login (HTTP 401) stops the link for good instead of retrying', async () => {
+    const lost = [];
+    const sockets = [], timers = [];
+    const link = createModemLink({
+        session: async () => { const error = new Error('Login unavailable'); error.auth = true; throw error; },
+        socket: () => { const ws = new Socket(); sockets.push(ws); return ws; },
+        receive() {}, status() {}, disconnect() {}, authLost: () => lost.push(true),
+        schedule: (fn, ms) => { const timer = {fn, ms}; timers.push(timer); return timer; },
+        cancel: timer => timers.splice(timers.indexOf(timer), 1),
+    });
+    await link.start();
+    assert.equal(lost.length, 1);
+    assert.equal(timers.length, 0);
+    assert.equal(sockets.length, 0);
+    link.reconnect();
+    assert.equal(timers.length, 0);
+    assert.equal(link.send('x'), false);
+});

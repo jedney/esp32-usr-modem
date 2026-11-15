@@ -22,6 +22,7 @@ const paths = {
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/>',
     chip: '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4M10 10h4v4h-4z"/>',
     terminal: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/>',
+    logout: '<path d="M10 4H5v16h5M14 8l4 4-4 4M18 12H9"/>',
 };
 function icon(name) {
     return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths[name] || paths.sliders}</svg>`;
@@ -308,6 +309,17 @@ function makePopup(section, parent = null) {
             history.append(copy);
             popup.append(history);
         }
+        if (section.id === 'help') {
+            // Browser-only and always available: observers, calls, prompts, tests and uploads.
+            const logout = element('button', 'menu-item'); logout.id = 'logout'; logout.type = 'button';
+            logout.dataset.always = 'true';
+            logout.title = 'End this browser login in every tab. Other browsers stay logged in.';
+            logout.innerHTML = icon('logout');
+            const copy = element('span', 'menu-copy');
+            copy.append(element('span', 'menu-name', 'Log out'));
+            logout.append(copy);
+            popup.append(logout);
+        }
         if (section.id === 'hardware-tests') {
             const lines = element('div', 'line-controls'); lines.id = 'line-controls'; lines.hidden = true;
             for (const [id, name] of [['dcd','Toggle DCD'], ['ri','Toggle RI'], ['cts','Toggle CTS']]) {
@@ -404,7 +416,7 @@ function updateState() {
     for (const {section, trigger} of menuEntries) trigger.disabled = section.items.length && section.id !== 'phonebook' ? !canOpen(section.id) : !canRun;
     for (const button of document.querySelectorAll('.menu-popup .menu-item')) {
         button.disabled = button.id === 'stop-test' ? !controls
-            : button.dataset.link || button.dataset.back ? false
+            : button.dataset.link || button.dataset.back || button.dataset.always ? false
             : button.dataset.section ? !canOpen(button.dataset.section) : !canRun;
     }
     for (const button of document.querySelectorAll('.requires-idle')) button.disabled = !!reason;
@@ -421,5 +433,11 @@ function updateState() {
 document.addEventListener('focusin', event => {
     if (!event.target.closest('.menu-section, .menu-popup') && !dialog.open) closeMenus();
 });
-return {update: updateState};
+// Before the login screen: close menus and dialogs and forget scanned networks.
+function clear() {
+    closeMenus();
+    if (dialog.open) dismiss();
+    networks = [];
+}
+return {update: updateState, clear};
 }
