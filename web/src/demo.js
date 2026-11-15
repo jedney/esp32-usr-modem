@@ -7,6 +7,9 @@ export function startDemoModem({message, write}) {
     let screen = null, detail = null, swallowEnter = false, skipLf = false, escape = '';
     let opened = false, menu = false, call = false, onlineCommand = false, line = '', cols = 80, rows = 25;
     let pluses = 0;
+    let received = 0, waiting = null;
+    const book = new Map([['1', '1,bbs.example.net,23,TELNET,0'], ['2', '2,retro.example.org,2323,TELNET,0']]);
+    const ready = () => message({t:'ready', idle:opened && !menu && !call && !waiting && !line, rx:received});
     const access = () => message({t: 'access', edit: opened, state: opened ? 'terminal' : 'read-only'});
     const hangup = () => {
         call = false;
@@ -22,7 +25,7 @@ export function startDemoModem({message, write}) {
         else {
             for (const item of screen ? screen.items : data.menu) {
                 const m = metadata.get(item.id);
-                out += `${item.key}. ${m.friendly}\r\n   ${m.help}\r\n`;
+                out += `${item.key}. ${m.friendly}\r\n`;
             }
             out += screen ? 'X. Back\r\n' : 'Q. Exit preview\r\n';
         }
@@ -46,7 +49,7 @@ export function startDemoModem({message, write}) {
         if (!screen && item.items.length) screen = item;
         else if (screen?.id === 'client-tests') detail = 'Client Tests run on serial only.';
         else {
-            detail = `DEMO: ${m.friendly}\r\n${m.help}\r\nNo device service connected.`;
+            detail = `DEMO: ${m.friendly}\r\nNo device service connected.`;
             for (const [i, value] of (m.values || []).slice(0, 15).entries())
                 detail += `\r\n${String.fromCharCode(65 + i)}. ${value.label}`;
         }
@@ -54,10 +57,11 @@ export function startDemoModem({message, write}) {
         redraw();
     };
     message({t: 'hello', name: 'Sportster DEMO', ver: 'DEMO'});
-    message({t: 'clock', epoch: 0, tzo: 0});
-    message({t: 'wifi', state: 'down'}); message({t: 'led', m: 0}); message({t: 'call', state: 'idle'});
+    message({t: 'clock', epoch: Math.floor(Date.now() / 1000), tzo: 0});
+    message({t: 'wifi', state: 'up', ssid:'Demo Wi-Fi', rssi:-48}); message({t: 'led', m: 112}); message({t: 'call', state: 'idle'});
     access();
     const command = () => {
+        const original = line.trim();
         const text = line.trim().toUpperCase();
         line = '';
         if (text === 'AT*CONFIG') { menu = true; redraw(); }
@@ -73,11 +77,34 @@ export function startDemoModem({message, write}) {
         else if (text === 'AT*HELP') write('\r\nDEMO: AT*CONFIG, ATDT1, ATH. No device services connected.\r\nOK\r\n');
         else if (text === 'ATH') { hangup(); write('\r\nOK\r\n'); }
         else if (text === 'ATO' && call) { onlineCommand = false; write('\r\nCONNECT 14400\r\n'); }
+        else if (text === 'AT*PHONEBOOK?') write('\r\n' + [...book.values()].join('\r\n') + '\r\nOK\r\n');
+        else if (text.startsWith('AT*PHONEBOOK=')) {
+            const entry = original.slice('AT*PHONEBOOK='.length);
+            book.set(entry.split(',')[0], entry.split(',').length === 4 ? entry + ',0' : entry);
+            write('\r\nDEMO: destination saved for this preview only.\r\nOK\r\n');
+        } else if (text.startsWith('AT*PHONEDELETE=')) {
+            book.delete(original.split('=')[1]); write('\r\nOK\r\n');
+        } else if (text === 'AT*WIFISCAN') {
+            waiting = 'key';
+            write('\r\n 1  Demo Wi-Fi                         -48 dBm  ch  1  WPA2\r\n'
+                + ' 2  Guest network                       -73 dBm  ch  6  Open\r\nPress a key to continue.\r\n');
+        } else if (text.startsWith('AT*WIFIJOIN=')) {
+            waiting = 'password'; write('\r\nDEMO: no network will be joined.\r\nWi-Fi password: ');
+        } else if (/^AT\*(?:RESTART|FACTORY|WIFI=OFF|WIFIFORGET)$/.test(text)) {
+            waiting = 'confirm'; write('\r\nDEMO: confirm in the terminal (Y/N, then Enter): ');
+        } else if (/^AT\*(?:PLAY=|HW)/.test(text)) {
+            waiting = text.startsWith('AT*HWBRIDGE') ? 'bridge' : 'key';
+            message({t:'hardware',active:true,mode:text === 'AT*HWLINES' ? 'lines' : ''});
+            write('\r\nDEMO: no hardware is operated. ' + (waiting === 'bridge' ? 'Press Ctrl-X to stop.' : 'Press any key to finish.') + '\r\n');
+        } else if (commands.some(c => c.template && text.startsWith('AT' + c.template.split(/[={]/)[0].toUpperCase()))) {
+            write('\r\nDEMO: synthetic command accepted; no device settings changed.\r\nOK\r\n');
+        }
         else write(text === 'AT' ? '\r\nOK\r\n' : '\r\nERROR\r\n');
     };
     const close = () => {
         hangup();
         opened = false; menu = false; screen = null; detail = null;
+        waiting = null; received = 0;
         swallowEnter = false; skipLf = false; escape = '';
         access();
     };
@@ -87,14 +114,16 @@ export function startDemoModem({message, write}) {
             if (typeof bytes === 'string') {
                 const msg = JSON.parse(bytes);
                 if (msg.t === 'open') {
+                    received = 0;
                     opened = true; access();
                     write('Sportster DEMO terminal — synthetic values only.\r\n'
                         + 'Type AT*CONFIG for the list preview, or ATDT1 for a simulated call.\r\n');
-                } else if (opened && msg.t === 'hangup') hangup();
+                } else if (opened && msg.t === 'hangup') { received = 0; hangup(); }
                 else if (opened && msg.t === 'size') { cols = msg.cols; rows = msg.rows; }
-                return;
+                ready(); return;
             }
             if (!opened) return;
+            received = (received + bytes.length) >>> 0;
             if (call && !onlineCommand) {
                 for (const ch of new TextDecoder().decode(bytes)) {
                     if (ch === '+') {
@@ -104,11 +133,18 @@ export function startDemoModem({message, write}) {
                         pluses = 0;
                     }
                 }
-                return;
+                ready(); return;
             }
             for (const ch of new TextDecoder().decode(bytes)) {
                 if (ch === '\n' && skipLf) { skipLf = false; continue; }
                 skipLf = ch === '\r';
+                if (waiting) {
+                    const finish = waiting === 'key' || (waiting === 'bridge' ? ch === '\x18' : ch === '\r' || ch === '\n' || ch === '\x1b');
+                    if (finish) {
+                        waiting = null; message({t:'hardware',active:false}); write('\r\nDEMO: finished.\r\nOK\r\n');
+                    } else if (waiting === 'password' && ch >= ' ') write('*');
+                    continue;
+                }
                 if (!menu) {
                     if (ch === '\r' || ch === '\n') command();
                     else if (ch === '\x08' || ch === '\x7f') { line = line.slice(0, -1); write('\b \b'); }
@@ -124,6 +160,7 @@ export function startDemoModem({message, write}) {
                     queueMicrotask(() => { if (escape === '\x1b') { escape = ''; key('\x1b'); } });
                 } else key(ch);
             }
+            ready();
         },
     };
 }

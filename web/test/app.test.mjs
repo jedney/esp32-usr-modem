@@ -14,7 +14,7 @@ class Element {
 
 test('page wires ownership, keys, paste, terminal-mode resize, idle hangup and close', async t => {
     const elements = new Map(), listeners = new Map(), intervals = [], timers = new Map(), sockets = [];
-    let time = 0, term;
+    let time = 0, term, menuOptions;
     const element = id => {
         if (!elements.has(id)) elements.set(id, new Element());
         return elements.get(id);
@@ -46,6 +46,7 @@ test('page wires ownership, keys, paste, terminal-mode resize, idle hangup and c
         clearTimeout: fn => timers.delete(fn),
         setInterval: (fn, ms) => { intervals.push({fn, ms}); return fn; },
         __TestTerminal: Terminal,
+        __TestCreateMenus: options => { menuOptions = options; return {update() {}}; },
     };
     for (const [name, value] of Object.entries(globals)) {
         const descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
@@ -55,6 +56,7 @@ test('page wires ownership, keys, paste, terminal-mode resize, idle hangup and c
     t.mock.method(Date, 'now', () => time);
     let source = await readFile(new URL('../src/app.js', import.meta.url), 'utf8');
     source = source.replace("import { Terminal } from './xterm.mjs';", 'const Terminal = globalThis.__TestTerminal;');
+    source = source.replace("import {createMenuBar} from './menu-view.js';", 'const createMenuBar = globalThis.__TestCreateMenus;');
     source = source.replace(/from '(\.\/[^']+)'/g,
         (_, name) => `from '${new URL('../src/' + name.slice(2), import.meta.url).href}'`);
     source = source.replace(/main\(\);\s*$/, 'await main();');
@@ -68,6 +70,14 @@ test('page wires ownership, keys, paste, terminal-mode resize, idle hangup and c
     ws.message({t: 'access', edit: true, state: 'terminal'});
     assert.equal(term.options.disableStdin, false);
     assert.equal(element('close-terminal').disabled, false);
+    assert.equal(menuOptions.state().busy, true);
+    ws.message({t:'ready', idle:true, rx:0});
+    assert.equal(menuOptions.state().busy, false);
+    assert.equal(menuOptions.run('AT*MODEL=28800\r'), true);
+    assert.deepEqual(ws.sent.at(-1), new TextEncoder().encode('AT*MODEL=28800\r'));
+    assert.equal(menuOptions.state().busy, true);
+    ws.message({t:'ready', idle:true, rx:15});
+    assert.equal(menuOptions.state().busy, false);
     const runTimers = ms => {
         for (const [fn, delay] of [...timers]) if (delay === ms) { timers.delete(fn); fn(); }
     };

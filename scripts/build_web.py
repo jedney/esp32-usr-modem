@@ -24,6 +24,10 @@ def web_files(root: pathlib.Path) -> dict:
     return {
         "index.html": src / "index.html",
         "style.css": src / "style.css",
+        "menubar.css": src / "menubar.css",
+        "menubar.js": src / "menubar.js",
+        "menu-view.js": src / "menu-view.js",
+        "command-channel.js": src / "command-channel.js",
         "app.js": src / "app.js",
         "status.js": src / "status.js",
         "demo.js": src / "demo.js",

@@ -148,6 +148,7 @@ config::Terminal *browserMenu = nullptr;
 uint32_t browserClient = 0;
 hostport::InputBuffer browserInput;
 uint32_t browserFromComputer = 0, browserToComputer = 0;
+uint32_t browserCommandBytes = 0;
 bool browserUtf8 = false;
 bool hardwareRunning = false;
 bool browserTestCancelled = false;
@@ -324,6 +325,7 @@ public:
             if (!webServer.read(browserClient, &c, 1))
                 return -1;
             ++browserFromComputer;
+            ++browserCommandBytes;
         }
         if (c == 0x18) {
             browserTestCancelled = true;
@@ -386,6 +388,9 @@ atcmd::Reply cmdHelp(atcmd::Port &port, const char *args) {
     }
     atcmd::showStarHelp(port);
     withTerm(port, [](hwconsole::Term &t) { hwconsole::printHelp(t); });
+    if (port.browser()) {
+        port.line("The browser menus send these commands; answer prompts in the terminal.");
+    }
     return atcmd::Reply::kOk;
 }
 
@@ -1259,6 +1264,29 @@ void publishCall(uint32_t now, bool force) {
 // Nothing is built while no browser is connected. A browser that arrives
 // after none gets all four messages rebuilt in the same pass.
 void publishWebStatus() {
+    static uint32_t readyClient = 0, readyBytes = 0;
+    static bool wasReady = false;
+    if (browserClient) {
+        bool ready = !hardwareRunning && !browserSession->callUp() && !browserMenu->isOpen() &&
+                     !browserSession->port().busy() && browserSession->port().lineEmpty() &&
+                     !browserInput.size() &&
+                     (!callSlot.busy() || callSlot.heldBy(browserSession)) &&
+                     net.joinResult() != netcfg::JoinResult::kRunning &&
+                     net.scanState() != netcfg::ScanState::kRunning;
+        if (readyClient != browserClient || wasReady != ready ||
+            readyBytes != browserCommandBytes) {
+            webServer.commandState(
+                browserClient,
+                std::string("{\"t\":\"ready\",\"idle\":") + (ready ? "true" : "false") +
+                    ",\"rx\":" + std::to_string(browserCommandBytes) +
+                    ",\"errors\":" + std::to_string(browserSession->port().errorCount()) + "}");
+            readyClient = browserClient;
+            readyBytes = browserCommandBytes;
+            wasReady = ready;
+        }
+    } else {
+        readyClient = 0;
+    }
     static bool hadBrowser = false;
     bool browser = false;
     for (unsigned i = 0; i < hw::WebService::kClients && !browser; ++i) {
@@ -1354,6 +1382,7 @@ void serveReadOnlyBrowser(uint32_t id, bool fresh) {
     browserUtf8 = false;
     browserSession->resize(80, 25);
     browserClient = id;
+    browserCommandBytes = 0;
     browserAccess(id, true);
     static const char welcome[] = "USR Modem terminal\r\nType AT*HELP for commands.\r\n";
     browserSink.write(welcome, sizeof welcome - 1);
@@ -1372,10 +1401,13 @@ void runBrowserDeparture() {
 
 void serveConfigBrowser(uint32_t id) {
     uint32_t now = millis();
-    if (webServer.takeHangup(id) && browserSession->callUp()) {
+    if (webServer.takeHangup(id)) {
+        webServer.discardInput(id);
+        browserCommandBytes = 0;
         browserInput.clear();
         browserSession->port().discardInput();
-        browserSession->hangUp();
+        if (browserSession->callUp())
+            browserSession->hangUp();
     }
     bool menuWasOpen = browserMenu->isOpen();
     unsigned columns, rows;
@@ -1390,6 +1422,7 @@ void serveConfigBrowser(uint32_t id) {
         size_t room = browserSession->hostSpace();
         size_t n = webServer.read(id, bytes, room < sizeof bytes ? room : sizeof bytes);
         browserFromComputer += n;
+        browserCommandBytes += n;
         browserInput.append(bytes, n);
         browserInput.poll(*browserSession, now, true);
     }

@@ -2,30 +2,17 @@ Settings
 Illustration only: current values appear on the modem.
 
 A. Current and stored profiles
-   Show the settings in use and the two saved profiles.
 B. Modem profile settings
-   Change the active modem settings. Save a profile to keep the changes.
 C. Modem model
-   Choose the modem identity and default connection speed. This is saved immediately.
 D. Rings before answering
-   Choose how many rings to wait before answering; zero turns automatic answering off. Values above eight answer on the eighth ring; save a profile to keep this setting.
 E. Answer incoming calls on
-   Choose which local connection receives incoming calls. This is saved immediately.
 F. RS232 serial speed
-   Choose the RS232 speed or let the modem detect it from AT. The maintenance console stays at 115200 bits per second.
 G. Limit data to modem speed
-   Limit data transfer to the selected modem line speed. This is saved immediately.
 H. Save active profile
-   Save the active modem settings to one of the two stored profiles.
 I. Load stored/factory profile
-   Load a saved or factory modem profile. This closes the menu.
 J. Load factory profile
-   Load factory modem settings into the active profile. Save a profile to keep them.
 K. Power-on profile
-   Choose which stored or factory profile loads at power on. This is saved immediately.
 L. Saved dial string
-   Save a dial string in one of four modem number slots.
 M. Terminal style
-   Choose plain text or ANSI colour for the wrapping configuration list.
 
 X. Back / Q. Exit; Esc goes back.

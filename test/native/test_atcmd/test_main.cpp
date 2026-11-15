@@ -183,9 +183,14 @@ void test_numeric_results() {
 void test_quiet_mode() {
     MemStore st;
     Rig r(st);
+    TEST_ASSERT_EQUAL_UINT32(0, r.port.errorCount());
     TEST_ASSERT_EQUAL_STRING("ATQ1\r", r.type("ATQ1\r").c_str());
     TEST_ASSERT_EQUAL_STRING("ATX9\r", r.type("ATX9\r").c_str());  // even ERROR is silent
+    TEST_ASSERT_EQUAL_UINT32(1, r.port.errorCount());
+    r.port.unsolicited(Result::kNoCarrier);
+    TEST_ASSERT_EQUAL_UINT32(1, r.port.errorCount());
     ENDS_WITH(r.type("ATQ0\r"), "\r\nOK\r\n");
+    TEST_ASSERT_EQUAL_UINT32(1, r.port.errorCount());
 }
 
 void test_quiet_still_shows_information() {

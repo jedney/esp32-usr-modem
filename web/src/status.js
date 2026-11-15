@@ -209,7 +209,7 @@ export function createStatusEvents(show) {
             if (!owned || connected(call)) { line = ''; return; }
             for (const ch of decoder.decode(bytes, {stream: true})) {
                 if (ch === '\r' || ch === '\n') {
-                    if (line === 'ERROR') show('Command refused');
+                    if (line === 'ERROR' || line === '4') show('Command refused');
                     line = '';
                 } else line = (line + ch).slice(-256);
             }

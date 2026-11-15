@@ -181,6 +181,7 @@ public:
     bool busy() const { return state_ == State::kSecret || state_ == State::kWait; }
     // Nothing typed since the last result: an unsolicited message can be printed.
     bool lineEmpty() const { return state_ == State::kIdle; }
+    uint32_t errorCount() const { return errorCount_; }
 
     Modem &modem() { return modem_; }
     uint32_t baud() const { return baud_; }
@@ -209,6 +210,7 @@ private:
     Sink *redirected_ = nullptr;
     bool readable_ = false;
     uint32_t directWrites_ = 0;
+    uint32_t errorCount_ = 0;  // Command failures, including when Q1 suppresses their text.
     bool browser_ = false;
     uint8_t clientBackspace_ = 0;
     uint32_t baud_;

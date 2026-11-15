@@ -26,6 +26,7 @@ class HandoffContract(unittest.TestCase):
             self.assertNotIn('ARROWS',text)
             self.assertIn('X. Back',text)
             self.assertIn('A. ',text)
+            self.assertFalse(any(line.startswith('   ') for line in text.splitlines()))
     def test_four_exact_models(self):
         expected={'sportster-14.4k':'#6f327f','sportster-28.8k':'#448FA1','sportster-33.6k':'#349b67','sportster-56k':'#3F668E'}
         self.assertEqual({m['id']:m['accent'] for m in theme['models']},expected)

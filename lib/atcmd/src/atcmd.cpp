@@ -280,6 +280,9 @@ void Port::beginInfo() {
 }
 
 void Port::result(Result r) {
+    if (!unsolicited_ && r == Result::kError) {
+        ++errorCount_;
+    }
     if (readable_) {
         Profile display = modem_.active();
         display.v[modemcfg::kQ] = 0;

@@ -316,8 +316,6 @@ void Terminal::currentValue(const Action &a, char *out, size_t cap) const {
 }
 void Terminal::describe(const UiMetadata &m) {
     char text[256];
-    emit("   ");
-    emitLine(m.help);
     const char *unit = *m.displayUnit ? m.displayUnit : m.unit;
     if (m.min >= 0 && m.max >= 0) {
         snprintf(text, sizeof text, "   Range: %g-%g %s", m.min * m.displayScale,
@@ -375,7 +373,6 @@ void Terminal::drawMenu() {
         if (!a->available)
             emit(" [unavailable]");
         emit("\r\n");
-        describe(m);
     }
     if (screen_ == S::Phonebook && services_ && services_->phonebook()) {
         auto *book = services_->phonebook();
@@ -413,8 +410,7 @@ void Terminal::drawForm() {
     size_t count = choosingVariant_ ? editor_->variantCount : m.valueCount;
     for (size_t i = choiceOffset_; i < count && i < choiceOffset_ + kPageItems; ++i) {
         const char *label = choosingVariant_ ? editor_->variants[i].friendly : m.values[i].label;
-        const char *help = choosingVariant_ ? editor_->variants[i].help : m.values[i].description;
-        snprintf(text, sizeof text, "%c. %s - %s", char('A' + i - choiceOffset_), label, help);
+        snprintf(text, sizeof text, "%c. %s", char('A' + i - choiceOffset_), label);
         emitLine(text);
     }
     if (choiceOffset_)

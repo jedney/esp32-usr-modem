@@ -31,6 +31,8 @@ public:
     bool write(uint32_t id, const uint8_t *data, size_t len);
     size_t space(uint32_t id);
     void text(uint32_t id, const std::string &message);
+    // Command readiness follows all queued terminal output and has its own status slot.
+    void commandState(uint32_t id, const std::string &message);
     void snapshot(unsigned type, const std::string &message, bool force = false);
     void pump();
     // Upload hand-shake, modem loop side (see webinterface::UploadHandshake).
@@ -58,7 +60,7 @@ private:
         std::string csrf;
         webinterface::Queue<webinterface::kTerminalInputBytes> input;
         webinterface::Queue<webinterface::kTerminalOutputBytes> output;
-        std::string messages[6];
+        std::string messages[7];
         uint32_t sent[4] = {};
     };
     struct Context {

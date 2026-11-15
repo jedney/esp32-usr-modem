@@ -2,12 +2,8 @@ Phonebook
 Illustration only: current values appear on the modem.
 
 A. List entries
-   Show up to 64 saved destinations. Number 1 starts as Amiga Retro BBS.
 B. Add / edit entry
-   Save a destination with a number, address and connection type. Changes are saved immediately.
 C. Delete entry
-   Delete a saved destination by its number. The change is saved immediately.
 D. Dial
-   Call a saved number or a network address. This closes the menu.
 
 X. Back / Q. Exit; Esc goes back.

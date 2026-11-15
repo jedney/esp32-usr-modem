@@ -129,6 +129,9 @@ test('command refusal spans frames but BBS output and read-only bytes never crea
     events.access({edit: true, state: 'terminal'});
     events.output(bytes('\r\nER')); events.output(bytes('ROR\r\n'));
     assert.equal(messages.at(-1), 'Command refused');
+    const refusals = messages.length;
+    events.output(bytes('4\r\n'));
+    assert.equal(messages.length, refusals + 1);
     events.call({state: 'connected'});
     const before = messages.length;
     events.output(bytes('ERROR\r\n')); assert.equal(messages.length, before);

@@ -40,6 +40,9 @@ def main(out: pathlib.Path) -> None:
         style = style.replace(f"url('{font.name}')", f"url('{data_url('font/woff2', font.read_bytes())}')")
 
     modules = {
+        "usr-menubar": (SRC / "menubar.js").read_text(encoding="utf-8").replace("'./ui-commands.js'", "'usr-ui-commands'"),
+        "usr-menu-view": (SRC / "menu-view.js").read_text(encoding="utf-8").replace("'./ui-commands.js'", "'usr-ui-commands'").replace("'./menubar.js'", "'usr-menubar'"),
+        "usr-command-channel": (SRC / "command-channel.js").read_text(encoding="utf-8"),
         "usr-xterm": strip_source_map((VENDOR / "xterm.mjs").read_text(encoding="utf-8")),
         "usr-status": (SRC / "status.js").read_text(encoding="utf-8"),
         "usr-ui-data": (SRC / "ui-data.js").read_text(encoding="utf-8"),
@@ -59,6 +62,8 @@ def main(out: pathlib.Path) -> None:
     app = app.replace("'./link.js'", "'usr-link'")
     app = app.replace("'./geometry.js'", "'usr-geometry'")
     app = app.replace("'./idle.js'", "'usr-idle'").replace("'./toast.js'", "'usr-toast'")
+    app = app.replace("'./menubar.js'", "'usr-menubar'").replace("'./menu-view.js'", "'usr-menu-view'")
+    app = app.replace("'./command-channel.js'", "'usr-command-channel'")
     import_map = {"imports": {k: data_url("text/javascript", v.encode()) for k, v in modules.items()}}
 
     # The modem's Content-Security-Policy forbids inline scripts; the preview needs them.
@@ -66,6 +71,8 @@ def main(out: pathlib.Path) -> None:
     html = html.replace('<link rel="stylesheet" href="xterm.css">',
                         f"<style>{(VENDOR / 'xterm.css').read_text(encoding='utf-8')}</style>")
     html = html.replace('<link rel="stylesheet" href="style.css">', f"<style>{style}</style>")
+    html = html.replace('<link rel="stylesheet" href="menubar.css">',
+                        f"<style>{(SRC / 'menubar.css').read_text(encoding='utf-8')}</style>")
     for name in ("idle", "toast"):
         html = html.replace(f'<script type="module" src="{name}.js"></script>',
                             f'<script type="module">import "usr-{name}";</script>')

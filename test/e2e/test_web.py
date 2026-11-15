@@ -179,7 +179,7 @@ def web(request, console):
 
 
 def test_assets_require_digest_and_have_correct_gzip_mime(web):
-    for path in ("/", "/app.js", "/upload.js", "/upload_flow.js", "/link.js", "/geometry.js", "/idle.js", "/toast.js", "/ui-data.js", "/ui-commands.js", "/api/session"):
+    for path in ("/", "/app.js", "/upload.js", "/upload_flow.js", "/link.js", "/geometry.js", "/idle.js", "/toast.js", "/ui-data.js", "/ui-commands.js", "/menubar.js", "/menu-view.js", "/command-channel.js", "/menubar.css", "/api/session"):
         code, _, _ = web.request(path, auth=False)
         require(code == 401, "Unauthenticated resource exposed")
     code, headers, body = web.request("/app.js")
@@ -193,7 +193,7 @@ def test_assets_require_digest_and_have_correct_gzip_mime(web):
 def test_parallel_page_load_has_no_connection_resets(web):
     """A browser loads a dozen files at once, each on its own connection."""
     paths = ["/", "/app.js", "/upload.js", "/upload_flow.js", "/link.js", "/geometry.js", "/idle.js", "/toast.js",
-             "/ui-data.js", "/ui-commands.js", "/api/session"] * 2
+             "/ui-data.js", "/ui-commands.js", "/menubar.js", "/menu-view.js", "/command-channel.js", "/menubar.css", "/api/session"] * 2
 
     def fetch(path):
         try:
@@ -648,6 +648,50 @@ def test_browser_letter_lists_keep_geometry_separate_and_tests_serial_only(web):
         peer.send(b"la")
         text, _ = peer.collect(0.4)
         require(b"Client Tests run on serial only" in text, "Browser ran a serial diagnostic")
+
+
+def test_menu_readiness_tracks_partial_commands_and_terminal_prompts(web):
+    with web.ws() as peer:
+        _, messages = peer.open_terminal()
+        ready = next((m for m in reversed(messages) if m.get("t") == "ready"), None)
+        require(ready and ready.get("idle") is True and ready.get("rx") == 0,
+                "No idle menu readiness on open")
+        received = 0
+
+        def send(data, idle):
+            nonlocal received
+            peer.send(data)
+            received += len(data)
+            text, messages = peer.collect(0.4)
+            ready = next((m for m in reversed(messages) if m.get("t") == "ready"), None)
+            require(ready is not None and ready.get("rx") == received and ready.get("idle") is idle,
+                    f"Menu readiness: expected rx={received}, idle={idle}; got {ready}")
+            return text
+
+        send(b"ATQ0V1\r", True)
+        send(b"AT", False)
+        send(b"\x08\x08", False)  # Hayes AT prefix cannot be erased with Backspace.
+        send(b"\r", True)
+        send(b"AT*RESTART\r", False)
+        send(b"n\r", True)
+        text = send(b"AT*PHONEBOOK?\r", True)
+        require(b"OK" in text, "Phonebook reply did not finish before the idle acknowledgement")
+        send(b"ATQ1\r", True)
+        peer.send(b"AT*NOTACOMMAND\r")
+        received += len(b"AT*NOTACOMMAND\r")
+        text, messages = peer.collect(0.4)
+        failed = next((m for m in reversed(messages) if m.get("t") == "ready"), {})
+        require(failed.get("idle") is True and failed.get("rx") == received and
+                failed.get("errors", 0) > ready.get("errors", 0) and b"ERROR" not in text,
+                "Quiet command failure was not acknowledged")
+        send(b"ATQ0\r", True)
+        send(b"AT*CONFIG\r", False)
+        send(b"q\r", True)
+        peer.send(b'{"t":"hangup"}', opcode=1)
+        _, messages = peer.collect(0.4)
+        ready = next((m for m in reversed(messages) if m.get("t") == "ready"), {})
+        require(ready.get("idle") is True and ready.get("rx") == 0,
+                "An idle hang-up did not acknowledge the reset input count")
 
 
 def test_terminal_at_commands_config_exit_and_serial_only_services(web):

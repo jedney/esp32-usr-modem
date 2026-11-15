@@ -360,6 +360,10 @@ esp_err_t WebService::serve(httpd_req_t *req) {
         const char *mime;
     };
     static const Asset assets[] = {{"/index.html", "text/html; charset=utf-8"},
+                                   {"/menubar.css", "text/css"},
+                                   {"/menubar.js", "text/javascript"},
+                                   {"/menu-view.js", "text/javascript"},
+                                   {"/command-channel.js", "text/javascript"},
                                    {"/style.css", "text/css"},
                                    {"/app.js", "text/javascript"},
                                    {"/status.js", "text/javascript"},
@@ -667,6 +671,13 @@ void WebService::text(uint32_t id, const std::string &message) {
         c->messages[5] = message;
     }
 }
+void WebService::commandState(uint32_t id, const std::string &message) {
+    Lock lock(mutex_);
+    auto *c = find(id);
+    if (c) {
+        c->messages[6] = message;
+    }
+}
 void WebService::snapshot(unsigned type, const std::string &message, bool force) {
     Lock lock(mutex_);
     if (type < 4) {
@@ -690,7 +701,7 @@ void WebService::sendClients() {
         bool close;
         uint8_t bytes[512];
         size_t n;
-        std::string messages[6];
+        std::string messages[7];
         {
             Lock lock(self.mutex_);
             auto &c = self.clients_[i];
@@ -709,6 +720,9 @@ void WebService::sendClients() {
             }
             for (unsigned j = 0; j < 6; ++j) {
                 messages[j].swap(c.messages[j]);
+            }
+            if (c.output.size() == 0) {
+                messages[6].swap(c.messages[6]);
             }
         }
         // hello precedes the initial snapshots and terminal bytes.
@@ -729,6 +743,14 @@ void WebService::sendClients() {
             frame.final = true;
             frame.payload = bytes;
             frame.len = n;
+            close = httpd_ws_send_frame_async(self.server_, fd, &frame) != ESP_OK;
+        }
+        if (!messages[6].empty() && !close) {
+            httpd_ws_frame_t frame = {};
+            frame.type = HTTPD_WS_TYPE_TEXT;
+            frame.final = true;
+            frame.payload = reinterpret_cast<uint8_t *>(&messages[6][0]);
+            frame.len = messages[6].size();
             close = httpd_ws_send_frame_async(self.server_, fd, &frame) != ESP_OK;
         }
         devicecfg::wipe(bytes, sizeof bytes);

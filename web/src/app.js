@@ -14,6 +14,9 @@ import {createModemLink} from './link.js';
 import {terminalGeometry, sizeMessage} from './geometry.js';
 import {createIdleGuard} from './idle.js';
 import {createToasts} from './toast.js';
+import {createMenuBar} from './menu-view.js';
+import {menuDisabledReason} from './menubar.js';
+import {createCommandChannel} from './command-channel.js';
 
 const COLS = 80;
 const ROWS = 25;
@@ -53,10 +56,17 @@ const state = {
     cell: null, // measured { w, h } per px of font size
     csrf: null, version: null, edit: false, upload: false, online: false, opening: false,
     reloadWhenOnline: false, // set after a successful update: reload once the modem is back
+    hardware: null, busy: true,
 };
+let menus = null;
 
 const toasts = createToasts({container: $('toasts')});
 const events = S.createStatusEvents(text => toasts.show(text));
+const channel = createCommandChannel({
+    send: bytes => send(bytes),
+    changed: () => { state.busy = channel.busy(); updateControls(); },
+    show: text => toasts.show(text),
+});
 const idle = createIdleGuard({
     prompt: seconds => {
         $('idle-guard').hidden = seconds === null;
@@ -75,12 +85,21 @@ const idle = createIdleGuard({
 function updateControls(showOperation = true) {
     $('open-terminal').disabled = !state.online || state.edit || state.opening || state.upload;
     $('close-terminal').disabled = !state.edit || state.upload;
-    $('upload').disabled = !state.edit || state.upload;
+    $('open-terminal').hidden = state.edit;
+    $('close-terminal').hidden = !state.edit;
+    if ($('upload')) $('upload').disabled = !!menuDisabledReason(state);
+    $('hangup').disabled = !state.edit || !state.online || !state.call.browser ||
+        !['dialling','ringing','connected','ppp','slip'].includes(state.call.state) || state.upload;
     term.options.disableStdin = !state.edit || state.upload;
     if (showOperation && !state.upload) {
-        $('operation').textContent = state.edit ? 'Terminal open — type AT*HELP for commands'
-            : state.opening ? 'Opening terminal…' : 'Read-only live status — open the terminal to type';
+        const reason = state.opening ? 'Opening terminal…' : menuDisabledReason(state);
+        const guidance = reason || 'Choose a menu item or type a command. AT*HELP for all commands.';
+        $('menu-reason').title = guidance;
+        $('menu-reason').querySelector('.guidance-long').textContent = guidance;
+        $('menu-reason').querySelector('.guidance-short').textContent = !state.online ? 'Offline'
+            : !state.edit ? 'Open terminal' : reason ? 'Finish in terminal' : 'AT*HELP';
     }
+    menus?.update();
     idle.connected(S.browserCallConnected(state.call, state.edit) && state.online);
 }
 
@@ -113,11 +132,13 @@ function modemNow() {
 function showCall() {
     const d = S.describeCall(state.call);
     const el = $('call');
-    el.className = `item ${d.cls}`;
-    $('call-label').textContent = d.label;
+    el.className = `session-state ${d.cls}`;
+    $('call-label').textContent = state.call.state === 'idle' ? 'No call' : d.label;
     $('remote-label').textContent = S.describeRemote(state.call);
     $('remote').title = state.call.number ? `Remote host (dialled ${state.call.number})` : 'Remote host';
+    $('remote').hidden = !state.call.host && !state.call.ip;
     showTimes();
+    updateControls();
 }
 
 function showWifi() {
@@ -125,19 +146,25 @@ function showWifi() {
     const el = $('wifi');
     if (!w || w.state !== 'up') {
         el.dataset.bars = '0';
-        $('wifi-label').textContent = w && w.state === 'connecting' ? 'Wi-Fi connecting' : 'No Wi-Fi';
+        el.dataset.offline = 'true';
+        el.title = w && w.state === 'connecting' ? 'Wi-Fi connecting' : 'Wi-Fi disconnected';
+        el.setAttribute('aria-label', el.title);
         return;
     }
     el.dataset.bars = String(S.rssiBars(w.rssi));
-    $('wifi-label').textContent = `${w.ssid || 'Wi-Fi'} ${w.rssi} dBm`;
-    el.title = `Modem Wi-Fi: ${w.ssid || ''}, ${w.ip || ''}`;
+    el.dataset.offline = 'false';
+    el.title = `${w.ssid || 'Wi-Fi'} · ${w.rssi} dBm${w.ip ? ' · ' + w.ip : ''}`;
+    el.setAttribute('aria-label', el.title);
 }
 
 function showTimes() {
     const now = modemNow();
-    $('clock-label').textContent = S.formatClock(now, state.clock.tzo);
+    const clock = S.formatClock(now, state.clock.tzo);
+    $('clock-label').textContent = now > 0 ? clock.split(' ').at(-1) : '—';
+    $('clock-label').title = clock;
     const up = S.callUptime(state.call, now);
     $('uptime-label').textContent = up === null ? '--:--:--' : S.formatDuration(up);
+    $('uptime-label').hidden = up === null;
 }
 
 function setLink(status) {
@@ -146,7 +173,8 @@ function setLink(status) {
     document.body.classList.toggle('online', status === 'online');
     document.body.classList.toggle('offline', status === 'offline');
     $('link-label').textContent =
-        { online: 'Online', offline: 'Offline', connecting: 'Connecting', demo: 'Demo' }[status];
+        { online: 'Modem online', offline: 'Modem offline', connecting: 'Connecting', demo: 'Demo modem' }[status];
+    $('link').classList.toggle('offline', !state.online);
     if (status === 'demo') {
         document.body.classList.add('online');
     }
@@ -168,6 +196,7 @@ function handleMessage(msg) {
             events.access(msg, state.opening);
             state.edit = S.terminalAccess(msg);
             state.opening = false;
+            channel.reset();
             updateControls();
             if (state.edit) {
                 reportedSize = null;
@@ -176,8 +205,13 @@ function handleMessage(msg) {
             } else clearTimeout(sizeTimer);
             break;
         case 'hardware':
+            state.hardware = msg;
             $('line-controls').hidden = !msg.active || msg.mode !== 'lines';
             $('stop-test').hidden = !msg.active;
+            updateControls();
+            break;
+        case 'ready':
+            channel.ready(msg);
             break;
         case 'led':
             showLeds(msg.m);
@@ -237,6 +271,7 @@ function fitTerminal() {
         term.options.fontSize = size;
     }
     const message = sizeMessage(term.cols, term.rows);
+    $('terminal-geometry').textContent = `UTF-8 · ${term.cols} × ${term.rows}`;
     if (state.edit && message !== reportedSize) {
         clearTimeout(sizeTimer);
         sizeTimer = setTimeout(() => {
@@ -280,6 +315,7 @@ function connectModem() {
             else {
                 const bytes = new Uint8Array(data);
                 events.output(bytes);
+                channel.output(bytes);
                 term.write(bytes);
             }
         },
@@ -294,6 +330,8 @@ function connectModem() {
             state.csrf = null;
             state.edit = false;
             state.opening = false;
+            state.hardware = null;
+            channel.reset();
             reportedSize = null;
             clearTimeout(sizeTimer);
             $('upload').disabled = true;
@@ -306,7 +344,10 @@ function connectModem() {
     reconnectModem = () => link.reconnect();
     openTerminal = () => link.openTerminal();
     closeTerminal = () => link.closeTerminal();
-    hangupCall = () => link.hangup();
+    hangupCall = () => {
+        channel.reset();
+        return link.hangup();
+    };
     pauseInput = busy => link.pause(busy);
     setInterval(() => link.poll(state.upload), 5000);
     link.start();
@@ -319,6 +360,7 @@ async function startDemo() {
         message: handleMessage,
         write: data => {
             events.output(typeof data === 'string' ? encoder.encode(data) : data);
+            channel.output(typeof data === 'string' ? encoder.encode(data) : data);
             term.write(data);
         },
     });
@@ -329,13 +371,15 @@ async function startDemo() {
     };
     openTerminal = () => { modem.receive('{"t":"open"}'); return true; };
     closeTerminal = () => modem.close();
-    hangupCall = () => { modem.receive('{"t":"hangup"}'); return true; };
+    hangupCall = () => { channel.reset(); modem.receive('{"t":"hangup"}'); return true; };
     term.focus();
 }
 
 // ---------------------------------------------------------------- start
 
 async function main() {
+    menus = createMenuBar({state: () => state, run: (line, done) => channel.request(line, done),
+        focus: () => term.focus(), notify: text => toasts.show(text)});
     $('open-terminal').onclick = () => {
         state.opening = true;
         updateControls();
@@ -347,14 +391,19 @@ async function main() {
     };
     $('close-terminal').onclick = () => closeTerminal();
     $('here').onclick = () => { idle.activity(); term.focus(); };
-    $('dcd').onclick = () => send(encoder.encode('d'));
-    $('ri').onclick = () => send(encoder.encode('r'));
-    $('cts').onclick = () => send(encoder.encode('c'));
-    $('stop-test').onclick = () => send(new Uint8Array([0x18]));
+    $('hangup').onclick = () => { if (!hangupCall()) toasts.show('Could not hang up. Check the modem link.'); };
+    $('dcd').onclick = () => channel.input(encoder.encode('d'));
+    $('ri').onclick = () => channel.input(encoder.encode('r'));
+    $('cts').onclick = () => channel.input(encoder.encode('c'));
+    $('stop-test').onclick = () => { channel.input(new Uint8Array([0x18])); term.focus(); };
     $('upload').onclick = () => $('image').click();
     const uploadFlow = createUploadFlow({
         state,
-        show: text => { $('operation').textContent = text; },
+        show: text => {
+            $('menu-reason').title = text;
+            $('menu-reason').querySelector('.guidance-long').textContent = text;
+            $('menu-reason').querySelector('.guidance-short').textContent = 'Image upload';
+        },
         setBusy: busy => {
             pauseInput(busy);
             updateControls(false);
@@ -375,7 +424,7 @@ async function main() {
     $('image').onchange = async () => {
         try {
             const result = await uploadFlow($('image').files[0]);
-            if (['rejected', 'lost', 'failed'].includes(result)) toasts.show($('operation').textContent);
+            if (['rejected', 'lost', 'failed'].includes(result)) toasts.show($('menu-reason').querySelector('.guidance-long').textContent);
         } finally { $('image').value = ''; }
     };
     buildLeds();
@@ -390,7 +439,7 @@ async function main() {
     window.addEventListener('resize', fitTerminal);
     const input = bytes => {
         idle.activity();
-        if (!send(bytes)) toasts.show(state.edit
+        if (!channel.input(bytes)) toasts.show(state.edit
             ? 'Input could not be sent. Wait for the modem before pasting again.'
             : 'Open the terminal before typing');
     };

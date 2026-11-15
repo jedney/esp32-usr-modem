@@ -14,7 +14,7 @@ def generate():
         lines = [title, 'Illustration only: current values appear on the modem.', '']
         for item in items:
             m = bindings[item['id']]
-            lines += [f"{item['key']}. {m['friendly']}", f"   {m['help']}"]
+            lines += [f"{item['key']}. {m['friendly']}"]
         return '\n'.join(lines + ['', 'X. Back / Q. Exit; Esc goes back.', ''])
 
     for model in theme['models']:

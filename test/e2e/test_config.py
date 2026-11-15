@@ -89,12 +89,15 @@ def test_reserved_dial_escape_resume_and_hangup(local):
     require(local.command("AT")[-1] == "OK", "Dialed menu did not release call slot")
 
 
-def test_submenus_help_and_hardware_availability(local):
+def test_compact_submenus_field_units_and_hardware_availability(local):
     local.raw(b"AT*CONFIG\r")
     data = send(local, b"c\r")
     require(b"Rings before answering" in data and b"Answer incoming calls on" in data and b"Modem model" in data, "Missing settings")
+    require(b"Choose how many rings" not in data and b"Range:" not in data,
+            "Menu list includes field help or ranges")
     data = send(local, b"d\r")
-    require(b"rings" in data and b"Range: 0-255" in data, "Missing setting help or units")
+    require(b"rings" in data and b"Range: 0-255" in data, "Missing field range or units")
+    require(b"Choose how many rings" not in data, "Terminal form includes menu help")
     send(local, b"\x1b")
     send(local, b"\x1b")
     data = send(local, b"k\r")

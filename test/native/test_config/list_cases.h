@@ -12,6 +12,9 @@ void test_lists_use_only_letters_and_sgr_at_every_size() {
             auto text = r.drain();
             TEST_ASSERT_TRUE(contains(text, "A. Status"));
             TEST_ASSERT_TRUE(contains(text, "M. Command Reference"));
+            TEST_ASSERT_FALSE(contains(text, "Show the call, front lights"));
+            TEST_ASSERT_FALSE(contains(text, "   Range:"));
+            TEST_ASSERT_FALSE(contains(text, "   Units:"));
             TEST_ASSERT_FALSE(contains(text, "[18t"));
             for (size_t i = 0; i < text.size(); ++i)
                 if (text[i] == 27) {
@@ -32,7 +35,11 @@ void test_lists_use_only_letters_and_sgr_at_every_size() {
             r.feed("\x1b[B\x1bOC1");
             TEST_ASSERT_TRUE(r.drain().empty());
             r.feed("c");
-            TEST_ASSERT_TRUE(contains(r.drain(), "Rings before answering"));
+            text = r.drain();
+            TEST_ASSERT_TRUE(contains(text, "Rings before answering"));
+            TEST_ASSERT_FALSE(contains(text, "Choose how many rings"));
+            TEST_ASSERT_FALSE(contains(text, "   Range:"));
+            TEST_ASSERT_FALSE(contains(text, "   Units:"));
         }
 }
 void test_every_section_and_profile_page_is_reachable() {
@@ -64,6 +71,8 @@ void test_enum_choices_show_friendly_labels_and_confirm() {
     auto text = r.drain();
     TEST_ASSERT_TRUE(contains(text, "A. US Robotics Sportster 14.4k"));
     TEST_ASSERT_TRUE(contains(text, "B. US Robotics Sportster 28.8k"));
+    TEST_ASSERT_FALSE(contains(text, "Use the 14.4k identity"));
+    TEST_ASSERT_FALSE(contains(text, "Choose the modem identity"));
     r.feed("b\r");
     TEST_ASSERT_TRUE(contains(r.drain(), "Y confirms"));
     TEST_ASSERT_EQUAL(14400, r.modem.model());

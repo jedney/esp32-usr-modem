@@ -2,34 +2,19 @@ Hardware Tests
 Illustration only: current values appear on the modem.
 
 A. Guided tests
-   Walk through hardware checks. Serial line and loopback steps are skipped when using RS232.
 B. Pin map
-   Show which processor pins connect to each part.
 C. Board information
-   Show the processor, memory, firmware and file storage information.
 D. Files
-   List the files stored on the device.
 E. Indicator lights
-   Light an indicator or run a light pattern. Automatic mode returns control to the modem.
 F. Speaker amplifier
-   Choose automatic speaker control or force the amplifier on or off.
 G. Test volume
-   Set the hardware test volume or use the physical volume knob.
 H. Test tone or frequency sweep
-   Play a fixed test frequency, a telephone tone or a frequency sweep. Press any key to stop.
 I. Touch-tone digits
-   Play touch-tone digits, star, hash or the letters A to D. Press any key to stop.
 J. Pulse-dial digits
-   Play UK pulse-dial clicks for digits zero to nine. Press any key to stop.
 K. Volume knob readings
-   Show live readings from the volume knob. Press any key to stop.
 L. RS232 control lines
-   Check the RS232 control lines. Use the maintenance console because this takes over RS232.
 M. Serial loopback test
-   Run the serial loopback tests. Use the maintenance console because this takes over RS232.
 N. Serial port bridge
-   Bridge the maintenance console to RS232. This takes over the RS232 port.
 O. Set an RS232 output
-   Drive an RS232 output while idle. Use the maintenance console because this takes over RS232.
 
 X. Back / Q. Exit; Esc goes back.
