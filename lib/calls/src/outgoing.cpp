@@ -234,6 +234,7 @@ void Outgoing::poll() {
         stage_ != CallStage::kConnectDelay) {
         return;
     }
+    connection_.terminalSize(session_->columns(), session_->rows());
     connection_.poll(now);
     SocketState state = socket_.state();
     if (state == SocketState::kDnsError) {

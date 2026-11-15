@@ -5,6 +5,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <initializer_list>
 
 namespace atcmd {
 
@@ -518,6 +519,21 @@ void Port::askConfirmation(const char *prompt, SecretHandler fn, void *ctx) {
     maskSecret_ = false;
 }
 
+void Port::discardInput() {
+    if (state_ == State::kWait)
+        feed('\x03');
+    cancelPrompt();
+    state_ = State::kIdle;
+    len_ = 0;
+    overflow_ = privateLine_ = false;
+    privateStart_ = 0;
+    repeatAllowed_ = false;
+    for (auto *buffer : {&line_, &last_}) {
+        volatile char *p = *buffer;
+        for (size_t i = 0; i < sizeof line_; ++i)
+            p[i] = 0;
+    }
+}
 bool Port::cancelPrompt() {
     if (state_ != State::kSecret) {
         return false;

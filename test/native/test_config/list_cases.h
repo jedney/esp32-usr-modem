@@ -16,9 +16,17 @@ void test_lists_use_only_letters_and_sgr_at_every_size() {
             for (size_t i = 0; i < text.size(); ++i)
                 if (text[i] == 27) {
                     TEST_ASSERT_EQUAL_STRING("ANSI", style);
+                    if (i + 1 >= text.size()) {
+                        TEST_FAIL_MESSAGE("Truncated ANSI escape");
+                        return;
+                    }
                     TEST_ASSERT_EQUAL('[', text[++i]);
                     while (i + 1 < text.size() && (isdigit(text[i + 1]) || text[i + 1] == ';'))
                         ++i;
+                    if (i + 1 >= text.size()) {
+                        TEST_FAIL_MESSAGE("Unterminated SGR colour");
+                        return;
+                    }
                     TEST_ASSERT_EQUAL('m', text[++i]);
                 }
             r.feed("\x1b[B\x1bOC1");

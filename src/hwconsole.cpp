@@ -667,7 +667,10 @@ void runBridge(uint32_t baud) {
     hw::lineSet(OutSignal::kDCD, true);
     out().printf("Bridge: console <-> RS232 at %lu 8N1, CTS and DCD on. Ctrl-X ends.\r\n",
                  static_cast<unsigned long>(baud));
-    drainInput();
+    // Browser input following the AT command is already bridge payload. Keep
+    // prefetched paste bytes; serial terminals still need their CR/LF drained.
+    if (!term->isBrowser())
+        drainInput();
     HardwareSerial &u = hw::uart();
     bool dtr = hw::dtrAsserted();
     bool rts = hw::rtsAsserted();

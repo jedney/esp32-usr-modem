@@ -157,10 +157,21 @@ void WebService::disconnect(uint32_t id) {
     Lock lock(mutex_);
     auto *c = find(id);
     if (c) {
+        terminalOwner_.close(id);
         c->active = false;
         c->input.clear();
         c->output.clear();
         c->csrf.clear();
+    }
+}
+void WebService::close(uint32_t id) {
+    Lock lock(mutex_);
+    auto *c = find(id);
+    if (c) {
+        c->close = true;
+        c->input.clear();
+        c->output.clear();
+        terminalOwner_.close(id);
     }
 }
 void WebService::freeContext(void *value) {
@@ -169,19 +180,25 @@ void WebService::freeContext(void *value) {
     delete ctx;
 }
 void WebService::stop() {
+    {
+        Lock lock(mutex_);
+        for (auto &c : clients_) {
+            terminalOwner_.close(c.id);
+            c.active = false;
+            c.input.clear();
+            c.output.clear();
+            c.csrf.clear();
+        }
+        auth_.reset();
+        tickets_.reset();
+    }
+    // Release a receive handler waiting for modem space before waiting for the
+    // HTTP task itself. That task must never need progress from this loop to stop.
     if (server_) {
         httpd_stop(server_);
         server_ = nullptr;
     }
     Lock lock(mutex_);
-    for (auto &c : clients_) {
-        c.active = false;
-        c.input.clear();
-        c.output.clear();
-        c.csrf.clear();
-    }
-    auth_.reset();
-    tickets_.reset();
     workQueued_ = false;
 }
 void WebService::poll(bool enabled, bool up, const char *name, const char *ip) {
@@ -196,7 +213,22 @@ void WebService::poll(bool enabled, bool up, const char *name, const char *ip) {
         Lock lock(mutex_);
         usedAck_ = ok;
     }
-    bool changed = hash_ != device_.digestHash() || name_ != name || ip_ != ip;
+    bool changed = name_ != name || ip_ != ip;
+    if (hash_ != device_.digestHash()) {
+        Lock lock(mutex_);
+        hash_ = device_.digestHash();
+        auth_.reset();
+        tickets_.reset();
+        usedAck_ = false;
+        // Send the requesting terminal's generated password before closing its
+        // authenticated connection. New requests already require the new hash.
+        for (auto &c : clients_)
+            if (c.active) {
+                c.close = true;
+                terminalOwner_.close(c.id);
+                c.input.clear();
+            }
+    }
     if (uploading()) {
         return;
     }
@@ -399,12 +431,65 @@ esp_err_t WebService::ws(httpd_req_t *req) {
         return ESP_FAIL;
     }
     httpd_ws_frame_t frame = {};
-    if (httpd_ws_recv_frame(req, &frame, 0) != ESP_OK || frame.len > 1024) {
+    if (httpd_ws_recv_frame(req, &frame, 0) != ESP_OK ||
+        frame.len > webinterface::kTerminalFrameBytes) {
         return ESP_FAIL;
     }
-    uint8_t data[1024];
+    uint8_t data[512];
     frame.payload = data;
+    // Receive binary frames in bounded pieces. While the modem holds input off,
+    // keep sending output here: queued HTTP work cannot run inside this handler.
+    if (frame.type == HTTPD_WS_TYPE_BINARY || frame.type == HTTPD_WS_TYPE_CONTINUE) {
+        {
+            Lock lock(mutex_);
+            auto *c = find(context->id);
+            if (!c || (c->fragmented ? frame.type != HTTPD_WS_TYPE_CONTINUE
+                                     : frame.type != HTTPD_WS_TYPE_BINARY))
+                return ESP_FAIL;
+            c->fragmented = !frame.final;
+        }
+        while (frame.left_len) {
+            size_t n = frame.left_len < sizeof data ? frame.left_len : sizeof data;
+            if (httpd_ws_recv_frame_part(req, &frame, n) != ESP_OK) {
+                devicecfg::wipe(data, sizeof data);
+                return ESP_FAIL;
+            }
+            size_t offset = 0;
+            uint32_t progress = millis();
+            while (offset < n) {
+                {
+                    Lock lock(mutex_);
+                    auto *c = find(context->id);
+                    if (!c) {
+                        devicecfg::wipe(data, sizeof data);
+                        return ESP_FAIL;
+                    }
+                    if (!terminalOwner_.owns(c->id)) {
+                        offset = n;  // observers never queue commands
+                    } else {
+                        size_t used = c->input.append(data + offset, n - offset);
+                        offset += used;
+                        if (used)
+                            progress = millis();
+                    }
+                }
+                sendClients();
+                if (offset < n) {
+                    if (millis() - progress >= 30000) {
+                        devicecfg::wipe(data, sizeof data);
+                        return ESP_FAIL;
+                    }
+                    delay(1);
+                }
+            }
+            devicecfg::wipe(data, sizeof data);
+        }
+        return ESP_OK;
+    }
+    if (frame.len > sizeof data)
+        return ESP_FAIL;
     if (httpd_ws_recv_frame(req, &frame, sizeof data) != ESP_OK) {
+        devicecfg::wipe(data, sizeof data);
         return ESP_FAIL;
     }
     if (frame.type == HTTPD_WS_TYPE_PING) {
@@ -434,23 +519,21 @@ esp_err_t WebService::ws(httpd_req_t *req) {
     Lock lock(mutex_);
     auto *c = find(context->id);
     if (c && !c->fragmented && frame.type == HTTPD_WS_TYPE_TEXT && frame.final) {
+        std::string message(reinterpret_cast<const char *>(data), frame.len);
+        if (message == "{\"t\":\"open\"}") {
+            c->openRequested = true;
+            return ESP_OK;
+        }
         unsigned columns, rows;
-        if (!webinterface::terminalSize(
-                std::string(reinterpret_cast<const char *>(data), frame.len), columns, rows))
+        if (!webinterface::terminalSize(message, columns, rows))
             return ESP_FAIL;
         c->columns = columns;
         c->rows = rows;
         c->sizeChanged = true;
         return ESP_OK;
     }
-    if (!c || (c->fragmented ? frame.type != HTTPD_WS_TYPE_CONTINUE
-                             : frame.type != HTTPD_WS_TYPE_BINARY)) {
-        return ESP_FAIL;
-    }
-    c->fragmented = !frame.final;
-    bool ok = c->input.push(data, frame.len);
     devicecfg::wipe(data, sizeof data);
-    return ok ? ESP_OK : ESP_FAIL;
+    return ESP_FAIL;
 }
 uint32_t WebService::prepareUpgrade(int fd, const std::string &host, const std::string &origin,
                                     const std::string &target) {
@@ -478,6 +561,7 @@ uint32_t WebService::prepareUpgrade(int fd, const std::string &host, const std::
     available->input.clear();
     available->output.clear();
     available->fragmented = available->close = false;
+    available->openRequested = false;
     available->columns = 80;
     available->rows = 25;
     available->sizeChanged = true;
@@ -498,11 +582,13 @@ uint32_t WebService::prepareUpgrade(int fd, const std::string &host, const std::
 }
 uint32_t WebService::clientId(unsigned index) {
     Lock lock(mutex_);
-    return index < kClients && clients_[index].active ? clients_[index].id : 0;
+    return index < kClients && clients_[index].active && !clients_[index].close ? clients_[index].id
+                                                                                : 0;
 }
 bool WebService::connected(uint32_t id) {
     Lock lock(mutex_);
-    return find(id) != nullptr;
+    auto *c = find(id);
+    return c && !c->close;
 }
 size_t WebService::read(uint32_t id, uint8_t *data, size_t cap) {
     Lock lock(mutex_);
@@ -519,6 +605,27 @@ bool WebService::takeSize(uint32_t id, unsigned &columns, unsigned &rows) {
     c->sizeChanged = false;
     return true;
 }
+bool WebService::takeOpen(uint32_t id) {
+    Lock lock(mutex_);
+    auto *c = find(id);
+    if (!c || c->close || !c->openRequested)
+        return false;
+    c->openRequested = false;
+    return true;
+}
+void WebService::terminal(uint32_t id, bool enabled) {
+    Lock lock(mutex_);
+    auto *c = find(id);
+    if (!c)
+        return;
+    if (enabled)
+        enabled = terminalOwner_.open(id, true);
+    else
+        terminalOwner_.close(id);
+    c->input.clear();
+    c->messages[5] = enabled ? "{\"t\":\"access\",\"edit\":true,\"state\":\"terminal\"}"
+                             : "{\"t\":\"access\",\"edit\":false,\"state\":\"read-only\"}";
+}
 void WebService::discardInput(uint32_t id) {
     Lock lock(mutex_);
     auto *c = find(id);
@@ -529,19 +636,15 @@ void WebService::discardInput(uint32_t id) {
 bool WebService::write(uint32_t id, const uint8_t *data, size_t len) {
     Lock lock(mutex_);
     auto *c = find(id);
-    if (!c) {
+    if (!c || c->close) {
         return false;
     }
-    if (!c->output.push(data, len)) {
-        c->close = true;
-        return false;
-    }
-    return true;
+    return c->output.push(data, len);
 }
 size_t WebService::space(uint32_t id) {
     Lock lock(mutex_);
     auto *c = find(id);
-    return c ? c->output.space() : 0;
+    return c && !c->close ? c->output.space() : 0;
 }
 void WebService::text(uint32_t id, const std::string &message) {
     Lock lock(mutex_);
@@ -561,6 +664,12 @@ void WebService::snapshot(unsigned type, const std::string &message, bool force)
 }
 void WebService::sendWork(void *ctx) {
     auto &self = *static_cast<WebService *>(ctx);
+    self.sendClients();
+    Lock lock(self.mutex_);
+    self.workQueued_ = false;
+}
+void WebService::sendClients() {
+    auto &self = *this;
     for (unsigned i = 0; i < kClients; ++i) {
         int fd;
         uint32_t id;
@@ -576,7 +685,7 @@ void WebService::sendWork(void *ctx) {
             }
             fd = c.fd;
             id = c.id;
-            close = c.close;
+            close = c.close && c.output.size() == 0;
             n = c.output.pop(bytes, sizeof bytes);
             for (unsigned j = 0; j < 4; ++j) {
                 if (c.sent[j] != self.revision_[j]) {
@@ -608,13 +717,12 @@ void WebService::sendWork(void *ctx) {
             frame.len = n;
             close = httpd_ws_send_frame_async(self.server_, fd, &frame) != ESP_OK;
         }
+        devicecfg::wipe(bytes, sizeof bytes);
         if (close) {
             self.disconnect(id);
             httpd_sess_trigger_close(self.server_, fd);
         }
     }
-    Lock lock(self.mutex_);
-    self.workQueued_ = false;
 }
 void WebService::pump() {
     if (!server_ || millis() - nextPump_ < 20) {

@@ -46,6 +46,8 @@ void TcpConnection::poll(uint32_t) {
     if (n) {
         telnet_.tx.drop(socket_.write(buf, n));
     }
+    if (!raw_)
+        telnet_.poll();
     size_t cap = telnet_.rx.space();
     if (cap > sizeof buf) {
         cap = sizeof buf;

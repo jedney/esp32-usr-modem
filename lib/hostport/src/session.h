@@ -78,6 +78,9 @@ public:
     void setDialer(Dialer *dialer) { dialer_ = dialer; }
     void setBaudControl(BaudControl *control) { baudControl_ = control; }
     bool dial(const char *text, bool pulse) override;
+    void resize(unsigned columns, unsigned rows);
+    unsigned columns() const { return columns_; }
+    unsigned rows() const { return rows_; }
     uint32_t lineSpeed() const { return lineSpeed_; }
     uint32_t reportedSpeed() const { return reportSpeed_; }
 
@@ -131,6 +134,7 @@ private:
     bool xoff_ = false;
     uint32_t now_ = 0;
     uint32_t payloadSent_ = 0, payloadReceived_ = 0;
+    unsigned columns_ = 80, rows_ = 24;
     uint8_t echo_[256] = {};  // F0: online data echoed back to the computer
     size_t echoLen_ = 0;
 };

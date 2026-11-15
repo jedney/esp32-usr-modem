@@ -23,6 +23,10 @@ public:
     virtual bool localService() const { return false; }
     virtual bool binaryService() const { return false; }
     virtual void escaped() {}
+    virtual void terminalSize(unsigned columns, unsigned rows) {
+        (void)columns;
+        (void)rows;
+    }
     virtual void poll(uint32_t nowMs) { (void)nowMs; }
 };
 

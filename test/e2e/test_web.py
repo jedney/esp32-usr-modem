@@ -1,4 +1,4 @@
-"""Real HTTP/Digest/WebSocket checks; no real credential changes or flash writes.
+"""Real HTTP/Digest/WebSocket checks; maintenance writes require explicit flags.
 
 The existing USR_MODEM_PASSWORD is reused in memory. Traffic is never included
 in assertion messages. --web-tests opts in; upload acceptance is separate.
@@ -15,6 +15,7 @@ import re
 import socket
 import struct
 import time
+import threading
 import urllib.error
 import urllib.request
 
@@ -74,6 +75,7 @@ class WS:
     def __init__(self, host, token, origin=None):
         self.socket = socket.create_connection((host, 80), timeout=4)
         self.buffer = b""
+        self.closed = False
         key = base64.b64encode(os.urandom(16)).decode()
         text = (f"GET /ws?token={token} HTTP/1.1\r\nHost: {host}\r\n"
                 f"Origin: {origin or 'http://' + host}\r\nUpgrade: websocket\r\n"
@@ -105,7 +107,7 @@ class WS:
             head += struct.pack("!H", n)
         self.socket.sendall(head + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(data)))
 
-    def collect(self, seconds=0.5):
+    def collect(self, seconds=0.5, allow_close=False):
         text, messages = bytearray(), []
         end = time.monotonic() + seconds
         self.socket.settimeout(0.1)
@@ -132,6 +134,9 @@ class WS:
                 if total is None or len(self.buffer) < total:
                     part = self.socket.recv(4096)
                     if not part:
+                        self.closed = True
+                        if allow_close:
+                            break
                         raise EOFError("WebSocket closed")
                     self.buffer += part
                     continue
@@ -146,10 +151,16 @@ class WS:
                 pass
         return bytes(text), messages
 
+    def open_terminal(self):
+        text, messages = self.collect(0.3)
+        self.send(b'{"t":"open"}', opcode=1)
+        more, later = self.collect(0.3)
+        return text + more, messages + later
+
     def enter(self):
-        """Every browser starts read-only; E opens the configuration screen when free."""
-        text, messages = self.collect(0.4)
-        self.send(b"e")
+        """Open the terminal explicitly, then enter the shared configuration menu."""
+        text, messages = self.open_terminal()
+        self.send(b"AT*CONFIG\r")
         more, later = self.collect(0.4)
         return text + more, messages + later
 
@@ -270,11 +281,14 @@ def test_ticket_origin_single_use_and_initial_snapshots(web):
                 "Initial status snapshot incomplete")
         require(b"Read-only" in text and b"A. Status" not in text,
                 "Browser did not start read-only")
-        peer.send(b"e")
-        text, messages = peer.collect(0.6)
+        peer.send(b'{"t":"open"}', opcode=1)
+        _, messages = peer.collect(0.3)
+        peer.send(b"AT*CONFIG\r")
+        text, later = peer.collect(0.4)
+        messages += later
         require(b"A. Status" in text, "Shared browser menu missing")
         require(any(m.get("t") == "access" and m.get("edit") for m in messages),
-                "E did not grant edit access")
+                "Explicit open did not grant terminal access")
     with web.ws(ticket) as peer:
         require(not peer.accepted, "Reused ticket accepted")
 
@@ -295,10 +309,10 @@ def test_one_browser_menu_and_second_browser_read_only(web, console):
             text, messages = second.collect(0.5)
             require(b"Read-only" in text, "Second browser took menu ownership")
             require(console.command("AT*CONFIG")[-1] == "ERROR", "Serial menu stole browser slot")
-            second.send(b"e")
+            second.send(b'{"t":"open"}', opcode=1)
             _, messages = second.collect(0.3)
             require(not any(m.get("t") == "access" and m.get("edit") for m in messages),
-                    "Second browser took the menu with E")
+                    "Second browser took terminal ownership")
             second.send(b"c\r")
             text, _ = second.collect(0.3)
             require(b"Settings" not in text, "Read-only input invoked menu")
@@ -314,6 +328,8 @@ def test_browser_status_during_console_menu_cannot_run_commands(web, console):
         with web.ws() as peer:
             text, _ = peer.collect(0.5)
             require(b"Read-only" in text, "Browser stole serial menu")
+            peer.send(b'{"t":"open"}', opcode=1)
+            peer.collect(0.2)
             peer.send(b"AT*PASS\rAT*HWBRIDGE\r")
             text, _ = peer.collect(0.3)
             require(b"Device password:" not in text and b"Bridge:" not in text,
@@ -585,7 +601,7 @@ def test_interrupted_upload_frees_the_modem(web, console, request):
     with web.ws() as owner:
         require(owner.accepted, "Browser refused")
         text, messages = owner.collect(0.5)
-        owner.send(b"e")
+        owner.send(b'{"t":"open"}', opcode=1)
         more, later = owner.collect(0.5)
         hello = next((m for m in messages + later if m.get("t") == "hello"), None)
         require(hello is not None and hello.get("csrf"), "No CSRF token in the page snapshot")
@@ -625,10 +641,256 @@ def test_browser_letter_lists_keep_geometry_separate_and_tests_serial_only(web):
         text, _ = peer.collect(0.4)
         require(b"A. Status" in text and b"M. Command Reference" in text, "Incomplete browser list")
         require(b"\x1b" not in re.sub(rb"\x1b\[[0-9;]*m", b"", text), "Browser menu emitted cursor controls")
-        for width in (20, 40, 80, 132):
+        for width in (80, 132, 255, 512):
             peer.send(f'{{"t":"size","cols":{width},"rows":25}}'.encode(), opcode=1)
             text, _ = peer.collect(0.2)
             require(not text, "Transport size repainted the browser list")
         peer.send(b"la")
         text, _ = peer.collect(0.4)
         require(b"Client Tests run on serial only" in text, "Browser ran a serial diagnostic")
+
+
+def test_terminal_at_commands_config_exit_and_serial_only_services(web):
+    with web.ws() as peer:
+        _, messages = peer.open_terminal()
+        require(any(m.get("state") == "terminal" for m in messages), "Terminal access missing")
+        peer.send(b"AT\rATI\r")
+        text, _ = peer.collect(0.5)
+        require(b"OK" in text, "Browser AT parser did not answer")
+        peer.send(b"AT*CONFIG\r")
+        text, _ = peer.collect(0.4)
+        require(b"A. Status" in text, "AT*CONFIG did not open")
+        peer.send(b"q\r")
+        peer.collect(0.3)
+        peer.send(b"AT\r")
+        text, _ = peer.collect(0.3)
+        require(b"OK" in text, "Leaving configuration lost terminal ownership")
+        for command in (b"ATD666\r", b"ATD667\r", b"ATD5517546\r", b"ATD5517545\r",
+                        b"AT*TEST SUMMARY\r", b"AT*SX=TEST\r", b"AT*RX\r"):
+            peer.send(command)
+            text, _ = peer.collect(0.3)
+            require(b"ERROR" in text and b"CONNECT" not in text, "Browser ran a serial service")
+        peer.send(b"AT*STYLE=UTF8\rAT*STYLE?\r")
+        text, _ = peer.collect(0.3)
+        require(b"UTF8" in text and b"ERROR" not in text, "UTF8 style unavailable")
+        peer.send(b"AT*STYLE=CP437\rAT*STYLE?\r")
+        text, _ = peer.collect(0.3)
+        require(b"CP437" in text and b"ERROR" not in text, "CP437 style unavailable")
+        peer.send(b"AT*SIZE=160,60\rAT*SIZE?\r")
+        text, _ = peer.collect(0.3)
+        require(b"160,60" in text and b"ERROR" not in text, "Browser transport size unavailable")
+
+
+def test_terminal_large_command_paste_and_fragmented_input(web):
+    with web.ws() as peer:
+        peer.open_terminal()
+        peer.send(b"AT\r" * 3000)
+        text, _ = peer.collect(8)
+        require(text.count(b"OK\r\n") == 3000, "Large paste lost command replies")
+        peer.send(b"AT", final=False)
+        peer.send(b'{"t":"ping"}', opcode=1)
+        peer.send(b"\r", opcode=0)
+        text, messages = peer.collect(0.4)
+        require(b"OK" in text and any(m.get("t") == "pong" for m in messages),
+                "Fragmented input or interleaved heartbeat failed")
+
+
+def test_terminal_disconnect_forgets_partial_command_and_repeat(web):
+    with web.ws() as peer:
+        peer.open_terminal()
+        peer.send(b"ATQ1")
+        peer.collect(0.2)
+    with web.ws() as peer:
+        peer.open_terminal()
+        peer.send(b"\rAT\r")
+        text, _ = peer.collect(0.3)
+        require(b"OK" in text, "New terminal inherited partial command")
+
+
+def test_terminal_hardware_bridge_consumes_prefetched_tail(web, rs232):
+    with web.ws() as peer:
+        peer.open_terminal()
+        rs232.ser.reset_input_buffer()
+        peer.send(b"AT*HWBRIDGE\rprefetched-browser-input")
+        text, _ = peer.collect(0.4)
+        require(b"Bridge:" in text, "Direct browser hardware test did not start")
+        received = bytearray()
+        end = time.monotonic() + 1
+        while time.monotonic() < end:
+            received.extend(rs232.ser.read(rs232.ser.in_waiting or 1))
+        require(b"prefetched-browser-input" in received, "Hardware test lost prefetched input")
+        peer.send(b"\x18")
+        peer.collect(0.3)
+        peer.send(b"AT\r")
+        text, _ = peer.collect(0.3)
+        require(b"OK" in text, "Direct hardware test did not return to command mode")
+
+
+def test_browser_generated_password_reaches_requesting_terminal(web, console, request):
+    if not request.config.getoption("--device-tests"):
+        pytest.skip("--device-tests not enabled")
+    original = os.environ["USR_MODEM_PASSWORD"]
+    try:
+        with web.ws() as peer:
+            peer.open_terminal()
+            peer.send(b"AT*PASS\r")
+            text, _ = peer.collect(1, allow_close=True)
+            require(re.search(rb"Device password: [^\r\n]{12}\r\n", text) is not None,
+                    "Generated password did not reach authenticated terminal")
+            require(b"OK" in text, "Browser password generation failed")
+            require(peer.closed, "Password change did not close authenticated terminal")
+    finally:
+        require(console.command("AT*PASS=" + original)[-1] == "OK", "Password restore failed")
+        time.sleep(0.3)
+    require(Web(web.host).request("/api/session")[0] == 200, "Restored browser login failed")
+
+
+@contextlib.contextmanager
+def terminal_bbs(port):
+    """Negotiate NAWS, record unescaped input and keep the local carrier up."""
+    listener = socket.socket()
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(("0.0.0.0", port))
+    listener.listen(1)
+    listener.settimeout(0.2)
+    received, sizes, connections, errors = bytearray(), [], [], []
+    ready, closed, stop = threading.Event(), threading.Event(), threading.Event()
+
+    def run():
+        try:
+            while not stop.is_set():
+                try:
+                    connection, _ = listener.accept()
+                    break
+                except socket.timeout:
+                    continue
+            else:
+                return
+            with connection:
+                connections.append(connection)
+                connection.settimeout(0.2)
+                connection.sendall(bytes([255, 253, 31]) + b"local-bbs-ready\r\n")
+                ready.set()
+                state, sub = 0, bytearray()
+                while not stop.is_set():
+                    try:
+                        data = connection.recv(4096)
+                    except socket.timeout:
+                        continue
+                    if not data:
+                        closed.set()
+                        return
+                    for b in data:
+                        if state == 0:
+                            if b == 255:
+                                state = 1
+                            else:
+                                received.append(b)
+                        elif state == 1:
+                            if b == 255:
+                                received.append(b)
+                                state = 0
+                            elif b in (251, 252, 253, 254):
+                                state = 2
+                            elif b == 250:
+                                sub.clear()
+                                state = 3
+                            else:
+                                state = 0
+                        elif state == 2:
+                            state = 0
+                        elif state == 3:
+                            if b == 255:
+                                state = 4
+                            else:
+                                sub.append(b)
+                        elif state == 4:
+                            if b == 240:
+                                if len(sub) == 5 and sub[0] == 31:
+                                    sizes.append(struct.unpack("!HH", sub[1:]))
+                                state = 0
+                            else:
+                                if b == 255:
+                                    sub.append(b)
+                                state = 3
+        except OSError:
+            if not stop.is_set():
+                errors.append("local Telnet socket failed")
+
+    worker = threading.Thread(target=run, daemon=True)
+    worker.start()
+    try:
+        yield listener.getsockname()[1], received, sizes, ready, closed, connections
+    finally:
+        stop.set()
+        worker.join(timeout=2)
+        listener.close()
+        require(not errors, "Local Telnet peer failed")
+
+
+def test_terminal_dials_telnet_paste_resize_escape_and_disconnect(web, console, request):
+    address = request.config.getoption("--call-server-ip")
+    if not address:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as route:
+            route.connect((web.host, 80))
+            address = route.getsockname()[0]
+    throttle = console.command("AT*THROTTLE?")[0]
+    profile = " ".join(console.command("ATI4"))
+    old_m = re.search(r"(?<!\S)M(\d+)", profile)
+    require(console.command("ATM0")[-1] == "OK", "Cannot mute test dial")
+    require(console.command("AT*THROTTLE=OFF")[-1] == "OK", "Cannot set test speed")
+    try:
+        with terminal_bbs(request.config.getoption("--call-server-port")) as (port, received, sizes, ready, closed, connections):
+            with web.ws() as peer:
+                peer.open_terminal()
+                peer.send(b'{"t":"size","cols":160,"rows":60}', opcode=1)
+                peer.send(f"ATD{address}:{port}\r".encode())
+                text, messages = peer.collect(4)
+                require(ready.is_set() and b"CONNECT" in text and b"local-bbs-ready" in text,
+                        "Browser Telnet dial failed (check local listener reachability)")
+                require((160, 60) in sizes, "Initial NAWS ignored terminal size")
+                require(any(m.get("state") == "connected" for m in messages), "Call state missing")
+                with web.ws() as observer:
+                    observer.collect(0.2)
+                    observer.send(b'{"t":"open"}', opcode=1)
+                    _, messages = observer.collect(0.2)
+                    require(not any(m.get("edit") for m in messages), "Observer stole terminal")
+                    observer.send(b"observer-must-not-reach-bbs")
+                    paste = b"large-paste-" * 4000
+                    peer.send(paste)
+                    peer.collect(3)
+                    require(bytes(received) == paste, "BBS paste lost bytes or accepted observer input")
+                peer.send(b'{"t":"size","cols":255,"rows":511}', opcode=1)
+                peer.collect(0.5)
+                require((255, 511) in sizes, "Live NAWS resize failed")
+                connections[0].sendall(b"\x01\xda\xc4\xbf\r\n" + b"fast-output-" * 6000)
+                text, _ = peer.collect(4)
+                require(text.startswith("\u263a\u250c\u2500\u2510\r\n".encode()) and
+                        text.endswith(b"fast-output-" * 6000), "Fast BBS output or CP437 glyphs lost bytes")
+                time.sleep(1.1)
+                peer.send(b"+++")
+                text, _ = peer.collect(1.4)
+                require(b"OK" in text and not closed.is_set(), "+++ did not keep carrier in command mode")
+                peer.send(b"AT*STYLE=UTF8\rATO\r")
+                text, _ = peer.collect(0.4)
+                require(b"CONNECT" in text, "ATO did not resume BBS")
+                connections[0].sendall("UTF8 caf\u00e9 \u2713\r\n".encode())
+                text, _ = peer.collect(0.4)
+                require("UTF8 caf\u00e9 \u2713".encode() in text, "UTF8 BBS output was translated")
+            require(closed.wait(2), "Closing browser did not hang up BBS")
+        with terminal_bbs(request.config.getoption("--call-server-port")) as (port, _, _, ready, closed, _):
+            with web.ws() as peer:
+                peer.open_terminal()
+                peer.send(f"AT*DIAL={address}:{port}\r".encode())
+                text, _ = peer.collect(4)
+                require(ready.is_set() and b"CONNECT" in text, "AT*DIAL did not dial on browser session")
+                time.sleep(1.1)
+                peer.send(b"+++")
+                peer.collect(1.4)
+                peer.send(b"ATH\r")
+                text, _ = peer.collect(0.3)
+                require(b"OK" in text and closed.wait(1), "Browser ATH did not hang up")
+    finally:
+        console.command("AT*THROTTLE=" + throttle)
+        if old_m:
+            console.command("ATM" + old_m.group(1))

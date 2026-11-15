@@ -22,10 +22,10 @@ bool terminalSize(const std::string &message, unsigned &columns, unsigned &rows)
         return offset > start && (offset - start == 1 || message[start] != '0');
     };
     unsigned c, r;
-    if (!number(c, 132) || c < 1 || message.compare(offset, 8, ",\"rows\":") != 0)
+    if (!number(c, 65535) || c < 80 || message.compare(offset, 8, ",\"rows\":") != 0)
         return false;
     offset += 8;
-    if (!number(r, 50) || r < 1 || message.substr(offset) != "}")
+    if (!number(r, 65535) || r < 25 || message.substr(offset) != "}")
         return false;
     columns = c;
     rows = r;

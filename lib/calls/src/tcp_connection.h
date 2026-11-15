@@ -41,6 +41,7 @@ public:
     bool isOpen() const override;
     void close() override;
     void poll(uint32_t nowMs) override;
+    void terminalSize(unsigned columns, unsigned rows) override { telnet_.resize(columns, rows); }
 
 private:
     Socket &socket_;

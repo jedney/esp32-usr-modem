@@ -2,6 +2,11 @@
 #include "web_policy.h"
 namespace webinterface {
 std::string terminalUtf8(const uint8_t *bytes, size_t len, bool cp437) {
+    static const uint16_t low[32] = {
+        0x2400, 0x263a, 0x263b, 0x2665, 0x2666, 0x2663, 0x2660, 7,      8,      9,      10,
+        0x2642, 0x2640, 13,     0x266b, 0x263c, 0x25ba, 0x25c4, 0x2195, 0x203c, 0x00b6, 0x00a7,
+        0x25ac, 0x21a8, 0x2191, 0x2193, 0x2192, 27,     0x221f, 0x2194, 0x25b2, 0x25bc,
+    };
     static const uint16_t high[128] = {
         0x00c7, 0x00fc, 0x00e9, 0x00e2, 0x00e4, 0x00e0, 0x00e5, 0x00e7, 0x00ea, 0x00eb, 0x00e8,
         0x00ef, 0x00ee, 0x00ec, 0x00c4, 0x00c5, 0x00c9, 0x00e6, 0x00c6, 0x00f4, 0x00f6, 0x00f2,
@@ -19,11 +24,16 @@ std::string terminalUtf8(const uint8_t *bytes, size_t len, bool cp437) {
     std::string out;
     for (size_t i = 0; i < len; ++i) {
         uint16_t c = bytes[i];
-        if (c < 128) {
+        if (cp437 && c < 32) {
+            c = low[c];
+        } else if (cp437 && c == 127) {
+            c = 0x2302;
+        } else if (c < 128) {
             out += static_cast<char>(c);
             continue;
+        } else {
+            c = cp437 ? high[c - 128] : '?';
         }
-        c = cp437 ? high[c - 128] : '?';
         if (c < 128) {
             out += static_cast<char>(c);
         } else if (c < 0x800) {

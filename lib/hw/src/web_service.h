@@ -25,6 +25,8 @@ public:
     size_t read(uint32_t id, uint8_t *data, size_t cap);
     void discardInput(uint32_t id);
     bool takeSize(uint32_t id, unsigned &columns, unsigned &rows);
+    bool takeOpen(uint32_t id);
+    void terminal(uint32_t id, bool enabled);
     bool write(uint32_t id, const uint8_t *data, size_t len);
     size_t space(uint32_t id);
     void text(uint32_t id, const std::string &message);
@@ -43,17 +45,18 @@ public:
     uint32_t prepareUpgrade(int fd, const std::string &host, const std::string &origin,
                             const std::string &target);
     void disconnect(uint32_t id);
+    void close(uint32_t id);  // modem task: ask the HTTP task to close an unresponsive socket
 
 private:
     struct Client {
         uint32_t id = 0;
         int fd = -1;
         bool active = false, fragmented = false, close = false;
-        bool sizeChanged = false;
+        bool sizeChanged = false, openRequested = false;
         unsigned columns = 80, rows = 25;
         std::string csrf;
-        webinterface::Queue<2048> input;
-        webinterface::Queue<16384> output;
+        webinterface::Queue<webinterface::kTerminalInputBytes> input;
+        webinterface::Queue<webinterface::kTerminalOutputBytes> output;
         std::string messages[6];
         uint32_t sent[4] = {};
     };
@@ -67,6 +70,7 @@ private:
     static esp_err_t update(httpd_req_t *req);
     static void freeContext(void *ctx);
     static void sendWork(void *ctx);
+    void sendClients();  // HTTP task only; also drains output while input is held off
     esp_err_t serve(httpd_req_t *req);
     esp_err_t ws(httpd_req_t *req);
     esp_err_t upload(httpd_req_t *req);
@@ -84,6 +88,7 @@ private:
     std::string name_, ip_, hash_;
     bool needUsed_ = false, usedAck_ = false, workQueued_ = false;
     Client clients_[kClients];
+    webinterface::TerminalOwner terminalOwner_;
     uint32_t nextId_ = 1, nextPump_ = 0;
     std::string snapshots_[4];
     uint32_t revision_[4] = {};

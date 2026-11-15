@@ -54,7 +54,7 @@ Every command is listed in **[docs/COMMANDS.md](docs/COMMANDS.md)**.
 
 With the speaker on, a call plays the dial tone, the digits, ringing, the handshake for the line speed, a short pause, and then `CONNECT`. Dialling a host name plays the digits of its IP address. `ATM0` connects at once in silence. `AT*RINGDELAY` and `AT*CONNECTDELAY` set the ringing and the pause. Results follow the Sportster: refused gives `BUSY`, no connection within `S7` seconds gives `NO ANSWER`, no Wi-Fi or an unknown host gives `NO DIAL TONE`, and a dropped call gives `NO CARRIER`.
 
-Telnet calls negotiate binary mode, ANSI terminal type and an 80x24 window. The reported `CONNECT` speed comes from the phonebook entry, else `AT&N`, else the selected model (`AT*MODEL`, factory 14400). With `&B0` the RS232 speed follows the call speed. The data itself runs at full speed unless `AT*THROTTLE=ON`.
+Telnet calls negotiate binary mode, ANSI terminal type and the session window size (serial defaults to 80x24; browser reports live dimensions). The reported `CONNECT` speed comes from the phonebook entry, else `AT&N`, else the selected model (`AT*MODEL`, factory 14400). With `&B0` the RS232 speed follows the call speed. The data itself runs at full speed unless `AT*THROTTLE=ON`.
 
 ## Incoming calls
 
@@ -77,11 +77,11 @@ The menu inventory has shared typed metadata in `lib/config/ui-bindings.json`: f
 - Choose items by letter, A, B, C. X or Esc goes back; Q exits at the main menu. Ctrl-C exits immediately and Ctrl-L prints the current list again. Arrow and function keys are ignored.
 - Each option shows a friendly name, help, units and the current value where available. Enumerations have lettered friendly choices; press Enter to confirm a selection. Text fields use Enter, Backspace and Ctrl-U. Multi-field commands prompt for each value in turn; secret input is masked.
 - P and R switch long lists and command output pages; Enter advances output. Changes that need review keep their Y/N confirmation, including delete/dial checks and the Wi-Fi join flow. Client Tests run on serial only.
-- `AT*STYLE=ANSI` adds colour; `AT*STYLE=PLAIN` uses plain text. Both print scrolling lines that wrap at any terminal width, without cursor positioning, box drawing or periodic redraws. `AT*SIZE` and browser size reports retain transport dimensions independently of the menu.
+- `AT*STYLE=ANSI` adds colour; `AT*STYLE=PLAIN` uses plain text. `AT*STYLE=CP437|UTF8` independently selects browser BBS encoding. Both list styles print scrolling lines that wrap at any terminal width, without cursor positioning, box drawing or periodic redraws. `AT*SIZE` and browser size reports retain transport dimensions independently of the menu.
 
 ## Web interface
 
-Open `http://usr-modem.local` (or the modem's IP) and log in as **admin** with the device password. The page shows the front-panel lights, call state and clock, and a terminal. Every browser starts read-only, so an open tab never blocks a call; press **E** (or **Enter configuration**) to open the same configuration screen as `AT*CONFIG` when no call, test or other menu is using the modem. `AT*WEB=OFF` turns the web interface off.
+Open `http://usr-modem.local` (or the modem's IP) and log in as **admin** with the device password. The page shows the front-panel lights, call state and clock, and a terminal. Every browser starts as a read-only status observer. Explicitly opening the terminal grants one browser its own modem port: type AT commands, dial a BBS with `ATD`, escape with `+++`, resume with `ATO` and hang up with `ATH`. `AT*CONFIG` opens the configuration list. Closing the owner socket hangs up. The terminal reports its size to Telnet NAWS and defaults to CP437 BBS output; `AT*STYLE=UTF8` selects a UTF-8 BBS. Client Tests, file transfers and PPP/SLIP stay serial only. `AT*WEB=OFF` turns the web interface off.
 
 The page can install a `firmware.bin` or `littlefs.bin` from a release. The modem checks the image belongs to this project and matches its SHA-256, and asks before installing an older version. A LittleFS image replaces the sounds, web files and **call history**. Keep a USB cable handy: if power fails during a LittleFS install, restore it over USB (`pio run -e s3 -t uploadfs`). Browser network changes are undone after 60 seconds unless you confirm them. The web protocol and security rules are in [web/PROTOCOL.md](web/PROTOCOL.md).
 

@@ -144,7 +144,7 @@ What follows `ATDT`/`ATDP`:
 
 In numbers, spaces, `-`, brackets and the modifiers `, W @ ! ;` are ignored. Invalid strings give ERROR without any sound. `AT*DIALTEST <string>` shows how a string would be dialled.
 
-With the speaker on (`M1`-`M3`) an outgoing call plays: dial tone (`S6`), the digits (DTMF or pulse), ringing (`AT*RINGDELAY`), the handshake for the line speed, a pause (`AT*CONNECTDELAY`), then `CONNECT`. For a host name the name is looked up during the dial tone and the digits of its IP address are played. `ATM0` connects without sounds or pauses. Pressing a key before `CONNECT` cancels the call. Telnet entries negotiate binary mode, ANSI terminal type and an 80x24 window; RAW entries pass bytes unchanged.
+With the speaker on (`M1`-`M3`) an outgoing call plays: dial tone (`S6`), the digits (DTMF or pulse), ringing (`AT*RINGDELAY`), the handshake for the line speed, a pause (`AT*CONNECTDELAY`), then `CONNECT`. For a host name the name is looked up during the dial tone and the digits of its IP address are played. `ATM0` connects without sounds or pauses. Pressing a key before `CONNECT` cancels the call. Telnet entries negotiate binary mode, ANSI terminal type and the session window size (serial defaults to 80x24; browser reports live dimensions); RAW entries pass bytes unchanged.
 
 ## Project commands (`AT*`)
 
@@ -164,7 +164,7 @@ With the speaker on (`M1`-`M3`) an outgoing call plays: dial tone (`S6`), the di
 | `AT*PHONEBOOK=<number>,<host>,<port>,<TELNET\|RAW>[,<speed>]` | Add or replace an entry. Number 1-11 digits (leading zeros count, special numbers refused); host up to 63 characters; port 1-65535; speed 0 or omitted = no override |
 | `AT*PHONEDELETE=<number>` | Delete an entry |
 | `AT*BOOKCLEAR` | Empty the phonebook (used by export restore). If the stored phonebook is damaged, `AT*PHONEBOOK=` and `AT*PHONEDELETE=` give `ERROR` and change nothing; this command is the way out |
-| `AT*DIAL=<number\|host:port>` | Dial like `ATDT`; from the browser the call goes to the RS232 port |
+| `AT*DIAL=<number\|host:port>` | Dial like `ATDT` on the requesting session, including the browser terminal |
 | `AT*DIALTEST <string>` | Show how a dial string is understood, without dialling |
 | `AT*TESTCALL[=<seconds>]` | Test call to a built-in echo, to try `+++`, `ATO`, `ATH`, DTR, DCD and flow control. With seconds (1-3600), the far end hangs up after that long |
 | `AT*INTERNET[?]` | Internet (PPP/SLIP) state, addresses, DNS, counters and last end reason |
@@ -191,7 +191,7 @@ With the speaker on (`M1`-`M3`) an outgoing call plays: dial tone (`S6`), the di
 
 | Command | What it does |
 |---|---|
-| `AT*PASS` | New random device password, shown once on this port (not from the browser) |
+| `AT*PASS` | New random device password, shown once on this local port or authenticated browser terminal |
 | `AT*PASS=<text>` | Set the device password: 8-32 printable characters. Masked as you type |
 | `AT*OTA[?]` | OTA policy and state |
 | `AT*OTA=<ALWAYS\|DEMAND>` | OTA always listening, or only on demand. Saved; factory ALWAYS |
@@ -209,8 +209,8 @@ The device password (user `admin`) protects the web interface, the network conso
 | Command | What it does |
 |---|---|
 | `AT*CONFIG` | Open the wrapping letter menu now (`ATDT123` opens it after dial sounds). Letters open items, Enter confirms text/choices, X/Esc goes back, P/R pages, Q exits at the root. Friendly help, units and current values appear inline. A screen with no key for 5 minutes closes itself ("Screen closed after 5 minutes idle."), drops unsaved edits and frees the line. A running test or command is not cut off; the 5 minutes start again when it ends |
-| `AT*STYLE[?]` / `=<ANSI\|PLAIN>` | Wrapping configuration list: ANSI colour or plain text, without cursor positioning. This port, this boot |
-| `AT*SIZE[?]` / `=<cols>,<rows>` | Transport dimensions for this port, 1-132 by 1-50. Independent of menu layout; this boot |
+| `AT*STYLE[?]` / `=<ANSI\|PLAIN\|CP437\|UTF8>` | Browser BBS encoding: CP437 (default) or UTF8; independent of the wrapping configuration list: ANSI colour or plain text, without cursor positioning. This port, this boot |
+| `AT*SIZE[?]` / `=<cols>,<rows>` | Transport dimensions for this port: serial 1-132 by 1-50; browser 80-65535 by 25-65535, also sent as Telnet NAWS. Independent of menu layout; this boot |
 | `AT*STATUS` | Model, front panel, ports, call, Wi-Fi, the network console's client, and the least free stack so far of the main loop, the network (lwIP) task and the web server, in bytes (-1: task not running) |
 | `AT*SETTING[?]` / `=<modem command>` | Show the profiles, or change a setting through the normal checks (`AT*SETTING=S0=2`). Exactly one setting command is accepted (`E0`, `&N8`, `S7=45`, `S7.1=1`, `&Z2=host`); anything after it, such as `E0DT555`, gives `ERROR` |
 | `AT*HELP` / `AT*?` | List project commands and hardware tests |

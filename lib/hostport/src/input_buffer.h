@@ -19,7 +19,31 @@ public:
         size_ += length;
         return true;
     }
-    void poll(Session &session, uint32_t now) {
+    size_t read(uint8_t *data, size_t cap) {
+        size_t n = size_ < cap ? size_ : cap;
+        memcpy(data, bytes_, n);
+        size_ -= n;
+        memmove(bytes_, bytes_ + n, size_);
+        wipeTail();
+        return n;
+    }
+    void poll(Session &session, uint32_t now, bool interactive = false) {
+        if (interactive) {
+            // A command can synchronously enter a hardware test. Remove each
+            // byte before dispatch, so that test can read the prefetched tail.
+            while (size_ && session.hostSpace()) {
+                uint8_t byte;
+                read(&byte, 1);
+                if (!session.fromHost(&byte, 1, now)) {
+                    memmove(bytes_ + 1, bytes_, size_);
+                    ++size_;
+                    bytes_[0] = byte;
+                    break;
+                }
+                byte = 0;
+            }
+            return;
+        }
         size_t used = session.fromHost(bytes_, size_, now);
         size_ -= used;
         memmove(bytes_, bytes_ + used, size_);

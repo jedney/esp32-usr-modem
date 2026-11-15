@@ -32,7 +32,7 @@ Client Tests run on serial only; the browser lists them for reference and refuse
 
 The configuration list uses ASCII with optional ANSI SGR colour, including the active model accent when RGB colour is enabled. It never emits a cursor address, erase-screen command, size query, wrap-mode change or cursor visibility control. Idle lists emit nothing. CP437 and Latin-1 diagnostics and the BBS byte-to-UTF-8 conversion remain separate from menu rendering.
 
-`AT*SIZE`, browser size frames and received serial size reports still store transport dimensions. They never clip, reflow or repaint the menu. Browser sizing and Telnet negotiation may use them independently. Client Tests retain their own display and size measurements. There is no menu size selector.
+`AT*SIZE`, browser size frames and received serial size reports still store transport dimensions. They never clip, reflow or repaint the menu. Browser geometry is 80-65535 columns by 25-65535 rows and feeds the browser session and live Telnet NAWS independently of the menu. The browser opens its terminal explicitly, retains ownership after leaving a menu, and hangs up when its socket closes. `AT*STYLE=CP437|UTF8` selects BBS encoding independently of PLAIN/ANSI menu colour. Client Tests retain their own display and size measurements. There is no menu size selector.
 
 ## Verification
 

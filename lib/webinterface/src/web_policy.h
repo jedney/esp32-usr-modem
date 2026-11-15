@@ -6,6 +6,9 @@
 #include "modemcfg.h"
 
 namespace webinterface {
+constexpr size_t kTerminalInputBytes = 2048;
+constexpr size_t kTerminalOutputBytes = 16384;
+constexpr size_t kTerminalFrameBytes = 1024 * 1024;
 class Crypto {
 public:
     virtual ~Crypto() = default;
@@ -20,6 +23,24 @@ std::string terminalUtf8(const uint8_t *bytes, size_t len, bool cp437);
 // Strict bounded geometry envelope, distinct from terminal input.
 bool terminalSize(const std::string &message, unsigned &columns, unsigned &rows);
 int compareVersions(const std::string &a, const std::string &b);  // -2 = invalid
+// Opening a socket does not own the terminal. Only an explicit open may claim it.
+class TerminalOwner {
+public:
+    bool open(uint32_t id, bool available) {
+        if (!id || (!owns(id) && (owner_ || !available)))
+            return false;
+        owner_ = id;
+        return true;
+    }
+    bool owns(uint32_t id) const { return id && id == owner_; }
+    void close(uint32_t id) {
+        if (owns(id))
+            owner_ = 0;
+    }
+
+private:
+    uint32_t owner_ = 0;
+};
 // Largest request header (request line and fields) the web server takes. The HTTP server's
 // own header limit (httpd_config_t::max_req_hdr_len) is set to the same value.
 constexpr size_t kMaxHeader = 4096;
@@ -128,6 +149,11 @@ public:
             bytes_[(head_ + count_++) % N] = data[i];
         }
         return true;
+    }
+    size_t append(const uint8_t *data, size_t len) {
+        size_t n = len < space() ? len : space();
+        push(data, n);
+        return n;
     }
     size_t pop(uint8_t *data, size_t cap) {
         size_t n = count_ < cap ? count_ : cap;

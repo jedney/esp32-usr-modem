@@ -170,6 +170,7 @@ public:
     // A visible line prompt for Y/N confirmation; uses the same cancellation rules.
     void askConfirmation(const char *prompt, SecretHandler fn, void *ctx);
     bool cancelPrompt();  // timeout: wipe the pending input and send ERROR
+    void discardInput();  // closed terminal: cancel work and forget partial/repeat lines
     // The final result comes later, through finish(). Meanwhile typing is not a command;
     // any key (not LF) cancels: `cancel` is called and ERROR sent.
     void wait(CancelHandler cancel, void *ctx, Result cancelResult = Result::kError,

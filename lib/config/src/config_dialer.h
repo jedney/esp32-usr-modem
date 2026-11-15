@@ -20,6 +20,10 @@ public:
         usb_ = usb;
         usbMenu_ = usbMenu;
     }
+    void setBrowser(hostport::Session *browser, Terminal *menu) {
+        browser_ = browser;
+        browserMenu_ = menu;
+    }
     bool start(hostport::Session &session, const char *text, bool pulse) override;
     void poll();
     void cancel();
@@ -31,6 +35,8 @@ private:
     Terminal &consoleMenu_, &hostMenu_;
     hostport::Session *usb_ = nullptr;
     Terminal *usbMenu_ = nullptr;
+    hostport::Session *browser_ = nullptr;
+    Terminal *browserMenu_ = nullptr;
     calls::Outgoing &outgoing_;
     hostport::CallSlot &slot_;
     calls::CallSound &sound_;

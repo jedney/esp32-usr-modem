@@ -7,7 +7,7 @@
 //   - the RS232 host port (UART1, rs232.cpp): speed from "AT" or AT*BAUD, flow control,
 //     DTR, DCD, RI;
 //   - the USB modem port on the S3's native USB (usbport.cpp);
-//   - the browser terminal (web page, hw::WebService), read-only until E is pressed.
+//   - the browser terminal (web page, hw::WebService), explicitly opened by its owner.
 // One call at a time (hostport::CallSlot): outgoing Telnet/TCP (calls::Outgoing),
 // incoming on port 23 (calls::Incoming), PPP/SLIP Internet dial-up (lib/internet) and the
 // AT*TESTCALL echo. Wi-Fi, mDNS and the NTP clock are in lib/netcfg; device credentials,
@@ -146,6 +146,9 @@ config::Terminal *consoleMenu = nullptr, *hostMenu = nullptr, *usbMenu = nullptr
 hostport::Session *browserSession = nullptr;
 config::Terminal *browserMenu = nullptr;
 uint32_t browserClient = 0;
+hostport::InputBuffer browserInput;
+uint32_t browserFromComputer = 0, browserToComputer = 0;
+bool browserUtf8 = false;
 bool hardwareRunning = false;
 bool browserTestCancelled = false;
 volatile const char imageMarker[] = "USRMODEM/1/FIRMWARE/" FW_VERSION "\n";
@@ -155,7 +158,23 @@ void pollLeds(uint32_t now);
 class BrowserSink : public atcmd::Sink {
 public:
     void write(const char *data, size_t len) override {
-        webServer.write(browserClient, reinterpret_cast<const uint8_t *>(data), len);
+        uint32_t progress = millis();
+        while (len && webServer.connected(browserClient)) {
+            size_t room = webServer.space(browserClient);
+            size_t n = len < room ? len : room;
+            if (n && webServer.write(browserClient, reinterpret_cast<const uint8_t *>(data), n)) {
+                data += n;
+                len -= n;
+                browserToComputer += n;
+                progress = millis();
+            } else if (millis() - progress >= 2000) {
+                webServer.close(browserClient);
+                break;
+            }
+            webServer.pump();
+            if (len)
+                delay(1);
+        }
     }
 };
 BrowserSink browserSink;
@@ -301,8 +320,10 @@ public:
             return 0x18;
         }
         uint8_t c;
-        if (!webServer.read(browserClient, &c, 1)) {
-            return -1;
+        if (!browserInput.read(&c, 1)) {
+            if (!webServer.read(browserClient, &c, 1))
+                return -1;
+            ++browserFromComputer;
         }
         if (c == 0x18) {
             browserTestCancelled = true;
@@ -712,10 +733,22 @@ private:
         return Reply::kDone;
     }
     Reply cmdStyle(atcmd::Port &port, const char *, const char *args) {
+        if (port.browser()) {
+            if (!strcmp(args, "=UTF8")) {
+                browserUtf8 = true;
+                return Reply::kOk;
+            }
+            if (!strcmp(args, "=CP437")) {
+                browserUtf8 = false;
+                return Reply::kOk;
+            }
+        }
         if (isQuery(args)) {
             auto style = menuOf(port).style();
             port.beginInfo();
             port.line(style == config::Style::Plain ? "PLAIN" : "ANSI");
+            if (port.browser())
+                port.line(browserUtf8 ? "UTF8" : "CP437");
             return Reply::kOk;
         }
         return *args == '=' && menuOf(port).setStyle(args + 1) ? Reply::kOk : Reply::kError;
@@ -724,7 +757,21 @@ private:
         auto &menu = menuOf(port);
         if (isQuery(args)) {
             port.beginInfo();
-            port.printf("%u,%u\r\n", menu.columns(), menu.rows());
+            port.printf("%u,%u\r\n", port.browser() ? browserSession->columns() : menu.columns(),
+                        port.browser() ? browserSession->rows() : menu.rows());
+            return Reply::kOk;
+        }
+        if (port.browser() && *args == '=') {
+            std::string size(args + 1);
+            size_t comma = size.find(',');
+            unsigned columns, rows;
+            if (comma == std::string::npos ||
+                !webinterface::terminalSize("{\"t\":\"size\",\"cols\":" + size.substr(0, comma) +
+                                                ",\"rows\":" + size.substr(comma + 1) + "}",
+                                            columns, rows))
+                return Reply::kError;
+            browserSession->resize(columns, rows);
+            menu.resize(columns, rows);
             return Reply::kOk;
         }
         return *args == '=' && menu.setSize(args + 1) ? Reply::kOk : Reply::kError;
@@ -1076,6 +1123,8 @@ void pollLeds(uint32_t now) {
                                rs232::bytesToComputer(), rs232::bytesFromComputer()});
     hostport::addHostPort(in, {usbport::session().dcd(), usbport::dtrOn(),
                                usbport::bytesToComputer(), usbport::bytesFromComputer()});
+    hostport::addHostPort(
+        in, {browserSession->callUp(), browserClient != 0, browserToComputer, browserFromComputer});
     uint8_t mask = panel.update(in, now);
     if (mask != ledMask || mask != hw::ledsMask()) {
         hw::ledsSet(mask);
@@ -1084,14 +1133,12 @@ void pollLeds(uint32_t now) {
 }
 
 void browserAccess(uint32_t id, bool edit) {
-    webServer.text(id,
-                   edit ? "{\"t\":\"access\",\"edit\":true}" : "{\"t\":\"access\",\"edit\":false}");
+    webServer.terminal(id, edit);
 }
 void browserWaiting(uint32_t id) {
     static const char message[] =
         "\x1b[2J\x1b[HUSR Modem live status\r\n"
-        "Read-only. Press E to open the configuration screen.\r\n"
-        "(It opens only when no call, test or other menu is using the modem.)\r\n";
+        "Read-only. Open the terminal to send AT commands.\r\n";
     webServer.write(id, reinterpret_cast<const uint8_t *>(message), sizeof message - 1);
     browserAccess(id, false);
 }
@@ -1160,7 +1207,8 @@ const char *webCallState() {
         state = journal.session()            ? "connected"
                 : journal.current().incoming ? "ringing"
                                              : "dialling";
-    } else if (console->callUp() || rs232::session().callUp() || usbport::session().callUp()) {
+    } else if (console->callUp() || rs232::session().callUp() || usbport::session().callUp() ||
+               browserSession->callUp()) {
         state = "test";
     } else if (consoleMenu->isOpen() || hostMenu->isOpen() || usbMenu->isOpen() ||
                browserMenu->isOpen()) {
@@ -1249,7 +1297,9 @@ void answerUploadRequest() {
     if (!webServer.takeUploadRequest(uploadClient)) {
         return;
     }
-    bool allow = !hardwareRunning && browserClient == uploadClient && browserMenu->isOpen() &&
+    bool allow = !hardwareRunning && browserClient == uploadClient && !browserSession->callUp() &&
+                 !browserSession->port().busy() && browserSession->port().lineEmpty() &&
+                 !browserInput.size() && (!callSlot.busy() || callSlot.heldBy(browserSession)) &&
                  console->port().lineEmpty() && rs232::session().port().lineEmpty() &&
                  usbport::session().port().lineEmpty() &&
                  net.joinResult() != netcfg::JoinResult::kRunning &&
@@ -1257,8 +1307,10 @@ void answerUploadRequest() {
     if (allow) {
         webServer.discardInput(browserClient);
         browserSession->hangUp();
+        browserInput.clear();
         hwconsole::restoreBrowserResources();
         browserAccess(browserClient, false);
+        browserClient = 0;
     }
     allow = allow && callSlot.claim(&webServer);
     if (allow) {
@@ -1268,100 +1320,89 @@ void answerUploadRequest() {
     // The server may have stopped waiting (2 s) while we checked: then allowUpload()
     // changes nothing and we release the claim, so no upload is left half-started.
     // ArduinoOTA resumes on the next ota.poll(); the browser keeps its
-    // read-only view and can press E again.
+    // read-only view and can open the terminal again.
     if (!webServer.allowUpload(allow) && allow) {
         callSlot.release(&webServer);
     }
 }
 
-// The browser with the configuration screen closed it or went away: back to read-only.
+// The terminal belongs to its browser until that socket closes, including command mode.
 void releaseConfigBrowser() {
-    if (!browserClient || (webServer.connected(browserClient) &&
-                           (browserSession->localOpen() || browserSession->port().busy()))) {
+    if (!browserClient || webServer.connected(browserClient))
         return;
-    }
-    if (!webServer.connected(browserClient)) {
-        netcfg::detachCommands(browserSession->port());
-    }
-    webServer.discardInput(browserClient);
-    browserSession->port().cancelPrompt();
+    netcfg::detachCommands(browserSession->port());
+    browserInput.clear();
+    browserSession->port().discardInput();
     browserSession->hangUp();
     hwconsole::restoreBrowserResources();
-    if (webServer.connected(browserClient)) {
-        browserWaiting(browserClient);
-    }
     browserClient = 0;
 }
 
-// Every browser starts read-only: opening the page claims nothing, so a
-// forgotten tab can't turn callers away. E takes the configuration screen when free;
-// other keys are dropped.
+// A status tab claims nothing; opening the terminal is a separate control message.
 void serveReadOnlyBrowser(uint32_t id, bool fresh) {
-    uint8_t bytes[128];
-    if (fresh) {
+    if (fresh)
         browserWaiting(id);
+    if (!webServer.takeOpen(id))
+        return;
+    if (browserClient || callSlot.busy() || hardwareRunning) {
+        browserAccess(id, id == browserClient);
+        return;
     }
-    size_t n = webServer.read(id, bytes, sizeof bytes);
-    bool enter = n && (bytes[0] == 'e' || bytes[0] == 'E');
-    while (webServer.read(id, bytes, sizeof bytes)) {
-    }
-    if (enter && !browserClient && !callSlot.busy() && !hardwareRunning) {
-        browserClient = id;
-        if (browserMenu->open() && browserSession->startLocal(*browserMenu)) {
-            browserAccess(id, true);
-        } else {
-            browserMenu->close();
-            browserClient = 0;
-        }
-    }
-    devicecfg::wipe(bytes, sizeof bytes);
+    browserInput.clear();
+    browserUtf8 = false;
+    browserSession->resize(80, 25);
+    browserClient = id;
+    browserAccess(id, true);
+    static const char welcome[] = "USR Modem terminal\r\nType AT*HELP for commands.\r\n";
+    browserSink.write(welcome, sizeof welcome - 1);
 }
 
-// A menu action the browser leaves the screen for. The browser has no data line, so a
-// dial goes to the RS232 host port when that port can take it (checked first).
+// Menu departures run on the same terminal, including phonebook dial actions.
 void runBrowserDeparture() {
     char departure[atcmd::kLineMax + 1];
     if (browserMenu->takeDeparture(departure, sizeof departure)) {
         browserSession->tick(millis(), true);
         hwconsole::restoreBrowserResources();
-        if (!strncmp(departure, "*DIAL=", 6)) {
-            auto &host = rs232::session();
-            if (host.mode() == hostport::Mode::kCommand && !host.localOpen() &&
-                host.port().lineEmpty()) {
-                browserSession->port().line("Dialling on the RS232 host port.");
-                host.port().execute(departure);
-            } else {
-                browserSession->port().line("The RS232 host port is busy: not dialled.");
-            }
-        } else {
-            browserSession->port().execute(departure);
-        }
+        browserSession->port().execute(departure);
     }
     devicecfg::wipe(departure, sizeof departure);
 }
 
-// The browser with the configuration screen: one key in, as much output as fits.
 void serveConfigBrowser(uint32_t id) {
-    uint8_t bytes[128];
-    // Read at most one key: an action may enter an interactive hardware test,
-    // whose adapter must retain the following queued keys for that test.
+    uint32_t now = millis();
+    bool menuWasOpen = browserMenu->isOpen();
     unsigned columns, rows;
-    if (webServer.takeSize(id, columns, rows))
+    if (webServer.takeSize(id, columns, rows)) {
+        browserSession->resize(columns, rows);
         browserMenu->resize(columns, rows);
-    if (webServer.read(id, bytes, 1)) {
-        browserSession->fromHost(bytes, 1, millis());
+    }
+    browserSession->tick(now, true);
+    browserInput.poll(*browserSession, now, true);
+    uint8_t bytes[256];
+    if (!browserInput.size()) {
+        size_t room = browserSession->hostSpace();
+        size_t n = webServer.read(id, bytes, room < sizeof bytes ? room : sizeof bytes);
+        browserFromComputer += n;
+        browserInput.append(bytes, n);
+        browserInput.poll(*browserSession, now, true);
     }
     browserSession->tick(millis(), true);
-    // CP437 can expand to three UTF-8 bytes. Pull only what the transport
-    // can retain, leaving the shared terminal's response cursor in place.
+    // CP437 glyphs expand to at most three UTF-8 bytes. Leave undeliverable data
+    // in the Session so backpressure reaches the TCP peer.
     size_t room = webServer.space(id) / 3;
     size_t n = browserSession->toHost(bytes, room < sizeof bytes ? room : sizeof bytes);
     if (n) {
-        // Configuration output uses ASCII and optional ANSI colour.
-        std::string output = webinterface::terminalUtf8(bytes, n, false);
-        webServer.write(id, reinterpret_cast<const uint8_t *>(output.data()), output.size());
+        bool bbs =
+            browserSession->callUp() && !browserSession->binaryLocal() && !browserMenu->isOpen();
+        std::string output = bbs && browserUtf8
+                                 ? std::string(reinterpret_cast<const char *>(bytes), n)
+                                 : webinterface::terminalUtf8(bytes, n, bbs);
+        if (webServer.write(id, reinterpret_cast<const uint8_t *>(output.data()), output.size()))
+            browserToComputer += output.size();
     }
     runBrowserDeparture();
+    if (menuWasOpen && !browserMenu->isOpen())
+        hwconsole::restoreBrowserResources();
     devicecfg::wipe(bytes, sizeof bytes);
 }
 
@@ -1456,6 +1497,8 @@ void createCallServices() {
     configDialer = new config::Dialer(*console, *consoleMenu, *hostMenu, *outgoing, callSlot,
                                       callAudio, msNow);
     configDialer->setUsb(&usbport::session(), usbMenu);
+    configDialer->setBrowser(browserSession, browserMenu);
+    browserSession->setDialer(configDialer);
     internetDialer = new dialup::Dialer(*modem, internetSettings, net, callSlot, internetNetwork,
                                         callAudio, msNow, *configDialer);
     internetDialer->setObserver(&journal);

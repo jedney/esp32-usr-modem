@@ -11,6 +11,7 @@
 #include "autobaud.h"
 #include "connection.h"
 #include "hwtest.h"
+#include "input_buffer.h"
 #include "linectl.h"
 #include "panel.h"
 #include "serial_state.h"
@@ -655,6 +656,80 @@ void test_session_full_call_holds_the_rest() {
     r.fromCall();
     TEST_ASSERT_EQUAL(EchoConnection::kSize, r.s.hostSpace());
 }
+void test_browser_pump_retains_input_and_disconnect_forgets_commands() {
+    Rig r;
+    r.s.port().setBrowser(true);
+    r.call();
+    std::vector<uint8_t> full(EchoConnection::kSize, 'a');
+    r.s.fromHost(full.data(), full.size(), r.now);
+    InputBuffer input;
+    const uint8_t tail[] = {'b', 'c'};
+    input.append(tail, sizeof tail);
+    input.poll(r.s, r.now, true);
+    TEST_ASSERT_EQUAL(sizeof tail, input.size());
+    r.fromCall();
+    input.poll(r.s, r.now, true);
+    TEST_ASSERT_EQUAL(0, input.size());
+    TEST_ASSERT_EQUAL_STRING("bc", r.fromCall().c_str());
+    r.s.hangUp();
+    r.send("ATQ1");
+    r.s.port().discardInput();
+    r.out.take();
+    r.send("\rAT\r");
+    TEST_ASSERT_NOT_NULL(strstr(r.out.take().c_str(), "OK"));
+    TEST_ASSERT_EQUAL(0, r.modem.active().get(modemcfg::kQ));
+    r.s.port().discardInput();
+    r.send("A/");
+    TEST_ASSERT_NOT_NULL(strstr(r.out.take().c_str(), "ERROR"));
+}
+void test_session_keeps_terminal_size_before_and_during_call() {
+    class SizedEcho : public EchoConnection {
+    public:
+        unsigned columns = 0, rows = 0;
+        void terminalSize(unsigned c, unsigned r) override {
+            columns = c;
+            rows = r;
+        }
+    } echo;
+    Rig r;
+    r.s.resize(160, 60);
+    echo.open(0, 0);
+    TEST_ASSERT_TRUE(r.s.startCall(echo));
+    TEST_ASSERT_EQUAL(160, echo.columns);
+    TEST_ASSERT_EQUAL(60, echo.rows);
+    r.s.resize(255, 511);
+    TEST_ASSERT_EQUAL(255, echo.columns);
+    TEST_ASSERT_EQUAL(511, echo.rows);
+    r.s.resize(65536, 0);
+    TEST_ASSERT_EQUAL(255, echo.columns);
+}
+void test_interactive_handler_can_read_prefetched_input() {
+    InputBuffer input;
+    class InteractiveSink : public atcmd::Sink {
+    public:
+        explicit InteractiveSink(InputBuffer &input) : input_(input) {}
+        void write(const char *data, size_t len) override {
+            output.append(data, len);
+            if (output.find("OK\r\n") != std::string::npos && tail.empty()) {
+                uint8_t bytes[32];
+                size_t n = input_.read(bytes, sizeof bytes);
+                tail.assign(reinterpret_cast<const char *>(bytes), n);
+            }
+        }
+        InputBuffer &input_;
+        std::string output, tail;
+    } sink(input);
+    MemStore store;
+    atcmd::Modem modem(store, nullptr, 0);
+    modem.begin();
+    CallSlot slot;
+    Session session(modem, sink, 115200, slot);
+    const std::string bytes = "AT\rtest-controls";
+    input.append(reinterpret_cast<const uint8_t *>(bytes.data()), bytes.size());
+    input.poll(session, 0, true);
+    TEST_ASSERT_EQUAL_STRING("test-controls", sink.tail.c_str());
+    TEST_ASSERT_EQUAL(0, input.size());
+}
 
 void test_session_atz_hangs_up() {
     Rig r;
@@ -1201,6 +1276,9 @@ int main() {
     RUN_TEST(test_session_local_echo_f0);
     RUN_TEST(test_session_xon_xoff_from_computer);
     RUN_TEST(test_session_full_call_holds_the_rest);
+    RUN_TEST(test_browser_pump_retains_input_and_disconnect_forgets_commands);
+    RUN_TEST(test_session_keeps_terminal_size_before_and_during_call);
+    RUN_TEST(test_interactive_handler_can_read_prefetched_input);
     RUN_TEST(test_session_atz_hangs_up);
     RUN_TEST(test_session_amp_c0_dcd_always_on);
     RUN_TEST(test_panel_mirrors_lines);

@@ -15,7 +15,7 @@
 */
 // Adapted from Zimodem's handleAsciiIAC, Copyright 2016-2026 Bo Zimmerman.
 // Apache-2.0; see credits/zimodem. Changed for this project: nonblocking parser,
-// bounded subnegotiation, stateful option replies, BINARY, ANSI, and 80x24 NAWS.
+// bounded subnegotiation, stateful option replies, BINARY, ANSI, and live NAWS dimensions.
 #include "telnet.h"
 #include <cstring>
 #include <initializer_list>
@@ -31,6 +31,9 @@ void Telnet::command(uint8_t cmd, uint8_t option) {
     tx.put(option);
 }
 void Telnet::begin() {
+    columns_ = 80;
+    rows_ = 24;
+    sizePending_ = false;
     rx.clear();
     tx.clear();
     memset(local_, 0, sizeof local_);
@@ -46,6 +49,31 @@ void Telnet::begin() {
     command(DO, BINARY);
     command(DO, SGA);
 }
+void Telnet::resize(unsigned columns, unsigned rows) {
+    if (!columns || columns > 65535 || !rows || rows > 65535 ||
+        (columns == columns_ && rows == rows_))
+        return;
+    columns_ = columns;
+    rows_ = rows;
+    sizePending_ = true;
+    poll();
+}
+void Telnet::poll() {
+    // Coalesce resizes until negotiation and queue space permit a complete frame.
+    if (!sizePending_ || local_[NAWS] != 2 || tx.space() < 13)
+        return;
+    const uint8_t size[] = {uint8_t(columns_ >> 8), uint8_t(columns_), uint8_t(rows_ >> 8),
+                            uint8_t(rows_)};
+    command(SB, NAWS);
+    for (uint8_t b : size) {
+        tx.put(b);
+        if (b == IAC)
+            tx.put(b);
+    }
+    tx.put(IAC);
+    tx.put(SE);
+    sizePending_ = false;
+}
 void Telnet::negotiate(uint8_t option) {
     bool positive = cmd_ == DO || cmd_ == WILL;
     bool local = cmd_ == DO || cmd_ == DONT;
@@ -60,10 +88,8 @@ void Telnet::negotiate(uint8_t option) {
         bool newlyEnabled = state != 2;
         state = 2;
         if (local && option == NAWS && newlyEnabled) {
-            const uint8_t size[] = {IAC, SB, NAWS, 0, 80, 0, 24, IAC, SE};
-            for (uint8_t b : size) {
-                tx.put(b);
-            }
+            sizePending_ = true;
+            poll();
         }
     } else if (positive) {
         if (state != 3) {

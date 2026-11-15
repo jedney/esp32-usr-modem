@@ -263,6 +263,35 @@ void test_telnet_refusals_no_loops_and_oversized_subnegotiation() {
     TEST_ASSERT_EQUAL(1, t.rx.read(&byte, 1));
     TEST_ASSERT_EQUAL('x', byte);
 }
+void test_telnet_resize_negotiation_escapes_and_backpressure() {
+    Telnet t;
+    t.begin();
+    t.tx.clear();
+    t.resize(132, 50);
+    TEST_ASSERT_EQUAL(0, t.tx.size());
+    for (uint8_t b : {255, 253, 31})
+        t.feed(b);
+    uint8_t data[32];
+    const uint8_t first[] = {255, 250, 31, 0, 132, 0, 50, 255, 240};
+    TEST_ASSERT_EQUAL(sizeof first, t.tx.read(data, sizeof data));
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(first, data, sizeof first);
+    t.resize(132, 50);
+    TEST_ASSERT_EQUAL(0, t.tx.size());
+    while (t.tx.space())
+        t.tx.put(0);
+    t.resize(255, 511);
+    t.tx.clear();
+    t.poll();
+    const uint8_t resized[] = {255, 250, 31, 0, 255, 255, 1, 255, 255, 255, 240};
+    TEST_ASSERT_EQUAL(sizeof resized, t.tx.read(data, sizeof data));
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(resized, data, sizeof resized);
+    for (uint8_t b : {255, 254, 31})
+        t.feed(b);
+    t.tx.clear();
+    t.resize(80, 25);
+    t.poll();
+    TEST_ASSERT_EQUAL(0, t.tx.size());
+}
 // Option negotiation can't loop, and a full send queue stops reading.
 void test_telnet_mixed_storm_is_bounded_and_two_ends_settle() {
     Telnet t;
@@ -358,6 +387,33 @@ void test_s7_does_not_cut_a_connected_call_during_the_handshake_sound() {
     r.poll();
     TEST_ASSERT_TRUE(r.session.callUp());
     TEST_ASSERT_NOT_EQUAL(std::string::npos, r.output.text.find("CONNECT"));
+}
+void test_naws_uses_live_session_size_during_dial_handshake() {
+    Rig r;
+    r.modem.active().v[modemcfg::kM] = 1;
+    r.send("AT*RINGDELAY=0\r");
+    r.session.resize(160, 60);
+    r.send("ATDT1\r");
+    r.sound.active = false;
+    r.poll();
+    r.sound.active = false;
+    r.poll();
+    r.socket.status = SocketState::kOpen;
+    r.socket.input = {255, 253, 31};
+    r.poll();
+    r.socket.output.clear();
+    r.poll();
+    const uint8_t expected[] = {255, 250, 31, 0, 160, 0, 60, 255, 240};
+    TEST_ASSERT_EQUAL(sizeof expected, r.socket.output.size());
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, r.socket.output.data(), sizeof expected);
+    TEST_ASSERT_FALSE(r.session.callUp());
+    r.session.resize(132, 50);
+    r.socket.output.clear();
+    r.poll();
+    const uint8_t resized[] = {255, 250, 31, 0, 132, 0, 50, 255, 240};
+    TEST_ASSERT_EQUAL(sizeof resized, r.socket.output.size());
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(resized, r.socket.output.data(), sizeof resized);
+    TEST_ASSERT_FALSE(r.session.callUp());
 }
 void test_s7_still_ends_a_connection_that_never_opens() {
     Rig r;
@@ -1045,10 +1101,12 @@ int main() {
     RUN_TEST(test_phonebook_capacity_and_corruption);
     RUN_TEST(test_phonebook_command_roundtrip_and_strict_arguments);
     RUN_TEST(test_telnet_fragmented_negotiation_ansi_naws_and_escaped_ff);
+    RUN_TEST(test_telnet_resize_negotiation_escapes_and_backpressure);
     RUN_TEST(test_telnet_refusals_no_loops_and_oversized_subnegotiation);
     RUN_TEST(test_telnet_mixed_storm_is_bounded_and_two_ends_settle);
     RUN_TEST(test_telnet_full_send_queue_stops_reading_the_socket);
     RUN_TEST(test_s7_does_not_cut_a_connected_call_during_the_handshake_sound);
+    RUN_TEST(test_naws_uses_live_session_size_during_dial_handshake);
     RUN_TEST(test_s7_still_ends_a_connection_that_never_opens);
     RUN_TEST(test_tcp_raw_all_bytes_and_partial_socket_writes);
     RUN_TEST(test_pending_connect_reset_and_refusal_are_busy_but_other_errors_are_not);

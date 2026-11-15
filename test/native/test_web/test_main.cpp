@@ -211,6 +211,12 @@ void test_queue_wrap_overflow_and_secret_cleanup() {
     queue.clear();
     TEST_ASSERT_EQUAL(0, queue.pop(output, 4));
     TEST_ASSERT_EQUAL(4, queue.space());
+    TEST_ASSERT_EQUAL(4, queue.append(input, 4));
+    TEST_ASSERT_EQUAL(0, queue.append(input, 2));
+    TEST_ASSERT_EQUAL(2, queue.pop(output, 2));
+    TEST_ASSERT_EQUAL(2, queue.append(input, 4));
+    TEST_ASSERT_EQUAL(4, queue.pop(output, 4));
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, output, 4);
 }
 void test_version_order_is_numeric_and_invalid_is_distinct() {
     TEST_ASSERT_EQUAL(1, compareVersions("0.11", "0.9"));
@@ -278,6 +284,9 @@ void test_browser_cp437_is_utf8_and_serial_source_bytes_are_unchanged() {
                              terminalUtf8(bytes, sizeof bytes, true).c_str());
     TEST_ASSERT_EQUAL_STRING("???\r\n", terminalUtf8(bytes, sizeof bytes, false).c_str());
     TEST_ASSERT_EQUAL_HEX8(0xda, bytes[0]);
+    const uint8_t controls[] = {0, 1, 7, 8, 9, 10, 12, 13, 27, 31};
+    TEST_ASSERT_EQUAL_STRING("\xe2\x90\x80\xe2\x98\xba\a\b\t\n\xe2\x99\x80\r\x1b\xe2\x96\xbc",
+                             terminalUtf8(controls, sizeof controls, true).c_str());
 }
 void test_raw_headers_reject_duplicates_smuggling_and_pipelining() {
     const std::string good = "GET / HTTP/1.1\r\nHost: usr-modem.local\r\n\r\n";
@@ -331,8 +340,14 @@ void test_terminal_geometry_is_bounded_and_cannot_be_terminal_input() {
     TEST_ASSERT_TRUE(terminalSize("{\"t\":\"size\",\"cols\":132,\"rows\":50}", columns, rows));
     TEST_ASSERT_EQUAL(132, columns);
     TEST_ASSERT_EQUAL(50, rows);
+    TEST_ASSERT_TRUE(terminalSize("{\"t\":\"size\",\"cols\":65535,\"rows\":65535}", columns, rows));
+    TEST_ASSERT_EQUAL(65535, columns);
+    TEST_ASSERT_EQUAL(65535, rows);
+    columns = 132;
+    rows = 50;
     for (const char *bad :
-         {"{\"t\":\"size\",\"cols\":133,\"rows\":50}", "{\"t\":\"size\",\"cols\":80,\"rows\":0}",
+         {"{\"t\":\"size\",\"cols\":65536,\"rows\":50}", "{\"t\":\"size\",\"cols\":80,\"rows\":0}",
+          "{\"t\":\"size\",\"cols\":79,\"rows\":25}", "{\"t\":\"size\",\"cols\":80,\"rows\":24}",
           "{\"t\":\"size\",\"cols\":-1,\"rows\":25}", "{\"t\":\"size\",\"cols\":080,\"rows\":25}",
           "{\"t\":\"size\",\"cols\":80,\"rows\":25}AT*FACTORY",
           "{\"t\":\"size\",\"cols\":80,\"rows\":25,\"cols\":120}",
@@ -700,8 +715,38 @@ void test_filesystem_image_needs_exact_size_and_littlefs_marker() {
     ImageCheck badVersion(true, "0.11-dev", size);
     TEST_ASSERT_FALSE(badVersion.write(reinterpret_cast<const uint8_t *>(marker.data()), 1));
 }
+void test_terminal_owner_requires_explicit_open() {
+    TerminalOwner owner;
+    TEST_ASSERT_FALSE(owner.owns(1));
+    TEST_ASSERT_FALSE(owner.open(0, true));
+    TEST_ASSERT_FALSE(owner.open(1, false));
+    TEST_ASSERT_TRUE(owner.open(1, true));
+    TEST_ASSERT_TRUE(owner.owns(1));
+    TEST_ASSERT_FALSE(owner.open(2, true));
+    owner.close(2);
+    TEST_ASSERT_TRUE(owner.owns(1));
+    owner.close(1);
+    TEST_ASSERT_TRUE(owner.open(2, true));
+}
+void test_terminal_queue_limits_retain_the_remainder() {
+    Queue<kTerminalInputBytes> input;
+    Queue<kTerminalOutputBytes> output;
+    std::string paste(kTerminalOutputBytes + 1000, 'p');
+    auto *bytes = reinterpret_cast<const uint8_t *>(paste.data());
+    TEST_ASSERT_EQUAL(2048, input.append(bytes, paste.size()));
+    TEST_ASSERT_EQUAL(0, input.append(bytes, 1));
+    TEST_ASSERT_EQUAL(16384, output.append(bytes, paste.size()));
+    TEST_ASSERT_FALSE(output.push(bytes, 1));
+    uint8_t chunk[512];
+    TEST_ASSERT_EQUAL(512, output.pop(chunk, sizeof chunk));
+    TEST_ASSERT_TRUE(output.push(bytes, 512));
+    TEST_ASSERT_EQUAL(16384, output.size());
+    TEST_ASSERT_EQUAL(1024 * 1024, kTerminalFrameBytes);
+}
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_terminal_owner_requires_explicit_open);
+    RUN_TEST(test_terminal_queue_limits_retain_the_remainder);
     RUN_TEST(test_terminal_geometry_is_bounded_and_cannot_be_terminal_input);
     RUN_TEST(test_raw_headers_reject_duplicates_smuggling_and_pipelining);
     RUN_TEST(test_browser_cp437_is_utf8_and_serial_source_bytes_are_unchanged);

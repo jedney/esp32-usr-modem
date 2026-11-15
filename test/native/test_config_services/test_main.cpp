@@ -318,6 +318,39 @@ void test_reserved_dial_audio_stages_and_cancel_release_reservation() {
     TEST_ASSERT_FALSE(r.slot.busy());
     TEST_ASSERT_FALSE(menu.isOpen());
 }
+void test_browser_reserved_dial_uses_its_own_menu() {
+    Rig r;
+    Sink hostSink, browserSink;
+    hostport::Session host(r.modem, hostSink, 38400, r.slot);
+    hostport::Session browser(r.modem, browserSink, 115200, r.slot);
+    browser.port().setBrowser(true);
+    Terminal consoleMenu(r.session, false), hostMenu(host, true), browserMenu(browser, false);
+    Socket socket;
+    Sound sound;
+    calls::Outgoing outgoing(r.modem, r.phonebook, r.slot, socket, sound, now, network);
+    Dialer dialer(r.session, consoleMenu, hostMenu, outgoing, r.slot, sound, now);
+    dialer.setBrowser(&browser, &browserMenu);
+    browser.setDialer(&dialer);
+    r.run("M0");
+    TEST_ASSERT_TRUE(browser.dial("123", false));
+    TEST_ASSERT_TRUE(browserMenu.isOpen());
+    TEST_ASSERT_FALSE(consoleMenu.isOpen());
+    TEST_ASSERT_FALSE(hostMenu.isOpen());
+    TEST_ASSERT_TRUE(browser.callUp());
+    browser.hangUp();
+    TEST_ASSERT_FALSE(r.slot.busy());
+    r.run("M1");
+    TEST_ASSERT_TRUE(browser.dial("123", false));
+    TEST_ASSERT_TRUE(r.slot.busy());
+    TEST_ASSERT_TRUE(browser.port().busy());
+    browser.port().discardInput();
+    browser.hangUp();
+    TEST_ASSERT_FALSE(browser.port().busy());
+    TEST_ASSERT_FALSE(r.slot.busy());
+    TEST_ASSERT_FALSE(browserMenu.isOpen());
+    for (const char *number : {"666", "667", "5517546", "5517545"})
+        TEST_ASSERT_FALSE(browser.dial(number, false));
+}
 void test_local_service_f0_never_echoes_password_and_escape_wipes_prompt() {
     Rig r;
     Terminal menu(r.session, false);
@@ -711,6 +744,7 @@ int main() {
     RUN_TEST(test_journal_records_payload_and_cleanup_once_with_clock_wrap);
     RUN_TEST(test_reserved_dial_is_offline_local_and_can_escape_ato_hangup);
     RUN_TEST(test_reserved_dial_audio_stages_and_cancel_release_reservation);
+    RUN_TEST(test_browser_reserved_dial_uses_its_own_menu);
     RUN_TEST(test_local_service_f0_never_echoes_password_and_escape_wipes_prompt);
     RUN_TEST(test_menu_command_results_are_readable_with_nonstandard_at_format);
     RUN_TEST(test_outgoing_history_failure_and_same_burst_redial_are_recorded_once);
