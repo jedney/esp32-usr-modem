@@ -87,8 +87,8 @@ button:disabled { cursor: default; color: var(--muted); }
 .session-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 .session-state { display: inline-flex; align-items: center; gap: 6px; color: #a7b8ad; font-size: 11px; white-space: nowrap; }
 .session-state.up { color: #acd5b5; }
-.terminal-frame { margin: 6px 8px 0; border: 1px solid #35413b; border-radius: var(--radius); background: var(--terminal);
-    color: var(--terminal-ink); box-shadow: inset 0 1px 3px #0005; overflow: hidden;
+.terminal-frame { margin: 6px 8px 0; border: 1px solid #353535; border-radius: var(--radius); background: #000;
+    color: var(--terminal-ink); box-shadow: none; overflow: hidden;
     display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .terminal-header { display: flex; align-items: center; gap: 16px; padding: 5px 10px 5px 14px; color: #a7b8ad;
     background: #1d2925; border-bottom: 1px solid #35413b; font: 12px/1.5 system-ui, sans-serif; flex: none; }
