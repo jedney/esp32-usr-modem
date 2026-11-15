@@ -37,7 +37,7 @@ void test_idle_menu_has_no_periodic_display_output() {
             frame.append(reinterpret_cast<const char *>(bytes), n);
         }
         size_t position = 0;
-        for (const char *label : {"About", "Hardware Tests", "Client Tests", "Command Reference"}) {
+        for (const char *label : {"Status", "Phone Book", "Call History", "Settings", "Help"}) {
             position = frame.find(label, position);
             TEST_ASSERT_NOT_EQUAL(std::string::npos, position);
             position += strlen(label);
@@ -47,7 +47,7 @@ void test_idle_menu_has_no_periodic_display_output() {
         TEST_ASSERT_EQUAL(0, terminal->read(bytes, sizeof bytes));
         terminal->poll(4200);
         TEST_ASSERT_EQUAL(0, terminal->read(bytes, sizeof bytes));
-        const uint8_t settings = 'c';
+        const uint8_t settings = 'd';
         terminal->write(&settings, 1);
         TEST_ASSERT_GREATER_THAN(0, terminal->read(bytes, sizeof bytes));
         while (terminal->read(bytes, sizeof bytes)) {
@@ -56,6 +56,10 @@ void test_idle_menu_has_no_periodic_display_output() {
         TEST_ASSERT_EQUAL(0, terminal->read(bytes, sizeof bytes));
         TEST_ASSERT_TRUE(terminal->resize(20, 8));
         TEST_ASSERT_EQUAL(0, terminal->read(bytes, sizeof bytes));
+        const uint8_t general = 'a';
+        terminal->write(&general, 1);
+        while (terminal->read(bytes, sizeof bytes)) {
+        }
         const uint8_t model = 'c';
         terminal->write(&model, 1);
         frame.clear();

@@ -5,14 +5,13 @@ const icons = {
     status: 'activity', phonebook: 'book', settings: 'sliders', sounds: 'sound',
     debug: 'pulse', 'call-history': 'history', 'wifi-clock': 'wifi',
     'updates-reset': 'upload', 'export-configuration': 'download', about: 'info',
-    'hardware-tests': 'chip', 'command-reference': 'terminal',
+    'hardware-tests': 'chip', 'command-reference': 'terminal', 'settings-group':'sliders', help:'info', clock:'history', reset:'pulse', github:'info',
 };
 
 export function menuSections() {
-    return commands.filter(c => c.screen === 'Main' && c.id !== 'client-tests').map(section => ({
-        ...section, icon: icons[section.id],
-        items: section.template ? [] : commands.filter(c => c.screen === section.target),
-    }));
+    const section = command => ({...command, icon:icons[command.id] || 'sliders',
+        items: command.template ? [] : commands.filter(c => c.screen === command.target && c.id !== 'client-tests').map(section)});
+    return commands.filter(c => c.screen === 'Main').map(section);
 }
 
 export function menuDisabledReason(state) {

@@ -189,11 +189,11 @@ def test_client_that_stops_reading_does_not_stall_the_modem(host, password, rs23
     try:
         log_in(sock, password)
         receive(sock, wait=0.5)  # the replay
-        # The client asks for about 9.4 KB a second (AT*ABOUT) and reads nothing: about 190 KB,
+        # The client asks for a long AT*HELP reply each second and reads nothing: enough output to overrun a stalled client,
         # more than the 16 KB log plus the TCP buffers, even if Windows grows its window.
         sock.settimeout(1.0)
         for _ in range(20):
-            sock.sendall(b"AT*ABOUT\r")
+            sock.sendall(b"AT*HELP\r")
             started = time.monotonic()
             assert rs232.command("AT", timeout=3.0)[-1] == "OK"
             assert time.monotonic() - started < 1.0, "the modem waited for the network client"

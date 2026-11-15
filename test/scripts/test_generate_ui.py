@@ -24,8 +24,8 @@ def test_generated_firmware_and_demo_are_current_and_deterministic():
         for key, value in bindings[row["id"]].items():
             assert row[key] == value
     menu = json.loads((ROOT / "ui/menu-definition.json").read_text(encoding="utf-8"))
-    assert len(menu["main_menu"]) == 13
-    assert sum(len(p["items"]) for p in menu["main_menu"]) == 78
+    assert [n["id"] for n in menu["main_menu"]] == ["status", "phonebook", "call-history", "settings-group", "help"]
+    assert len(list(ui.walk_menu(menu["main_menu"]))) == 96
 
 
 @pytest.mark.parametrize("change", [
@@ -35,6 +35,7 @@ def test_generated_firmware_and_demo_are_current_and_deterministic():
     {"values": [{"value": "14400", "label": "", "description": "Missing label"}]},
     {"values": [{"value": "14400", "label": "A", "description": "A"}] * 2},
     {"displayScale": 0}, {"optional": "yes"}, {"template": "*MODEL={value"},
+    {"screen": "Help"},
 ])
 def test_invalid_metadata_is_rejected(tmp_path, change):
     for relative in ("ui/menu-definition.json", "ui/theme-tokens.json", "lib/config/ui-bindings.json"):

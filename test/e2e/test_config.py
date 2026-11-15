@@ -56,9 +56,9 @@ def local(console):
 def test_direct_configuration_styles_and_quit(local, style):
     local.command("AT*STYLE=" + style)
     data = local.raw(b"AT*CONFIG\r")
-    require(b"Configuration" in data and b"Phonebook" in data, "Missing root menu")
-    positions = [data.find(label) for label in (b"About", b"Hardware Tests", b"Client Tests", b"Command Reference")]
-    require(all(position >= 0 for position in positions) and positions == sorted(positions), "Wrong J-M menu order")
+    require(b"Configuration" in data and b"Phone Book" in data, "Missing root menu")
+    positions = [data.find(label) for label in (b"Status", b"Phone Book", b"Call History", b"Settings", b"Help")]
+    require(all(position >= 0 for position in positions) and positions == sorted(positions), "Wrong root menu order")
     require(b"CONNECT" not in data, "Direct configuration emitted CONNECT")
     if style == "PLAIN":
         require(b"\x1b" not in data, "Plain mode emitted terminal escapes")
@@ -75,7 +75,7 @@ def test_idle_menu_does_not_repaint(local, style):
     require(b"Configuration" in data, "Missing root menu")
     data = read(local, 6)
     require(not data, "Idle menu emitted display output")
-    data = send(local, b"c\r", 1)
+    data = send(local, b"d\r", 1)
     require(b"Settings" in data, "Menu stopped responding to input")
 
 
@@ -91,7 +91,7 @@ def test_reserved_dial_escape_resume_and_hangup(local):
 
 def test_compact_submenus_field_units_and_hardware_availability(local):
     local.raw(b"AT*CONFIG\r")
-    data = send(local, b"c\r")
+    data = send(local, b"da\r")
     require(b"Rings before answering" in data and b"Answer incoming calls on" in data and b"Modem model" in data, "Missing settings")
     require(b"Choose how many rings" not in data and b"Range:" not in data,
             "Menu list includes field help or ranges")
@@ -100,7 +100,7 @@ def test_compact_submenus_field_units_and_hardware_availability(local):
     require(b"Choose how many rings" not in data, "Terminal form includes menu help")
     send(local, b"\x1b")
     send(local, b"\x1b")
-    data = send(local, b"k\r")
+    data = send(local, b"xede\r")
     require(b"Hardware Tests" in data and b"Guided tests" in data, "Missing hardware screen")
     data += read(local, 0.1)
     require(b"RS232 control lines" in data and b"loopback" in data and b"bridge" in data, "Missing console port tests")
@@ -114,17 +114,17 @@ def test_letter_tour_and_masked_entry_at_multiple_widths(local, style):
         for width in (20, 40, 80, 132):
             local.command(f"AT*SIZE={width},25")
             root = local.raw(b"AT*CONFIG\r")
-            require(b"A. Status" in root and b"M. Command Reference" in root, "Incomplete letter menu")
-            for letter, title in ((b"b", b"Phonebook"), (b"c", b"Settings"), (b"d", b"Sounds"),
-                                  (b"e", b"Debug"), (b"g", b"Wi-Fi and Clock"),
-                                  (b"h", b"Updates and Reset"), (b"k", b"Hardware Tests"), (b"l", b"Client Tests")):
-                require(title in send(local, letter, 0.2), "Letter tour did not reach a section")
-                send(local, b"x", 0.2)
-            send(local, b"cc", 0.2)
+            require(b"A. Status" in root and b"E. Help" in root, "Incomplete letter menu")
+            for path, title in ((b"b", b"Phone Book"), (b"da", b"General Settings"), (b"db", b"Sounds"),
+                                (b"ed", b"Diagnostics"), (b"dc", b"Wi-Fi"), (b"dd", b"Clock"),
+                                (b"de", b"Updates"), (b"df", b"Reset"), (b"ede", b"Hardware Tests"), (b"edf", b"Client Tests")):
+                require(title in send(local, path, 0.2), "Letter tour did not reach a section")
+                send(local, b"x" * len(path), 0.2)
+            send(local, b"dac", 0.2)
             choices = send(local, b"\x0c", 0.2)
             require(b"A. US Robotics Sportster 14.4k" in choices, "Friendly model choices missing")
             send(local, b"\x1b", 0.2)
-            send(local, b"xhd", 0.2)
+            send(local, b"xed", 0.2)
             masked = send(local, b"MenuCanary123", 0.2)
             require(b"MenuCanary123" not in masked and b"***" in masked, "Secret entry was not masked")
             cancelled = send(local, b"\x1b", 0.2)
@@ -150,6 +150,16 @@ def test_menu_rejects_incoming_caller(local):
             data = b""
         require(data == b"", "Caller was not rejected during configuration")
     require(b"RING" not in read(local, 0.2), "Incoming call interrupted configuration")
+
+
+def test_compact_about_and_project_repository(local):
+    lines = local.command('AT*ABOUT')
+    text = '\n'.join(lines)
+    require(len(text) < 3500, 'About is too long')
+    require('Zimodem: https://' in text and 'xterm.js: https://' in text, 'Project links missing')
+    require('Full credits and licences: credits/LICENSES.md' in text, 'Full credits pointer missing')
+    require(lines[-2] == 'https://github.com/jedney/esp32-usr-modem', 'About does not close with project URL')
+    require(local.command('AT*GITHUB')[-2] == lines[-2], 'GitHub command differs from About')
 
 
 def test_configuration_commands_export_and_credentials(local):
@@ -190,7 +200,7 @@ def test_rs232_hardware_takeover_tests_are_unavailable(rs232):
     rs232.command("AT*STYLE=PLAIN")
     try:
         rs232.raw(b"AT*CONFIG\r")
-        data = send(rs232, b"k\r", 1)
+        data = send(rs232, b"ede\r", 1)
         require(b"unavailable: takes over RS232" in data, "RS232 test restriction is absent")
         data = send(rs232, b"l\r", 1)
         require(b"DTR=" not in data, "Unavailable line test took over RS232")
@@ -205,8 +215,8 @@ def test_usb_modem_letter_menu(usb):
         for style in ("PLAIN", "ANSI"):
             usb.command("AT*STYLE=" + style)
             root = usb.raw(b"AT*CONFIG\r")
-            require(b"A. Status" in root and b"M. Command Reference" in root, "USB menu missing")
-            choices = send(usb, b"cc")
+            require(b"A. Status" in root and b"E. Help" in root, "USB menu missing")
+            choices = send(usb, b"dac")
             require(b"A. US Robotics Sportster 14.4k" in choices, "USB letter navigation failed")
             send(usb, b"\x03")
             require(usb.command("AT")[-1] == "OK", "USB menu did not release the port")

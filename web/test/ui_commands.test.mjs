@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import commands from '../src/ui-commands.js';
 
 test('typed command catalogue loads in JavaScript with portable patterns', () => {
-  assert.equal(commands.length, 91);
+  assert.equal(commands.length, 96);
   function visit(node) {
     if (node.pattern) assert.doesNotThrow(() => new RegExp(`^(?:${node.pattern})$`));
     for (const child of [...(node.fields || []), ...(node.variants || [])]) visit(child);

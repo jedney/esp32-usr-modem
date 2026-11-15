@@ -492,7 +492,7 @@ void test_call_sequence_pulse_and_buffered_greeting() {
     r.poll();
     TEST_ASSERT_EQUAL(int(SoundStage::kDigits), int(r.sound.stages.back()));
     TEST_ASSERT_TRUE(r.sound.pulse);
-    TEST_ASSERT_EQUAL_STRING("1", r.sound.digits.c_str());
+    TEST_ASSERT_EQUAL_STRING("203011347", r.sound.digits.c_str());
     r.sound.active = false;
     r.poll();
     TEST_ASSERT_EQUAL(int(CallStage::kRingback), int(r.call.stage()));
@@ -611,7 +611,7 @@ void test_other_port_cannot_replace_dial_target() {
     r.sound.active = false;
     r.poll();
     r.poll(1500);
-    TEST_ASSERT_EQUAL_STRING("www.amigaretro.com", r.socket.host.c_str());
+    TEST_ASSERT_EQUAL_STRING("203.0.113.47", r.socket.host.c_str());
 }
 
 void test_call_delay_commands_persist_validate_and_roll_back() {
@@ -732,6 +732,40 @@ void test_ringback_snapshot_wrap_and_cancellation_keep_call_slot_safe() {
     }
 }
 
+void test_speed_dial_uses_destination_ip_for_tones_and_pulses() {
+    for (bool pulse : {false, true}) {
+        Rig r;
+        Entry entry;
+        strcpy(entry.number, "42");
+        strcpy(entry.host, "198.51.100.24");
+        entry.port = 2323;
+        TEST_ASSERT_TRUE(r.book.put(entry));
+        r.modem.active().v[modemcfg::kM] = 1;
+        r.socket.resolvedAddress = "198.51.100.24";
+        r.send(pulse ? "ATDP42\r" : "ATDT42\r");
+        TEST_ASSERT_EQUAL_STRING("198.51.100.24", r.socket.looked.c_str());
+        r.sound.active = false;
+        r.poll();
+        TEST_ASSERT_EQUAL_STRING("1985110024", r.sound.digits.c_str());
+        TEST_ASSERT_EQUAL(pulse, r.sound.pulse);
+        r.sound.active = false;
+        r.poll();
+        r.poll(1500);
+        TEST_ASSERT_EQUAL_STRING("198.51.100.24", r.socket.host.c_str());
+        TEST_ASSERT_EQUAL(2323, r.socket.port);
+        TEST_ASSERT_EQUAL(1, r.socket.resolves);
+    }
+    Rig r;
+    r.modem.active().v[modemcfg::kM] = 1;
+    r.socket.lookupResult = SocketState::kDnsError;
+    r.send("ATDT1\r");
+    r.output.take();
+    r.sound.active = false;
+    r.poll();
+    TEST_ASSERT_NOT_NULL(strstr(r.output.take().c_str(), "NO DIAL TONE"));
+    TEST_ASSERT_FALSE(r.slot.busy());
+    TEST_ASSERT_EQUAL(0, r.socket.begins);
+}
 void test_hostname_dial_plays_resolved_ip_as_digits_and_connects_to_it() {
     Rig r;
     r.modem.active().v[modemcfg::kM] = 1;
@@ -778,14 +812,14 @@ void test_hostname_lookup_failure_timeout_and_non_hostname_dials() {
         TEST_ASSERT_EQUAL(0, r.socket.begins);
     }
     {
-        // A phonebook number keeps the typed digits and needs no lookup.
+        // A speed dial uses the resolved destination, not the phonebook slot.
         Rig r;
         r.modem.active().v[modemcfg::kM] = 1;
         r.send("ATDT1\r");
         r.sound.active = false;
         r.poll();
-        TEST_ASSERT_EQUAL_STRING("1", r.sound.digits.c_str());
-        TEST_ASSERT_EQUAL(0, r.socket.resolves);
+        TEST_ASSERT_EQUAL_STRING("203011347", r.sound.digits.c_str());
+        TEST_ASSERT_EQUAL(1, r.socket.resolves);
     }
     {
         // ATM0 plays no digits, so the connect does the lookup itself.
@@ -1096,6 +1130,7 @@ int main() {
     RUN_TEST(test_ringback_snapshot_wrap_and_cancellation_keep_call_slot_safe);
     RUN_TEST(test_connect_delay_rollover_hangup_keypress_and_m0);
     RUN_TEST(test_hostname_dial_plays_resolved_ip_as_digits_and_connects_to_it);
+    RUN_TEST(test_speed_dial_uses_destination_ip_for_tones_and_pulses);
     RUN_TEST(test_hostname_lookup_failure_timeout_and_non_hostname_dials);
     RUN_TEST(test_phonebook_defaults_exact_keys_validation_and_atomic_save);
     RUN_TEST(test_phonebook_capacity_and_corruption);

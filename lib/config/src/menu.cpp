@@ -39,7 +39,7 @@ bool confirmation(const Action &a, bool browser, const char *command) {
         return strcmp(a.command, "*PHONEBOOK?") != 0;
     if (a.screen == S::Updates)
         return a.input;
-    if (a.screen == S::Wifi)
+    if (a.screen == S::Wifi || a.screen == S::Clock)
         return !strcmp(a.command, "*WIFIJOIN=") || !strcmp(a.command, "*WIFI=") ||
                !strcmp(a.command, "*WIFIFORGET") || !strcmp(a.command, "*WIFIIP=") ||
                !strcmp(a.command, "*HOSTNAME=") || !strcmp(a.command, "*TZ=") ||
@@ -61,11 +61,14 @@ const Action *actions(size_t &count) {
     return kActions;
 }
 const char *screenName(Screen screen) {
-    static const char *const names[] = {
-        "Configuration",     "Settings", "Profile", "Phonebook",      "Wi-Fi and Clock",
-        "Updates and Reset", "Sounds",   "Debug",   "Hardware Tests", "Client Tests"};
-    auto i = static_cast<unsigned>(screen);
-    return i < sizeof names / sizeof names[0] ? names[i] : "Unknown";
+    if (screen == S::Main)
+        return "Configuration";
+    if (screen == S::Profile)
+        return "Profile";
+    for (const auto &action : kActions)
+        if (!*action.command && action.target == screen)
+            return action.metadata->friendly;
+    return "Unknown";
 }
 bool Terminal::open() {
     if (open_)

@@ -98,7 +98,7 @@ void test_menu_actions_have_production_at_star_handlers() {
     Rig r;
     size_t n;
     const auto *a = actions(n);
-    TEST_ASSERT_EQUAL(91, n);
+    TEST_ASSERT_EQUAL(96, n);
     for (size_t i = 0; i < n; ++i) {
         TEST_ASSERT_NOT_NULL(a[i].metadata);
         TEST_ASSERT_TRUE(*a[i].metadata->friendly);

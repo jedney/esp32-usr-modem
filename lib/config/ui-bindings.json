@@ -114,7 +114,7 @@
     "command": "",
     "help": "Save, change and dial your favourite destinations.",
     "target": "Phonebook",
-    "friendly": "Phonebook",
+    "friendly": "Phone Book",
     "type": "action",
     "template": ""
   },
@@ -421,11 +421,11 @@
     "unit": "characters"
   },
   "settings": {
-    "screen": "Main",
+    "screen": "Options",
     "command": "",
     "help": "Choose the modem model and connection preferences.",
     "target": "Settings",
-    "friendly": "Settings",
+    "friendly": "General Settings",
     "type": "action",
     "template": ""
   },
@@ -2621,7 +2621,7 @@
     ]
   },
   "sounds": {
-    "screen": "Main",
+    "screen": "Options",
     "command": "",
     "help": "Listen to dial tones and recorded modem handshakes.",
     "target": "Sounds",
@@ -2901,7 +2901,7 @@
     "displayScale": 0.001
   },
   "debug": {
-    "screen": "Main",
+    "screen": "Help",
     "command": "",
     "help": "View diagnostic events and restart information.",
     "target": "Debug",
@@ -2973,11 +2973,11 @@
     "template": "*CALLLOG"
   },
   "wifi-clock": {
-    "screen": "Main",
+    "screen": "Options",
     "command": "",
     "help": "Connect to Wi-Fi, check the network and set the clock.",
     "target": "Wifi",
-    "friendly": "Wi-Fi and Clock",
+    "friendly": "Wi-Fi",
     "type": "action",
     "template": ""
   },
@@ -3160,19 +3160,19 @@
     "pattern": "[A-Za-z0-9](?:[A-Za-z0-9-]{0,30}[A-Za-z0-9])?"
   },
   "wifi-clock.time": {
-    "screen": "Wifi",
+    "screen": "Clock",
     "command": "*TIME",
     "help": "Show the local time after the clock has synchronised with a time server.",
-    "target": "Wifi",
+    "target": "Clock",
     "friendly": "Time",
     "type": "action",
     "template": "*TIME"
   },
   "wifi-clock.time-zone": {
-    "screen": "Wifi",
+    "screen": "Clock",
     "command": "*TZ=",
     "help": "Choose a time zone or enter a POSIX clock rule. Daylight saving follows the selected rule.",
-    "target": "Wifi",
+    "target": "Clock",
     "input": true,
     "friendly": "Time zone",
     "type": "enum",
@@ -3264,10 +3264,10 @@
     "unit": "characters"
   },
   "wifi-clock.ntp-server": {
-    "screen": "Wifi",
+    "screen": "Clock",
     "command": "*NTP=",
     "help": "Choose a time server using letters, digits, hyphens and dots. Do not start with a dot or hyphen, end with a dot, or leave an empty name part.",
-    "target": "Wifi",
+    "target": "Clock",
     "input": true,
     "friendly": "Time server",
     "type": "string",
@@ -3306,11 +3306,11 @@
     "pattern": "(?![.-])(?!.*\\.$)[A-Za-z0-9._-]+"
   },
   "updates-reset": {
-    "screen": "Main",
+    "screen": "Options",
     "command": "",
     "help": "Manage software updates, the device password and resets.",
     "target": "Updates",
-    "friendly": "Updates and Reset",
+    "friendly": "Updates",
     "type": "action",
     "template": ""
   },
@@ -3380,10 +3380,10 @@
     "pattern": "[\\x20-\\x7e]{8,32}"
   },
   "updates-reset.restart": {
-    "screen": "Updates",
+    "screen": "Reset",
     "command": "*RESTART",
     "help": "Restart the device after confirmation. This closes the menu.",
-    "target": "Updates",
+    "target": "Reset",
     "input": false,
     "secret": false,
     "rs232Unavailable": false,
@@ -3393,10 +3393,10 @@
     "template": "*RESTART"
   },
   "updates-reset.factory-reset": {
-    "screen": "Updates",
+    "screen": "Reset",
     "command": "*FACTORY",
     "help": "Erase all settings and passwords after confirmation. This closes the menu.",
-    "target": "Updates",
+    "target": "Reset",
     "input": false,
     "secret": false,
     "rs232Unavailable": false,
@@ -3450,16 +3450,16 @@
     ]
   },
   "export-configuration": {
-    "screen": "Main",
+    "screen": "Options",
     "command": "*EXPORT",
     "help": "Show commands that restore your settings. Passwords are left out.",
-    "target": "Main",
+    "target": "Options",
     "friendly": "Export Configuration",
     "type": "action",
     "template": "*EXPORT"
   },
   "hardware-tests": {
-    "screen": "Main",
+    "screen": "Debug",
     "command": "",
     "help": "Check the lights, speaker and serial electronics.",
     "target": "Hardware",
@@ -3875,25 +3875,25 @@
     ]
   },
   "command-reference": {
-    "screen": "Main",
+    "screen": "Help",
     "command": "*REFERENCE",
     "help": "Show the standard modem commands and the device commands.",
-    "target": "Main",
+    "target": "Help",
     "friendly": "Command Reference",
     "type": "action",
     "template": "*REFERENCE"
   },
   "about": {
-    "screen": "Main",
+    "screen": "Help",
     "command": "*ABOUT",
     "help": "Show the version, build information and software credits.",
-    "target": "Main",
+    "target": "Help",
     "friendly": "About",
     "type": "action",
     "template": "*ABOUT"
   },
   "client-tests": {
-    "screen": "Main",
+    "screen": "Debug",
     "command": "",
     "help": "Check a serial terminal using the maintenance console or modem port. These tests cannot run in the browser.",
     "target": "Client",
@@ -4146,5 +4146,51 @@
     "friendly": "Reset terminal settings",
     "type": "action",
     "template": "*TEST RESET"
+  },
+  "clock": {
+    "screen": "Options",
+    "target": "Clock",
+    "command": "",
+    "template": "",
+    "friendly": "Clock",
+    "help": "Set the modem clock, time zone and time server.",
+    "type": "action"
+  },
+  "reset": {
+    "screen": "Options",
+    "target": "Reset",
+    "command": "",
+    "template": "",
+    "friendly": "Reset",
+    "help": "Restart the modem or restore factory settings.",
+    "type": "action"
+  },
+  "settings-group": {
+    "screen": "Main",
+    "target": "Options",
+    "command": "",
+    "template": "",
+    "friendly": "Settings",
+    "help": "Configure modem, sounds, network, clock and updates.",
+    "type": "action"
+  },
+  "github": {
+    "screen": "Help",
+    "target": "Help",
+    "command": "*GITHUB",
+    "template": "*GITHUB",
+    "friendly": "GitHub",
+    "help": "Open the project repository for source, documentation, credits and licences.",
+    "type": "action",
+    "url": "https://github.com/jedney/esp32-usr-modem"
+  },
+  "help": {
+    "screen": "Main",
+    "target": "Help",
+    "command": "",
+    "template": "",
+    "friendly": "Help",
+    "help": "Find project information, commands and diagnostic tools.",
+    "type": "action"
   }
 }

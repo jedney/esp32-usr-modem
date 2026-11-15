@@ -2,17 +2,9 @@ Sportster 28.8k Series - Configuration
 Illustration only: current values appear on the modem.
 
 A. Status
-B. Phonebook
-C. Settings
-D. Sounds
-E. Diagnostics
-F. Call History
-G. Wi-Fi and Clock
-H. Updates and Reset
-I. Export Configuration
-J. About
-K. Hardware Tests
-L. Client Tests
-M. Command Reference
+B. Phone Book
+C. Call History
+D. Settings
+E. Help
 
 X. Back / Q. Exit; Esc goes back.

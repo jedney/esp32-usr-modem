@@ -3,20 +3,18 @@ import assert from 'node:assert/strict';
 import commands from '../src/ui-commands.js';
 import {menuSections, menuDisabledReason, visibleMenuCount, commandForm, buildCommand, parsePhonebook, parseNetworks} from '../src/menubar.js';
 
-test('bar follows the generated configuration layout and omits serial-only client tests', () => {
-    const sections = menuSections();
-    assert.deepEqual(sections.map(s => s.id), commands
-        .filter(c => c.screen === 'Main' && c.id !== 'client-tests').map(c => c.id));
-    for (const section of sections) {
-        assert.ok(section.friendly && section.help && section.icon);
-        for (const item of section.items) {
-            assert.ok(item.friendly && item.help);
-            assert.ok(commands.includes(item));
-            assert.ok(item.template || item.fields?.every(field => field.template || field.readOnly));
-        }
+const walk = nodes => nodes.flatMap(node => [node, ...walk(node.items)]);
+test('bar follows the shared five-menu hierarchy and omits serial-only client tests', () => {
+    const sections = menuSections(), all = walk(sections);
+    assert.deepEqual(sections.map(s => s.friendly), ['Status','Phone Book','Call History','Settings','Help']);
+    assert.deepEqual(sections[3].items.map(s => s.friendly), ['General Settings','Sounds','Wi-Fi','Clock','Updates','Reset','Export Configuration']);
+    assert.deepEqual(sections[4].items.map(s => s.friendly), ['About','GitHub','Command Reference','Diagnostics']);
+    for (const item of all) {
+        assert.ok(item.friendly && item.help && item.icon);
+        assert.ok(commands.some(command => command.id === item.id));
     }
-    assert.ok(sections.find(s => s.id === 'settings').items.some(i => i.id === 'settings.model'));
-    assert.ok(!sections.flatMap(s => s.items).some(i => i.screen === 'Client'));
+    assert.ok(all.some(i => i.id === 'settings.model'));
+    assert.ok(!all.some(i => i.id === 'client-tests' || i.screen === 'Client'));
 });
 
 test('bar explains offline, read-only, upload and busy states', () => {
@@ -42,7 +40,7 @@ const example = field => field.values?.[0].value ?? (field.type === 'int'
     : field.type === 'ip' ? '192.168.1.1' : field.type === 'secret' ? 'abcdefgh' : 'example');
 
 test('every browser menu action, variant and editable register builds one valid line', () => {
-    for (const item of menuSections().flatMap(s => s.template ? [s] : s.items)) {
+    for (const item of walk(menuSections()).filter(s => !s.items.length)) {
         const variants = item.variants || (item.template ? [null] : item.fields.filter(f => !f.readOnly));
         for (const variant of variants) {
             const form = commandForm(item, variant?.id);

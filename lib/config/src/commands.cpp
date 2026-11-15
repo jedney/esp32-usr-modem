@@ -140,6 +140,7 @@ atcmd::Reply Commands::command(atcmd::Port &p, const char *name, const char *arg
         {"DIAL", &Commands::dial},
         {"REFERENCE", &Commands::reference},
         {"ABOUT", &Commands::about},
+        {"GITHUB", &Commands::github},
         {"EXPORT", &Commands::exportCommand},
         {"LOG", &Commands::logCommand},
         {"CALLLOG", &Commands::callLog},
@@ -255,10 +256,19 @@ atcmd::Reply Commands::about(atcmd::Port &p, const char *args) {
     }
     p.beginInfo();
     p.printf("USR Modem Emulator v%s (%s)\r\n", FW_VERSION, FW_COMMIT);
-    p.line("USRobotics command behavior; replica project by Jon Edney.");
+    p.line("By Jon Edney. Libraries and projects:");
     for (const char *credit : kCredits) {
         p.line(credit);
     }
+    p.line("Full credits and licences: credits/LICENSES.md in the project repository:");
+    p.line(kProjectUrl);
+    return atcmd::Reply::kOk;
+}
+atcmd::Reply Commands::github(atcmd::Port &p, const char *args) {
+    if (!query(args))
+        return atcmd::Reply::kError;
+    p.beginInfo();
+    p.line(kProjectUrl);
     return atcmd::Reply::kOk;
 }
 atcmd::Reply Commands::exportCommand(atcmd::Port &p, const char *args) {

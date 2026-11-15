@@ -1,4 +1,4 @@
-Settings
+General Settings
 Illustration only: current values appear on the modem.
 
 A. Current and stored profiles

@@ -17,7 +17,12 @@ enum class Screen : uint8_t {
     Sounds,
     Debug,
     Hardware,
-    Client
+    Client,
+    Options,
+    Help,
+    Clock,
+    Reset,
+    Count
 };
 enum class UiType : uint8_t { Enum, Int, String, Bool, Ip, Action, Secret };
 struct UiValue {
@@ -110,6 +115,7 @@ private:
     atcmd::Reply dial(atcmd::Port &port, const char *args);
     atcmd::Reply reference(atcmd::Port &port, const char *args);
     atcmd::Reply about(atcmd::Port &port, const char *args);
+    atcmd::Reply github(atcmd::Port &port, const char *args);
     atcmd::Reply exportCommand(atcmd::Port &port, const char *args);
     atcmd::Reply logCommand(atcmd::Port &port, const char *args);
     atcmd::Reply callLog(atcmd::Port &port, const char *args);
@@ -204,7 +210,7 @@ private:
     Focus focus_ = Focus::Menu;
     Screen stack_[10] = {};
     unsigned depth_ = 0;
-    size_t offsets_[10] = {};
+    size_t offsets_[static_cast<unsigned>(Screen::Count)] = {};
     unsigned cols_ = 80, rows_ = 25;
     bool dirty_ = false;
     char staging_[16384] = {};

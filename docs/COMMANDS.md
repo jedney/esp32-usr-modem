@@ -208,6 +208,10 @@ The device password (user `admin`) protects the web interface, the network conso
 
 ### Configuration screen and terminal
 
+The shared top-level order is Status, Phone Book, Call History, Settings and Help (A-E in AT*CONFIG). Settings contains General Settings, Sounds, Wi-Fi, Clock, Updates, Reset and Export Configuration. Help contains About, GitHub, Command Reference and Diagnostics. Diagnostics retains its log and reset-information tools plus Hardware Tests and serial-only Client Tests; the browser omits Client Tests. Nested groups have Back controls in the browser and X/Esc in the terminal.
+
+A fresh browser terminal feeds AT through the real modem parser, without a session banner; configured echo, quiet and result formats still apply. The browser title is "Web Terminal - {model name}" and follows the selected model.
+
 The browser automatically requests one authenticated AT terminal on page open, respecting existing modem reservations and browser ownership. Terminal loss shows a centred reconnect overlay; click the terminal or select a menu item to request access again. Close the tab to release the terminal. Keyboard and menu commands use that terminal's bytes. A connected browser call warns after four minutes without user activity and hangs up and closes the terminal after five; activity cancels the warning and incoming BBS data does not count. This page policy adds no AT command and never applies to serial calls. Diagnostics → Recent console history reads the newest 16 KB of maintenance-console output (1 KB fallback without PSRAM), including device-password lines if still present. No AT command is added. See [the web protocol](../web/PROTOCOL.md#idle-guard-and-notifications) for the owner-only hang-up control and event toasts.
 
 | Command | What it does |
@@ -219,7 +223,8 @@ The browser automatically requests one authenticated AT terminal on page open, r
 | `AT*SETTING[?]` / `=<modem command>` | Show the profiles, or change a setting through the normal checks (`AT*SETTING=S0=2`). Exactly one setting command is accepted (`E0`, `&N8`, `S7=45`, `S7.1=1`, `&Z2=host`); anything after it, such as `E0DT555`, gives `ERROR` |
 | `AT*HELP` / `AT*?` | List project commands and hardware tests |
 | `AT*REFERENCE` | All AT and AT* commands |
-| `AT*ABOUT` | Version, credits and licences |
+| `AT*ABOUT` | Version, project names and URLs; full credits/licences are in the linked GitHub repository |
+| `AT*GITHUB` | Print the project repository URL; Help > GitHub opens it in a new browser tab |
 | `AT*SOUNDS` | List generated tones and sound files |
 | `AT*PLAY=<name\|speed>` | Play `DIAL`, `BUSY`, `RING`, `DTMF`, `PULSE`, `SWEEP`, a line speed (handshake) or a `/sounds/...` file. Any key stops it |
 

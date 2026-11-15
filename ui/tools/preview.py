@@ -17,11 +17,16 @@ def generate():
             lines += [f"{item['key']}. {m['friendly']}"]
         return '\n'.join(lines + ['', 'X. Back / Q. Exit; Esc goes back.', ''])
 
+    def walk(nodes):
+        for node in nodes:
+            yield node
+            yield from walk(node.get('items', []))
+
     for model in theme['models']:
         (ROOT / 'previews' / f"main-{model['id']}.txt").write_text(
             listing(model['label'] + ' - Configuration', menu), encoding='utf-8', newline='\n')
     for section, name in [('settings', 'settings'), ('phonebook', 'phonebook'), ('hardware-tests', 'hardware-tests')]:
-        parent = next(m for m in menu if m['id'] == section)
+        parent = next(m for m in walk(menu) if m['id'] == section)
         (ROOT / 'previews' / f'{name}-28.8k.txt').write_text(
             listing(parent['label'], parent['items']), encoding='utf-8', newline='\n')
 

@@ -1,4 +1,4 @@
-Phonebook
+Phone Book
 Illustration only: current values appear on the modem.
 
 A. List entries

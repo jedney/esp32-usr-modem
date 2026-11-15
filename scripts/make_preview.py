@@ -88,7 +88,7 @@ def main(out: pathlib.Path) -> None:
         f"<script>window.USR_MODEM_DEMO = true;</script>\n"
         f'<script type="module">{app}</script>',
     )
-    html = html.replace("<title>USR Modem</title>", "<title>USR Modem (preview)</title>")
+    html = html.replace("<title>Web Terminal</title>", "<title>Web Terminal (preview)</title>")
     out.write_text(html, encoding="utf-8")
     print(f"Preview: {out} ({out.stat().st_size / 1024:.0f} KB). Synthetic terminal; no device services connected.")
 

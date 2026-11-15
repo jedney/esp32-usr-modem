@@ -5,6 +5,7 @@ import commands from './ui-commands.js';
 export function startDemoModem({message, write}) {
     const metadata = new Map(commands.map(item => [item.id, item]));
     let screen = null, detail = null, swallowEnter = false, skipLf = false, escape = '';
+    const screens = [];
     let opened = false, menu = false, call = false, onlineCommand = false, line = '', cols = 80, rows = 25;
     let pluses = 0;
     let received = 0, waiting = null;
@@ -33,7 +34,7 @@ export function startDemoModem({message, write}) {
     };
     const back = () => {
         if (detail) detail = null;
-        else screen = null;
+        else screen = screens.pop() || null;
         redraw();
     };
     const key = ch => {
@@ -46,10 +47,10 @@ export function startDemoModem({message, write}) {
         const item = (screen ? screen.items : data.menu).find(i => i.key === upper);
         if (!item) return;
         const m = metadata.get(item.id);
-        if (!screen && item.items.length) screen = item;
+        if (item.items?.length) { screens.push(screen); screen = item; }
         else if (screen?.id === 'client-tests') detail = 'Client Tests run on serial only.';
         else {
-            detail = `DEMO: ${m.friendly}\r\nNo device service connected.`;
+            detail = `DEMO: ${m.friendly}\r\n${m.url || 'No device service connected.'}`;
             for (const [i, value] of (m.values || []).slice(0, 15).entries())
                 detail += `\r\n${String.fromCharCode(65 + i)}. ${value.label}`;
         }
@@ -109,6 +110,7 @@ export function startDemoModem({message, write}) {
     const close = () => {
         hangup();
         opened = false; menu = false; screen = null; detail = null;
+        screens.length = 0;
         waiting = null; received = 0;
         swallowEnter = false; skipLf = false; escape = '';
         access();
@@ -121,8 +123,7 @@ export function startDemoModem({message, write}) {
                 if (msg.t === 'open') {
                     received = 0;
                     opened = true; access();
-                    write('Sportster DEMO terminal — synthetic values only.\r\n'
-                        + 'Type AT*CONFIG for the list preview, or ATDT1 for a simulated call.\r\n');
+                    write('AT\r\r\nOK\r\n');
                 } else if (opened && msg.t === 'hangup') { received = 0; hangup(); }
                 else if (opened && msg.t === 'size') { cols = msg.cols; rows = msg.rows; }
                 ready(); return;

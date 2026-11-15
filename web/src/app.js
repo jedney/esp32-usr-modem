@@ -224,7 +224,6 @@ function handleMessage(msg) {
         case 'hello':
             state.csrf = msg.csrf;
             state.version = msg.ver;
-            document.title = `${msg.name || 'USR Modem'} v${msg.ver || '?'}`;
             requestAnimationFrame(fitTerminal);
             break;
         case 'access':
@@ -264,6 +263,7 @@ function handleMessage(msg) {
         case 'call':
             if (typeof msg.model === 'string' && msg.model && $('model-name').textContent !== msg.model) {
                 $('model-name').textContent = msg.model;
+                document.title = `Web Terminal - ${msg.model}`;
                 requestAnimationFrame(fitTerminal);
             }
             events.call(msg);

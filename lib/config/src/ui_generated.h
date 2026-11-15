@@ -2,12 +2,12 @@
 #pragma once
 // clang-format off
 namespace config {
-constexpr uint32_t kBindingsFingerprint = 1035019914u;
-constexpr UiValue kCommandMetadata_14_fields_3_values[] = {
+constexpr uint32_t kBindingsFingerprint = 3546047027u;
+constexpr UiValue kCommandMetadata_3_fields_3_values[] = {
     {"TELNET", "Telnet", "Negotiate terminal settings with the server."},
     {"RAW", "Raw TCP", "Send the bytes without Telnet negotiation."},
 };
-constexpr UiValue kCommandMetadata_14_fields_4_values[] = {
+constexpr UiValue kCommandMetadata_3_fields_4_values[] = {
     {"0", "Use modem setting", "Use the modem model and active profile."},
     {"300", "300 bits per second", "Override the connection speed for this destination."},
     {"1200", "1,200 bits per second", "Override the connection speed for this destination."},
@@ -48,106 +48,106 @@ constexpr UiValue kCommandMetadata_14_fields_4_values[] = {
     {"54666", "54,666 bits per second", "Override the connection speed for this destination."},
     {"56000", "56,000 bits per second", "Override the connection speed for this destination."},
 };
-constexpr UiMetadata kCommandMetadata_14_fields[] = {
+constexpr UiMetadata kCommandMetadata_3_fields[] = {
     {"num", "Phonebook number", "Enter up to eleven digits without formatting. The built-in configuration and internet numbers are reserved.", UiType::String, "digits", -1, -1, 1, 11, "(?!(?:123|666|667|5517545|5517546)$)[0-9]{1,11}", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "digits", 1},
     {"host", "Host address", "Enter a network name or IPv4 address.", UiType::String, "characters", -1, -1, 1, 63, "(?![.-])(?!.*\\.$)[A-Za-z0-9._-]+", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "characters", 1},
     {"port", "Network port", "Enter the destination TCP port.", UiType::Int, "port number", 1, 65535, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "port number", 1},
-    {"proto", "Connection type", "Choose terminal negotiation or an unchanged byte stream.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_14_fields_3_values, 2, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"speed", "Connection speed", "Choose a speed override for this destination.", UiType::Enum, "bits per second", -1, -1, -1, -1, "", kCommandMetadata_14_fields_4_values, 39, "", nullptr, 0, nullptr, 0, true, false, false, "bits per second", 1},
+    {"proto", "Connection type", "Choose terminal negotiation or an unchanged byte stream.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_3_fields_3_values, 2, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"speed", "Connection speed", "Choose a speed override for this destination.", UiType::Enum, "bits per second", -1, -1, -1, -1, "", kCommandMetadata_3_fields_4_values, 39, "", nullptr, 0, nullptr, 0, true, false, false, "bits per second", 1},
 };
-constexpr UiValue kCommandMetadata_18_fields_0_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_0_values[] = {
     {"0", "ITU-T", "Answer sequence: itu-t."},
     {"1", "Bell", "Answer sequence: bell."},
 };
-constexpr UiValue kCommandMetadata_18_fields_1_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_1_values[] = {
     {"0", "Off", "Command echo: off."},
     {"1", "On", "Command echo: on."},
 };
-constexpr UiValue kCommandMetadata_18_fields_2_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_2_values[] = {
     {"0", "On", "Online local echo: on."},
     {"1", "Off", "Online local echo: off."},
 };
-constexpr UiValue kCommandMetadata_18_fields_3_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_3_values[] = {
     {"0", "Low", "Speaker level: low."},
     {"1", "Low", "Speaker level: low."},
     {"2", "Medium", "Speaker level: medium."},
     {"3", "High", "Speaker level: high."},
 };
-constexpr UiValue kCommandMetadata_18_fields_4_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_4_values[] = {
     {"0", "Silent", "Speaker mode: silent."},
     {"1", "Until connected", "Speaker mode: until connected."},
     {"2", "Always on", "Speaker mode: always on."},
     {"3", "Omit dial tone", "Speaker mode: omit dial tone."},
 };
-constexpr UiValue kCommandMetadata_18_fields_5_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_5_values[] = {
     {"0", "Show results", "Result messages: show results."},
     {"1", "Quiet", "Result messages: quiet."},
     {"2", "Quiet when answering", "Result messages: quiet when answering."},
 };
-constexpr UiValue kCommandMetadata_18_fields_6_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_6_values[] = {
     {"0", "Numbers", "Result format: numbers."},
     {"1", "Words", "Result format: words."},
 };
-constexpr UiValue kCommandMetadata_18_fields_7_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_7_values[] = {
     {"0", "Basic", "Call progress detail: basic."},
     {"1", "Connection speed", "Call progress detail: connection speed."},
     {"2", "Dial tone", "Call progress detail: dial tone."},
     {"3", "Busy signal", "Call progress detail: busy signal."},
     {"4", "Full progress", "Call progress detail: full progress."},
 };
-constexpr UiValue kCommandMetadata_18_fields_8_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_8_values[] = {
     {"P", "Pulse", "Dial method: pulse."},
     {"T", "Tone", "Dial method: tone."},
 };
-constexpr UiValue kCommandMetadata_18_fields_9_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_9_values[] = {
     {"0", "None", "Connection detail: none."},
     {"1", "Error control", "Connection detail: error control."},
     {"2", "Modulation", "Connection detail: modulation."},
     {"3", "Protocol", "Connection detail: protocol."},
 };
-constexpr UiValue kCommandMetadata_18_fields_10_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_10_values[] = {
     {"0", "Follow call speed", "Host speed mode: follow call speed."},
     {"1", "Fixed speed", "Host speed mode: fixed speed."},
     {"2", "Mixed speed", "Host speed mode: mixed speed."},
 };
-constexpr UiValue kCommandMetadata_18_fields_11_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_11_values[] = {
     {"0", "Always on", "Carrier detect: always on."},
     {"1", "Follow carrier", "Carrier detect: follow carrier."},
 };
-constexpr UiValue kCommandMetadata_18_fields_12_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_12_values[] = {
     {"0", "Ignore DTR", "Terminal ready action: ignore dtr."},
     {"2", "Hang up", "Terminal ready action: hang up."},
     {"3", "Reset profile", "Terminal ready action: reset profile."},
 };
-constexpr UiValue kCommandMetadata_18_fields_13_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_13_values[] = {
     {"0", "Off", "Guard tone: off."},
     {"1", "550 hertz", "Guard tone: 550 hertz."},
     {"2", "1800 hertz", "Guard tone: 1800 hertz."},
 };
-constexpr UiValue kCommandMetadata_18_fields_14_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_14_values[] = {
     {"0", "Off", "Transmit flow control: off."},
     {"1", "CTS", "Transmit flow control: cts."},
     {"2", "XON and XOFF", "Transmit flow control: xon and xoff."},
     {"3", "Both", "Transmit flow control: both."},
 };
-constexpr UiValue kCommandMetadata_18_fields_15_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_15_values[] = {
     {"0", "Off", "Receive software flow: off."},
     {"1", "Local and remote", "Receive software flow: local and remote."},
     {"2", "Local only", "Receive software flow: local only."},
     {"5", "Non-error-control mode", "Receive software flow: non-error-control mode."},
 };
-constexpr UiValue kCommandMetadata_18_fields_16_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_16_values[] = {
     {"0", "Off", "Compression preference: off."},
     {"1", "Automatic", "Compression preference: automatic."},
     {"2", "On", "Compression preference: on."},
     {"3", "Selective", "Compression preference: selective."},
 };
-constexpr UiValue kCommandMetadata_18_fields_17_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_17_values[] = {
     {"0", "Normal", "Error control preference: normal."},
     {"4", "Normal or reliable", "Error control preference: normal or reliable."},
     {"5", "Reliable only", "Error control preference: reliable only."},
 };
-constexpr UiValue kCommandMetadata_18_fields_18_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_18_values[] = {
     {"0", "Highest speed", "Fixed line speed: highest speed."},
     {"1", "300 bits per second", "Fixed line speed: 300 bits per second."},
     {"2", "1,200 bits per second", "Fixed line speed: 1,200 bits per second."},
@@ -188,22 +188,22 @@ constexpr UiValue kCommandMetadata_18_fields_18_values[] = {
     {"37", "54,666 bits per second", "Fixed line speed: 54,666 bits per second."},
     {"38", "56,000 bits per second", "Fixed line speed: 56,000 bits per second."},
 };
-constexpr UiValue kCommandMetadata_18_fields_19_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_19_values[] = {
     {"0", "US", "Pulse dial ratio: us."},
     {"1", "UK", "Pulse dial ratio: uk."},
 };
-constexpr UiValue kCommandMetadata_18_fields_20_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_20_values[] = {
     {"1", "Ignore RTS", "Receive hardware flow: ignore rts."},
     {"2", "Obey RTS", "Receive hardware flow: obey rts."},
 };
-constexpr UiValue kCommandMetadata_18_fields_21_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_21_values[] = {
     {"0", "Always asserted", "Data set ready: always asserted."},
 };
-constexpr UiValue kCommandMetadata_18_fields_22_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_22_values[] = {
     {"4", "Allow", "Remote loopback: allow."},
     {"5", "Refuse", "Remote loopback: refuse."},
 };
-constexpr UiValue kCommandMetadata_18_fields_23_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_23_values[] = {
     {"0", "No minimum", "Minimum line speed: no minimum."},
     {"1", "300 bits per second", "Minimum line speed: 300 bits per second."},
     {"2", "1,200 bits per second", "Minimum line speed: 1,200 bits per second."},
@@ -244,13 +244,13 @@ constexpr UiValue kCommandMetadata_18_fields_23_values[] = {
     {"37", "54,666 bits per second", "Minimum line speed: 54,666 bits per second."},
     {"38", "56,000 bits per second", "Minimum line speed: 56,000 bits per second."},
 };
-constexpr UiValue kCommandMetadata_18_fields_24_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_24_values[] = {
     {"0", "Destructive, expedited", "Break handling: destructive, expedited."},
     {"1", "Non-destructive, expedited", "Break handling: non-destructive, expedited."},
     {"2", "Non-destructive, unexpedited", "Break handling: non-destructive, unexpedited."},
     {"3", "Destructive, unexpedited", "Break handling: destructive, unexpedited."},
 };
-constexpr UiValue kCommandMetadata_18_fields_28_values[] = {
+constexpr UiValue kCommandMetadata_10_fields_28_values[] = {
     {"0", "Character code 0", "Use this non-printing character to end commands."},
     {"1", "Character code 1", "Use this non-printing character to end commands."},
     {"2", "Character code 2", "Use this non-printing character to end commands."},
@@ -285,36 +285,36 @@ constexpr UiValue kCommandMetadata_18_fields_28_values[] = {
     {"31", "Character code 31", "Use this non-printing character to end commands."},
     {"127", "Character code 127", "Use this non-printing character to end commands."},
 };
-constexpr UiMetadata kCommandMetadata_18_fields[] = {
-    {"B", "Answer sequence", "Choose answer sequence for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_0_values, 2, "*SETTING=B{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"E", "Command echo", "Choose command echo for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_1_values, 2, "*SETTING=E{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"F", "Online local echo", "Choose online local echo for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_2_values, 2, "*SETTING=F{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"L", "Speaker level", "Choose speaker level for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_3_values, 4, "*SETTING=L{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"M", "Speaker mode", "Choose speaker mode for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_4_values, 4, "*SETTING=M{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"Q", "Result messages", "Choose result messages for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_5_values, 3, "*SETTING=Q{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"V", "Result format", "Choose result format for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_6_values, 2, "*SETTING=V{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"X", "Call progress detail", "Choose call progress detail for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_7_values, 5, "*SETTING=X{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"T", "Dial method", "Choose dial method for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_8_values, 2, "*SETTING={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"&A", "Connection detail", "Choose connection detail for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_9_values, 4, "*SETTING=&A{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"&B", "Host speed mode", "Choose host speed mode for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_10_values, 3, "*SETTING=&B{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"&C", "Carrier detect", "Choose carrier detect for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_11_values, 2, "*SETTING=&C{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"&D", "Terminal ready action", "Choose terminal ready action for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_12_values, 3, "*SETTING=&D{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"&G", "Guard tone", "Choose guard tone for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_13_values, 3, "*SETTING=&G{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"&H", "Transmit flow control", "Choose transmit flow control for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_14_values, 4, "*SETTING=&H{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"&I", "Receive software flow", "Choose receive software flow for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_15_values, 4, "*SETTING=&I{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"&K", "Compression preference", "Choose compression preference for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_16_values, 4, "*SETTING=&K{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"&M", "Error control preference", "Choose error control preference for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_17_values, 3, "*SETTING=&M{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"&N", "Fixed line speed", "Choose fixed line speed for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_18_values, 39, "*SETTING=&N{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"&P", "Pulse dial ratio", "Choose pulse dial ratio for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_19_values, 2, "*SETTING=&P{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"&R", "Receive hardware flow", "Choose receive hardware flow for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_20_values, 2, "*SETTING=&R{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"&S", "Data set ready", "Choose data set ready for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_21_values, 1, "*SETTING=&S{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"&T", "Remote loopback", "Choose remote loopback for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_22_values, 2, "*SETTING=&T{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"&U", "Minimum line speed", "Choose minimum line speed for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_23_values, 39, "*SETTING=&U{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"&Y", "Break handling", "Choose break handling for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_fields_24_values, 4, "*SETTING=&Y{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+constexpr UiMetadata kCommandMetadata_10_fields[] = {
+    {"B", "Answer sequence", "Choose answer sequence for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_0_values, 2, "*SETTING=B{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"E", "Command echo", "Choose command echo for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_1_values, 2, "*SETTING=E{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"F", "Online local echo", "Choose online local echo for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_2_values, 2, "*SETTING=F{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"L", "Speaker level", "Choose speaker level for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_3_values, 4, "*SETTING=L{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"M", "Speaker mode", "Choose speaker mode for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_4_values, 4, "*SETTING=M{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"Q", "Result messages", "Choose result messages for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_5_values, 3, "*SETTING=Q{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"V", "Result format", "Choose result format for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_6_values, 2, "*SETTING=V{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"X", "Call progress detail", "Choose call progress detail for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_7_values, 5, "*SETTING=X{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"T", "Dial method", "Choose dial method for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_8_values, 2, "*SETTING={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"&A", "Connection detail", "Choose connection detail for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_9_values, 4, "*SETTING=&A{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"&B", "Host speed mode", "Choose host speed mode for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_10_values, 3, "*SETTING=&B{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"&C", "Carrier detect", "Choose carrier detect for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_11_values, 2, "*SETTING=&C{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"&D", "Terminal ready action", "Choose terminal ready action for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_12_values, 3, "*SETTING=&D{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"&G", "Guard tone", "Choose guard tone for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_13_values, 3, "*SETTING=&G{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"&H", "Transmit flow control", "Choose transmit flow control for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_14_values, 4, "*SETTING=&H{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"&I", "Receive software flow", "Choose receive software flow for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_15_values, 4, "*SETTING=&I{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"&K", "Compression preference", "Choose compression preference for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_16_values, 4, "*SETTING=&K{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"&M", "Error control preference", "Choose error control preference for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_17_values, 3, "*SETTING=&M{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"&N", "Fixed line speed", "Choose fixed line speed for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_18_values, 39, "*SETTING=&N{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"&P", "Pulse dial ratio", "Choose pulse dial ratio for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_19_values, 2, "*SETTING=&P{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"&R", "Receive hardware flow", "Choose receive hardware flow for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_20_values, 2, "*SETTING=&R{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"&S", "Data set ready", "Choose data set ready for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_21_values, 1, "*SETTING=&S{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"&T", "Remote loopback", "Choose remote loopback for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_22_values, 2, "*SETTING=&T{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"&U", "Minimum line speed", "Choose minimum line speed for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_23_values, 39, "*SETTING=&U{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"&Y", "Break handling", "Choose break handling for the active profile. Save a profile to keep the change.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_10_fields_24_values, 4, "*SETTING=&Y{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"S0", "Auto-answer rings", "Set the auto-answer rings. Save a profile to keep the change.", UiType::Int, "rings", 0, 255, -1, -1, "", nullptr, 0, "*SETTING=S0={value}", nullptr, 0, nullptr, 0, false, false, false, "rings", 1},
     {"S1", "Current ring count", "This is the live ring count and cannot be edited.", UiType::Int, "rings", 0, 255, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, true, "rings", 1},
     {"S2", "Escape character", "Set the escape character. Save a profile to keep the change.", UiType::Int, "character code", 0, 255, -1, -1, "", nullptr, 0, "*SETTING=S2={value}", nullptr, 0, nullptr, 0, false, false, false, "character code", 1},
-    {"S3", "Command terminator", "Choose a non-printing command terminator character. Save a profile to keep the change.", UiType::Enum, "character code", -1, -1, -1, -1, "", kCommandMetadata_18_fields_28_values, 33, "*SETTING=S3={value}", nullptr, 0, nullptr, 0, false, false, false, "character code", 1},
+    {"S3", "Command terminator", "Choose a non-printing command terminator character. Save a profile to keep the change.", UiType::Enum, "character code", -1, -1, -1, -1, "", kCommandMetadata_10_fields_28_values, 33, "*SETTING=S3={value}", nullptr, 0, nullptr, 0, false, false, false, "character code", 1},
     {"S4", "Response line feed", "Set the response line feed. Save a profile to keep the change.", UiType::Int, "character code", 0, 127, -1, -1, "", nullptr, 0, "*SETTING=S4={value}", nullptr, 0, nullptr, 0, false, false, false, "character code", 1},
     {"S5", "Backspace character", "Set the backspace character. Save a profile to keep the change.", UiType::Int, "character code", 0, 127, -1, -1, "", nullptr, 0, "*SETTING=S5={value}", nullptr, 0, nullptr, 0, false, false, false, "character code", 1},
     {"S6", "Dial-tone wait", "Set the dial-tone wait. Save a profile to keep the change.", UiType::Int, "seconds", 0, 255, -1, -1, "", nullptr, 0, "*SETTING=S6={value}", nullptr, 0, nullptr, 0, false, false, false, "seconds", 1},
@@ -376,19 +376,19 @@ constexpr UiMetadata kCommandMetadata_18_fields[] = {
     {"S62", "Compatibility register S62", "Set this modem compatibility register. Save a profile to keep the change.", UiType::Int, "register value", 0, 255, -1, -1, "", nullptr, 0, "*SETTING=S62={value}", nullptr, 0, nullptr, 0, false, false, false, "register value", 1},
     {"S63", "Compatibility register S63", "Set this modem compatibility register. Save a profile to keep the change.", UiType::Int, "register value", 0, 255, -1, -1, "", nullptr, 0, "*SETTING=S63={value}", nullptr, 0, nullptr, 0, false, false, false, "register value", 1},
 };
-constexpr UiValue kCommandMetadata_19_values[] = {
+constexpr UiValue kCommandMetadata_11_values[] = {
     {"14400", "US Robotics Sportster 14.4k", "Use the 14.4k identity and default connection speed."},
     {"28800", "US Robotics Sportster 28.8k", "Use the 28.8k identity and default connection speed."},
     {"33600", "US Robotics Sportster 33.6k", "Use the 33.6k identity and default connection speed."},
     {"56000", "US Robotics Sportster 56k", "Use the 56k identity and default connection speed."},
 };
-constexpr UiValue kCommandMetadata_21_values[] = {
+constexpr UiValue kCommandMetadata_13_values[] = {
     {"RS232", "RS232 port", "Answer on the serial modem port."},
     {"CONSOLE", "Maintenance console", "Answer on the maintenance console."},
     {"USB", "USB modem port", "Answer on the USB modem port."},
     {"AUTO", "Automatic", "Use the first port with DTR asserted: RS232, USB, then console."},
 };
-constexpr UiValue kCommandMetadata_22_values[] = {
+constexpr UiValue kCommandMetadata_14_values[] = {
     {"AUTO", "Automatic", "Detect the speed from AT."},
     {"300", "300 bits per second", "Use this fixed RS232 speed."},
     {"600", "600 bits per second", "Use this fixed RS232 speed."},
@@ -401,15 +401,15 @@ constexpr UiValue kCommandMetadata_22_values[] = {
     {"57600", "57,600 bits per second", "Use this fixed RS232 speed."},
     {"115200", "115,200 bits per second", "Use this fixed RS232 speed."},
 };
-constexpr UiValue kCommandMetadata_23_values[] = {
+constexpr UiValue kCommandMetadata_15_values[] = {
     {"ON", "On", "Enable this feature."},
     {"OFF", "Off", "Disable this feature."},
 };
-constexpr UiValue kCommandMetadata_24_values[] = {
+constexpr UiValue kCommandMetadata_16_values[] = {
     {"0", "Stored profile 0", "Save to the first stored profile."},
     {"1", "Stored profile 1", "Save to the second stored profile."},
 };
-constexpr UiValue kCommandMetadata_25_values[] = {
+constexpr UiValue kCommandMetadata_17_values[] = {
     {"0", "Power-on profile", "Load the selected power-on profile."},
     {"1", "Stored profile 0", "Load the first stored profile."},
     {"2", "Stored profile 1", "Load the second stored profile."},
@@ -417,27 +417,27 @@ constexpr UiValue kCommandMetadata_25_values[] = {
     {"4", "Factory: hardware flow control", "Load factory settings using RTS and CTS."},
     {"5", "Factory: software flow control", "Load factory settings using XON and XOFF."},
 };
-constexpr UiValue kCommandMetadata_26_values[] = {
+constexpr UiValue kCommandMetadata_18_values[] = {
     {"0", "No flow control", "Load factory settings without flow control."},
     {"1", "Hardware flow control", "Load factory settings using RTS and CTS."},
     {"2", "Software flow control", "Load factory settings using XON and XOFF."},
 };
-constexpr UiValue kCommandMetadata_27_values[] = {
+constexpr UiValue kCommandMetadata_19_values[] = {
     {"0", "Stored profile 0", "Start with the first stored profile."},
     {"1", "Stored profile 1", "Start with the second stored profile."},
     {"2", "Factory: no flow control", "Start without flow control."},
     {"3", "Factory: hardware flow control", "Start with RTS and CTS flow control."},
     {"4", "Factory: software flow control", "Start with XON and XOFF flow control."},
 };
-constexpr UiMetadata kCommandMetadata_28_fields[] = {
+constexpr UiMetadata kCommandMetadata_20_fields[] = {
     {"slot", "Stored number slot", "Choose one of four modem slots.", UiType::Int, "slot number", 0, 3, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "slot number", 1},
     {"number", "Dial string", "Enter the number or address to store.", UiType::String, "characters", -1, -1, -1, 40, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "characters", 1},
 };
-constexpr UiValue kCommandMetadata_29_values[] = {
+constexpr UiValue kCommandMetadata_21_values[] = {
     {"ANSI", "Colour text", "Use ANSI colours and line drawing."},
     {"PLAIN", "Plain text", "Use plain ASCII characters."},
 };
-constexpr UiValue kCommandMetadata_31_values[] = {
+constexpr UiValue kCommandMetadata_24_values[] = {
     {"DIAL", "Dial tone", "Play a UK dial tone."},
     {"BUSY", "Busy tone", "Play a UK busy tone."},
     {"RING", "Ringback", "Play a UK ringback tone."},
@@ -483,39 +483,54 @@ constexpr UiValue kCommandMetadata_31_values[] = {
     {"54666", "54,666 bits per second handshake", "Play the recording selected for this connection speed."},
     {"56000", "56,000 bits per second handshake", "Play the recording selected for this connection speed."},
 };
-constexpr UiValue kCommandMetadata_35_values[] = {
-    {"0", "Off", "Do not record diagnostic events."},
-    {"1", "Normal", "Record connection and service events."},
-    {"2", "Detailed", "Record additional diagnostic detail."},
-};
-constexpr UiMetadata kCommandMetadata_40_fields[] = {
+constexpr UiMetadata kCommandMetadata_30_fields[] = {
     {"ssid", "Wi-Fi network", "Enter the network name exactly as shown.", UiType::String, "bytes", -1, -1, 1, 32, "[^\\x00-\\x1f\\x7f]+", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "bytes", 1},
 };
-constexpr UiMetadata kCommandMetadata_40_variants_0_fields[] = {
+constexpr UiMetadata kCommandMetadata_30_variants_0_fields[] = {
     {"ssid", "Wi-Fi network", "Enter the network name exactly as shown.", UiType::String, "bytes", -1, -1, 1, 32, "[^\\x00-\\x1f\\x7f]+", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "bytes", 1},
 };
-constexpr UiMetadata kCommandMetadata_40_variants_1_fields[] = {
+constexpr UiMetadata kCommandMetadata_30_variants_1_fields[] = {
     {"index", "Scan number", "Enter a number from the scan results.", UiType::Int, "network number", 1, 20, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "network number", 1},
 };
-constexpr UiMetadata kCommandMetadata_40_variants[] = {
-    {"name", "Network name", "Enter a Wi-Fi name, then the password at the hidden prompt.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*WIFIJOIN=\"{ssid}\"", kCommandMetadata_40_variants_0_fields, 1, nullptr, 0, false, false, false, "", 1},
-    {"scan", "Scanned network", "Choose a network number from the most recent scan.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*WIFIJOIN={index}", kCommandMetadata_40_variants_1_fields, 1, nullptr, 0, false, false, false, "", 1},
+constexpr UiMetadata kCommandMetadata_30_variants[] = {
+    {"name", "Network name", "Enter a Wi-Fi name, then the password at the hidden prompt.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*WIFIJOIN=\"{ssid}\"", kCommandMetadata_30_variants_0_fields, 1, nullptr, 0, false, false, false, "", 1},
+    {"scan", "Scanned network", "Choose a network number from the most recent scan.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*WIFIJOIN={index}", kCommandMetadata_30_variants_1_fields, 1, nullptr, 0, false, false, false, "", 1},
 };
-constexpr UiValue kCommandMetadata_41_values[] = {
+constexpr UiValue kCommandMetadata_31_values[] = {
     {"ON", "On", "Enable this feature."},
     {"OFF", "Off", "Disable this feature."},
 };
-constexpr UiMetadata kCommandMetadata_43_variants_1_fields[] = {
+constexpr UiMetadata kCommandMetadata_33_variants_1_fields[] = {
     {"ip", "Device address", "Enter an IPv4 address in dotted form.", UiType::Ip, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"mask", "Subnet mask", "Enter an IPv4 address in dotted form.", UiType::Ip, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"gateway", "Gateway", "Enter an IPv4 address in dotted form.", UiType::Ip, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"dns", "Name server", "Enter an IPv4 address in dotted form.", UiType::Ip, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, true, false, false, "", 1},
 };
-constexpr UiMetadata kCommandMetadata_43_variants[] = {
+constexpr UiMetadata kCommandMetadata_33_variants[] = {
     {"dhcp", "Automatic address", "Ask the network to assign an address.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*WIFIIP=DHCP", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"static", "Static address", "The address and gateway must share a valid subnet.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*WIFIIP={ip},{mask},{gateway},{dns}", kCommandMetadata_43_variants_1_fields, 4, nullptr, 0, false, false, false, "", 1},
+    {"static", "Static address", "The address and gateway must share a valid subnet.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*WIFIIP={ip},{mask},{gateway},{dns}", kCommandMetadata_33_variants_1_fields, 4, nullptr, 0, false, false, false, "", 1},
 };
-constexpr UiValue kCommandMetadata_46_values[] = {
+constexpr UiMetadata kCommandMetadata_38_fields[] = {
+    {"local", "Modem address", "Enter an IPv4 address in dotted form.", UiType::Ip, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"peer", "Computer address", "Enter an IPv4 address in dotted form.", UiType::Ip, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+};
+constexpr UiMetadata kCommandMetadata_38_variants_0_fields[] = {
+    {"local", "Modem address", "Enter an IPv4 address in dotted form.", UiType::Ip, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"peer", "Computer address", "Enter an IPv4 address in dotted form.", UiType::Ip, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+};
+constexpr UiMetadata kCommandMetadata_38_variants_2_fields[] = {
+    {"dns", "Name server", "Enter an IPv4 address in dotted form.", UiType::Ip, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+};
+constexpr UiMetadata kCommandMetadata_38_variants[] = {
+    {"ip", "Dial-up addresses", "Use the two host addresses of the same private /30 subnet.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*INTERNET=IP,{local},{peer}", kCommandMetadata_38_variants_0_fields, 2, nullptr, 0, false, false, false, "", 1},
+    {"dns-auto", "Automatic name server", "Use the Wi-Fi network name server.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*INTERNET=DNS,AUTO", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"dns", "Name server address", "Set a fixed name server for dial-up internet.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*INTERNET=DNS,{dns}", kCommandMetadata_38_variants_2_fields, 1, nullptr, 0, false, false, false, "", 1},
+};
+constexpr UiValue kCommandMetadata_39_values[] = {
+    {"666", "PPP internet", "Start a PPP internet connection."},
+    {"667", "SLIP internet", "Start a SLIP internet connection."},
+};
+constexpr UiValue kCommandMetadata_42_values[] = {
     {"Pacific/Auckland", "Auckland", "Use the clock and daylight saving rules for Pacific/Auckland."},
     {"Pacific/Chatham", "Chatham", "Use the clock and daylight saving rules for Pacific/Chatham."},
     {"Australia/Sydney", "Sydney", "Use the clock and daylight saving rules for Australia/Sydney."},
@@ -533,41 +548,26 @@ constexpr UiValue kCommandMetadata_46_values[] = {
     {"Pacific/Honolulu", "Honolulu", "Use the clock and daylight saving rules for Pacific/Honolulu."},
     {"UTC", "UTC", "Use the clock and daylight saving rules for UTC."},
 };
-constexpr UiMetadata kCommandMetadata_51_fields[] = {
-    {"local", "Modem address", "Enter an IPv4 address in dotted form.", UiType::Ip, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"peer", "Computer address", "Enter an IPv4 address in dotted form.", UiType::Ip, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-};
-constexpr UiMetadata kCommandMetadata_51_variants_0_fields[] = {
-    {"local", "Modem address", "Enter an IPv4 address in dotted form.", UiType::Ip, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"peer", "Computer address", "Enter an IPv4 address in dotted form.", UiType::Ip, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-};
-constexpr UiMetadata kCommandMetadata_51_variants_2_fields[] = {
-    {"dns", "Name server", "Enter an IPv4 address in dotted form.", UiType::Ip, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-};
-constexpr UiMetadata kCommandMetadata_51_variants[] = {
-    {"ip", "Dial-up addresses", "Use the two host addresses of the same private /30 subnet.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*INTERNET=IP,{local},{peer}", kCommandMetadata_51_variants_0_fields, 2, nullptr, 0, false, false, false, "", 1},
-    {"dns-auto", "Automatic name server", "Use the Wi-Fi network name server.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*INTERNET=DNS,AUTO", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"dns", "Name server address", "Set a fixed name server for dial-up internet.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*INTERNET=DNS,{dns}", kCommandMetadata_51_variants_2_fields, 1, nullptr, 0, false, false, false, "", 1},
-};
-constexpr UiValue kCommandMetadata_52_values[] = {
-    {"666", "PPP internet", "Start a PPP internet connection."},
-    {"667", "SLIP internet", "Start a SLIP internet connection."},
-};
-constexpr UiValue kCommandMetadata_55_values[] = {
+constexpr UiValue kCommandMetadata_47_values[] = {
     {"ALWAYS", "Always available", "Keep the wireless update listener available."},
     {"DEMAND", "Only when requested", "Open wireless updates only on request."},
     {"ON", "Open for ten minutes", "Allow wireless updates for ten minutes."},
     {"OFF", "Close update window", "Close the current wireless update window."},
 };
-constexpr UiValue kCommandMetadata_59_values[] = {
+constexpr UiValue kCommandMetadata_49_values[] = {
     {"ON", "On", "Enable this feature."},
     {"OFF", "Off", "Disable this feature."},
 };
-constexpr UiValue kCommandMetadata_60_values[] = {
+constexpr UiValue kCommandMetadata_50_values[] = {
     {"ON", "On", "Enable this feature."},
     {"OFF", "Off", "Disable this feature."},
 };
-constexpr UiValue kCommandMetadata_65_values[] = {
+constexpr UiValue kCommandMetadata_61_values[] = {
+    {"0", "Off", "Do not record diagnostic events."},
+    {"1", "Normal", "Record connection and service events."},
+    {"2", "Detailed", "Record additional diagnostic detail."},
+};
+constexpr UiValue kCommandMetadata_69_values[] = {
     {"AA", "Auto answer", "Light the auto-answer indicator."},
     {"CD", "Carrier", "Light the carrier indicator."},
     {"RD", "Receive data", "Light the received-data indicator."},
@@ -581,155 +581,160 @@ constexpr UiValue kCommandMetadata_65_values[] = {
     {"CHASE", "Chase", "Sweep backwards and forwards through the lights."},
     {"WALK", "Walk", "Step through the lights."},
 };
-constexpr UiValue kCommandMetadata_66_values[] = {
+constexpr UiValue kCommandMetadata_70_values[] = {
     {"AUTO", "Automatic", "Let the modem control the amplifier."},
     {"ON", "On", "Enable this feature."},
     {"OFF", "Off", "Disable this feature."},
 };
-constexpr UiMetadata kCommandMetadata_67_fields[] = {
+constexpr UiMetadata kCommandMetadata_71_fields[] = {
     {"percent", "Test volume", "Zero is silent and one hundred is full volume.", UiType::Int, "percent", 0, 100, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "percent", 1},
 };
-constexpr UiMetadata kCommandMetadata_67_variants_0_fields[] = {
+constexpr UiMetadata kCommandMetadata_71_variants_0_fields[] = {
     {"percent", "Test volume", "Zero is silent and one hundred is full volume.", UiType::Int, "percent", 0, 100, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "percent", 1},
 };
-constexpr UiMetadata kCommandMetadata_67_variants[] = {
-    {"level", "Fixed volume", "Set the test volume as a percentage.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*HWVOL={percent}", kCommandMetadata_67_variants_0_fields, 1, nullptr, 0, false, false, false, "", 1},
+constexpr UiMetadata kCommandMetadata_71_variants[] = {
+    {"level", "Fixed volume", "Set the test volume as a percentage.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*HWVOL={percent}", kCommandMetadata_71_variants_0_fields, 1, nullptr, 0, false, false, false, "", 1},
     {"pot", "Volume knob", "Follow the physical volume knob.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*HWVOL=POT", nullptr, 0, nullptr, 0, false, false, false, "", 1},
 };
-constexpr UiMetadata kCommandMetadata_68_fields[] = {
+constexpr UiMetadata kCommandMetadata_72_fields[] = {
     {"hz", "Frequency", "Choose a tone below the speaker sample limit.", UiType::Int, "hertz", 20, 7000, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "hertz", 1},
     {"ms", "Duration", "Choose how long to play the tone.", UiType::Int, "milliseconds", 10, 60000, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, true, false, false, "milliseconds", 1},
 };
-constexpr UiMetadata kCommandMetadata_68_variants_0_fields[] = {
+constexpr UiMetadata kCommandMetadata_72_variants_0_fields[] = {
     {"hz", "Frequency", "Choose a tone below the speaker sample limit.", UiType::Int, "hertz", 20, 7000, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "hertz", 1},
     {"ms", "Duration", "Choose how long to play the tone.", UiType::Int, "milliseconds", 10, 60000, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, true, false, false, "milliseconds", 1},
 };
-constexpr UiValue kCommandMetadata_68_variants_1_fields_0_values[] = {
+constexpr UiValue kCommandMetadata_72_variants_1_fields_0_values[] = {
     {"DIAL", "Dial tone", "Play a UK dial tone."},
     {"BUSY", "Busy tone", "Play a UK busy tone."},
     {"RING", "Ringback", "Play a UK ringback tone."},
     {"SWEEP", "Frequency sweep", "Sweep from 200 to 4000 hertz."},
 };
-constexpr UiMetadata kCommandMetadata_68_variants_1_fields[] = {
-    {"value", "Tone", "Choose a telephone tone or sweep.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_68_variants_1_fields_0_values, 4, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+constexpr UiMetadata kCommandMetadata_72_variants_1_fields[] = {
+    {"value", "Tone", "Choose a telephone tone or sweep.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_72_variants_1_fields_0_values, 4, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
 };
-constexpr UiMetadata kCommandMetadata_68_variants[] = {
-    {"frequency", "Fixed frequency", "Play a test tone for the chosen duration.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*HWTONE={hz},{ms}", kCommandMetadata_68_variants_0_fields, 2, nullptr, 0, false, false, false, "", 1},
-    {"tone", "Telephone tone", "Play a familiar telephone tone or sweep.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*HWTONE={value}", kCommandMetadata_68_variants_1_fields, 1, nullptr, 0, false, false, false, "", 1},
+constexpr UiMetadata kCommandMetadata_72_variants[] = {
+    {"frequency", "Fixed frequency", "Play a test tone for the chosen duration.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*HWTONE={hz},{ms}", kCommandMetadata_72_variants_0_fields, 2, nullptr, 0, false, false, false, "", 1},
+    {"tone", "Telephone tone", "Play a familiar telephone tone or sweep.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*HWTONE={value}", kCommandMetadata_72_variants_1_fields, 1, nullptr, 0, false, false, false, "", 1},
 };
-constexpr UiValue kCommandMetadata_75_fields_0_values[] = {
+constexpr UiValue kCommandMetadata_79_fields_0_values[] = {
     {"DCD", "Carrier detect", "Drive the carrier detect line."},
     {"RI", "Ring indicator", "Drive the ring indicator line."},
     {"CTS", "Clear to send", "Drive the clear-to-send line."},
 };
-constexpr UiValue kCommandMetadata_75_fields_1_values[] = {
+constexpr UiValue kCommandMetadata_79_fields_1_values[] = {
     {"ON", "On", "Enable this feature."},
     {"OFF", "Off", "Disable this feature."},
 };
-constexpr UiMetadata kCommandMetadata_75_fields[] = {
-    {"signal", "Output signal", "Choose the output to drive.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_75_fields_0_values, 3, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"state", "Signal state", "Choose whether to assert the output.", UiType::Bool, "", -1, -1, -1, -1, "", kCommandMetadata_75_fields_1_values, 2, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+constexpr UiMetadata kCommandMetadata_79_fields[] = {
+    {"signal", "Output signal", "Choose the output to drive.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_79_fields_0_values, 3, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"state", "Signal state", "Choose whether to assert the output.", UiType::Bool, "", -1, -1, -1, -1, "", kCommandMetadata_79_fields_1_values, 2, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
 };
-constexpr UiValue kCommandMetadata_76_values[] = {
+constexpr UiValue kCommandMetadata_81_values[] = {
     {"ANSI", "ANSI colour", "Check ANSI colour rendering."},
     {"PC", "PC characters", "Check PC line drawing."},
     {"PLAIN", "Plain text", "Check plain text."},
     {"LATIN1", "Latin-1", "Check accented characters."},
 };
-constexpr UiValue kCommandMetadata_88_fields_0_values[] = {
+constexpr UiValue kCommandMetadata_93_fields_0_values[] = {
     {"ANSI", "ANSI", "Use ANSI colours."},
     {"CP437", "PC characters", "Use PC line drawing."},
     {"PLAIN", "Plain text", "Use ASCII text."},
     {"LATIN1", "Latin-1", "Use Latin-1 characters."},
 };
-constexpr UiValue kCommandMetadata_88_fields_3_values[] = {
+constexpr UiValue kCommandMetadata_93_fields_3_values[] = {
     {"8", "Backspace", "Use character code 8."},
     {"127", "Delete", "Use character code 127."},
 };
-constexpr UiMetadata kCommandMetadata_88_fields[] = {
-    {"charset", "Character set", "Choose the terminal character set.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_88_fields_0_values, 4, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+constexpr UiMetadata kCommandMetadata_93_fields[] = {
+    {"charset", "Character set", "Choose the terminal character set.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_93_fields_0_values, 4, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"columns", "Columns", "Enter the terminal width.", UiType::Int, "columns", 1, 9999, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "columns", 1},
     {"rows", "Rows", "Enter the terminal height.", UiType::Int, "rows", 1, 9999, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "rows", 1},
-    {"backspace", "Backspace key", "Choose the code sent by the backspace key.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_88_fields_3_values, 2, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"backspace", "Backspace key", "Choose the code sent by the backspace key.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_93_fields_3_values, 2, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
 };
 constexpr UiMetadata kCommandMetadata[] = {
     {"status", "Status", "Show the call, front lights, network and serial connection.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*STATUS", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"phonebook", "Phonebook", "Save, change and dial your favourite destinations.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"settings", "Settings", "Choose the modem model and connection preferences.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"sounds", "Sounds", "Listen to dial tones and recorded modem handshakes.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"debug", "Diagnostics", "View diagnostic events and restart information.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"call-history", "Call History", "Show the last 50 network calls, including calls before a restart.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*CALLLOG", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"wifi-clock", "Wi-Fi and Clock", "Connect to Wi-Fi, check the network and set the clock.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"updates-reset", "Updates and Reset", "Manage software updates, the device password and resets.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"export-configuration", "Export Configuration", "Show commands that restore your settings. Passwords are left out.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*EXPORT", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"about", "About", "Show the version, build information and software credits.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*ABOUT", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"hardware-tests", "Hardware Tests", "Check the lights, speaker and serial electronics.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"client-tests", "Client Tests", "Check a serial terminal using the maintenance console or modem port. These tests cannot run in the browser.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"command-reference", "Command Reference", "Show the standard modem commands and the device commands.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*REFERENCE", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"phonebook", "Phone Book", "Save, change and dial your favourite destinations.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"phonebook.list-entries", "List entries", "Show up to 64 saved destinations. Number 1 starts as Amiga Retro BBS.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*PHONEBOOK?", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"phonebook.add-edit-entry", "Add / edit entry", "Save a destination with a number, address and connection type. Changes are saved immediately.", UiType::String, "", -1, -1, -1, -1, "", nullptr, 0, "*PHONEBOOK={num},{host},{port},{proto},{speed}", kCommandMetadata_14_fields, 5, nullptr, 0, false, false, false, "", 1},
+    {"phonebook.add-edit-entry", "Add / edit entry", "Save a destination with a number, address and connection type. Changes are saved immediately.", UiType::String, "", -1, -1, -1, -1, "", nullptr, 0, "*PHONEBOOK={num},{host},{port},{proto},{speed}", kCommandMetadata_3_fields, 5, nullptr, 0, false, false, false, "", 1},
     {"phonebook.delete-entry", "Delete entry", "Delete a saved destination by its number. The change is saved immediately.", UiType::String, "digits", -1, -1, 1, 11, "(?!(?:123|666|667|5517545|5517546)$)[0-9]{1,11}", nullptr, 0, "*PHONEDELETE={value}", nullptr, 0, nullptr, 0, false, false, false, "digits", 1},
     {"phonebook.dial", "Dial", "Call a saved number or a network address. This closes the menu.", UiType::String, "characters", -1, -1, -1, 71, "", nullptr, 0, "*DIAL={value}", nullptr, 0, nullptr, 0, false, false, false, "characters", 1},
+    {"call-history", "Call History", "Show the last 50 network calls, including calls before a restart.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*CALLLOG", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"settings-group", "Settings", "Configure modem, sounds, network, clock and updates.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"settings", "General Settings", "Choose the modem model and connection preferences.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"settings.current-stored-profiles", "Current and stored profiles", "Show the settings in use and the two saved profiles.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*SETTING?", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"settings.edit-profile-registers", "Modem profile settings", "Change the active modem settings. Save a profile to keep the changes.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", kCommandMetadata_18_fields, 89, nullptr, 0, false, false, false, "", 1},
-    {"settings.model", "Modem model", "Choose the modem identity and default connection speed. This is saved immediately.", UiType::Enum, "bits per second", -1, -1, -1, -1, "", kCommandMetadata_19_values, 4, "*MODEL={value}", nullptr, 0, nullptr, 0, false, false, false, "bits per second", 1},
+    {"settings.edit-profile-registers", "Modem profile settings", "Change the active modem settings. Save a profile to keep the changes.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", kCommandMetadata_10_fields, 89, nullptr, 0, false, false, false, "", 1},
+    {"settings.model", "Modem model", "Choose the modem identity and default connection speed. This is saved immediately.", UiType::Enum, "bits per second", -1, -1, -1, -1, "", kCommandMetadata_11_values, 4, "*MODEL={value}", nullptr, 0, nullptr, 0, false, false, false, "bits per second", 1},
     {"settings.auto-answer-rings", "Rings before answering", "Choose how many rings to wait before answering; zero turns automatic answering off. Values above eight answer on the eighth ring; save a profile to keep this setting.", UiType::Int, "rings", 0, 255, -1, -1, "", nullptr, 0, "*SETTING=S0={value}", nullptr, 0, nullptr, 0, false, false, false, "rings", 1},
-    {"settings.auto-answer-destination", "Answer incoming calls on", "Choose which local connection receives incoming calls. This is saved immediately.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_21_values, 4, "*ANSWERPORT={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"settings.host-baud", "RS232 serial speed", "Choose the RS232 speed or let the modem detect it from AT. The maintenance console stays at 115200 bits per second.", UiType::Enum, "bits per second", -1, -1, -1, -1, "", kCommandMetadata_22_values, 11, "*BAUD={value}", nullptr, 0, nullptr, 0, false, false, false, "bits per second", 1},
-    {"settings.data-throttle", "Limit data to modem speed", "Limit data transfer to the selected modem line speed. This is saved immediately.", UiType::Bool, "", -1, -1, -1, -1, "", kCommandMetadata_23_values, 2, "*THROTTLE={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"settings.save-active-profile", "Save active profile", "Save the active modem settings to one of the two stored profiles.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_24_values, 2, "*SETTING=&W{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"settings.load-stored-factory-profile", "Load stored/factory profile", "Load a saved or factory modem profile. This closes the menu.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_25_values, 6, "*SETTING=Z{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"settings.load-factory-profile", "Load factory profile", "Load factory modem settings into the active profile. Save a profile to keep them.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_26_values, 3, "*SETTING=&F{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"settings.power-on-profile", "Power-on profile", "Choose which stored or factory profile loads at power on. This is saved immediately.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_27_values, 5, "*SETTING=Y{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"settings.stored-number", "Saved dial string", "Save a dial string in one of four modem number slots.", UiType::String, "", -1, -1, -1, -1, "", nullptr, 0, "*SETTING=&Z{slot}={number}", kCommandMetadata_28_fields, 2, nullptr, 0, false, false, false, "", 1},
-    {"settings.terminal-style", "Terminal style", "Choose plain text or ANSI colour for the wrapping configuration list.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_29_values, 2, "*STYLE={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"settings.auto-answer-destination", "Answer incoming calls on", "Choose which local connection receives incoming calls. This is saved immediately.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_13_values, 4, "*ANSWERPORT={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"settings.host-baud", "RS232 serial speed", "Choose the RS232 speed or let the modem detect it from AT. The maintenance console stays at 115200 bits per second.", UiType::Enum, "bits per second", -1, -1, -1, -1, "", kCommandMetadata_14_values, 11, "*BAUD={value}", nullptr, 0, nullptr, 0, false, false, false, "bits per second", 1},
+    {"settings.data-throttle", "Limit data to modem speed", "Limit data transfer to the selected modem line speed. This is saved immediately.", UiType::Bool, "", -1, -1, -1, -1, "", kCommandMetadata_15_values, 2, "*THROTTLE={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"settings.save-active-profile", "Save active profile", "Save the active modem settings to one of the two stored profiles.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_16_values, 2, "*SETTING=&W{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"settings.load-stored-factory-profile", "Load stored/factory profile", "Load a saved or factory modem profile. This closes the menu.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_17_values, 6, "*SETTING=Z{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"settings.load-factory-profile", "Load factory profile", "Load factory modem settings into the active profile. Save a profile to keep them.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_18_values, 3, "*SETTING=&F{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"settings.power-on-profile", "Power-on profile", "Choose which stored or factory profile loads at power on. This is saved immediately.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_19_values, 5, "*SETTING=Y{value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"settings.stored-number", "Saved dial string", "Save a dial string in one of four modem number slots.", UiType::String, "", -1, -1, -1, -1, "", nullptr, 0, "*SETTING=&Z{slot}={number}", kCommandMetadata_20_fields, 2, nullptr, 0, false, false, false, "", 1},
+    {"settings.terminal-style", "Terminal style", "Choose plain text or ANSI colour for the wrapping configuration list.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_21_values, 2, "*STYLE={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"sounds", "Sounds", "Listen to dial tones and recorded modem handshakes.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"sounds.list-sounds", "List sounds", "Show the available generated tones and recorded handshakes.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*SOUNDS", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"sounds.play-sound", "Play a sound", "Play a tone or recorded handshake. Press any key to stop.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_31_values, 44, "*PLAY={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"sounds.play-sound", "Play a sound", "Play a tone or recorded handshake. Press any key to stop.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_24_values, 44, "*PLAY={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"sounds.ring-delay", "Ringing duration", "Choose how long outgoing ringback plays before connecting. This is saved immediately.", UiType::Int, "milliseconds", 0, 60000, -1, -1, "", nullptr, 0, "*RINGDELAY={value}", nullptr, 0, nullptr, 0, false, false, false, "seconds", 0.001},
     {"sounds.connect-delay", "Pause before connecting", "Choose the pause after the handshake and before the connection message. This is saved immediately.", UiType::Int, "milliseconds", 0, 60000, -1, -1, "", nullptr, 0, "*CONNECTDELAY={value}", nullptr, 0, nullptr, 0, false, false, false, "seconds", 0.001},
-    {"debug.view-log", "View log", "Show recent diagnostic events. Passwords and call data are never recorded.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*LOG", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"debug.verbosity", "Diagnostic detail", "Choose how much diagnostic detail to keep until restart.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_35_values, 3, "*LOG={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"debug.clear-debug-log", "Clear debug log", "Clear the diagnostic events held in memory.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*LOG=CLEAR", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"debug.reset-crash-information", "Restart and crash information", "Show the saved restart reason and any available crash information.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*RESETINFO", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"wifi-clock", "Wi-Fi", "Connect to Wi-Fi, check the network and set the clock.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"wifi-clock.network-status", "Network status", "Show the network name, address and signal strength. The Wi-Fi password is never shown.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*WIFI?", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"wifi-clock.scan", "Find Wi-Fi networks", "Find nearby Wi-Fi networks. Press any key to cancel.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*WIFISCAN", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"wifi-clock.join", "Connect to Wi-Fi", "Choose a scanned network or enter its name. Enter the Wi-Fi password at the hidden terminal prompt.", UiType::String, "", -1, -1, -1, -1, "", nullptr, 0, "*WIFIJOIN=\"{ssid}\"", kCommandMetadata_40_fields, 1, kCommandMetadata_40_variants, 2, false, false, false, "", 1},
-    {"wifi-clock.wifi-toggle", "Wi-Fi on / off", "Turn Wi-Fi on or off. Turning it off asks for confirmation and disconnects network clients.", UiType::Bool, "", -1, -1, -1, -1, "", kCommandMetadata_41_values, 2, "*WIFI={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"wifi-clock.join", "Connect to Wi-Fi", "Choose a scanned network or enter its name. Enter the Wi-Fi password at the hidden terminal prompt.", UiType::String, "", -1, -1, -1, -1, "", nullptr, 0, "*WIFIJOIN=\"{ssid}\"", kCommandMetadata_30_fields, 1, kCommandMetadata_30_variants, 2, false, false, false, "", 1},
+    {"wifi-clock.wifi-toggle", "Wi-Fi on / off", "Turn Wi-Fi on or off. Turning it off asks for confirmation and disconnects network clients.", UiType::Bool, "", -1, -1, -1, -1, "", kCommandMetadata_31_values, 2, "*WIFI={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"wifi-clock.forget-network", "Forget network", "Forget the saved Wi-Fi name and password.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*WIFIFORGET", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"wifi-clock.ip-configuration", "Network addresses", "Use automatic addressing or enter an address, subnet mask and gateway. Static addresses must share a subnet with the gateway.", UiType::String, "", -1, -1, -1, -1, "", nullptr, 0, "*WIFIIP=DHCP", nullptr, 0, kCommandMetadata_43_variants, 2, false, false, false, "", 1},
+    {"wifi-clock.ip-configuration", "Network addresses", "Use automatic addressing or enter an address, subnet mask and gateway. Static addresses must share a subnet with the gateway.", UiType::String, "", -1, -1, -1, -1, "", nullptr, 0, "*WIFIIP=DHCP", nullptr, 0, kCommandMetadata_33_variants, 2, false, false, false, "", 1},
     {"wifi-clock.network-name", "Network name", "Choose the local network name using letters, digits and hyphens, with no hyphen at either end. A trailing .local is accepted and removed.", UiType::String, "characters", -1, -1, 1, 32, "[A-Za-z0-9](?:[A-Za-z0-9-]{0,30}[A-Za-z0-9])?", nullptr, 0, "*HOSTNAME={value}", nullptr, 0, nullptr, 0, false, false, false, "characters", 1},
-    {"wifi-clock.time", "Time", "Show the local time after the clock has synchronised with a time server.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*TIME", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"wifi-clock.time-zone", "Time zone", "Choose a time zone or enter a POSIX clock rule. Daylight saving follows the selected rule.", UiType::Enum, "characters", -1, -1, -1, 63, "", kCommandMetadata_46_values, 16, "*TZ={value}", nullptr, 0, nullptr, 0, false, true, false, "characters", 1},
-    {"wifi-clock.ntp-server", "Time server", "Choose a time server using letters, digits, hyphens and dots. Do not start with a dot or hyphen, end with a dot, or leave an empty name part.", UiType::String, "characters", -1, -1, 1, 63, "(?![.-])(?!.*\\.\\.)(?!.*\\.$)[A-Za-z0-9.-]+", nullptr, 0, "*NTP={value}", nullptr, 0, nullptr, 0, false, false, false, "characters", 1},
     {"wifi-clock.dns-lookup", "Look up a network address", "Look up the network address of a host. Press a key to cancel.", UiType::String, "characters", -1, -1, 1, 63, "(?![.-])(?!.*\\.$)[A-Za-z0-9._-]+", nullptr, 0, "*DNS={value}", nullptr, 0, nullptr, 0, false, false, false, "characters", 1},
     {"wifi-clock.ping", "Check a network connection", "Check whether a host responds on the network. Press a key to cancel.", UiType::String, "characters", -1, -1, 1, 63, "(?![.-])(?!.*\\.$)[A-Za-z0-9._-]+", nullptr, 0, "*PING={value}", nullptr, 0, nullptr, 0, false, false, false, "characters", 1},
     {"wifi-clock.internet-status", "Internet dial-up status", "Show the dial-up internet connection and address settings. Drop DTR or use the other local port to hang up.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*INTERNET?", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"wifi-clock.internet-settings", "Dial-up internet addresses", "Choose private addresses for dial-up internet or its name server. The two addresses must be the usable hosts of the same private /30 subnet.", UiType::String, "", -1, -1, -1, -1, "", nullptr, 0, "*INTERNET=IP,{local},{peer}", kCommandMetadata_51_fields, 2, kCommandMetadata_51_variants, 3, false, false, false, "", 1},
-    {"wifi-clock.internet-dial", "Connect to dial-up internet", "Start a dial-up internet connection using PPP or SLIP. The computer needs a TCP/IP stack; the browser starts it on RS232.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_52_values, 2, "*DIAL={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"wifi-clock.internet-settings", "Dial-up internet addresses", "Choose private addresses for dial-up internet or its name server. The two addresses must be the usable hosts of the same private /30 subnet.", UiType::String, "", -1, -1, -1, -1, "", nullptr, 0, "*INTERNET=IP,{local},{peer}", kCommandMetadata_38_fields, 2, kCommandMetadata_38_variants, 3, false, false, false, "", 1},
+    {"wifi-clock.internet-dial", "Connect to dial-up internet", "Start a dial-up internet connection using PPP or SLIP. The computer needs a TCP/IP stack; the browser starts it on RS232.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_39_values, 2, "*DIAL={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"clock", "Clock", "Set the modem clock, time zone and time server.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"wifi-clock.time", "Time", "Show the local time after the clock has synchronised with a time server.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*TIME", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"wifi-clock.time-zone", "Time zone", "Choose a time zone or enter a POSIX clock rule. Daylight saving follows the selected rule.", UiType::Enum, "characters", -1, -1, -1, 63, "", kCommandMetadata_42_values, 16, "*TZ={value}", nullptr, 0, nullptr, 0, false, true, false, "characters", 1},
+    {"wifi-clock.ntp-server", "Time server", "Choose a time server using letters, digits, hyphens and dots. Do not start with a dot or hyphen, end with a dot, or leave an empty name part.", UiType::String, "characters", -1, -1, 1, 63, "(?![.-])(?!.*\\.\\.)(?!.*\\.$)[A-Za-z0-9.-]+", nullptr, 0, "*NTP={value}", nullptr, 0, nullptr, 0, false, false, false, "characters", 1},
+    {"updates-reset", "Updates", "Manage software updates, the device password and resets.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"updates-reset.firmware-version", "Firmware version", "Show the firmware version and build information.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*VER", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"updates-reset.ota-status", "Wireless update status", "Show the wireless update policy and remaining update window.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*OTA?", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"updates-reset.ota-policy-window", "Allow wireless updates", "Choose when wireless updates are allowed. Leave the menu before uploading.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_55_values, 4, "*OTA={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"updates-reset.ota-policy-window", "Allow wireless updates", "Choose when wireless updates are allowed. Leave the menu before uploading.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_47_values, 4, "*OTA={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"updates-reset.change-device-password", "Change device password", "Choose a device password of 8 to 32 printable characters. This is saved immediately.", UiType::Secret, "characters", -1, -1, 8, 32, "[\\x20-\\x7e]{8,32}", nullptr, 0, "*PASS={value}", nullptr, 0, nullptr, 0, false, false, false, "characters", 1},
+    {"updates-reset.web-interface", "Web interface", "Turn the browser interface on or off. Turning it off closes browser sessions.", UiType::Bool, "", -1, -1, -1, -1, "", kCommandMetadata_49_values, 2, "*WEB={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"updates-reset.network-console", "Network console", "Turn the network console on or off on TCP port 2001. Turning it off closes the connected client.", UiType::Bool, "", -1, -1, -1, -1, "", kCommandMetadata_50_values, 2, "*NETCONSOLE={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"reset", "Reset", "Restart the modem or restore factory settings.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"updates-reset.restart", "Restart", "Restart the device after confirmation. This closes the menu.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*RESTART", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"updates-reset.factory-reset", "Factory reset", "Erase all settings and passwords after confirmation. This closes the menu.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*FACTORY", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"updates-reset.web-interface", "Web interface", "Turn the browser interface on or off. Turning it off closes browser sessions.", UiType::Bool, "", -1, -1, -1, -1, "", kCommandMetadata_59_values, 2, "*WEB={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"updates-reset.network-console", "Network console", "Turn the network console on or off on TCP port 2001. Turning it off closes the connected client.", UiType::Bool, "", -1, -1, -1, -1, "", kCommandMetadata_60_values, 2, "*NETCONSOLE={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"export-configuration", "Export Configuration", "Show commands that restore your settings. Passwords are left out.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*EXPORT", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"help", "Help", "Find project information, commands and diagnostic tools.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"about", "About", "Show the version, build information and software credits.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*ABOUT", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"github", "GitHub", "Open the project repository for source, documentation, credits and licences.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*GITHUB", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"command-reference", "Command Reference", "Show the standard modem commands and the device commands.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*REFERENCE", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"debug", "Diagnostics", "View diagnostic events and restart information.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"debug.view-log", "View log", "Show recent diagnostic events. Passwords and call data are never recorded.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*LOG", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"debug.verbosity", "Diagnostic detail", "Choose how much diagnostic detail to keep until restart.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_61_values, 3, "*LOG={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"debug.clear-debug-log", "Clear debug log", "Clear the diagnostic events held in memory.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*LOG=CLEAR", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"debug.reset-crash-information", "Restart and crash information", "Show the saved restart reason and any available crash information.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*RESETINFO", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"hardware-tests", "Hardware Tests", "Check the lights, speaker and serial electronics.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"hardware-tests.guided-tests", "Guided tests", "Walk through hardware checks. Serial line and loopback steps are skipped when using RS232.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*HWTEST", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"hardware-tests.pin-map", "Pin map", "Show which processor pins connect to each part.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*HWPINS", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"hardware-tests.board-information", "Board information", "Show the processor, memory, firmware and file storage information.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*HWINFO", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"hardware-tests.files", "Files", "List the files stored on the device.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*HWFILES", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"hardware-tests.leds", "Indicator lights", "Light an indicator or run a light pattern. Automatic mode returns control to the modem.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_65_values, 12, "*HWLED={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"hardware-tests.amplifier", "Speaker amplifier", "Choose automatic speaker control or force the amplifier on or off.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_66_values, 3, "*HWAMP={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"hardware-tests.test-volume", "Test volume", "Set the hardware test volume or use the physical volume knob.", UiType::String, "", -1, -1, -1, -1, "", nullptr, 0, "*HWVOL={percent}", kCommandMetadata_67_fields, 1, kCommandMetadata_67_variants, 2, false, false, false, "", 1},
-    {"hardware-tests.tone-sweep", "Test tone or frequency sweep", "Play a fixed test frequency, a telephone tone or a frequency sweep. Press any key to stop.", UiType::String, "", -1, -1, -1, -1, "", nullptr, 0, "*HWTONE={hz},{ms}", kCommandMetadata_68_fields, 2, kCommandMetadata_68_variants, 2, false, false, false, "", 1},
+    {"hardware-tests.leds", "Indicator lights", "Light an indicator or run a light pattern. Automatic mode returns control to the modem.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_69_values, 12, "*HWLED={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"hardware-tests.amplifier", "Speaker amplifier", "Choose automatic speaker control or force the amplifier on or off.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_70_values, 3, "*HWAMP={value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"hardware-tests.test-volume", "Test volume", "Set the hardware test volume or use the physical volume knob.", UiType::String, "", -1, -1, -1, -1, "", nullptr, 0, "*HWVOL={percent}", kCommandMetadata_71_fields, 1, kCommandMetadata_71_variants, 2, false, false, false, "", 1},
+    {"hardware-tests.tone-sweep", "Test tone or frequency sweep", "Play a fixed test frequency, a telephone tone or a frequency sweep. Press any key to stop.", UiType::String, "", -1, -1, -1, -1, "", nullptr, 0, "*HWTONE={hz},{ms}", kCommandMetadata_72_fields, 2, kCommandMetadata_72_variants, 2, false, false, false, "", 1},
     {"hardware-tests.dtmf", "Touch-tone digits", "Play touch-tone digits, star, hash or the letters A to D. Press any key to stop.", UiType::String, "characters", -1, -1, -1, 120, "[0-9A-Da-d*#]*", nullptr, 0, "*HWDTMF={value}", nullptr, 0, nullptr, 0, false, false, false, "characters", 1},
     {"hardware-tests.pulse", "Pulse-dial digits", "Play UK pulse-dial clicks for digits zero to nine. Press any key to stop.", UiType::String, "characters", -1, -1, -1, 119, "[0-9]*", nullptr, 0, "*HWPULSE={value}", nullptr, 0, nullptr, 0, false, false, false, "characters", 1},
     {"hardware-tests.potentiometer", "Volume knob readings", "Show live readings from the volume knob. Press any key to stop.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*HWPOT", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"hardware-tests.rs232-lines", "RS232 control lines", "Check the RS232 control lines. Use the maintenance console because this takes over RS232.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*HWLINES", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"hardware-tests.loopback", "Serial loopback test", "Run the serial loopback tests. Use the maintenance console because this takes over RS232.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*HWLOOP=ALL", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"hardware-tests.bridge", "Serial port bridge", "Bridge the maintenance console to RS232. This takes over the RS232 port.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*HWBRIDGE", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"hardware-tests.output-signal", "Set an RS232 output", "Drive an RS232 output while idle. Use the maintenance console because this takes over RS232.", UiType::String, "", -1, -1, -1, -1, "", nullptr, 0, "*HWSIG={signal},{state}", kCommandMetadata_75_fields, 2, nullptr, 0, false, false, false, "", 1},
-    {"client-tests.display", "Display patterns", "Check how your serial terminal displays text and colour. Confirm the result in the terminal.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_76_values, 4, "*TEST {value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"hardware-tests.output-signal", "Set an RS232 output", "Drive an RS232 output while idle. Use the maintenance console because this takes over RS232.", UiType::String, "", -1, -1, -1, -1, "", nullptr, 0, "*HWSIG={signal},{state}", kCommandMetadata_79_fields, 2, nullptr, 0, false, false, false, "", 1},
+    {"client-tests", "Client Tests", "Check a serial terminal using the maintenance console or modem port. These tests cannot run in the browser.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"client-tests.display", "Display patterns", "Check how your serial terminal displays text and colour. Confirm the result in the terminal.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_81_values, 4, "*TEST {value}", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"client-tests.size", "Measure screen", "Measure the serial terminal size, with a ruler or manual entry if needed.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*TEST SIZE", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"client-tests.keys", "Keyboard codes", "Show the keys sent by the serial terminal. Press Ctrl-] to finish.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*TEST KEYS", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"client-tests.id", "Terminal identification", "Ask the serial terminal to identify itself and show its replies.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*TEST ID", nullptr, 0, nullptr, 0, false, false, false, "", 1},
@@ -741,102 +746,107 @@ constexpr UiMetadata kCommandMetadata[] = {
     {"client-tests.format", "Serial format", "Show the configured serial speed and format.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*TEST FORMAT", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"client-tests.transfer", "File transfers", "Test a serial file transfer using XMODEM, YMODEM or ZMODEM.", UiType::String, "characters", -1, -1, -1, 113, "", nullptr, 0, "*TEST TRANSFER={value}", nullptr, 0, nullptr, 0, false, false, false, "characters", 1},
     {"client-tests.summary", "Results summary", "Show the serial terminal findings, saved settings and last transfer.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*TEST SUMMARY", nullptr, 0, nullptr, 0, false, false, false, "", 1},
-    {"client-tests.edit", "Edit terminal settings", "Enter the character set, screen size and backspace key for this serial port.", UiType::String, "", -1, -1, -1, -1, "", nullptr, 0, "*TEST SET={charset},{columns},{rows},{backspace}", kCommandMetadata_88_fields, 4, nullptr, 0, false, false, false, "", 1},
+    {"client-tests.edit", "Edit terminal settings", "Enter the character set, screen size and backspace key for this serial port.", UiType::String, "", -1, -1, -1, -1, "", nullptr, 0, "*TEST SET={charset},{columns},{rows},{backspace}", kCommandMetadata_93_fields, 4, nullptr, 0, false, false, false, "", 1},
     {"client-tests.apply", "Save terminal settings", "Confirm in the terminal to save the findings for this serial port.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*TEST APPLY", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"client-tests.reset", "Reset terminal settings", "Confirm in the terminal to restore default settings for this serial port.", UiType::Action, "", -1, -1, -1, -1, "", nullptr, 0, "*TEST RESET", nullptr, 0, nullptr, 0, false, false, false, "", 1},
 };
 constexpr Action kActions[] = {
     {Screen::Main, "Status", "*STATUS", "Show the call, front lights, network and serial connection.", Screen::Main, false, false, false, false, "status", 'A', true, "View modem, carrier, line and connection status", &kCommandMetadata[0]},
-    {Screen::Main, "Phonebook", "", "Save, change and dial your favourite destinations.", Screen::Phonebook, false, false, false, false, "phonebook", 'B', true, "Manage saved numbers and dial", &kCommandMetadata[1]},
-    {Screen::Main, "Settings", "", "Choose the modem model and connection preferences.", Screen::Settings, false, false, false, false, "settings", 'C', true, "Configure modem options and stored profiles", &kCommandMetadata[2]},
-    {Screen::Main, "Sounds", "", "Listen to dial tones and recorded modem handshakes.", Screen::Sounds, false, false, false, false, "sounds", 'D', true, "Browse and play sounds", &kCommandMetadata[3]},
-    {Screen::Main, "Debug", "", "View diagnostic events and restart information.", Screen::Debug, false, false, false, false, "debug", 'E', true, "View diagnostic logs and reset/crash data", &kCommandMetadata[4]},
-    {Screen::Main, "Call History", "*CALLLOG", "Show the last 50 network calls, including calls before a restart.", Screen::Main, false, false, false, false, "call-history", 'F', true, "Inspect call records and connection results", &kCommandMetadata[5]},
-    {Screen::Main, "Wi-Fi and Clock", "", "Connect to Wi-Fi, check the network and set the clock.", Screen::Wifi, false, false, false, false, "wifi-clock", 'G', true, "Manage networking and time services", &kCommandMetadata[6]},
-    {Screen::Main, "Updates and Reset", "", "Manage software updates, the device password and resets.", Screen::Updates, false, false, false, false, "updates-reset", 'H', true, "Manage firmware, password, restart and reset", &kCommandMetadata[7]},
-    {Screen::Main, "Export Configuration", "*EXPORT", "Show commands that restore your settings. Passwords are left out.", Screen::Main, false, false, false, false, "export-configuration", 'I', true, "Export modem configuration safely", &kCommandMetadata[8]},
-    {Screen::Main, "About", "*ABOUT", "Show the version, build information and software credits.", Screen::Main, false, false, false, false, "about", 'J', true, "Show version, device and project information", &kCommandMetadata[9]},
-    {Screen::Main, "Hardware Tests", "", "Check the lights, speaker and serial electronics.", Screen::Hardware, false, false, false, false, "hardware-tests", 'K', true, "Run guided and individual hardware tests", &kCommandMetadata[10]},
-    {Screen::Main, "Client Tests", "", "Check a serial terminal using the maintenance console or modem port. These tests cannot run in the browser.", Screen::Client, false, false, false, false, "client-tests", 'L', true, "Serial terminal diagnostics and X/Y/ZMODEM", &kCommandMetadata[11]},
-    {Screen::Main, "Command Reference", "*REFERENCE", "Show the standard modem commands and the device commands.", Screen::Main, false, false, false, false, "command-reference", 'M', true, "Browse AT commands and usage examples", &kCommandMetadata[12]},
-    {Screen::Phonebook, "List entries", "*PHONEBOOK?", "Show up to 64 saved destinations. Number 1 starts as Amiga Retro BBS.", Screen::Phonebook, false, false, false, false, "phonebook.list-entries", 'A', true, "Show up to 64 saved destinations. Number 1 starts as Amiga Retro BBS.", &kCommandMetadata[13]},
-    {Screen::Phonebook, "Add / edit entry", "*PHONEBOOK=", "Save a destination with a number, address and connection type. Changes are saved immediately.", Screen::Phonebook, true, false, false, false, "phonebook.add-edit-entry", 'B', true, "Save a destination with a number, address and connection type. Changes are saved immediately.", &kCommandMetadata[14]},
-    {Screen::Phonebook, "Delete entry", "*PHONEDELETE=", "Delete a saved destination by its number. The change is saved immediately.", Screen::Phonebook, true, false, false, false, "phonebook.delete-entry", 'C', true, "Delete a saved destination by its number. The change is saved immediately.", &kCommandMetadata[15]},
-    {Screen::Phonebook, "Dial", "*DIAL=", "Call a saved number or a network address. This closes the menu.", Screen::Phonebook, true, false, false, true, "phonebook.dial", 'D', true, "Call a saved number or a network address. This closes the menu.", &kCommandMetadata[16]},
-    {Screen::Settings, "Current and stored profiles", "*SETTING?", "Show the settings in use and the two saved profiles.", Screen::Settings, false, false, false, false, "settings.current-stored-profiles", 'A', true, "Show the settings in use and the two saved profiles.", &kCommandMetadata[17]},
-    {Screen::Settings, "Edit profile / registers", "", "Change the active modem settings. Save a profile to keep the changes.", Screen::Profile, false, false, false, false, "settings.edit-profile-registers", 'B', true, "Change the active modem settings. Save a profile to keep the changes.", &kCommandMetadata[18]},
-    {Screen::Settings, "Model", "*MODEL=", "Choose the modem identity and default connection speed. This is saved immediately.", Screen::Settings, true, false, false, false, "settings.model", 'C', true, "Choose the modem identity and default connection speed. This is saved immediately.", &kCommandMetadata[19]},
-    {Screen::Settings, "Auto-answer rings (S0)", "*SETTING=S0=", "Choose how many rings to wait before answering; zero turns automatic answering off. Values above eight answer on the eighth ring; save a profile to keep this setting.", Screen::Settings, true, false, false, false, "settings.auto-answer-rings", 'D', true, "Choose how many rings to wait before answering; zero turns automatic answering off. Values above eight answer on the eighth ring; save a profile to keep this setting.", &kCommandMetadata[20]},
-    {Screen::Settings, "Auto-answer destination", "*ANSWERPORT=", "Choose which local connection receives incoming calls. This is saved immediately.", Screen::Settings, true, false, false, false, "settings.auto-answer-destination", 'E', true, "Choose which local connection receives incoming calls. This is saved immediately.", &kCommandMetadata[21]},
-    {Screen::Settings, "Host baud", "*BAUD=", "Choose the RS232 speed or let the modem detect it from AT. The maintenance console stays at 115200 bits per second.", Screen::Settings, true, false, false, true, "settings.host-baud", 'F', true, "Choose the RS232 speed or let the modem detect it from AT. The maintenance console stays at 115200 bits per second.", &kCommandMetadata[22]},
-    {Screen::Settings, "Data throttle", "*THROTTLE=", "Limit data transfer to the selected modem line speed. This is saved immediately.", Screen::Settings, true, false, false, false, "settings.data-throttle", 'G', true, "Limit data transfer to the selected modem line speed. This is saved immediately.", &kCommandMetadata[23]},
-    {Screen::Settings, "Save active profile", "*SETTING=&W", "Save the active modem settings to one of the two stored profiles.", Screen::Settings, true, false, false, false, "settings.save-active-profile", 'H', true, "Save the active modem settings to one of the two stored profiles.", &kCommandMetadata[24]},
-    {Screen::Settings, "Load stored/factory profile", "*SETTING=Z", "Load a saved or factory modem profile. This closes the menu.", Screen::Settings, true, false, false, true, "settings.load-stored-factory-profile", 'I', true, "Load a saved or factory modem profile. This closes the menu.", &kCommandMetadata[25]},
-    {Screen::Settings, "Load factory profile", "*SETTING=&F", "Load factory modem settings into the active profile. Save a profile to keep them.", Screen::Settings, true, false, false, false, "settings.load-factory-profile", 'J', true, "Load factory modem settings into the active profile. Save a profile to keep them.", &kCommandMetadata[26]},
-    {Screen::Settings, "Power-on profile", "*SETTING=Y", "Choose which stored or factory profile loads at power on. This is saved immediately.", Screen::Settings, true, false, false, false, "settings.power-on-profile", 'K', true, "Choose which stored or factory profile loads at power on. This is saved immediately.", &kCommandMetadata[27]},
-    {Screen::Settings, "Stored number", "*SETTING=&Z", "Save a dial string in one of four modem number slots.", Screen::Settings, true, false, false, false, "settings.stored-number", 'L', true, "Save a dial string in one of four modem number slots.", &kCommandMetadata[28]},
-    {Screen::Settings, "Terminal style", "*STYLE=", "Choose plain text or ANSI colour for the wrapping configuration list.", Screen::Settings, true, false, false, false, "settings.terminal-style", 'M', true, "Choose plain text or ANSI colour for the wrapping configuration list.", &kCommandMetadata[29]},
-    {Screen::Sounds, "List sounds", "*SOUNDS", "Show the available generated tones and recorded handshakes.", Screen::Sounds, false, false, false, false, "sounds.list-sounds", 'A', true, "Show the available generated tones and recorded handshakes.", &kCommandMetadata[30]},
-    {Screen::Sounds, "Play", "*PLAY=", "Play a tone or recorded handshake. Press any key to stop.", Screen::Sounds, true, false, false, false, "sounds.play-sound", 'B', true, "Play a tone or recorded handshake. Press any key to stop.", &kCommandMetadata[31]},
-    {Screen::Sounds, "Ringing duration", "*RINGDELAY=", "Choose how long outgoing ringback plays before connecting. This is saved immediately.", Screen::Sounds, true, false, false, false, "sounds.ring-delay", 'C', true, "Choose how long outgoing ringback plays before connecting. This is saved immediately.", &kCommandMetadata[32]},
-    {Screen::Sounds, "Delay before CONNECT", "*CONNECTDELAY=", "Choose the pause after the handshake and before the connection message. This is saved immediately.", Screen::Sounds, true, false, false, false, "sounds.connect-delay", 'D', true, "Choose the pause after the handshake and before the connection message. This is saved immediately.", &kCommandMetadata[33]},
-    {Screen::Debug, "View log", "*LOG", "Show recent diagnostic events. Passwords and call data are never recorded.", Screen::Debug, false, false, false, false, "debug.view-log", 'A', true, "Show recent diagnostic events. Passwords and call data are never recorded.", &kCommandMetadata[34]},
-    {Screen::Debug, "Verbosity", "*LOG=", "Choose how much diagnostic detail to keep until restart.", Screen::Debug, true, false, false, false, "debug.verbosity", 'B', true, "Choose how much diagnostic detail to keep until restart.", &kCommandMetadata[35]},
-    {Screen::Debug, "Clear debug log", "*LOG=CLEAR", "Clear the diagnostic events held in memory.", Screen::Debug, false, false, false, false, "debug.clear-debug-log", 'C', true, "Clear the diagnostic events held in memory.", &kCommandMetadata[36]},
-    {Screen::Debug, "Reset / crash information", "*RESETINFO", "Show the saved restart reason and any available crash information.", Screen::Debug, false, false, false, false, "debug.reset-crash-information", 'D', true, "Show the saved restart reason and any available crash information.", &kCommandMetadata[37]},
-    {Screen::Wifi, "Network status", "*WIFI?", "Show the network name, address and signal strength. The Wi-Fi password is never shown.", Screen::Wifi, false, false, false, false, "wifi-clock.network-status", 'A', true, "Show the network name, address and signal strength. The Wi-Fi password is never shown.", &kCommandMetadata[38]},
-    {Screen::Wifi, "Scan", "*WIFISCAN", "Find nearby Wi-Fi networks. Press any key to cancel.", Screen::Wifi, false, false, false, false, "wifi-clock.scan", 'B', true, "Find nearby Wi-Fi networks. Press any key to cancel.", &kCommandMetadata[39]},
-    {Screen::Wifi, "Join", "*WIFIJOIN=", "Choose a scanned network or enter its name. Enter the Wi-Fi password at the hidden terminal prompt.", Screen::Wifi, true, false, false, false, "wifi-clock.join", 'C', true, "Choose a scanned network or enter its name. Enter the Wi-Fi password at the hidden terminal prompt.", &kCommandMetadata[40]},
-    {Screen::Wifi, "Wi-Fi on / off", "*WIFI=", "Turn Wi-Fi on or off. Turning it off asks for confirmation and disconnects network clients.", Screen::Wifi, true, false, false, false, "wifi-clock.wifi-toggle", 'D', true, "Turn Wi-Fi on or off. Turning it off asks for confirmation and disconnects network clients.", &kCommandMetadata[41]},
-    {Screen::Wifi, "Forget network", "*WIFIFORGET", "Forget the saved Wi-Fi name and password.", Screen::Wifi, false, false, false, false, "wifi-clock.forget-network", 'E', true, "Forget the saved Wi-Fi name and password.", &kCommandMetadata[42]},
-    {Screen::Wifi, "IP configuration", "*WIFIIP=", "Use automatic addressing or enter an address, subnet mask and gateway. Static addresses must share a subnet with the gateway.", Screen::Wifi, true, false, false, false, "wifi-clock.ip-configuration", 'F', true, "Use automatic addressing or enter an address, subnet mask and gateway. Static addresses must share a subnet with the gateway.", &kCommandMetadata[43]},
-    {Screen::Wifi, "Network name", "*HOSTNAME=", "Choose the local network name using letters, digits and hyphens, with no hyphen at either end. A trailing .local is accepted and removed.", Screen::Wifi, true, false, false, false, "wifi-clock.network-name", 'G', true, "Choose the local network name using letters, digits and hyphens, with no hyphen at either end. A trailing .local is accepted and removed.", &kCommandMetadata[44]},
-    {Screen::Wifi, "Time", "*TIME", "Show the local time after the clock has synchronised with a time server.", Screen::Wifi, false, false, false, false, "wifi-clock.time", 'H', true, "Show the local time after the clock has synchronised with a time server.", &kCommandMetadata[45]},
-    {Screen::Wifi, "Time zone", "*TZ=", "Choose a time zone or enter a POSIX clock rule. Daylight saving follows the selected rule.", Screen::Wifi, true, false, false, false, "wifi-clock.time-zone", 'I', true, "Choose a time zone or enter a POSIX clock rule. Daylight saving follows the selected rule.", &kCommandMetadata[46]},
-    {Screen::Wifi, "NTP server", "*NTP=", "Choose a time server using letters, digits, hyphens and dots. Do not start with a dot or hyphen, end with a dot, or leave an empty name part.", Screen::Wifi, true, false, false, false, "wifi-clock.ntp-server", 'J', true, "Choose a time server using letters, digits, hyphens and dots. Do not start with a dot or hyphen, end with a dot, or leave an empty name part.", &kCommandMetadata[47]},
-    {Screen::Wifi, "DNS lookup", "*DNS=", "Look up the network address of a host. Press a key to cancel.", Screen::Wifi, true, false, false, false, "wifi-clock.dns-lookup", 'K', true, "Look up the network address of a host. Press a key to cancel.", &kCommandMetadata[48]},
-    {Screen::Wifi, "Ping", "*PING=", "Check whether a host responds on the network. Press a key to cancel.", Screen::Wifi, true, false, false, false, "wifi-clock.ping", 'L', true, "Check whether a host responds on the network. Press a key to cancel.", &kCommandMetadata[49]},
-    {Screen::Wifi, "Internet dial-up status", "*INTERNET?", "Show the dial-up internet connection and address settings. Drop DTR or use the other local port to hang up.", Screen::Wifi, false, false, false, false, "wifi-clock.internet-status", 'M', true, "Show the dial-up internet connection and address settings. Drop DTR or use the other local port to hang up.", &kCommandMetadata[50]},
-    {Screen::Wifi, "Internet addresses / DNS", "*INTERNET=", "Choose private addresses for dial-up internet or its name server. The two addresses must be the usable hosts of the same private /30 subnet.", Screen::Wifi, true, false, false, false, "wifi-clock.internet-settings", 'N', true, "Choose private addresses for dial-up internet or its name server. The two addresses must be the usable hosts of the same private /30 subnet.", &kCommandMetadata[51]},
-    {Screen::Wifi, "Dial Internet PPP / SLIP", "*DIAL=", "Start a dial-up internet connection using PPP or SLIP. The computer needs a TCP/IP stack; the browser starts it on RS232.", Screen::Wifi, true, false, false, true, "wifi-clock.internet-dial", 'O', true, "Start a dial-up internet connection using PPP or SLIP. The computer needs a TCP/IP stack; the browser starts it on RS232.", &kCommandMetadata[52]},
-    {Screen::Updates, "Firmware version", "*VER", "Show the firmware version and build information.", Screen::Updates, false, false, false, false, "updates-reset.firmware-version", 'A', true, "Show the firmware version and build information.", &kCommandMetadata[53]},
-    {Screen::Updates, "OTA status", "*OTA?", "Show the wireless update policy and remaining update window.", Screen::Updates, false, false, false, false, "updates-reset.ota-status", 'B', true, "Show the wireless update policy and remaining update window.", &kCommandMetadata[54]},
-    {Screen::Updates, "OTA policy / window", "*OTA=", "Choose when wireless updates are allowed. Leave the menu before uploading.", Screen::Updates, true, false, false, false, "updates-reset.ota-policy-window", 'C', true, "Choose when wireless updates are allowed. Leave the menu before uploading.", &kCommandMetadata[55]},
-    {Screen::Updates, "Change device password", "*PASS=", "Choose a device password of 8 to 32 printable characters. This is saved immediately.", Screen::Updates, true, true, false, false, "updates-reset.change-device-password", 'D', true, "Choose a device password of 8 to 32 printable characters. This is saved immediately.", &kCommandMetadata[56]},
-    {Screen::Updates, "Restart", "*RESTART", "Restart the device after confirmation. This closes the menu.", Screen::Updates, false, false, false, true, "updates-reset.restart", 'E', true, "Restart the device after confirmation. This closes the menu.", &kCommandMetadata[57]},
-    {Screen::Updates, "Factory reset", "*FACTORY", "Erase all settings and passwords after confirmation. This closes the menu.", Screen::Updates, false, false, false, true, "updates-reset.factory-reset", 'F', true, "Erase all settings and passwords after confirmation. This closes the menu.", &kCommandMetadata[58]},
-    {Screen::Updates, "Web interface", "*WEB=", "Turn the browser interface on or off. Turning it off closes browser sessions.", Screen::Updates, true, false, false, false, "updates-reset.web-interface", 'G', true, "Turn the browser interface on or off. Turning it off closes browser sessions.", &kCommandMetadata[59]},
-    {Screen::Updates, "Network console", "*NETCONSOLE=", "Turn the network console on or off on TCP port 2001. Turning it off closes the connected client.", Screen::Updates, true, false, false, false, "updates-reset.network-console", 'H', true, "Turn the network console on or off on TCP port 2001. Turning it off closes the connected client.", &kCommandMetadata[60]},
-    {Screen::Hardware, "Guided tests", "*HWTEST", "Walk through hardware checks. Serial line and loopback steps are skipped when using RS232.", Screen::Hardware, false, false, false, false, "hardware-tests.guided-tests", 'A', true, "Walk through hardware checks. Serial line and loopback steps are skipped when using RS232.", &kCommandMetadata[61]},
-    {Screen::Hardware, "Pin map", "*HWPINS", "Show which processor pins connect to each part.", Screen::Hardware, false, false, false, false, "hardware-tests.pin-map", 'B', true, "Show which processor pins connect to each part.", &kCommandMetadata[62]},
-    {Screen::Hardware, "Board information", "*HWINFO", "Show the processor, memory, firmware and file storage information.", Screen::Hardware, false, false, false, false, "hardware-tests.board-information", 'C', true, "Show the processor, memory, firmware and file storage information.", &kCommandMetadata[63]},
-    {Screen::Hardware, "Files", "*HWFILES", "List the files stored on the device.", Screen::Hardware, false, false, false, false, "hardware-tests.files", 'D', true, "List the files stored on the device.", &kCommandMetadata[64]},
-    {Screen::Hardware, "LEDs", "*HWLED=", "Light an indicator or run a light pattern. Automatic mode returns control to the modem.", Screen::Hardware, true, false, false, false, "hardware-tests.leds", 'E', true, "Light an indicator or run a light pattern. Automatic mode returns control to the modem.", &kCommandMetadata[65]},
-    {Screen::Hardware, "Amplifier", "*HWAMP=", "Choose automatic speaker control or force the amplifier on or off.", Screen::Hardware, true, false, false, false, "hardware-tests.amplifier", 'F', true, "Choose automatic speaker control or force the amplifier on or off.", &kCommandMetadata[66]},
-    {Screen::Hardware, "Test volume", "*HWVOL=", "Set the hardware test volume or use the physical volume knob.", Screen::Hardware, true, false, false, false, "hardware-tests.test-volume", 'G', true, "Set the hardware test volume or use the physical volume knob.", &kCommandMetadata[67]},
-    {Screen::Hardware, "Tone / sweep", "*HWTONE=", "Play a fixed test frequency, a telephone tone or a frequency sweep. Press any key to stop.", Screen::Hardware, true, false, false, false, "hardware-tests.tone-sweep", 'H', true, "Play a fixed test frequency, a telephone tone or a frequency sweep. Press any key to stop.", &kCommandMetadata[68]},
-    {Screen::Hardware, "DTMF", "*HWDTMF=", "Play touch-tone digits, star, hash or the letters A to D. Press any key to stop.", Screen::Hardware, true, false, false, false, "hardware-tests.dtmf", 'I', true, "Play touch-tone digits, star, hash or the letters A to D. Press any key to stop.", &kCommandMetadata[69]},
-    {Screen::Hardware, "Pulse", "*HWPULSE=", "Play UK pulse-dial clicks for digits zero to nine. Press any key to stop.", Screen::Hardware, true, false, false, false, "hardware-tests.pulse", 'J', true, "Play UK pulse-dial clicks for digits zero to nine. Press any key to stop.", &kCommandMetadata[70]},
-    {Screen::Hardware, "Potentiometer", "*HWPOT", "Show live readings from the volume knob. Press any key to stop.", Screen::Hardware, false, false, false, false, "hardware-tests.potentiometer", 'K', true, "Show live readings from the volume knob. Press any key to stop.", &kCommandMetadata[71]},
-    {Screen::Hardware, "RS232 lines", "*HWLINES", "Check the RS232 control lines. Use the maintenance console because this takes over RS232.", Screen::Hardware, false, false, true, false, "hardware-tests.rs232-lines", 'L', true, "Check the RS232 control lines. Use the maintenance console because this takes over RS232.", &kCommandMetadata[72]},
-    {Screen::Hardware, "Loopback", "*HWLOOP=ALL", "Run the serial loopback tests. Use the maintenance console because this takes over RS232.", Screen::Hardware, false, false, true, false, "hardware-tests.loopback", 'M', true, "Run the serial loopback tests. Use the maintenance console because this takes over RS232.", &kCommandMetadata[73]},
-    {Screen::Hardware, "Bridge", "*HWBRIDGE", "Bridge the maintenance console to RS232. This takes over the RS232 port.", Screen::Hardware, false, false, true, false, "hardware-tests.bridge", 'N', true, "Bridge the maintenance console to RS232. This takes over the RS232 port.", &kCommandMetadata[74]},
-    {Screen::Hardware, "Output signal", "*HWSIG=", "Drive an RS232 output while idle. Use the maintenance console because this takes over RS232.", Screen::Hardware, true, false, true, false, "hardware-tests.output-signal", 'O', true, "Drive an RS232 output while idle. Use the maintenance console because this takes over RS232.", &kCommandMetadata[75]},
-    {Screen::Client, "Display patterns", "*TEST ", "Check how your serial terminal displays text and colour. Confirm the result in the terminal.", Screen::Client, true, false, false, false, "client-tests.display", 'A', true, "Check how your serial terminal displays text and colour. Confirm the result in the terminal.", &kCommandMetadata[76]},
-    {Screen::Client, "Measure screen", "*TEST SIZE", "Measure the serial terminal size, with a ruler or manual entry if needed.", Screen::Client, false, false, false, false, "client-tests.size", 'B', true, "Measure the serial terminal size, with a ruler or manual entry if needed.", &kCommandMetadata[77]},
-    {Screen::Client, "Keyboard codes", "*TEST KEYS", "Show the keys sent by the serial terminal. Press Ctrl-] to finish.", Screen::Client, false, false, false, false, "client-tests.keys", 'C', true, "Show the keys sent by the serial terminal. Press Ctrl-] to finish.", &kCommandMetadata[78]},
-    {Screen::Client, "Terminal identification", "*TEST ID", "Ask the serial terminal to identify itself and show its replies.", Screen::Client, false, false, false, false, "client-tests.id", 'D', true, "Ask the serial terminal to identify itself and show its replies.", &kCommandMetadata[79]},
-    {Screen::Client, "Echo and line endings", "*TEST ECHO", "Check line endings and local echo. Press Ctrl-] to finish.", Screen::Client, false, false, false, false, "client-tests.echo", 'E', true, "Check line endings and local echo. Press Ctrl-] to finish.", &kCommandMetadata[80]},
-    {Screen::Client, "Transmit and RTS", "*TEST TX=", "Send data for the selected duration and check the pause signal.", Screen::Client, true, false, false, false, "client-tests.tx", 'F', true, "Send data for the selected duration and check the pause signal.", &kCommandMetadata[81]},
-    {Screen::Client, "Receive and CTS", "*TEST RX=", "Receive data for the selected duration and check flow control.", Screen::Client, true, false, false, false, "client-tests.rx", 'G', true, "Receive data for the selected duration and check flow control.", &kCommandMetadata[82]},
-    {Screen::Client, "Cable and signals", "*TEST CABLE", "Check RS232 cable signals and restore them afterwards. This test needs RS232.", Screen::Client, false, false, false, false, "client-tests.cable", 'H', true, "Check RS232 cable signals and restore them afterwards. This test needs RS232.", &kCommandMetadata[83]},
-    {Screen::Client, "Terminal bell", "*TEST BELL", "Send the terminal bell and confirm whether it was heard.", Screen::Client, false, false, false, false, "client-tests.bell", 'I', true, "Send the terminal bell and confirm whether it was heard.", &kCommandMetadata[84]},
-    {Screen::Client, "Serial format", "*TEST FORMAT", "Show the configured serial speed and format.", Screen::Client, false, false, false, false, "client-tests.format", 'J', true, "Show the configured serial speed and format.", &kCommandMetadata[85]},
-    {Screen::Client, "File transfers", "*TEST TRANSFER=", "Test a serial file transfer using XMODEM, YMODEM or ZMODEM.", Screen::Client, true, false, false, false, "client-tests.transfer", 'K', true, "Test a serial file transfer using XMODEM, YMODEM or ZMODEM.", &kCommandMetadata[86]},
-    {Screen::Client, "Results summary", "*TEST SUMMARY", "Show the serial terminal findings, saved settings and last transfer.", Screen::Client, false, false, false, false, "client-tests.summary", 'L', true, "Show the serial terminal findings, saved settings and last transfer.", &kCommandMetadata[87]},
-    {Screen::Client, "Edit client findings", "*TEST SET=", "Enter the character set, screen size and backspace key for this serial port.", Screen::Client, true, false, false, false, "client-tests.edit", 'M', true, "Enter the character set, screen size and backspace key for this serial port.", &kCommandMetadata[88]},
-    {Screen::Client, "Save client findings", "*TEST APPLY", "Confirm in the terminal to save the findings for this serial port.", Screen::Client, false, false, false, false, "client-tests.apply", 'N', true, "Confirm in the terminal to save the findings for this serial port.", &kCommandMetadata[89]},
-    {Screen::Client, "Reset client settings", "*TEST RESET", "Confirm in the terminal to restore default settings for this serial port.", Screen::Client, false, false, false, false, "client-tests.reset", 'O', true, "Confirm in the terminal to restore default settings for this serial port.", &kCommandMetadata[90]},
+    {Screen::Main, "Phone Book", "", "Save, change and dial your favourite destinations.", Screen::Phonebook, false, false, false, false, "phonebook", 'B', true, "Manage saved numbers and dial", &kCommandMetadata[1]},
+    {Screen::Phonebook, "List entries", "*PHONEBOOK?", "Show up to 64 saved destinations. Number 1 starts as Amiga Retro BBS.", Screen::Phonebook, false, false, false, false, "phonebook.list-entries", 'A', true, "Show up to 64 saved destinations. Number 1 starts as Amiga Retro BBS.", &kCommandMetadata[2]},
+    {Screen::Phonebook, "Add / edit entry", "*PHONEBOOK=", "Save a destination with a number, address and connection type. Changes are saved immediately.", Screen::Phonebook, true, false, false, false, "phonebook.add-edit-entry", 'B', true, "Save a destination with a number, address and connection type. Changes are saved immediately.", &kCommandMetadata[3]},
+    {Screen::Phonebook, "Delete entry", "*PHONEDELETE=", "Delete a saved destination by its number. The change is saved immediately.", Screen::Phonebook, true, false, false, false, "phonebook.delete-entry", 'C', true, "Delete a saved destination by its number. The change is saved immediately.", &kCommandMetadata[4]},
+    {Screen::Phonebook, "Dial", "*DIAL=", "Call a saved number or a network address. This closes the menu.", Screen::Phonebook, true, false, false, true, "phonebook.dial", 'D', true, "Call a saved number or a network address. This closes the menu.", &kCommandMetadata[5]},
+    {Screen::Main, "Call History", "*CALLLOG", "Show the last 50 network calls, including calls before a restart.", Screen::Main, false, false, false, false, "call-history", 'C', true, "Inspect call records and connection results", &kCommandMetadata[6]},
+    {Screen::Main, "Settings", "", "Configure modem, sounds, network, clock and updates.", Screen::Options, false, false, false, false, "settings-group", 'D', true, "Configure modem, sounds, network, clock and updates.", &kCommandMetadata[7]},
+    {Screen::Options, "General Settings", "", "Choose the modem model and connection preferences.", Screen::Settings, false, false, false, false, "settings", 'A', true, "Configure modem options and stored profiles", &kCommandMetadata[8]},
+    {Screen::Settings, "Current and stored profiles", "*SETTING?", "Show the settings in use and the two saved profiles.", Screen::Settings, false, false, false, false, "settings.current-stored-profiles", 'A', true, "Show the settings in use and the two saved profiles.", &kCommandMetadata[9]},
+    {Screen::Settings, "Edit profile / registers", "", "Change the active modem settings. Save a profile to keep the changes.", Screen::Profile, false, false, false, false, "settings.edit-profile-registers", 'B', true, "Change the active modem settings. Save a profile to keep the changes.", &kCommandMetadata[10]},
+    {Screen::Settings, "Model", "*MODEL=", "Choose the modem identity and default connection speed. This is saved immediately.", Screen::Settings, true, false, false, false, "settings.model", 'C', true, "Choose the modem identity and default connection speed. This is saved immediately.", &kCommandMetadata[11]},
+    {Screen::Settings, "Auto-answer rings (S0)", "*SETTING=S0=", "Choose how many rings to wait before answering; zero turns automatic answering off. Values above eight answer on the eighth ring; save a profile to keep this setting.", Screen::Settings, true, false, false, false, "settings.auto-answer-rings", 'D', true, "Choose how many rings to wait before answering; zero turns automatic answering off. Values above eight answer on the eighth ring; save a profile to keep this setting.", &kCommandMetadata[12]},
+    {Screen::Settings, "Auto-answer destination", "*ANSWERPORT=", "Choose which local connection receives incoming calls. This is saved immediately.", Screen::Settings, true, false, false, false, "settings.auto-answer-destination", 'E', true, "Choose which local connection receives incoming calls. This is saved immediately.", &kCommandMetadata[13]},
+    {Screen::Settings, "Host baud", "*BAUD=", "Choose the RS232 speed or let the modem detect it from AT. The maintenance console stays at 115200 bits per second.", Screen::Settings, true, false, false, true, "settings.host-baud", 'F', true, "Choose the RS232 speed or let the modem detect it from AT. The maintenance console stays at 115200 bits per second.", &kCommandMetadata[14]},
+    {Screen::Settings, "Data throttle", "*THROTTLE=", "Limit data transfer to the selected modem line speed. This is saved immediately.", Screen::Settings, true, false, false, false, "settings.data-throttle", 'G', true, "Limit data transfer to the selected modem line speed. This is saved immediately.", &kCommandMetadata[15]},
+    {Screen::Settings, "Save active profile", "*SETTING=&W", "Save the active modem settings to one of the two stored profiles.", Screen::Settings, true, false, false, false, "settings.save-active-profile", 'H', true, "Save the active modem settings to one of the two stored profiles.", &kCommandMetadata[16]},
+    {Screen::Settings, "Load stored/factory profile", "*SETTING=Z", "Load a saved or factory modem profile. This closes the menu.", Screen::Settings, true, false, false, true, "settings.load-stored-factory-profile", 'I', true, "Load a saved or factory modem profile. This closes the menu.", &kCommandMetadata[17]},
+    {Screen::Settings, "Load factory profile", "*SETTING=&F", "Load factory modem settings into the active profile. Save a profile to keep them.", Screen::Settings, true, false, false, false, "settings.load-factory-profile", 'J', true, "Load factory modem settings into the active profile. Save a profile to keep them.", &kCommandMetadata[18]},
+    {Screen::Settings, "Power-on profile", "*SETTING=Y", "Choose which stored or factory profile loads at power on. This is saved immediately.", Screen::Settings, true, false, false, false, "settings.power-on-profile", 'K', true, "Choose which stored or factory profile loads at power on. This is saved immediately.", &kCommandMetadata[19]},
+    {Screen::Settings, "Stored number", "*SETTING=&Z", "Save a dial string in one of four modem number slots.", Screen::Settings, true, false, false, false, "settings.stored-number", 'L', true, "Save a dial string in one of four modem number slots.", &kCommandMetadata[20]},
+    {Screen::Settings, "Terminal style", "*STYLE=", "Choose plain text or ANSI colour for the wrapping configuration list.", Screen::Settings, true, false, false, false, "settings.terminal-style", 'M', true, "Choose plain text or ANSI colour for the wrapping configuration list.", &kCommandMetadata[21]},
+    {Screen::Options, "Sounds", "", "Listen to dial tones and recorded modem handshakes.", Screen::Sounds, false, false, false, false, "sounds", 'B', true, "Browse and play sounds", &kCommandMetadata[22]},
+    {Screen::Sounds, "List sounds", "*SOUNDS", "Show the available generated tones and recorded handshakes.", Screen::Sounds, false, false, false, false, "sounds.list-sounds", 'A', true, "Show the available generated tones and recorded handshakes.", &kCommandMetadata[23]},
+    {Screen::Sounds, "Play", "*PLAY=", "Play a tone or recorded handshake. Press any key to stop.", Screen::Sounds, true, false, false, false, "sounds.play-sound", 'B', true, "Play a tone or recorded handshake. Press any key to stop.", &kCommandMetadata[24]},
+    {Screen::Sounds, "Ringing duration", "*RINGDELAY=", "Choose how long outgoing ringback plays before connecting. This is saved immediately.", Screen::Sounds, true, false, false, false, "sounds.ring-delay", 'C', true, "Choose how long outgoing ringback plays before connecting. This is saved immediately.", &kCommandMetadata[25]},
+    {Screen::Sounds, "Delay before CONNECT", "*CONNECTDELAY=", "Choose the pause after the handshake and before the connection message. This is saved immediately.", Screen::Sounds, true, false, false, false, "sounds.connect-delay", 'D', true, "Choose the pause after the handshake and before the connection message. This is saved immediately.", &kCommandMetadata[26]},
+    {Screen::Options, "Wi-Fi", "", "Connect to Wi-Fi, check the network and set the clock.", Screen::Wifi, false, false, false, false, "wifi-clock", 'C', true, "Manage networking and time services", &kCommandMetadata[27]},
+    {Screen::Wifi, "Network status", "*WIFI?", "Show the network name, address and signal strength. The Wi-Fi password is never shown.", Screen::Wifi, false, false, false, false, "wifi-clock.network-status", 'A', true, "Show the network name, address and signal strength. The Wi-Fi password is never shown.", &kCommandMetadata[28]},
+    {Screen::Wifi, "Scan", "*WIFISCAN", "Find nearby Wi-Fi networks. Press any key to cancel.", Screen::Wifi, false, false, false, false, "wifi-clock.scan", 'B', true, "Find nearby Wi-Fi networks. Press any key to cancel.", &kCommandMetadata[29]},
+    {Screen::Wifi, "Join", "*WIFIJOIN=", "Choose a scanned network or enter its name. Enter the Wi-Fi password at the hidden terminal prompt.", Screen::Wifi, true, false, false, false, "wifi-clock.join", 'C', true, "Choose a scanned network or enter its name. Enter the Wi-Fi password at the hidden terminal prompt.", &kCommandMetadata[30]},
+    {Screen::Wifi, "Wi-Fi on / off", "*WIFI=", "Turn Wi-Fi on or off. Turning it off asks for confirmation and disconnects network clients.", Screen::Wifi, true, false, false, false, "wifi-clock.wifi-toggle", 'D', true, "Turn Wi-Fi on or off. Turning it off asks for confirmation and disconnects network clients.", &kCommandMetadata[31]},
+    {Screen::Wifi, "Forget network", "*WIFIFORGET", "Forget the saved Wi-Fi name and password.", Screen::Wifi, false, false, false, false, "wifi-clock.forget-network", 'E', true, "Forget the saved Wi-Fi name and password.", &kCommandMetadata[32]},
+    {Screen::Wifi, "IP configuration", "*WIFIIP=", "Use automatic addressing or enter an address, subnet mask and gateway. Static addresses must share a subnet with the gateway.", Screen::Wifi, true, false, false, false, "wifi-clock.ip-configuration", 'F', true, "Use automatic addressing or enter an address, subnet mask and gateway. Static addresses must share a subnet with the gateway.", &kCommandMetadata[33]},
+    {Screen::Wifi, "Network name", "*HOSTNAME=", "Choose the local network name using letters, digits and hyphens, with no hyphen at either end. A trailing .local is accepted and removed.", Screen::Wifi, true, false, false, false, "wifi-clock.network-name", 'G', true, "Choose the local network name using letters, digits and hyphens, with no hyphen at either end. A trailing .local is accepted and removed.", &kCommandMetadata[34]},
+    {Screen::Wifi, "DNS lookup", "*DNS=", "Look up the network address of a host. Press a key to cancel.", Screen::Wifi, true, false, false, false, "wifi-clock.dns-lookup", 'H', true, "Look up the network address of a host. Press a key to cancel.", &kCommandMetadata[35]},
+    {Screen::Wifi, "Ping", "*PING=", "Check whether a host responds on the network. Press a key to cancel.", Screen::Wifi, true, false, false, false, "wifi-clock.ping", 'I', true, "Check whether a host responds on the network. Press a key to cancel.", &kCommandMetadata[36]},
+    {Screen::Wifi, "Internet dial-up status", "*INTERNET?", "Show the dial-up internet connection and address settings. Drop DTR or use the other local port to hang up.", Screen::Wifi, false, false, false, false, "wifi-clock.internet-status", 'J', true, "Show the dial-up internet connection and address settings. Drop DTR or use the other local port to hang up.", &kCommandMetadata[37]},
+    {Screen::Wifi, "Internet addresses / DNS", "*INTERNET=", "Choose private addresses for dial-up internet or its name server. The two addresses must be the usable hosts of the same private /30 subnet.", Screen::Wifi, true, false, false, false, "wifi-clock.internet-settings", 'K', true, "Choose private addresses for dial-up internet or its name server. The two addresses must be the usable hosts of the same private /30 subnet.", &kCommandMetadata[38]},
+    {Screen::Wifi, "Dial Internet PPP / SLIP", "*DIAL=", "Start a dial-up internet connection using PPP or SLIP. The computer needs a TCP/IP stack; the browser starts it on RS232.", Screen::Wifi, true, false, false, true, "wifi-clock.internet-dial", 'L', true, "Start a dial-up internet connection using PPP or SLIP. The computer needs a TCP/IP stack; the browser starts it on RS232.", &kCommandMetadata[39]},
+    {Screen::Options, "Clock", "", "Set the modem clock, time zone and time server.", Screen::Clock, false, false, false, false, "clock", 'D', true, "Set the modem clock, time zone and time server.", &kCommandMetadata[40]},
+    {Screen::Clock, "Time", "*TIME", "Show the local time after the clock has synchronised with a time server.", Screen::Clock, false, false, false, false, "wifi-clock.time", 'A', true, "Show the local time after the clock has synchronised with a time server.", &kCommandMetadata[41]},
+    {Screen::Clock, "Time zone", "*TZ=", "Choose a time zone or enter a POSIX clock rule. Daylight saving follows the selected rule.", Screen::Clock, true, false, false, false, "wifi-clock.time-zone", 'B', true, "Choose a time zone or enter a POSIX clock rule. Daylight saving follows the selected rule.", &kCommandMetadata[42]},
+    {Screen::Clock, "NTP server", "*NTP=", "Choose a time server using letters, digits, hyphens and dots. Do not start with a dot or hyphen, end with a dot, or leave an empty name part.", Screen::Clock, true, false, false, false, "wifi-clock.ntp-server", 'C', true, "Choose a time server using letters, digits, hyphens and dots. Do not start with a dot or hyphen, end with a dot, or leave an empty name part.", &kCommandMetadata[43]},
+    {Screen::Options, "Updates", "", "Manage software updates, the device password and resets.", Screen::Updates, false, false, false, false, "updates-reset", 'E', true, "Manage firmware, password, restart and reset", &kCommandMetadata[44]},
+    {Screen::Updates, "Firmware version", "*VER", "Show the firmware version and build information.", Screen::Updates, false, false, false, false, "updates-reset.firmware-version", 'A', true, "Show the firmware version and build information.", &kCommandMetadata[45]},
+    {Screen::Updates, "OTA status", "*OTA?", "Show the wireless update policy and remaining update window.", Screen::Updates, false, false, false, false, "updates-reset.ota-status", 'B', true, "Show the wireless update policy and remaining update window.", &kCommandMetadata[46]},
+    {Screen::Updates, "OTA policy / window", "*OTA=", "Choose when wireless updates are allowed. Leave the menu before uploading.", Screen::Updates, true, false, false, false, "updates-reset.ota-policy-window", 'C', true, "Choose when wireless updates are allowed. Leave the menu before uploading.", &kCommandMetadata[47]},
+    {Screen::Updates, "Change device password", "*PASS=", "Choose a device password of 8 to 32 printable characters. This is saved immediately.", Screen::Updates, true, true, false, false, "updates-reset.change-device-password", 'D', true, "Choose a device password of 8 to 32 printable characters. This is saved immediately.", &kCommandMetadata[48]},
+    {Screen::Updates, "Web interface", "*WEB=", "Turn the browser interface on or off. Turning it off closes browser sessions.", Screen::Updates, true, false, false, false, "updates-reset.web-interface", 'E', true, "Turn the browser interface on or off. Turning it off closes browser sessions.", &kCommandMetadata[49]},
+    {Screen::Updates, "Network console", "*NETCONSOLE=", "Turn the network console on or off on TCP port 2001. Turning it off closes the connected client.", Screen::Updates, true, false, false, false, "updates-reset.network-console", 'F', true, "Turn the network console on or off on TCP port 2001. Turning it off closes the connected client.", &kCommandMetadata[50]},
+    {Screen::Options, "Reset", "", "Restart the modem or restore factory settings.", Screen::Reset, false, false, false, false, "reset", 'F', true, "Restart the modem or restore factory settings.", &kCommandMetadata[51]},
+    {Screen::Reset, "Restart", "*RESTART", "Restart the device after confirmation. This closes the menu.", Screen::Reset, false, false, false, true, "updates-reset.restart", 'A', true, "Restart the device after confirmation. This closes the menu.", &kCommandMetadata[52]},
+    {Screen::Reset, "Factory reset", "*FACTORY", "Erase all settings and passwords after confirmation. This closes the menu.", Screen::Reset, false, false, false, true, "updates-reset.factory-reset", 'B', true, "Erase all settings and passwords after confirmation. This closes the menu.", &kCommandMetadata[53]},
+    {Screen::Options, "Export Configuration", "*EXPORT", "Show commands that restore your settings. Passwords are left out.", Screen::Options, false, false, false, false, "export-configuration", 'G', true, "Export modem configuration safely", &kCommandMetadata[54]},
+    {Screen::Main, "Help", "", "Find project information, commands and diagnostic tools.", Screen::Help, false, false, false, false, "help", 'E', true, "Find project information, commands and diagnostic tools.", &kCommandMetadata[55]},
+    {Screen::Help, "About", "*ABOUT", "Show the version, build information and software credits.", Screen::Help, false, false, false, false, "about", 'A', true, "Show version, device and project information", &kCommandMetadata[56]},
+    {Screen::Help, "GitHub", "*GITHUB", "Open the project repository for source, documentation, credits and licences.", Screen::Help, false, false, false, false, "github", 'B', true, "Open the project repository for source, documentation, credits and licences.", &kCommandMetadata[57]},
+    {Screen::Help, "Command Reference", "*REFERENCE", "Show the standard modem commands and the device commands.", Screen::Help, false, false, false, false, "command-reference", 'C', true, "Browse AT commands and usage examples", &kCommandMetadata[58]},
+    {Screen::Help, "Diagnostics", "", "View diagnostic events and restart information.", Screen::Debug, false, false, false, false, "debug", 'D', true, "View diagnostic logs and reset/crash data", &kCommandMetadata[59]},
+    {Screen::Debug, "View log", "*LOG", "Show recent diagnostic events. Passwords and call data are never recorded.", Screen::Debug, false, false, false, false, "debug.view-log", 'A', true, "Show recent diagnostic events. Passwords and call data are never recorded.", &kCommandMetadata[60]},
+    {Screen::Debug, "Verbosity", "*LOG=", "Choose how much diagnostic detail to keep until restart.", Screen::Debug, true, false, false, false, "debug.verbosity", 'B', true, "Choose how much diagnostic detail to keep until restart.", &kCommandMetadata[61]},
+    {Screen::Debug, "Clear debug log", "*LOG=CLEAR", "Clear the diagnostic events held in memory.", Screen::Debug, false, false, false, false, "debug.clear-debug-log", 'C', true, "Clear the diagnostic events held in memory.", &kCommandMetadata[62]},
+    {Screen::Debug, "Reset / crash information", "*RESETINFO", "Show the saved restart reason and any available crash information.", Screen::Debug, false, false, false, false, "debug.reset-crash-information", 'D', true, "Show the saved restart reason and any available crash information.", &kCommandMetadata[63]},
+    {Screen::Debug, "Hardware Tests", "", "Check the lights, speaker and serial electronics.", Screen::Hardware, false, false, false, false, "hardware-tests", 'E', true, "Run guided and individual hardware tests", &kCommandMetadata[64]},
+    {Screen::Hardware, "Guided tests", "*HWTEST", "Walk through hardware checks. Serial line and loopback steps are skipped when using RS232.", Screen::Hardware, false, false, false, false, "hardware-tests.guided-tests", 'A', true, "Walk through hardware checks. Serial line and loopback steps are skipped when using RS232.", &kCommandMetadata[65]},
+    {Screen::Hardware, "Pin map", "*HWPINS", "Show which processor pins connect to each part.", Screen::Hardware, false, false, false, false, "hardware-tests.pin-map", 'B', true, "Show which processor pins connect to each part.", &kCommandMetadata[66]},
+    {Screen::Hardware, "Board information", "*HWINFO", "Show the processor, memory, firmware and file storage information.", Screen::Hardware, false, false, false, false, "hardware-tests.board-information", 'C', true, "Show the processor, memory, firmware and file storage information.", &kCommandMetadata[67]},
+    {Screen::Hardware, "Files", "*HWFILES", "List the files stored on the device.", Screen::Hardware, false, false, false, false, "hardware-tests.files", 'D', true, "List the files stored on the device.", &kCommandMetadata[68]},
+    {Screen::Hardware, "LEDs", "*HWLED=", "Light an indicator or run a light pattern. Automatic mode returns control to the modem.", Screen::Hardware, true, false, false, false, "hardware-tests.leds", 'E', true, "Light an indicator or run a light pattern. Automatic mode returns control to the modem.", &kCommandMetadata[69]},
+    {Screen::Hardware, "Amplifier", "*HWAMP=", "Choose automatic speaker control or force the amplifier on or off.", Screen::Hardware, true, false, false, false, "hardware-tests.amplifier", 'F', true, "Choose automatic speaker control or force the amplifier on or off.", &kCommandMetadata[70]},
+    {Screen::Hardware, "Test volume", "*HWVOL=", "Set the hardware test volume or use the physical volume knob.", Screen::Hardware, true, false, false, false, "hardware-tests.test-volume", 'G', true, "Set the hardware test volume or use the physical volume knob.", &kCommandMetadata[71]},
+    {Screen::Hardware, "Tone / sweep", "*HWTONE=", "Play a fixed test frequency, a telephone tone or a frequency sweep. Press any key to stop.", Screen::Hardware, true, false, false, false, "hardware-tests.tone-sweep", 'H', true, "Play a fixed test frequency, a telephone tone or a frequency sweep. Press any key to stop.", &kCommandMetadata[72]},
+    {Screen::Hardware, "DTMF", "*HWDTMF=", "Play touch-tone digits, star, hash or the letters A to D. Press any key to stop.", Screen::Hardware, true, false, false, false, "hardware-tests.dtmf", 'I', true, "Play touch-tone digits, star, hash or the letters A to D. Press any key to stop.", &kCommandMetadata[73]},
+    {Screen::Hardware, "Pulse", "*HWPULSE=", "Play UK pulse-dial clicks for digits zero to nine. Press any key to stop.", Screen::Hardware, true, false, false, false, "hardware-tests.pulse", 'J', true, "Play UK pulse-dial clicks for digits zero to nine. Press any key to stop.", &kCommandMetadata[74]},
+    {Screen::Hardware, "Potentiometer", "*HWPOT", "Show live readings from the volume knob. Press any key to stop.", Screen::Hardware, false, false, false, false, "hardware-tests.potentiometer", 'K', true, "Show live readings from the volume knob. Press any key to stop.", &kCommandMetadata[75]},
+    {Screen::Hardware, "RS232 lines", "*HWLINES", "Check the RS232 control lines. Use the maintenance console because this takes over RS232.", Screen::Hardware, false, false, true, false, "hardware-tests.rs232-lines", 'L', true, "Check the RS232 control lines. Use the maintenance console because this takes over RS232.", &kCommandMetadata[76]},
+    {Screen::Hardware, "Loopback", "*HWLOOP=ALL", "Run the serial loopback tests. Use the maintenance console because this takes over RS232.", Screen::Hardware, false, false, true, false, "hardware-tests.loopback", 'M', true, "Run the serial loopback tests. Use the maintenance console because this takes over RS232.", &kCommandMetadata[77]},
+    {Screen::Hardware, "Bridge", "*HWBRIDGE", "Bridge the maintenance console to RS232. This takes over the RS232 port.", Screen::Hardware, false, false, true, false, "hardware-tests.bridge", 'N', true, "Bridge the maintenance console to RS232. This takes over the RS232 port.", &kCommandMetadata[78]},
+    {Screen::Hardware, "Output signal", "*HWSIG=", "Drive an RS232 output while idle. Use the maintenance console because this takes over RS232.", Screen::Hardware, true, false, true, false, "hardware-tests.output-signal", 'O', true, "Drive an RS232 output while idle. Use the maintenance console because this takes over RS232.", &kCommandMetadata[79]},
+    {Screen::Debug, "Client Tests", "", "Check a serial terminal using the maintenance console or modem port. These tests cannot run in the browser.", Screen::Client, false, false, false, false, "client-tests", 'F', true, "Serial terminal diagnostics and X/Y/ZMODEM", &kCommandMetadata[80]},
+    {Screen::Client, "Display patterns", "*TEST ", "Check how your serial terminal displays text and colour. Confirm the result in the terminal.", Screen::Client, true, false, false, false, "client-tests.display", 'A', true, "Check how your serial terminal displays text and colour. Confirm the result in the terminal.", &kCommandMetadata[81]},
+    {Screen::Client, "Measure screen", "*TEST SIZE", "Measure the serial terminal size, with a ruler or manual entry if needed.", Screen::Client, false, false, false, false, "client-tests.size", 'B', true, "Measure the serial terminal size, with a ruler or manual entry if needed.", &kCommandMetadata[82]},
+    {Screen::Client, "Keyboard codes", "*TEST KEYS", "Show the keys sent by the serial terminal. Press Ctrl-] to finish.", Screen::Client, false, false, false, false, "client-tests.keys", 'C', true, "Show the keys sent by the serial terminal. Press Ctrl-] to finish.", &kCommandMetadata[83]},
+    {Screen::Client, "Terminal identification", "*TEST ID", "Ask the serial terminal to identify itself and show its replies.", Screen::Client, false, false, false, false, "client-tests.id", 'D', true, "Ask the serial terminal to identify itself and show its replies.", &kCommandMetadata[84]},
+    {Screen::Client, "Echo and line endings", "*TEST ECHO", "Check line endings and local echo. Press Ctrl-] to finish.", Screen::Client, false, false, false, false, "client-tests.echo", 'E', true, "Check line endings and local echo. Press Ctrl-] to finish.", &kCommandMetadata[85]},
+    {Screen::Client, "Transmit and RTS", "*TEST TX=", "Send data for the selected duration and check the pause signal.", Screen::Client, true, false, false, false, "client-tests.tx", 'F', true, "Send data for the selected duration and check the pause signal.", &kCommandMetadata[86]},
+    {Screen::Client, "Receive and CTS", "*TEST RX=", "Receive data for the selected duration and check flow control.", Screen::Client, true, false, false, false, "client-tests.rx", 'G', true, "Receive data for the selected duration and check flow control.", &kCommandMetadata[87]},
+    {Screen::Client, "Cable and signals", "*TEST CABLE", "Check RS232 cable signals and restore them afterwards. This test needs RS232.", Screen::Client, false, false, false, false, "client-tests.cable", 'H', true, "Check RS232 cable signals and restore them afterwards. This test needs RS232.", &kCommandMetadata[88]},
+    {Screen::Client, "Terminal bell", "*TEST BELL", "Send the terminal bell and confirm whether it was heard.", Screen::Client, false, false, false, false, "client-tests.bell", 'I', true, "Send the terminal bell and confirm whether it was heard.", &kCommandMetadata[89]},
+    {Screen::Client, "Serial format", "*TEST FORMAT", "Show the configured serial speed and format.", Screen::Client, false, false, false, false, "client-tests.format", 'J', true, "Show the configured serial speed and format.", &kCommandMetadata[90]},
+    {Screen::Client, "File transfers", "*TEST TRANSFER=", "Test a serial file transfer using XMODEM, YMODEM or ZMODEM.", Screen::Client, true, false, false, false, "client-tests.transfer", 'K', true, "Test a serial file transfer using XMODEM, YMODEM or ZMODEM.", &kCommandMetadata[91]},
+    {Screen::Client, "Results summary", "*TEST SUMMARY", "Show the serial terminal findings, saved settings and last transfer.", Screen::Client, false, false, false, false, "client-tests.summary", 'L', true, "Show the serial terminal findings, saved settings and last transfer.", &kCommandMetadata[92]},
+    {Screen::Client, "Edit client findings", "*TEST SET=", "Enter the character set, screen size and backspace key for this serial port.", Screen::Client, true, false, false, false, "client-tests.edit", 'M', true, "Enter the character set, screen size and backspace key for this serial port.", &kCommandMetadata[93]},
+    {Screen::Client, "Save client findings", "*TEST APPLY", "Confirm in the terminal to save the findings for this serial port.", Screen::Client, false, false, false, false, "client-tests.apply", 'N', true, "Confirm in the terminal to save the findings for this serial port.", &kCommandMetadata[94]},
+    {Screen::Client, "Reset client settings", "*TEST RESET", "Confirm in the terminal to restore default settings for this serial port.", Screen::Client, false, false, false, false, "client-tests.reset", 'O', true, "Confirm in the terminal to restore default settings for this serial port.", &kCommandMetadata[95]},
 };
 struct ModelTheme { unsigned speed; const char *label; const char *shortLabel; unsigned rgb; };
 constexpr ModelTheme kModelThemes[] = {

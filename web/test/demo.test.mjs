@@ -8,10 +8,10 @@ test('demo uses friendly letter lists with only ANSI colour escapes', () => {
     demo.receive('{"t":"open"}');
     demo.receive(new TextEncoder().encode('AT*CONFIG\r'));
     assert.match(output, /A\. Status/);
-    assert.match(output, /L\. Client Tests/);
+    assert.match(output, /E\. Help/);
     assert.ok(!output.includes('Show the call, front lights'));
     assert.equal(output.replace(/\x1b\[[\d;]*m/g, '').includes('\x1b'), false);
-    demo.receive(new TextEncoder().encode('c\r\n'));
+    demo.receive(new TextEncoder().encode('da\r\n'));
     assert.match(output, /Rings before answering/);
     demo.receive(new TextEncoder().encode('c'));
     assert.match(output, /A\. US Robotics Sportster 14.4k/);
@@ -27,7 +27,7 @@ test('demo ignores arrows and sizes, and Client Tests stay serial only', () => {
     demo.receive(new TextEncoder().encode('\x1b[B'));
     demo.receive('{"t":"size","cols":120,"rows":45}');
     assert.equal(output, root);
-    demo.receive(new TextEncoder().encode('la'));
+    demo.receive(new TextEncoder().encode('edfa'));
     assert.match(output, /Client Tests run on serial only/);
     assert.deepEqual(messages.filter(m => m.t === 'call'), [{t: 'call', state: 'idle', model: 'US Robotics Sportster 14.4k'}]);
 });

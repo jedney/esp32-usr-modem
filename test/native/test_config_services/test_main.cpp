@@ -131,6 +131,22 @@ struct Rig {
         return sink.text;
     }
 };
+void test_about_is_compact_names_and_urls_and_ends_at_project_repository() {
+    Rig r;
+    const auto text = r.run("*ABOUT");
+    TEST_ASSERT_LESS_THAN(3500, text.size());
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, text.find("Arduino-ESP32 / ArduinoOTA: https://"));
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, text.find("Zimodem: https://"));
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, text.find("xterm.js: https://"));
+    TEST_ASSERT_EQUAL(std::string::npos, text.find("Obligations"));
+    TEST_ASSERT_EQUAL(std::string::npos, text.find("Keep upstream"));
+    TEST_ASSERT_NOT_EQUAL(std::string::npos,
+                          text.find("Full credits and licences: credits/LICENSES.md"));
+    const auto repo = r.run("*GITHUB");
+    TEST_ASSERT_NOT_EQUAL(std::string::npos,
+                          repo.find("https://github.com/jedney/esp32-usr-modem"));
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, repo.find("OK"));
+}
 void test_export_replays_nondefault_profiles_and_phonebook_without_secrets() {
     Rig source;
     source.run("E0M0&N38S7=21");
@@ -373,7 +389,7 @@ void test_local_service_f0_never_echoes_password_and_escape_wipes_prompt() {
             r.session.fromHost(&c, 1, clockMs);
         }
     };
-    feed("h\r");
+    feed("de\r");
     drain();
     feed("d\r");
     drain();
@@ -440,7 +456,7 @@ void test_menu_export_retains_complete_replayable_lines_across_pages() {
         }
     };
     drain();
-    feed("i\r");
+    feed("dg\r");
     std::string output;
     for (unsigned i = 0; i < 30; ++i) {
         auto page = drain();
@@ -561,11 +577,22 @@ void press(Terminal &t, const char *keys) {
     }
 }
 // Opens every configuration screen through the menu and returns all that was drawn.
+std::string screenPath(Screen target) {
+    if (target == Screen::Main)
+        return "";
+    size_t count;
+    const auto *rows = actions(count);
+    for (size_t i = 0; i < count; ++i)
+        if (!*rows[i].command && rows[i].target == target)
+            return screenPath(rows[i].screen) + rows[i].key;
+    TEST_FAIL_MESSAGE("Screen has no parent route");
+    return "";
+}
 std::string tourScreens(Rig &r, Services &services, size_t *visited) {
     std::string all;
-    bool seen[10] = {};
+    bool seen[14] = {};
     size_t count;
-    const Action *a = actions(count);
+    const auto *a = actions(count);
     for (const char *style : {"PLAIN", "ANSI"}) {
         for (unsigned width : {20u, 40u, 80u, 132u}) {
             Terminal screen(r.session, false);
@@ -577,35 +604,22 @@ std::string tourScreens(Rig &r, Services &services, size_t *visited) {
             seen[0] = true;
             screen.close();
             for (size_t i = 0; i < count; ++i) {
-                if (a[i].screen != Screen::Main || *a[i].command)
-                    continue;
                 screen.open();
                 drainScreen(screen);
+                const auto path = screenPath(a[i].screen);
+                press(screen, path.c_str());
+                all += drainScreen(screen);
+                seen[unsigned(a[i].screen)] = true;
                 press(screen, std::string(1, a[i].key).c_str());
-                auto text = drainScreen(screen);
-                TEST_ASSERT_NOT_EQUAL_MESSAGE(std::string::npos, text.find(screenName(a[i].target)),
-                                              a[i].id);
-                all += text;
-                seen[unsigned(a[i].target)] = true;
-                screen.close();
-                for (size_t j = 0; j < count; ++j) {
-                    if (a[j].screen != a[i].target)
-                        continue;
-                    screen.open();
-                    drainScreen(screen);
-                    press(screen, std::string(1, a[i].key).c_str());
-                    drainScreen(screen);
-                    press(screen, std::string(1, a[j].key).c_str());
-                    all += drainScreen(screen);
-                    if (!*a[j].command) {
-                        seen[unsigned(a[j].target)] = true;
-                        for (unsigned page = 0; page < 5; ++page) {
-                            press(screen, "r");
-                            all += drainScreen(screen);
-                        }
+                all += drainScreen(screen);
+                if (!*a[i].command) {
+                    seen[unsigned(a[i].target)] = true;
+                    for (unsigned page = 0; page < 5; ++page) {
+                        press(screen, "r");
+                        all += drainScreen(screen);
                     }
-                    screen.close();  // cancels waiting commands and wipes incomplete edits
                 }
+                screen.close();
             }
         }
     }
@@ -692,7 +706,7 @@ void test_no_output_contains_either_password_or_its_stored_forms() {
     services.commands = &r.commands;
     size_t visited = 0;
     const std::string drawn = tourScreens(r, services, &visited);
-    TEST_ASSERT_EQUAL(10, visited);
+    TEST_ASSERT_EQUAL(14, visited);
     TEST_ASSERT_GREATER_THAN(2000, drawn.size());
     TEST_ASSERT_NOT_EQUAL(std::string::npos, drawn.find("bbs.example.com"));  // phonebook drawn
     seen += drawn;
@@ -716,7 +730,7 @@ void test_letter_profile_editor_dispatches_real_setting_commands() {
     Terminal menu(r.session, false);
     menu.open();
     drainScreen(menu);
-    press(menu, "cbba\r");
+    press(menu, "dabba\r");
     TEST_ASSERT_NOT_EQUAL(std::string::npos, drainScreen(menu).find("*SETTING=E0"));
     press(menu, "y");
     drainScreen(menu);
@@ -735,6 +749,7 @@ void test_letter_profile_editor_dispatches_real_setting_commands() {
 }
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_about_is_compact_names_and_urls_and_ends_at_project_repository);
     RUN_TEST(test_letter_profile_editor_dispatches_real_setting_commands);
     RUN_TEST(test_menu_export_retains_complete_replayable_lines_across_pages);
     RUN_TEST(test_export_replays_nondefault_profiles_and_phonebook_without_secrets);

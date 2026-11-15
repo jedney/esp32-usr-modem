@@ -129,8 +129,8 @@ test('hardware stop stays reachable while new commands are disabled', async t =>
     doc.getElementById('stop-test').hidden = false;
     menu.update();
     assert.equal(doc.getElementById('stop-test').disabled,false);
-    assert.equal(doc.querySelectorAll('.menu-trigger').find(n => n.textContent.startsWith('Phonebook')).disabled,true);
-    assert.equal(doc.querySelectorAll('.menu-trigger').find(n => n.textContent.startsWith('Hardware Tests')).disabled,false);
+    assert.equal(doc.querySelectorAll('.menu-trigger').find(n => n.textContent.startsWith('Phone Book')).disabled,true);
+    assert.equal(doc.querySelectorAll('.menu-item').find(n => n.dataset.section === 'hardware-tests').disabled,false);
 });
 
 test('terminal-only actions live in Debug, Updates and Hardware Tests', t => {
@@ -148,15 +148,30 @@ test('terminal-only actions live in Debug, Updates and Hardware Tests', t => {
     assert.equal(doc.getElementById('stop-test').hidden,true);
 });
 
-test('disconnected menu selection requests access before opening the chosen menu', t => {
-    const {doc,state,menu,reconnects} = setup(t);
+test('disconnected action selection reconnects after navigating the nested menus', t => {
+    const {doc,state,menu,reconnects,clickItem} = setup(t);
     state.edit = false; state.online = false; state.busy = true; menu.update();
     const trigger = doc.querySelectorAll('.menu-trigger').find(n => n.textContent.startsWith('Settings'));
-    assert.equal(trigger.disabled,false);
     trigger.click();
+    assert.equal(doc.getElementById('popup-settings-group').hidden,false);
+    clickItem('General Settings');
+    assert.equal(doc.getElementById('popup-settings').hidden,false);
+    clickItem('Modem model');
     assert.equal(reconnects.length,1);
-    assert.equal(doc.getElementById('popup-settings').hidden,true);
+    assert.equal(doc.getElementById('command-dialog').open,false);
     state.edit = true; state.online = true; state.busy = false; menu.update();
     reconnects[0]();
-    assert.equal(doc.getElementById('popup-settings').hidden,false);
+    assert.equal(doc.getElementById('command-dialog').open,true);
+});
+
+test('GitHub opens a separate tab without needing a terminal', t => {
+    const {state,menu,clickItem,reconnects} = setup(t);
+    const opened = [];
+    const old = globalThis.window;
+    globalThis.window = {open:(...args) => opened.push(args)};
+    t.after(() => { if (old === undefined) delete globalThis.window; else globalThis.window = old; });
+    state.edit = false; state.online = false; state.busy = true; menu.update();
+    clickItem('GitHub');
+    assert.deepEqual(opened, [['https://github.com/jedney/esp32-usr-modem','_blank','noopener,noreferrer']]);
+    assert.equal(reconnects.length,0);
 });

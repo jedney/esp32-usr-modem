@@ -11,7 +11,7 @@ void test_lists_use_only_letters_and_sgr_at_every_size() {
             r.terminal.open();
             auto text = r.drain();
             TEST_ASSERT_TRUE(contains(text, "A. Status"));
-            TEST_ASSERT_TRUE(contains(text, "M. Command Reference"));
+            TEST_ASSERT_TRUE(contains(text, "E. Help"));
             TEST_ASSERT_FALSE(contains(text, "Show the call, front lights"));
             TEST_ASSERT_FALSE(contains(text, "   Range:"));
             TEST_ASSERT_FALSE(contains(text, "   Units:"));
@@ -34,7 +34,7 @@ void test_lists_use_only_letters_and_sgr_at_every_size() {
                 }
             r.feed("\x1b[B\x1bOC1");
             TEST_ASSERT_TRUE(r.drain().empty());
-            r.feed("c");
+            r.feed("da");
             text = r.drain();
             TEST_ASSERT_TRUE(contains(text, "Rings before answering"));
             TEST_ASSERT_FALSE(contains(text, "Choose how many rings"));
@@ -46,13 +46,17 @@ void test_every_section_and_profile_page_is_reachable() {
     Rig r;
     r.terminal.open();
     r.drain();
-    for (char key : {'B', 'C', 'D', 'E', 'G', 'H', 'K', 'L'}) {
-        r.feed(std::string(1, key).c_str());
-        TEST_ASSERT_FALSE(r.drain().empty());
-        r.feed("x");
+    for (const char *path : {"b", "da", "db", "dc", "dd", "de", "df", "ed", "ede", "edf"}) {
+        r.terminal.close();
+        r.terminal.open();
         r.drain();
+        r.feed(path);
+        TEST_ASSERT_FALSE(r.drain().empty());
     }
-    r.feed("cb");
+    r.terminal.close();
+    r.terminal.open();
+    r.drain();
+    r.feed("dab");
     auto text = r.drain();
     TEST_ASSERT_TRUE(contains(text, "Command echo"));
     for (unsigned i = 0; i < 5; ++i) {
@@ -67,7 +71,7 @@ void test_enum_choices_show_friendly_labels_and_confirm() {
     Rig r;
     r.terminal.open();
     r.drain();
-    r.feed("cc");
+    r.feed("dac");
     auto text = r.drain();
     TEST_ASSERT_TRUE(contains(text, "A. US Robotics Sportster 14.4k"));
     TEST_ASSERT_TRUE(contains(text, "B. US Robotics Sportster 28.8k"));
@@ -89,7 +93,7 @@ void test_forms_echo_only_new_text_and_mask_secrets() {
     Rig r;
     r.terminal.open();
     r.drain();
-    r.feed("hd");
+    r.feed("ded");
     r.drain();
     r.feed("SecretCanary123");
     auto text = r.drain();
@@ -99,7 +103,7 @@ void test_forms_echo_only_new_text_and_mask_secrets() {
     TEST_ASSERT_FALSE(contains(r.drain(), "SecretCanary"));
     r.terminal.poll(30001);
     TEST_ASSERT_TRUE(contains(r.drain(), "timed out"));
-    r.feed("xgk");
+    r.feed("xch");
     r.drain();
     r.feed("example.com");
     TEST_ASSERT_EQUAL_STRING("example.com", r.drain().c_str());
@@ -118,7 +122,7 @@ void test_async_password_and_geometry_are_isolated() {
     r.terminal.open();
     r.drain();
     stubAsync = true;
-    r.feed("kb");
+    r.feed("edeb");
     auto text = r.drain();
     TEST_ASSERT_TRUE(contains(text, "Password:"));
     TEST_ASSERT_TRUE(r.terminal.capturing());
@@ -174,7 +178,7 @@ void test_disabled_actions_and_browser_diagnostics() {
     Rig r(true);
     r.terminal.open();
     r.drain();
-    r.feed("k");
+    r.feed("ede");
     TEST_ASSERT_TRUE(contains(r.drain(), "unavailable: takes over RS232"));
     stubCalls = 0;
     r.feed("l");
@@ -184,7 +188,7 @@ void test_disabled_actions_and_browser_diagnostics() {
     browser.session.port().setBrowser(true);
     browser.terminal.open();
     browser.drain();
-    browser.feed("la");
+    browser.feed("edfa");
     TEST_ASSERT_TRUE(contains(browser.drain(), "Client Tests run on serial only"));
     TEST_ASSERT_EQUAL(0, stubCalls);
 }
@@ -197,7 +201,7 @@ void test_idle_cancel_timeout_and_reservation() {
     TEST_ASSERT_TRUE(r.drain().empty());
     r.terminal.resize(40, 10);
     TEST_ASSERT_TRUE(r.drain().empty());
-    r.feed("hd");
+    r.feed("ded");
     r.drain();
     r.feed("temporary");
     r.drain();
@@ -240,7 +244,7 @@ void test_metadata_units_ranges_and_current_values() {
     r.terminal.setStyle("PLAIN");
     r.terminal.open();
     r.drain();
-    r.feed("d");
+    r.feed("db");
     auto text = r.drain();
     TEST_ASSERT_TRUE(contains(text, "1.5 seconds"));
     r.feed("c");
@@ -251,7 +255,7 @@ void test_metadata_units_ranges_and_current_values() {
     r.feed("y");
     r.drain();
     TEST_ASSERT_EQUAL(1250, r.modem.ringDelayMs());
-    r.feed("xxgk");
+    r.feed("xxch");
     r.drain();
     r.feed(
         "123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"
@@ -301,7 +305,7 @@ void test_optional_fields_variants_and_register_edits() {
     r.drain();
     TEST_ASSERT_NOT_NULL(services.book.find("42"));
     TEST_ASSERT_EQUAL(0, services.book.find("42")->speed);
-    r.feed("xxcb");
+    r.feed("xxdab");
     r.drain();
     r.feed("b");
     r.drain();  // command echo, a profile enumeration
@@ -317,7 +321,7 @@ void test_optional_fields_variants_and_register_edits() {
     r.drain();
     r.feed("l");
     TEST_ASSERT_TRUE(contains(r.drain(), "read only"));  // S1
-    r.feed("xxgf");
+    r.feed("xxcf");
     r.drain();  // IP configuration variants
     r.feed("a");
     TEST_ASSERT_TRUE(contains(r.drain(), "*WIFIIP=DHCP"));
@@ -328,7 +332,7 @@ void test_invalid_numbers_and_terminal_reports_cannot_change_state() {
     Rig r;
     r.terminal.open();
     r.drain();
-    r.feed("dc");
+    r.feed("dbc");
     r.drain();
     for (const char *value : {"nan", "inf", "-1", "60.001", "0.0005", "1x"}) {
         r.feed(value);

@@ -9,6 +9,12 @@ ROOT = Path(__file__).resolve().parents[1]
 TYPES = {"enum", "int", "string", "bool", "ip", "action", "secret"}
 
 
+def walk_menu(nodes):
+    for node in nodes:
+        yield node
+        yield from walk_menu(node.get("items", []))
+
+
 def validate_metadata(node, path):
     def fail(message):
         raise ValueError(f"Invalid metadata {path}: {message}")
@@ -68,11 +74,22 @@ def validate_metadata(node, path):
 def catalogue(root):
     menu = json.loads((root / "ui/menu-definition.json").read_text(encoding="utf-8"))
     bindings = json.loads((root / "lib/config/ui-bindings.json").read_text(encoding="utf-8"))
-    items = list(menu["main_menu"])
-    items += [child for parent in menu["main_menu"] for child in parent["items"]]
+    items = list(walk_menu(menu["main_menu"]))
     ids = [item["id"] for item in items]
     if len(ids) != len(set(ids)) or set(ids) != set(bindings):
         raise ValueError("Every menu ID must have exactly one production binding")
+
+    def validate_parent(nodes, screen):
+        for node in nodes:
+            binding = bindings[node["id"]]
+            if binding["screen"] != screen:
+                raise ValueError(f"Invalid metadata {node['id']}: screen differs from menu parent")
+            if node.get("items"):
+                if binding["command"]:
+                    raise ValueError(f"Invalid metadata {node['id']}: a menu group cannot run a command")
+                validate_parent(node["items"], binding["target"])
+
+    validate_parent(menu["main_menu"], "Main")
     for item in items:
         b = bindings[item["id"]]
         validate_metadata(b, item["id"])
@@ -129,7 +146,7 @@ def command_data(root=ROOT):
 def generate(root=ROOT):
     menu, items, bindings = catalogue(root)
     theme = json.loads((root / "ui/theme-tokens.json").read_text(encoding="utf-8"))
-    for group in [menu["main_menu"], *[p["items"] for p in menu["main_menu"]]]:
+    for group in [menu["main_menu"], *[p.get("items", []) for p in items]]:
         keys = [item["key"] for item in group]
         if keys != list("ABCDEFGHIJKLMNO")[:len(keys)]:
             raise ValueError("Invalid hotkey order: use consecutive letters A-O")

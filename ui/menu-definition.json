@@ -14,7 +14,7 @@
     {
       "id": "phonebook",
       "key": "B",
-      "label": "Phonebook",
+      "label": "Phone Book",
       "group": "Connectivity",
       "icon": "phone",
       "summary": "Manage saved numbers and dial",
@@ -42,143 +42,8 @@
       ]
     },
     {
-      "id": "settings",
-      "key": "C",
-      "label": "Settings",
-      "group": "Configuration",
-      "icon": "gear",
-      "summary": "Configure modem options and stored profiles",
-      "items": [
-        {
-          "id": "settings.current-stored-profiles",
-          "label": "Current and stored profiles",
-          "key": "A"
-        },
-        {
-          "id": "settings.edit-profile-registers",
-          "label": "Edit profile / registers",
-          "key": "B"
-        },
-        {
-          "id": "settings.model",
-          "label": "Model",
-          "key": "C"
-        },
-        {
-          "id": "settings.auto-answer-rings",
-          "label": "Auto-answer rings (S0)",
-          "key": "D"
-        },
-        {
-          "id": "settings.auto-answer-destination",
-          "label": "Auto-answer destination",
-          "key": "E"
-        },
-        {
-          "id": "settings.host-baud",
-          "label": "Host baud",
-          "key": "F"
-        },
-        {
-          "id": "settings.data-throttle",
-          "label": "Data throttle",
-          "key": "G"
-        },
-        {
-          "id": "settings.save-active-profile",
-          "label": "Save active profile",
-          "key": "H"
-        },
-        {
-          "id": "settings.load-stored-factory-profile",
-          "label": "Load stored/factory profile",
-          "key": "I"
-        },
-        {
-          "id": "settings.load-factory-profile",
-          "label": "Load factory profile",
-          "key": "J"
-        },
-        {
-          "id": "settings.power-on-profile",
-          "label": "Power-on profile",
-          "key": "K"
-        },
-        {
-          "id": "settings.stored-number",
-          "label": "Stored number",
-          "key": "L"
-        },
-        {
-          "id": "settings.terminal-style",
-          "label": "Terminal style",
-          "key": "M"
-        }
-      ]
-    },
-    {
-      "id": "sounds",
-      "key": "D",
-      "label": "Sounds",
-      "group": "Configuration",
-      "icon": "speaker",
-      "summary": "Browse and play sounds",
-      "items": [
-        {
-          "id": "sounds.list-sounds",
-          "label": "List sounds",
-          "key": "A"
-        },
-        {
-          "id": "sounds.play-sound",
-          "label": "Play",
-          "key": "B"
-        },
-        {
-          "id": "sounds.ring-delay",
-          "label": "Ringing duration",
-          "key": "C"
-        },
-        {
-          "id": "sounds.connect-delay",
-          "label": "Delay before CONNECT",
-          "key": "D"
-        }
-      ]
-    },
-    {
-      "id": "debug",
-      "key": "E",
-      "label": "Debug",
-      "group": "Tools",
-      "icon": "wrench",
-      "summary": "View diagnostic logs and reset/crash data",
-      "items": [
-        {
-          "id": "debug.view-log",
-          "label": "View log",
-          "key": "A"
-        },
-        {
-          "id": "debug.verbosity",
-          "label": "Verbosity",
-          "key": "B"
-        },
-        {
-          "id": "debug.clear-debug-log",
-          "label": "Clear debug log",
-          "key": "C"
-        },
-        {
-          "id": "debug.reset-crash-information",
-          "label": "Reset / crash information",
-          "key": "D"
-        }
-      ]
-    },
-    {
       "id": "call-history",
-      "key": "F",
+      "key": "C",
       "label": "Call History",
       "group": "Connectivity",
       "icon": "list",
@@ -186,337 +51,510 @@
       "items": []
     },
     {
-      "id": "wifi-clock",
-      "key": "G",
-      "label": "Wi-Fi and Clock",
-      "group": "Configuration",
-      "icon": "wifi",
-      "summary": "Manage networking and time services",
+      "id": "settings-group",
+      "label": "Settings",
       "items": [
         {
-          "id": "wifi-clock.network-status",
-          "label": "Network status",
-          "key": "A"
-        },
-        {
-          "id": "wifi-clock.scan",
-          "label": "Scan",
-          "key": "B"
-        },
-        {
-          "id": "wifi-clock.join",
-          "label": "Join",
-          "key": "C"
-        },
-        {
-          "id": "wifi-clock.wifi-toggle",
-          "label": "Wi-Fi on / off",
-          "key": "D"
-        },
-        {
-          "id": "wifi-clock.forget-network",
-          "label": "Forget network",
-          "key": "E"
-        },
-        {
-          "id": "wifi-clock.ip-configuration",
-          "label": "IP configuration",
-          "key": "F"
-        },
-        {
-          "id": "wifi-clock.network-name",
-          "label": "Network name",
-          "key": "G"
-        },
-        {
-          "id": "wifi-clock.time",
-          "label": "Time",
-          "key": "H"
-        },
-        {
-          "id": "wifi-clock.time-zone",
-          "label": "Time zone",
-          "key": "I"
-        },
-        {
-          "id": "wifi-clock.ntp-server",
-          "label": "NTP server",
-          "key": "J"
-        },
-        {
-          "id": "wifi-clock.dns-lookup",
-          "label": "DNS lookup",
-          "key": "K"
-        },
-        {
-          "id": "wifi-clock.ping",
-          "label": "Ping",
-          "key": "L"
-        },
-        {
-          "id": "wifi-clock.internet-status",
-          "label": "Internet dial-up status",
-          "key": "M"
-        },
-        {
-          "id": "wifi-clock.internet-settings",
-          "label": "Internet addresses / DNS",
-          "key": "N"
-        },
-        {
-          "id": "wifi-clock.internet-dial",
-          "label": "Dial Internet PPP / SLIP",
-          "key": "O"
-        }
-      ]
-    },
-    {
-      "id": "updates-reset",
-      "key": "H",
-      "label": "Updates and Reset",
-      "group": "Maintenance",
-      "icon": "download",
-      "summary": "Manage firmware, password, restart and reset",
-      "items": [
-        {
-          "id": "updates-reset.firmware-version",
-          "label": "Firmware version",
-          "key": "A"
-        },
-        {
-          "id": "updates-reset.ota-status",
-          "label": "OTA status",
-          "key": "B"
-        },
-        {
-          "id": "updates-reset.ota-policy-window",
-          "label": "OTA policy / window",
-          "key": "C"
-        },
-        {
-          "id": "updates-reset.change-device-password",
-          "label": "Change device password",
-          "key": "D"
-        },
-        {
-          "id": "updates-reset.restart",
-          "label": "Restart",
-          "key": "E"
-        },
-        {
-          "id": "updates-reset.factory-reset",
-          "label": "Factory reset",
-          "key": "F"
-        },
-        {
-          "id": "updates-reset.web-interface",
-          "label": "Web interface",
-          "key": "G"
-        },
-        {
-          "id": "updates-reset.network-console",
-          "label": "Network console",
-          "key": "H"
-        }
-      ]
-    },
-    {
-      "id": "export-configuration",
-      "key": "I",
-      "label": "Export Configuration",
-      "group": "Maintenance",
-      "icon": "upload",
-      "summary": "Export modem configuration safely",
-      "items": []
-    },
-    {
-      "id": "about",
-      "key": "J",
-      "label": "About",
-      "group": "Information",
-      "icon": "info",
-      "summary": "Show version, device and project information",
-      "items": []
-    },
-    {
-      "id": "hardware-tests",
-      "key": "K",
-      "label": "Hardware Tests",
-      "group": "Tools",
-      "icon": "chip",
-      "summary": "Run guided and individual hardware tests",
-      "items": [
-        {
-          "id": "hardware-tests.guided-tests",
-          "label": "Guided tests",
-          "key": "A"
-        },
-        {
-          "id": "hardware-tests.pin-map",
-          "label": "Pin map",
-          "key": "B"
-        },
-        {
-          "id": "hardware-tests.board-information",
-          "label": "Board information",
-          "key": "C"
-        },
-        {
-          "id": "hardware-tests.files",
-          "label": "Files",
-          "key": "D"
-        },
-        {
-          "id": "hardware-tests.leds",
-          "label": "LEDs",
-          "key": "E"
-        },
-        {
-          "id": "hardware-tests.amplifier",
-          "label": "Amplifier",
-          "key": "F"
-        },
-        {
-          "id": "hardware-tests.test-volume",
-          "label": "Test volume",
-          "key": "G"
-        },
-        {
-          "id": "hardware-tests.tone-sweep",
-          "label": "Tone / sweep",
-          "key": "H"
-        },
-        {
-          "id": "hardware-tests.dtmf",
-          "label": "DTMF",
-          "key": "I"
-        },
-        {
-          "id": "hardware-tests.pulse",
-          "label": "Pulse",
-          "key": "J"
-        },
-        {
-          "id": "hardware-tests.potentiometer",
-          "label": "Potentiometer",
-          "key": "K"
-        },
-        {
-          "id": "hardware-tests.rs232-lines",
-          "label": "RS232 lines",
-          "key": "L"
-        },
-        {
-          "id": "hardware-tests.loopback",
-          "label": "Loopback",
-          "key": "M"
-        },
-        {
-          "id": "hardware-tests.bridge",
-          "label": "Bridge",
-          "key": "N"
-        },
-        {
-          "id": "hardware-tests.output-signal",
-          "label": "Output signal",
-          "key": "O"
-        }
-      ]
-    },
-    {
-      "id": "client-tests",
-      "key": "L",
-      "label": "Client Tests",
-      "group": "Tools",
-      "icon": "flask",
-      "summary": "Serial terminal diagnostics and X/Y/ZMODEM",
-      "status": "available",
-      "items": [
-        {
-          "id": "client-tests.display",
+          "id": "settings",
           "key": "A",
-          "label": "Display patterns"
+          "label": "General Settings",
+          "group": "Configuration",
+          "icon": "gear",
+          "summary": "Configure modem options and stored profiles",
+          "items": [
+            {
+              "id": "settings.current-stored-profiles",
+              "label": "Current and stored profiles",
+              "key": "A"
+            },
+            {
+              "id": "settings.edit-profile-registers",
+              "label": "Edit profile / registers",
+              "key": "B"
+            },
+            {
+              "id": "settings.model",
+              "label": "Model",
+              "key": "C"
+            },
+            {
+              "id": "settings.auto-answer-rings",
+              "label": "Auto-answer rings (S0)",
+              "key": "D"
+            },
+            {
+              "id": "settings.auto-answer-destination",
+              "label": "Auto-answer destination",
+              "key": "E"
+            },
+            {
+              "id": "settings.host-baud",
+              "label": "Host baud",
+              "key": "F"
+            },
+            {
+              "id": "settings.data-throttle",
+              "label": "Data throttle",
+              "key": "G"
+            },
+            {
+              "id": "settings.save-active-profile",
+              "label": "Save active profile",
+              "key": "H"
+            },
+            {
+              "id": "settings.load-stored-factory-profile",
+              "label": "Load stored/factory profile",
+              "key": "I"
+            },
+            {
+              "id": "settings.load-factory-profile",
+              "label": "Load factory profile",
+              "key": "J"
+            },
+            {
+              "id": "settings.power-on-profile",
+              "label": "Power-on profile",
+              "key": "K"
+            },
+            {
+              "id": "settings.stored-number",
+              "label": "Stored number",
+              "key": "L"
+            },
+            {
+              "id": "settings.terminal-style",
+              "label": "Terminal style",
+              "key": "M"
+            }
+          ]
         },
         {
-          "id": "client-tests.size",
+          "id": "sounds",
           "key": "B",
-          "label": "Measure screen"
+          "label": "Sounds",
+          "group": "Configuration",
+          "icon": "speaker",
+          "summary": "Browse and play sounds",
+          "items": [
+            {
+              "id": "sounds.list-sounds",
+              "label": "List sounds",
+              "key": "A"
+            },
+            {
+              "id": "sounds.play-sound",
+              "label": "Play",
+              "key": "B"
+            },
+            {
+              "id": "sounds.ring-delay",
+              "label": "Ringing duration",
+              "key": "C"
+            },
+            {
+              "id": "sounds.connect-delay",
+              "label": "Delay before CONNECT",
+              "key": "D"
+            }
+          ]
         },
         {
-          "id": "client-tests.keys",
+          "id": "wifi-clock",
           "key": "C",
-          "label": "Keyboard codes"
+          "label": "Wi-Fi",
+          "group": "Configuration",
+          "icon": "wifi",
+          "summary": "Manage networking and time services",
+          "items": [
+            {
+              "id": "wifi-clock.network-status",
+              "label": "Network status",
+              "key": "A"
+            },
+            {
+              "id": "wifi-clock.scan",
+              "label": "Scan",
+              "key": "B"
+            },
+            {
+              "id": "wifi-clock.join",
+              "label": "Join",
+              "key": "C"
+            },
+            {
+              "id": "wifi-clock.wifi-toggle",
+              "label": "Wi-Fi on / off",
+              "key": "D"
+            },
+            {
+              "id": "wifi-clock.forget-network",
+              "label": "Forget network",
+              "key": "E"
+            },
+            {
+              "id": "wifi-clock.ip-configuration",
+              "label": "IP configuration",
+              "key": "F"
+            },
+            {
+              "id": "wifi-clock.network-name",
+              "label": "Network name",
+              "key": "G"
+            },
+            {
+              "id": "wifi-clock.dns-lookup",
+              "label": "DNS lookup",
+              "key": "H"
+            },
+            {
+              "id": "wifi-clock.ping",
+              "label": "Ping",
+              "key": "I"
+            },
+            {
+              "id": "wifi-clock.internet-status",
+              "label": "Internet dial-up status",
+              "key": "J"
+            },
+            {
+              "id": "wifi-clock.internet-settings",
+              "label": "Internet addresses / DNS",
+              "key": "K"
+            },
+            {
+              "id": "wifi-clock.internet-dial",
+              "label": "Dial Internet PPP / SLIP",
+              "key": "L"
+            }
+          ]
         },
         {
-          "id": "client-tests.id",
-          "key": "D",
-          "label": "Terminal identification"
+          "id": "clock",
+          "label": "Clock",
+          "items": [
+            {
+              "id": "wifi-clock.time",
+              "label": "Time",
+              "key": "A"
+            },
+            {
+              "id": "wifi-clock.time-zone",
+              "label": "Time zone",
+              "key": "B"
+            },
+            {
+              "id": "wifi-clock.ntp-server",
+              "label": "NTP server",
+              "key": "C"
+            }
+          ],
+          "summary": "Set the modem clock, time zone and time server.",
+          "key": "D"
         },
         {
-          "id": "client-tests.echo",
+          "id": "updates-reset",
           "key": "E",
-          "label": "Echo and line endings"
+          "label": "Updates",
+          "group": "Maintenance",
+          "icon": "download",
+          "summary": "Manage firmware, password, restart and reset",
+          "items": [
+            {
+              "id": "updates-reset.firmware-version",
+              "label": "Firmware version",
+              "key": "A"
+            },
+            {
+              "id": "updates-reset.ota-status",
+              "label": "OTA status",
+              "key": "B"
+            },
+            {
+              "id": "updates-reset.ota-policy-window",
+              "label": "OTA policy / window",
+              "key": "C"
+            },
+            {
+              "id": "updates-reset.change-device-password",
+              "label": "Change device password",
+              "key": "D"
+            },
+            {
+              "id": "updates-reset.web-interface",
+              "label": "Web interface",
+              "key": "E"
+            },
+            {
+              "id": "updates-reset.network-console",
+              "label": "Network console",
+              "key": "F"
+            }
+          ]
         },
         {
-          "id": "client-tests.tx",
-          "key": "F",
-          "label": "Transmit and RTS"
+          "id": "reset",
+          "label": "Reset",
+          "items": [
+            {
+              "id": "updates-reset.restart",
+              "label": "Restart",
+              "key": "A"
+            },
+            {
+              "id": "updates-reset.factory-reset",
+              "label": "Factory reset",
+              "key": "B"
+            }
+          ],
+          "summary": "Restart the modem or restore factory settings.",
+          "key": "F"
         },
         {
-          "id": "client-tests.rx",
+          "id": "export-configuration",
           "key": "G",
-          "label": "Receive and CTS"
-        },
-        {
-          "id": "client-tests.cable",
-          "key": "H",
-          "label": "Cable and signals"
-        },
-        {
-          "id": "client-tests.bell",
-          "key": "I",
-          "label": "Terminal bell"
-        },
-        {
-          "id": "client-tests.format",
-          "key": "J",
-          "label": "Serial format"
-        },
-        {
-          "id": "client-tests.transfer",
-          "key": "K",
-          "label": "File transfers"
-        },
-        {
-          "id": "client-tests.summary",
-          "key": "L",
-          "label": "Results summary"
-        },
-        {
-          "id": "client-tests.edit",
-          "key": "M",
-          "label": "Edit client findings"
-        },
-        {
-          "id": "client-tests.apply",
-          "key": "N",
-          "label": "Save client findings"
-        },
-        {
-          "id": "client-tests.reset",
-          "key": "O",
-          "label": "Reset client settings"
+          "label": "Export Configuration",
+          "group": "Maintenance",
+          "icon": "upload",
+          "summary": "Export modem configuration safely",
+          "items": []
         }
-      ]
+      ],
+      "summary": "Configure modem, sounds, network, clock and updates.",
+      "key": "D"
     },
     {
-      "id": "command-reference",
-      "key": "M",
-      "label": "Command Reference",
-      "group": "Information",
-      "icon": "book",
-      "summary": "Browse AT commands and usage examples",
-      "items": []
+      "id": "help",
+      "label": "Help",
+      "items": [
+        {
+          "id": "about",
+          "key": "A",
+          "label": "About",
+          "group": "Information",
+          "icon": "info",
+          "summary": "Show version, device and project information",
+          "items": []
+        },
+        {
+          "id": "github",
+          "label": "GitHub",
+          "items": [],
+          "key": "B"
+        },
+        {
+          "id": "command-reference",
+          "key": "C",
+          "label": "Command Reference",
+          "group": "Information",
+          "icon": "book",
+          "summary": "Browse AT commands and usage examples",
+          "items": []
+        },
+        {
+          "id": "debug",
+          "key": "D",
+          "label": "Diagnostics",
+          "group": "Tools",
+          "icon": "wrench",
+          "summary": "View diagnostic logs and reset/crash data",
+          "items": [
+            {
+              "id": "debug.view-log",
+              "label": "View log",
+              "key": "A"
+            },
+            {
+              "id": "debug.verbosity",
+              "label": "Verbosity",
+              "key": "B"
+            },
+            {
+              "id": "debug.clear-debug-log",
+              "label": "Clear debug log",
+              "key": "C"
+            },
+            {
+              "id": "debug.reset-crash-information",
+              "label": "Reset / crash information",
+              "key": "D"
+            },
+            {
+              "id": "hardware-tests",
+              "key": "E",
+              "label": "Hardware Tests",
+              "group": "Tools",
+              "icon": "chip",
+              "summary": "Run guided and individual hardware tests",
+              "items": [
+                {
+                  "id": "hardware-tests.guided-tests",
+                  "label": "Guided tests",
+                  "key": "A"
+                },
+                {
+                  "id": "hardware-tests.pin-map",
+                  "label": "Pin map",
+                  "key": "B"
+                },
+                {
+                  "id": "hardware-tests.board-information",
+                  "label": "Board information",
+                  "key": "C"
+                },
+                {
+                  "id": "hardware-tests.files",
+                  "label": "Files",
+                  "key": "D"
+                },
+                {
+                  "id": "hardware-tests.leds",
+                  "label": "LEDs",
+                  "key": "E"
+                },
+                {
+                  "id": "hardware-tests.amplifier",
+                  "label": "Amplifier",
+                  "key": "F"
+                },
+                {
+                  "id": "hardware-tests.test-volume",
+                  "label": "Test volume",
+                  "key": "G"
+                },
+                {
+                  "id": "hardware-tests.tone-sweep",
+                  "label": "Tone / sweep",
+                  "key": "H"
+                },
+                {
+                  "id": "hardware-tests.dtmf",
+                  "label": "DTMF",
+                  "key": "I"
+                },
+                {
+                  "id": "hardware-tests.pulse",
+                  "label": "Pulse",
+                  "key": "J"
+                },
+                {
+                  "id": "hardware-tests.potentiometer",
+                  "label": "Potentiometer",
+                  "key": "K"
+                },
+                {
+                  "id": "hardware-tests.rs232-lines",
+                  "label": "RS232 lines",
+                  "key": "L"
+                },
+                {
+                  "id": "hardware-tests.loopback",
+                  "label": "Loopback",
+                  "key": "M"
+                },
+                {
+                  "id": "hardware-tests.bridge",
+                  "label": "Bridge",
+                  "key": "N"
+                },
+                {
+                  "id": "hardware-tests.output-signal",
+                  "label": "Output signal",
+                  "key": "O"
+                }
+              ]
+            },
+            {
+              "id": "client-tests",
+              "key": "F",
+              "label": "Client Tests",
+              "group": "Tools",
+              "icon": "flask",
+              "summary": "Serial terminal diagnostics and X/Y/ZMODEM",
+              "status": "available",
+              "items": [
+                {
+                  "id": "client-tests.display",
+                  "key": "A",
+                  "label": "Display patterns"
+                },
+                {
+                  "id": "client-tests.size",
+                  "key": "B",
+                  "label": "Measure screen"
+                },
+                {
+                  "id": "client-tests.keys",
+                  "key": "C",
+                  "label": "Keyboard codes"
+                },
+                {
+                  "id": "client-tests.id",
+                  "key": "D",
+                  "label": "Terminal identification"
+                },
+                {
+                  "id": "client-tests.echo",
+                  "key": "E",
+                  "label": "Echo and line endings"
+                },
+                {
+                  "id": "client-tests.tx",
+                  "key": "F",
+                  "label": "Transmit and RTS"
+                },
+                {
+                  "id": "client-tests.rx",
+                  "key": "G",
+                  "label": "Receive and CTS"
+                },
+                {
+                  "id": "client-tests.cable",
+                  "key": "H",
+                  "label": "Cable and signals"
+                },
+                {
+                  "id": "client-tests.bell",
+                  "key": "I",
+                  "label": "Terminal bell"
+                },
+                {
+                  "id": "client-tests.format",
+                  "key": "J",
+                  "label": "Serial format"
+                },
+                {
+                  "id": "client-tests.transfer",
+                  "key": "K",
+                  "label": "File transfers"
+                },
+                {
+                  "id": "client-tests.summary",
+                  "key": "L",
+                  "label": "Results summary"
+                },
+                {
+                  "id": "client-tests.edit",
+                  "key": "M",
+                  "label": "Edit client findings"
+                },
+                {
+                  "id": "client-tests.apply",
+                  "key": "N",
+                  "label": "Save client findings"
+                },
+                {
+                  "id": "client-tests.reset",
+                  "key": "O",
+                  "label": "Reset client settings"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "summary": "Find project information, commands and diagnostic tools.",
+      "key": "E"
     }
   ],
   "description": "Four Sportster variants, main menu and full nested inventory. Keys are UI-local; route by stable IDs. 80x25 mode is first-class.",

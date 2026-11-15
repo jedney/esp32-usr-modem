@@ -55,15 +55,17 @@ bool Outgoing::start(hostport::Session &session, const char *text, bool pulse) {
         return true;
     }
     reportSpeed_ = target_.speed || profile_.lineExplicit ? lineSpeed_ : modem_.model();
-    // Dial the number the user entered, never the digits in a phonebook expansion.
-    // A hostname has no number, so its digits come from its IP address (see poll).
-    setDigits(r.kind == dialstring::Kind::Host ? "" : text);
+    // Hostnames and speed dials sound the final IPv4 address, never a phonebook slot
+    // or digits embedded in a hostname. Numeric IP dial strings retain their digits.
+    const bool resolveDigits =
+        r.kind == dialstring::Kind::Host || r.kind == dialstring::Kind::Phonebook;
+    setDigits(resolveDigits ? "" : text);
     session.port().wait(cancelWait, this, atcmd::Result::kNoCarrier);
     if (profile_.get(modemcfg::kM) == 0 || profile_.get(modemcfg::kM) == 3) {
         connect(clock_());
     } else {
         stage_ = CallStage::kDial;
-        if (r.kind == dialstring::Kind::Host) {
+        if (resolveDigits) {
             // Look the name up while the dial tone plays.
             lookup_ = true;
             since_ = clock_();

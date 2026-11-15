@@ -3,12 +3,15 @@ import unittest, json, importlib.util
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 menu=json.loads((ROOT/'menu-definition.json').read_text(encoding="utf-8"))
+def walk(nodes):
+    return [item for node in nodes for item in [node, *walk(node.get('items', []))]]
+
 theme=json.loads((ROOT/'theme-tokens.json').read_text(encoding="utf-8"))
 
 class HandoffContract(unittest.TestCase):
     def test_typed_metadata_covers_the_whole_inventory(self):
         bindings = json.loads((ROOT.parent/'lib/config/ui-bindings.json').read_text(encoding='utf-8'))
-        items = menu['main_menu'] + [i for m in menu['main_menu'] for i in m['items']]
+        items = walk(menu['main_menu'])
         self.assertEqual(set(bindings), {i['id'] for i in items})
         for item in items:
             with self.subTest(id=item['id']):
@@ -35,24 +38,22 @@ class HandoffContract(unittest.TestCase):
             s=(ROOT/'previews'/f"main-{m['id']}.txt").read_text(encoding="utf-8")
             self.assertIn(m['label'],s)
     def test_inventory(self):
-        items=menu['main_menu']
-        self.assertEqual(len(items),13)
-        self.assertEqual(sum(len(m['items']) for m in items),78)
-        self.assertEqual([m['key'] for m in items],list('ABCDEFGHIJKLM'))
-        self.assertEqual([m['label'] for m in items[-4:]],
-                         ['About','Hardware Tests','Client Tests','Command Reference'])
-        self.assertEqual(len(set(m['id'] for m in items)),13)
-        self.assertEqual(len(set(i['id'] for m in items for i in m['items'])),78)
-        self.assertEqual([len(m['items']) for m in items],[0,4,13,4,4,0,15,8,0,0,15,15,0])
+        roots=menu['main_menu']; items=walk(roots)
+        self.assertEqual([n['label'] for n in roots], ['Status','Phone Book','Call History','Settings','Help'])
+        self.assertEqual([n['key'] for n in roots], list('ABCDE'))
+        self.assertEqual(len(items),96)
+        self.assertEqual(len(set(n['id'] for n in items)),96)
+        self.assertEqual([n['label'] for n in roots[3]['items']], ['General Settings','Sounds','Wi-Fi','Clock','Updates','Reset','Export Configuration'])
+        self.assertEqual([n['label'] for n in roots[4]['items']], ['About','GitHub','Command Reference','Diagnostics'])
     def test_disabled_version(self):
-        m=next(item for item in menu['main_menu'] if item['id']=='client-tests')
+        m=next(item for item in walk(menu['main_menu']) if item['id']=='client-tests')
         self.assertEqual(m['label'],'Client Tests')
         self.assertEqual(m['status'],'available')
         for p in (ROOT/'previews').glob('main-*.txt'):
-            self.assertIn('Client Tests',p.read_text(encoding="utf-8"))
+            self.assertIn('Help',p.read_text(encoding="utf-8"))
     def test_submenu_keys(self):
-        for m in menu['main_menu']:
-            keys=[i['key'] for i in m['items']]
+        for m in walk(menu['main_menu']):
+            keys=[i['key'] for i in m.get('items', [])]
             self.assertEqual(len(keys),len(set(keys)))
             self.assertEqual(keys,list('ABCDEFGHIJKLMNO')[:len(keys)])
             self.assertLessEqual(len(keys),15)

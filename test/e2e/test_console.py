@@ -50,11 +50,11 @@ def test_reply_starts_on_its_own_line(console, query):
 
 
 def test_long_reply_does_not_hold_up_the_rs232_port(console, rs232):
-    """AT*ABOUT (about 9.4 KB, the longest reply) goes out of the console at 115200 while
+    """AT*HELP (a long command-reference reply) goes out of the console at 115200 while
     the modem carries on; the RS232 port answers at once."""
     assert rs232.command("AT")[-1] == "OK"
     console.ser.reset_input_buffer()
-    console.ser.write(b"AT*ABOUT\r")
+    console.ser.write(b"AT*HELP\r")
     time.sleep(0.05)  # the reply has started
     started = time.monotonic()
     assert rs232.command("AT")[-1] == "OK"

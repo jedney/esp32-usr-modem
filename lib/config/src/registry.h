@@ -41,6 +41,7 @@ USR_CONFIG_COMMAND(RESTOREEND)
 USR_CONFIG_COMMAND(DIAL)
 USR_CONFIG_COMMAND(REFERENCE)
 USR_CONFIG_COMMAND(ABOUT)
+USR_CONFIG_COMMAND(GITHUB)
 USR_CONFIG_COMMAND(SOUNDS)
 USR_CONFIG_COMMAND(PLAY)
 USR_CONFIG_COMMAND(LOG)
@@ -118,7 +119,9 @@ public:
             {"DIAL", "AT*DIAL=<number|host:port>", "dial using shared call engine", registryDIAL,
              false},
             {"REFERENCE", "AT*REFERENCE", "AT and AT* reference", registryREFERENCE, false},
-            {"ABOUT", "AT*ABOUT", "version and licensing record", registryABOUT, false},
+            {"ABOUT", "AT*ABOUT", "version, project names and URLs; full credits on GitHub",
+             registryABOUT, false},
+            {"GITHUB", "AT*GITHUB", "project repository URL", registryGITHUB, false},
             {"SOUNDS", "AT*SOUNDS", "list generated tones and WAVs", registrySOUNDS, false},
             {"PLAY", "AT*PLAY=<name|speed>", "play a sound; any key cancels", registryPLAY, false},
             {"LOG", "AT*LOG[?]|=<0|1|2|CLEAR|offset,count>", "structured debug ring", registryLOG,

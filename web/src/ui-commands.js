@@ -17,143 +17,11 @@ export default [
     "command": "",
     "help": "Save, change and dial your favourite destinations.",
     "target": "Phonebook",
-    "friendly": "Phonebook",
+    "friendly": "Phone Book",
     "type": "action",
     "template": "",
     "id": "phonebook",
     "key": "B",
-    "available": true
-  },
-  {
-    "screen": "Main",
-    "command": "",
-    "help": "Choose the modem model and connection preferences.",
-    "target": "Settings",
-    "friendly": "Settings",
-    "type": "action",
-    "template": "",
-    "id": "settings",
-    "key": "C",
-    "available": true
-  },
-  {
-    "screen": "Main",
-    "command": "",
-    "help": "Listen to dial tones and recorded modem handshakes.",
-    "target": "Sounds",
-    "friendly": "Sounds",
-    "type": "action",
-    "template": "",
-    "id": "sounds",
-    "key": "D",
-    "available": true
-  },
-  {
-    "screen": "Main",
-    "command": "",
-    "help": "View diagnostic events and restart information.",
-    "target": "Debug",
-    "friendly": "Diagnostics",
-    "type": "action",
-    "template": "",
-    "id": "debug",
-    "key": "E",
-    "available": true
-  },
-  {
-    "screen": "Main",
-    "command": "*CALLLOG",
-    "help": "Show the last 50 network calls, including calls before a restart.",
-    "target": "Main",
-    "friendly": "Call History",
-    "type": "action",
-    "template": "*CALLLOG",
-    "id": "call-history",
-    "key": "F",
-    "available": true
-  },
-  {
-    "screen": "Main",
-    "command": "",
-    "help": "Connect to Wi-Fi, check the network and set the clock.",
-    "target": "Wifi",
-    "friendly": "Wi-Fi and Clock",
-    "type": "action",
-    "template": "",
-    "id": "wifi-clock",
-    "key": "G",
-    "available": true
-  },
-  {
-    "screen": "Main",
-    "command": "",
-    "help": "Manage software updates, the device password and resets.",
-    "target": "Updates",
-    "friendly": "Updates and Reset",
-    "type": "action",
-    "template": "",
-    "id": "updates-reset",
-    "key": "H",
-    "available": true
-  },
-  {
-    "screen": "Main",
-    "command": "*EXPORT",
-    "help": "Show commands that restore your settings. Passwords are left out.",
-    "target": "Main",
-    "friendly": "Export Configuration",
-    "type": "action",
-    "template": "*EXPORT",
-    "id": "export-configuration",
-    "key": "I",
-    "available": true
-  },
-  {
-    "screen": "Main",
-    "command": "*ABOUT",
-    "help": "Show the version, build information and software credits.",
-    "target": "Main",
-    "friendly": "About",
-    "type": "action",
-    "template": "*ABOUT",
-    "id": "about",
-    "key": "J",
-    "available": true
-  },
-  {
-    "screen": "Main",
-    "command": "",
-    "help": "Check the lights, speaker and serial electronics.",
-    "target": "Hardware",
-    "friendly": "Hardware Tests",
-    "type": "action",
-    "template": "",
-    "id": "hardware-tests",
-    "key": "K",
-    "available": true
-  },
-  {
-    "screen": "Main",
-    "command": "",
-    "help": "Check a serial terminal using the maintenance console or modem port. These tests cannot run in the browser.",
-    "target": "Client",
-    "friendly": "Client Tests",
-    "type": "action",
-    "template": "",
-    "id": "client-tests",
-    "key": "L",
-    "available": true
-  },
-  {
-    "screen": "Main",
-    "command": "*REFERENCE",
-    "help": "Show the standard modem commands and the device commands.",
-    "target": "Main",
-    "friendly": "Command Reference",
-    "type": "action",
-    "template": "*REFERENCE",
-    "id": "command-reference",
-    "key": "M",
     "available": true
   },
   {
@@ -468,6 +336,42 @@ export default [
     "unit": "characters",
     "id": "phonebook.dial",
     "key": "D",
+    "available": true
+  },
+  {
+    "screen": "Main",
+    "command": "*CALLLOG",
+    "help": "Show the last 50 network calls, including calls before a restart.",
+    "target": "Main",
+    "friendly": "Call History",
+    "type": "action",
+    "template": "*CALLLOG",
+    "id": "call-history",
+    "key": "C",
+    "available": true
+  },
+  {
+    "screen": "Main",
+    "target": "Options",
+    "command": "",
+    "template": "",
+    "friendly": "Settings",
+    "help": "Configure modem, sounds, network, clock and updates.",
+    "type": "action",
+    "id": "settings-group",
+    "key": "D",
+    "available": true
+  },
+  {
+    "screen": "Options",
+    "command": "",
+    "help": "Choose the modem model and connection preferences.",
+    "target": "Settings",
+    "friendly": "General Settings",
+    "type": "action",
+    "template": "",
+    "id": "settings",
+    "key": "A",
     "available": true
   },
   {
@@ -2701,6 +2605,18 @@ export default [
     "available": true
   },
   {
+    "screen": "Options",
+    "command": "",
+    "help": "Listen to dial tones and recorded modem handshakes.",
+    "target": "Sounds",
+    "friendly": "Sounds",
+    "type": "action",
+    "template": "",
+    "id": "sounds",
+    "key": "B",
+    "available": true
+  },
+  {
     "screen": "Sounds",
     "command": "*SOUNDS",
     "help": "Show the available generated tones and recorded handshakes.",
@@ -2984,69 +2900,15 @@ export default [
     "available": true
   },
   {
-    "screen": "Debug",
-    "command": "*LOG",
-    "help": "Show recent diagnostic events. Passwords and call data are never recorded.",
-    "target": "Debug",
-    "friendly": "View log",
+    "screen": "Options",
+    "command": "",
+    "help": "Connect to Wi-Fi, check the network and set the clock.",
+    "target": "Wifi",
+    "friendly": "Wi-Fi",
     "type": "action",
-    "template": "*LOG",
-    "id": "debug.view-log",
-    "key": "A",
-    "available": true
-  },
-  {
-    "screen": "Debug",
-    "command": "*LOG=",
-    "help": "Choose how much diagnostic detail to keep until restart.",
-    "target": "Debug",
-    "input": true,
-    "friendly": "Diagnostic detail",
-    "type": "enum",
-    "template": "*LOG={value}",
-    "values": [
-      {
-        "value": "0",
-        "label": "Off",
-        "description": "Do not record diagnostic events."
-      },
-      {
-        "value": "1",
-        "label": "Normal",
-        "description": "Record connection and service events."
-      },
-      {
-        "value": "2",
-        "label": "Detailed",
-        "description": "Record additional diagnostic detail."
-      }
-    ],
-    "id": "debug.verbosity",
-    "key": "B",
-    "available": true
-  },
-  {
-    "screen": "Debug",
-    "command": "*LOG=CLEAR",
-    "help": "Clear the diagnostic events held in memory.",
-    "target": "Debug",
-    "friendly": "Clear debug log",
-    "type": "action",
-    "template": "*LOG=CLEAR",
-    "id": "debug.clear-debug-log",
+    "template": "",
+    "id": "wifi-clock",
     "key": "C",
-    "available": true
-  },
-  {
-    "screen": "Debug",
-    "command": "*RESETINFO",
-    "help": "Show the saved restart reason and any available crash information.",
-    "target": "Debug",
-    "friendly": "Restart and crash information",
-    "type": "action",
-    "template": "*RESETINFO",
-    "id": "debug.reset-crash-information",
-    "key": "D",
     "available": true
   },
   {
@@ -3250,21 +3112,177 @@ export default [
   },
   {
     "screen": "Wifi",
-    "command": "*TIME",
-    "help": "Show the local time after the clock has synchronised with a time server.",
+    "command": "*DNS=",
+    "help": "Look up the network address of a host. Press a key to cancel.",
     "target": "Wifi",
-    "friendly": "Time",
-    "type": "action",
-    "template": "*TIME",
-    "id": "wifi-clock.time",
+    "input": true,
+    "friendly": "Look up a network address",
+    "type": "string",
+    "template": "*DNS={value}",
+    "minLength": 1,
+    "maxLength": 63,
+    "unit": "characters",
+    "pattern": "(?![.-])(?!.*\\.$)[A-Za-z0-9._-]+",
+    "id": "wifi-clock.dns-lookup",
     "key": "H",
     "available": true
   },
   {
     "screen": "Wifi",
+    "command": "*PING=",
+    "help": "Check whether a host responds on the network. Press a key to cancel.",
+    "target": "Wifi",
+    "input": true,
+    "friendly": "Check a network connection",
+    "type": "string",
+    "template": "*PING={value}",
+    "minLength": 1,
+    "maxLength": 63,
+    "unit": "characters",
+    "pattern": "(?![.-])(?!.*\\.$)[A-Za-z0-9._-]+",
+    "id": "wifi-clock.ping",
+    "key": "I",
+    "available": true
+  },
+  {
+    "screen": "Wifi",
+    "command": "*INTERNET?",
+    "help": "Show the dial-up internet connection and address settings. Drop DTR or use the other local port to hang up.",
+    "target": "Wifi",
+    "friendly": "Internet dial-up status",
+    "type": "action",
+    "template": "*INTERNET?",
+    "id": "wifi-clock.internet-status",
+    "key": "J",
+    "available": true
+  },
+  {
+    "screen": "Wifi",
+    "command": "*INTERNET=",
+    "help": "Choose private addresses for dial-up internet or its name server. The two addresses must be the usable hosts of the same private /30 subnet.",
+    "target": "Wifi",
+    "input": true,
+    "friendly": "Dial-up internet addresses",
+    "type": "string",
+    "template": "*INTERNET=IP,{local},{peer}",
+    "fields": [
+      {
+        "id": "local",
+        "friendly": "Modem address",
+        "help": "Enter an IPv4 address in dotted form.",
+        "type": "ip"
+      },
+      {
+        "id": "peer",
+        "friendly": "Computer address",
+        "help": "Enter an IPv4 address in dotted form.",
+        "type": "ip"
+      }
+    ],
+    "variants": [
+      {
+        "id": "ip",
+        "friendly": "Dial-up addresses",
+        "help": "Use the two host addresses of the same private /30 subnet.",
+        "type": "action",
+        "template": "*INTERNET=IP,{local},{peer}",
+        "fields": [
+          {
+            "id": "local",
+            "friendly": "Modem address",
+            "help": "Enter an IPv4 address in dotted form.",
+            "type": "ip"
+          },
+          {
+            "id": "peer",
+            "friendly": "Computer address",
+            "help": "Enter an IPv4 address in dotted form.",
+            "type": "ip"
+          }
+        ]
+      },
+      {
+        "id": "dns-auto",
+        "friendly": "Automatic name server",
+        "help": "Use the Wi-Fi network name server.",
+        "type": "action",
+        "template": "*INTERNET=DNS,AUTO"
+      },
+      {
+        "id": "dns",
+        "friendly": "Name server address",
+        "help": "Set a fixed name server for dial-up internet.",
+        "type": "action",
+        "template": "*INTERNET=DNS,{dns}",
+        "fields": [
+          {
+            "id": "dns",
+            "friendly": "Name server",
+            "help": "Enter an IPv4 address in dotted form.",
+            "type": "ip"
+          }
+        ]
+      }
+    ],
+    "id": "wifi-clock.internet-settings",
+    "key": "K",
+    "available": true
+  },
+  {
+    "screen": "Wifi",
+    "command": "*DIAL=",
+    "help": "Start a dial-up internet connection using PPP or SLIP. The computer needs a TCP/IP stack; the browser starts it on RS232.",
+    "target": "Wifi",
+    "input": true,
+    "leave": true,
+    "friendly": "Connect to dial-up internet",
+    "type": "enum",
+    "template": "*DIAL={value}",
+    "values": [
+      {
+        "value": "666",
+        "label": "PPP internet",
+        "description": "Start a PPP internet connection."
+      },
+      {
+        "value": "667",
+        "label": "SLIP internet",
+        "description": "Start a SLIP internet connection."
+      }
+    ],
+    "id": "wifi-clock.internet-dial",
+    "key": "L",
+    "available": true
+  },
+  {
+    "screen": "Options",
+    "target": "Clock",
+    "command": "",
+    "template": "",
+    "friendly": "Clock",
+    "help": "Set the modem clock, time zone and time server.",
+    "type": "action",
+    "id": "clock",
+    "key": "D",
+    "available": true
+  },
+  {
+    "screen": "Clock",
+    "command": "*TIME",
+    "help": "Show the local time after the clock has synchronised with a time server.",
+    "target": "Clock",
+    "friendly": "Time",
+    "type": "action",
+    "template": "*TIME",
+    "id": "wifi-clock.time",
+    "key": "A",
+    "available": true
+  },
+  {
+    "screen": "Clock",
     "command": "*TZ=",
     "help": "Choose a time zone or enter a POSIX clock rule. Daylight saving follows the selected rule.",
-    "target": "Wifi",
+    "target": "Clock",
     "input": true,
     "friendly": "Time zone",
     "type": "enum",
@@ -3355,14 +3373,14 @@ export default [
     "maxLength": 63,
     "unit": "characters",
     "id": "wifi-clock.time-zone",
-    "key": "I",
+    "key": "B",
     "available": true
   },
   {
-    "screen": "Wifi",
+    "screen": "Clock",
     "command": "*NTP=",
     "help": "Choose a time server using letters, digits, hyphens and dots. Do not start with a dot or hyphen, end with a dot, or leave an empty name part.",
-    "target": "Wifi",
+    "target": "Clock",
     "input": true,
     "friendly": "Time server",
     "type": "string",
@@ -3372,151 +3390,19 @@ export default [
     "unit": "characters",
     "pattern": "(?![.-])(?!.*\\.\\.)(?!.*\\.$)[A-Za-z0-9.-]+",
     "id": "wifi-clock.ntp-server",
-    "key": "J",
+    "key": "C",
     "available": true
   },
   {
-    "screen": "Wifi",
-    "command": "*DNS=",
-    "help": "Look up the network address of a host. Press a key to cancel.",
-    "target": "Wifi",
-    "input": true,
-    "friendly": "Look up a network address",
-    "type": "string",
-    "template": "*DNS={value}",
-    "minLength": 1,
-    "maxLength": 63,
-    "unit": "characters",
-    "pattern": "(?![.-])(?!.*\\.$)[A-Za-z0-9._-]+",
-    "id": "wifi-clock.dns-lookup",
-    "key": "K",
-    "available": true
-  },
-  {
-    "screen": "Wifi",
-    "command": "*PING=",
-    "help": "Check whether a host responds on the network. Press a key to cancel.",
-    "target": "Wifi",
-    "input": true,
-    "friendly": "Check a network connection",
-    "type": "string",
-    "template": "*PING={value}",
-    "minLength": 1,
-    "maxLength": 63,
-    "unit": "characters",
-    "pattern": "(?![.-])(?!.*\\.$)[A-Za-z0-9._-]+",
-    "id": "wifi-clock.ping",
-    "key": "L",
-    "available": true
-  },
-  {
-    "screen": "Wifi",
-    "command": "*INTERNET?",
-    "help": "Show the dial-up internet connection and address settings. Drop DTR or use the other local port to hang up.",
-    "target": "Wifi",
-    "friendly": "Internet dial-up status",
+    "screen": "Options",
+    "command": "",
+    "help": "Manage software updates, the device password and resets.",
+    "target": "Updates",
+    "friendly": "Updates",
     "type": "action",
-    "template": "*INTERNET?",
-    "id": "wifi-clock.internet-status",
-    "key": "M",
-    "available": true
-  },
-  {
-    "screen": "Wifi",
-    "command": "*INTERNET=",
-    "help": "Choose private addresses for dial-up internet or its name server. The two addresses must be the usable hosts of the same private /30 subnet.",
-    "target": "Wifi",
-    "input": true,
-    "friendly": "Dial-up internet addresses",
-    "type": "string",
-    "template": "*INTERNET=IP,{local},{peer}",
-    "fields": [
-      {
-        "id": "local",
-        "friendly": "Modem address",
-        "help": "Enter an IPv4 address in dotted form.",
-        "type": "ip"
-      },
-      {
-        "id": "peer",
-        "friendly": "Computer address",
-        "help": "Enter an IPv4 address in dotted form.",
-        "type": "ip"
-      }
-    ],
-    "variants": [
-      {
-        "id": "ip",
-        "friendly": "Dial-up addresses",
-        "help": "Use the two host addresses of the same private /30 subnet.",
-        "type": "action",
-        "template": "*INTERNET=IP,{local},{peer}",
-        "fields": [
-          {
-            "id": "local",
-            "friendly": "Modem address",
-            "help": "Enter an IPv4 address in dotted form.",
-            "type": "ip"
-          },
-          {
-            "id": "peer",
-            "friendly": "Computer address",
-            "help": "Enter an IPv4 address in dotted form.",
-            "type": "ip"
-          }
-        ]
-      },
-      {
-        "id": "dns-auto",
-        "friendly": "Automatic name server",
-        "help": "Use the Wi-Fi network name server.",
-        "type": "action",
-        "template": "*INTERNET=DNS,AUTO"
-      },
-      {
-        "id": "dns",
-        "friendly": "Name server address",
-        "help": "Set a fixed name server for dial-up internet.",
-        "type": "action",
-        "template": "*INTERNET=DNS,{dns}",
-        "fields": [
-          {
-            "id": "dns",
-            "friendly": "Name server",
-            "help": "Enter an IPv4 address in dotted form.",
-            "type": "ip"
-          }
-        ]
-      }
-    ],
-    "id": "wifi-clock.internet-settings",
-    "key": "N",
-    "available": true
-  },
-  {
-    "screen": "Wifi",
-    "command": "*DIAL=",
-    "help": "Start a dial-up internet connection using PPP or SLIP. The computer needs a TCP/IP stack; the browser starts it on RS232.",
-    "target": "Wifi",
-    "input": true,
-    "leave": true,
-    "friendly": "Connect to dial-up internet",
-    "type": "enum",
-    "template": "*DIAL={value}",
-    "values": [
-      {
-        "value": "666",
-        "label": "PPP internet",
-        "description": "Start a PPP internet connection."
-      },
-      {
-        "value": "667",
-        "label": "SLIP internet",
-        "description": "Start a SLIP internet connection."
-      }
-    ],
-    "id": "wifi-clock.internet-dial",
-    "key": "O",
+    "template": "",
+    "id": "updates-reset",
+    "key": "E",
     "available": true
   },
   {
@@ -3598,38 +3484,6 @@ export default [
   },
   {
     "screen": "Updates",
-    "command": "*RESTART",
-    "help": "Restart the device after confirmation. This closes the menu.",
-    "target": "Updates",
-    "input": false,
-    "secret": false,
-    "rs232Unavailable": false,
-    "leave": true,
-    "friendly": "Restart",
-    "type": "action",
-    "template": "*RESTART",
-    "id": "updates-reset.restart",
-    "key": "E",
-    "available": true
-  },
-  {
-    "screen": "Updates",
-    "command": "*FACTORY",
-    "help": "Erase all settings and passwords after confirmation. This closes the menu.",
-    "target": "Updates",
-    "input": false,
-    "secret": false,
-    "rs232Unavailable": false,
-    "leave": true,
-    "friendly": "Factory reset",
-    "type": "action",
-    "template": "*FACTORY",
-    "id": "updates-reset.factory-reset",
-    "key": "F",
-    "available": true
-  },
-  {
-    "screen": "Updates",
     "command": "*WEB=",
     "help": "Turn the browser interface on or off. Turning it off closes browser sessions.",
     "target": "Updates",
@@ -3650,7 +3504,7 @@ export default [
       }
     ],
     "id": "updates-reset.web-interface",
-    "key": "G",
+    "key": "E",
     "available": true
   },
   {
@@ -3675,7 +3529,202 @@ export default [
       }
     ],
     "id": "updates-reset.network-console",
-    "key": "H",
+    "key": "F",
+    "available": true
+  },
+  {
+    "screen": "Options",
+    "target": "Reset",
+    "command": "",
+    "template": "",
+    "friendly": "Reset",
+    "help": "Restart the modem or restore factory settings.",
+    "type": "action",
+    "id": "reset",
+    "key": "F",
+    "available": true
+  },
+  {
+    "screen": "Reset",
+    "command": "*RESTART",
+    "help": "Restart the device after confirmation. This closes the menu.",
+    "target": "Reset",
+    "input": false,
+    "secret": false,
+    "rs232Unavailable": false,
+    "leave": true,
+    "friendly": "Restart",
+    "type": "action",
+    "template": "*RESTART",
+    "id": "updates-reset.restart",
+    "key": "A",
+    "available": true
+  },
+  {
+    "screen": "Reset",
+    "command": "*FACTORY",
+    "help": "Erase all settings and passwords after confirmation. This closes the menu.",
+    "target": "Reset",
+    "input": false,
+    "secret": false,
+    "rs232Unavailable": false,
+    "leave": true,
+    "friendly": "Factory reset",
+    "type": "action",
+    "template": "*FACTORY",
+    "id": "updates-reset.factory-reset",
+    "key": "B",
+    "available": true
+  },
+  {
+    "screen": "Options",
+    "command": "*EXPORT",
+    "help": "Show commands that restore your settings. Passwords are left out.",
+    "target": "Options",
+    "friendly": "Export Configuration",
+    "type": "action",
+    "template": "*EXPORT",
+    "id": "export-configuration",
+    "key": "G",
+    "available": true
+  },
+  {
+    "screen": "Main",
+    "target": "Help",
+    "command": "",
+    "template": "",
+    "friendly": "Help",
+    "help": "Find project information, commands and diagnostic tools.",
+    "type": "action",
+    "id": "help",
+    "key": "E",
+    "available": true
+  },
+  {
+    "screen": "Help",
+    "command": "*ABOUT",
+    "help": "Show the version, build information and software credits.",
+    "target": "Help",
+    "friendly": "About",
+    "type": "action",
+    "template": "*ABOUT",
+    "id": "about",
+    "key": "A",
+    "available": true
+  },
+  {
+    "screen": "Help",
+    "target": "Help",
+    "command": "*GITHUB",
+    "template": "*GITHUB",
+    "friendly": "GitHub",
+    "help": "Open the project repository for source, documentation, credits and licences.",
+    "type": "action",
+    "url": "https://github.com/jedney/esp32-usr-modem",
+    "id": "github",
+    "key": "B",
+    "available": true
+  },
+  {
+    "screen": "Help",
+    "command": "*REFERENCE",
+    "help": "Show the standard modem commands and the device commands.",
+    "target": "Help",
+    "friendly": "Command Reference",
+    "type": "action",
+    "template": "*REFERENCE",
+    "id": "command-reference",
+    "key": "C",
+    "available": true
+  },
+  {
+    "screen": "Help",
+    "command": "",
+    "help": "View diagnostic events and restart information.",
+    "target": "Debug",
+    "friendly": "Diagnostics",
+    "type": "action",
+    "template": "",
+    "id": "debug",
+    "key": "D",
+    "available": true
+  },
+  {
+    "screen": "Debug",
+    "command": "*LOG",
+    "help": "Show recent diagnostic events. Passwords and call data are never recorded.",
+    "target": "Debug",
+    "friendly": "View log",
+    "type": "action",
+    "template": "*LOG",
+    "id": "debug.view-log",
+    "key": "A",
+    "available": true
+  },
+  {
+    "screen": "Debug",
+    "command": "*LOG=",
+    "help": "Choose how much diagnostic detail to keep until restart.",
+    "target": "Debug",
+    "input": true,
+    "friendly": "Diagnostic detail",
+    "type": "enum",
+    "template": "*LOG={value}",
+    "values": [
+      {
+        "value": "0",
+        "label": "Off",
+        "description": "Do not record diagnostic events."
+      },
+      {
+        "value": "1",
+        "label": "Normal",
+        "description": "Record connection and service events."
+      },
+      {
+        "value": "2",
+        "label": "Detailed",
+        "description": "Record additional diagnostic detail."
+      }
+    ],
+    "id": "debug.verbosity",
+    "key": "B",
+    "available": true
+  },
+  {
+    "screen": "Debug",
+    "command": "*LOG=CLEAR",
+    "help": "Clear the diagnostic events held in memory.",
+    "target": "Debug",
+    "friendly": "Clear debug log",
+    "type": "action",
+    "template": "*LOG=CLEAR",
+    "id": "debug.clear-debug-log",
+    "key": "C",
+    "available": true
+  },
+  {
+    "screen": "Debug",
+    "command": "*RESETINFO",
+    "help": "Show the saved restart reason and any available crash information.",
+    "target": "Debug",
+    "friendly": "Restart and crash information",
+    "type": "action",
+    "template": "*RESETINFO",
+    "id": "debug.reset-crash-information",
+    "key": "D",
+    "available": true
+  },
+  {
+    "screen": "Debug",
+    "command": "",
+    "help": "Check the lights, speaker and serial electronics.",
+    "target": "Hardware",
+    "friendly": "Hardware Tests",
+    "type": "action",
+    "template": "",
+    "id": "hardware-tests",
+    "key": "E",
     "available": true
   },
   {
@@ -4128,6 +4177,18 @@ export default [
     ],
     "id": "hardware-tests.output-signal",
     "key": "O",
+    "available": true
+  },
+  {
+    "screen": "Debug",
+    "command": "",
+    "help": "Check a serial terminal using the maintenance console or modem port. These tests cannot run in the browser.",
+    "target": "Client",
+    "friendly": "Client Tests",
+    "type": "action",
+    "template": "",
+    "id": "client-tests",
+    "key": "F",
     "available": true
   },
   {

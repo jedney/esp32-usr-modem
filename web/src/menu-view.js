@@ -260,33 +260,36 @@ function showPhonebook() {
 }
 const menuEntries = [];
 function choose(command, section) {
+    if (command.url) { closeMenus(); window.open(command.url, '_blank', 'noopener,noreferrer'); return; }
+    if (!state().edit) { ensureTerminal(() => choose(command, section)); return; }
     if (menuDisabledReason(state())) { notify(menuDisabledReason(state())); return; }
     if (command.id === 'phonebook.list-entries') { showPhonebook(); return; }
     if (command.input || !command.template) showDialog(command, section);
     else execute(buildCommand(commandForm(command)));
 }
-for (const section of menuSections()) {
-    const host = element('div', 'menu-section');
-    const trigger = element('button', 'menu-trigger'); trigger.type = 'button';
-    trigger.innerHTML = icon(section.icon);
-    trigger.append(element('span', '', section.friendly));
-    trigger.title = section.help;
-    host.append(trigger);
-    if (section.items.length) {
-        trigger.setAttribute('aria-expanded', 'false');
-        trigger.setAttribute('aria-controls', `popup-${section.id}`);
-        trigger.append(element('span', 'chevron', '⌄'));
-        const popup = element('div', 'menu-popup'); popup.id = `popup-${section.id}`; popup.hidden = true;
-        popup.append(element('div', 'menu-heading', section.friendly));
-        for (const item of section.items) {
-            const button = element('button', 'menu-item'); button.type = 'button'; button.innerHTML = icon(section.icon);
-            button.title = item.help;
-            const copy = element('span', 'menu-copy');
-            copy.append(element('span', 'menu-name', item.friendly));
-            button.append(copy, element('span', 'menu-tag', item.input ? 'Edit…' : 'Run'));
+let menuAnchor = null;
+function makePopup(section, parent = null) {
+    const popup = element('div', 'menu-popup'); popup.id = `popup-${section.id}`; popup.hidden = true;
+    popup.append(element('div', 'menu-heading', section.friendly));
+    if (parent) {
+        const back = element('button', 'menu-item', 'Back'); back.type = 'button'; back.dataset.back = 'true';
+        back.onclick = () => openPopup(parent, menuAnchor); popup.append(back);
+    }
+    for (const item of section.items) {
+        const button = element('button', 'menu-item'); button.type = 'button'; button.innerHTML = icon(item.icon || section.icon);
+        button.title = item.help;
+        const copy = element('span', 'menu-copy'); copy.append(element('span', 'menu-name', item.friendly));
+        button.append(copy, element('span', 'menu-tag', item.items.length ? '>' : item.url ? 'Link' : item.input ? 'Edit...' : 'Run'));
+        if (item.items.length) {
+            button.dataset.section = item.id;
+            const child = makePopup(item, popup);
+            button.onclick = () => openPopup(child, menuAnchor);
+        } else {
+            if (item.url) button.dataset.link = 'true';
             button.onclick = () => choose(item, section);
-            popup.append(button);
         }
+        popup.append(button);
+    }
         if (section.id === 'updates-reset') {
             const upload = element('button', 'menu-item'); upload.id = 'upload'; upload.type = 'button';
             upload.title = 'Install a firmware or filesystem image from a release.';
@@ -319,18 +322,27 @@ for (const section of menuSections()) {
             stop.append(copy, element('span', 'menu-tag', 'Ctrl-X'));
             popup.append(stop);
         }
+
+    document.body.append(popup);
+    return popup;
+}
+for (const section of menuSections()) {
+    const host = element('div', 'menu-section');
+    const trigger = element('button', 'menu-trigger'); trigger.type = 'button';
+    trigger.innerHTML = icon(section.icon); trigger.append(element('span', '', section.friendly));
+    trigger.title = section.help; host.append(trigger);
+    let popup;
+    if (section.items.length) {
+        popup = makePopup(section);
+        trigger.setAttribute('aria-expanded', 'false');
+        trigger.setAttribute('aria-controls', popup.id);
+        trigger.append(element('span', 'chevron', '⌄'));
         trigger.onclick = () => {
-            withTerminal(() => {
-                if (section.id === 'phonebook') { showPhonebook(); return; }
-                openPopup(popup, trigger);
-            });
+            if (section.id === 'phonebook') { withTerminal(showPhonebook); return; }
+            menuAnchor = trigger; openPopup(popup, trigger);
         };
-        document.body.append(popup);
-        menuEntries.push({section, host, trigger, popup});
-    } else {
-        trigger.onclick = () => withTerminal(() => choose(section, section));
-        menuEntries.push({section, host, trigger});
-    }
+    } else trigger.onclick = () => choose(section, section);
+    menuEntries.push({section, host, trigger, popup});
     $('menu').append(host);
 }
 const moreHost = element('div', 'menu-section');
@@ -368,7 +380,7 @@ function layoutMenu() {
         if (popup && section.id !== 'phonebook') {
             button.append(element('span', 'menu-tag', '›'));
             button.onclick = () => {
-                withTerminal(() => openPopup(popup, moreTrigger));
+                menuAnchor = moreTrigger; openPopup(popup, moreTrigger);
             };
         } else button.onclick = () => trigger.click();
         morePopup.append(button);
@@ -387,11 +399,13 @@ document.addEventListener('keydown', event => {
 function updateState() {
     const current = state(), reason = menuDisabledReason(current);
     const controls = current.online && current.edit && current.hardware?.active && !current.upload;
-    const canOpen = section => (!current.edit && !current.upload && !current.opening) || !reason || (controls && section === 'hardware-tests');
-    for (const {section, trigger} of menuEntries) trigger.disabled = !canOpen(section.id);
+    const canRun = !current.edit ? !current.upload && !current.opening : !reason;
+    const canOpen = section => !current.upload || section === 'help';
+    for (const {section, trigger} of menuEntries) trigger.disabled = section.items.length && section.id !== 'phonebook' ? !canOpen(section.id) : !canRun;
     for (const button of document.querySelectorAll('.menu-popup .menu-item')) {
         button.disabled = button.id === 'stop-test' ? !controls
-            : button.dataset.section ? !canOpen(button.dataset.section) : !!reason;
+            : button.dataset.link || button.dataset.back ? false
+            : button.dataset.section ? !canOpen(button.dataset.section) : !canRun;
     }
     for (const button of document.querySelectorAll('.requires-idle')) button.disabled = !!reason;
     $('line-controls').hidden = !controls || current.hardware.mode !== 'lines';
@@ -400,7 +414,6 @@ function updateState() {
     $('dialog-apply').disabled = !!reason;
     moreTrigger.disabled = !menuEntries.some(entry => entry.host.hidden && canOpen(entry.section.id));
     if (!current.edit || !current.online) {
-        closeMenus();
         if (dialog.open) dismiss();
     }
 }

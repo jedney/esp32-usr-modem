@@ -390,7 +390,7 @@ atcmd::Reply cmdHelp(atcmd::Port &port, const char *args) {
     withTerm(port, [](hwconsole::Term &t) { hwconsole::printHelp(t); });
     if (port.browser()) {
         port.line("The browser menus send these commands; answer prompts in the terminal.");
-        port.line("Diagnostics has recent console history. Hang up appears during calls.");
+        port.line("Help > Diagnostics has recent console history. Hang up appears during calls.");
     }
     return atcmd::Reply::kOk;
 }
@@ -1142,10 +1142,6 @@ void browserAccess(uint32_t id, bool edit) {
     webServer.terminal(id, edit);
 }
 void browserWaiting(uint32_t id) {
-    static const char message[] =
-        "\x1b[2J\x1b[HUSR Modem live status\r\n"
-        "Read-only. Open the terminal to send AT commands.\r\n";
-    webServer.write(id, reinterpret_cast<const uint8_t *>(message), sizeof message - 1);
     browserAccess(id, false);
 }
 // --- Web page status messages (web/PROTOCOL.md) ---------------------------------------
@@ -1389,8 +1385,10 @@ void serveReadOnlyBrowser(uint32_t id, bool fresh) {
     browserClient = id;
     browserCommandBytes = 0;
     browserAccess(id, true);
-    static const char welcome[] = "USR Modem terminal\r\nType AT*HELP for commands.\r\n";
-    browserSink.write(welcome, sizeof welcome - 1);
+    // Probe the fresh parser through its normal input path. These internal bytes are
+    // not browser input and do not advance the command-channel acknowledgement.
+    static const uint8_t probe[] = {'A', 'T', '\r'};
+    browserSession->fromHost(probe, sizeof probe, millis());
 }
 
 // Menu departures run on the same terminal, including phonebook dial actions.

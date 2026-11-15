@@ -289,6 +289,24 @@ def test_web_disable_closes_owner_and_serial_can_reenable(web, console):
     require(web.request("/api/session")[0] == 200, "Web did not restart")
 
 
+def test_new_terminal_starts_with_real_at_ok_without_session_banner(web, console):
+    profile = ' '.join(console.command('ATI4'))
+    old = dict(re.findall(r'(?<!\S)([EQV])(\d+)', profile))
+    console.command('ATE1Q0V1')
+    try:
+        with web.ws() as peer:
+            initial, messages = peer.collect(0.3)
+            require(not initial, 'Observer received a session banner')
+            peer.send(b'{"t":"open"}', opcode=1)
+            text, messages = peer.collect(0.4)
+            require(any(m.get('t') == 'access' and m.get('edit') for m in messages), 'Terminal unavailable')
+            require(text == b'AT\r\r\nOK\r\n', 'Fresh terminal did not contain only AT and its OK reply')
+            ready = next((m for m in reversed(messages) if m.get('t') == 'ready'), {})
+            require(ready.get('idle') and ready.get('rx') == 0, 'Initial probe broke command readiness')
+    finally:
+        console.command('AT' + ''.join(k + v for k, v in old.items()))
+
+
 def test_ticket_origin_single_use_and_initial_snapshots(web):
     ticket = web.ticket()
     with web.ws(ticket, "http://attacker.invalid") as peer:
@@ -298,7 +316,7 @@ def test_ticket_origin_single_use_and_initial_snapshots(web):
         text, messages = peer.collect(1)
         require({"hello", "led", "wifi", "clock", "call"}.issubset({m["t"] for m in messages}),
                 "Initial status snapshot incomplete")
-        require(b"Read-only" in text and b"A. Status" not in text,
+        require(not text,
                 "Browser did not start read-only")
         peer.send(b'{"t":"open"}', opcode=1)
         _, messages = peer.collect(0.3)
@@ -326,7 +344,7 @@ def test_one_browser_menu_and_second_browser_read_only(web, console):
         first.enter()
         with web.ws() as second:
             text, messages = second.collect(0.5)
-            require(b"Read-only" in text, "Second browser took menu ownership")
+            require(not text and any(m.get("t") == "access" and not m.get("edit") for m in messages), "Second browser took menu ownership")
             require(console.command("AT*CONFIG")[-1] == "ERROR", "Serial menu stole browser slot")
             second.send(b'{"t":"open"}', opcode=1)
             _, messages = second.collect(0.3)
@@ -346,7 +364,7 @@ def test_browser_status_during_console_menu_cannot_run_commands(web, console):
     try:
         with web.ws() as peer:
             text, _ = peer.collect(0.5)
-            require(b"Read-only" in text, "Browser stole serial menu")
+            require(not text, "Browser stole serial menu")
             peer.send(b'{"t":"open"}', opcode=1)
             peer.collect(0.2)
             peer.send(b"AT*PASS\rAT*HWBRIDGE\r")
@@ -373,7 +391,7 @@ def test_browser_hardware_line_toggles_restore_on_disconnect(web, manual_rs232):
     rs232 = manual_rs232
     with web.ws() as peer:
         peer.enter()
-        for keys in (b"k\r", b"l\r"):
+        for keys in (b"ede\r", b"l\r"):
             peer.send(keys)
             text, _ = peer.collect(0.4)
         require(b"Live RS232" in text, "Browser line test did not start")
@@ -400,7 +418,7 @@ def test_upload_rejects_missing_csrf_before_writing(web):
 def test_browser_bridge_to_com18_both_directions(web, rs232):
     with web.ws() as peer:
         peer.enter()
-        for keys in (b"k\r", b"n\r"):
+        for keys in (b"ede\r", b"n\r"):
             peer.send(keys)
             text, _ = peer.collect(0.4)
         require(b"Bridge:" in text, "Browser bridge did not start")
@@ -470,7 +488,7 @@ def test_incoming_rs232_call_keeps_browser_read_only_and_signals_follow(web, con
         require(observed == {False, True}, "RI did not follow the UK double ring")
         with web.ws() as peer:
             text, _ = peer.collect(0.4)
-            require(b"Read-only" in text, "Incoming call did not reserve browser access")
+            require(not text, "Incoming call did not reserve browser access")
             peer.send(b'{"t":"open"}', opcode=1)
             _, messages = peer.collect(0.3)
             require(not any(m.get('edit') for m in messages), 'Terminal open stole incoming RS232 call')
@@ -497,7 +515,7 @@ def test_incoming_rs232_call_keeps_browser_read_only_and_signals_follow(web, con
 def test_browser_forget_requires_confirmation_and_cancel_keeps_network(web):
     with web.ws() as peer:
         peer.enter()
-        peer.send(b"g\r")
+        peer.send(b"dc\r")
         peer.collect(0.3)
         peer.send(b"e\r")
         text, _ = peer.collect(0.3)
@@ -510,7 +528,7 @@ def test_browser_forget_requires_confirmation_and_cancel_keeps_network(web):
 def test_browser_guided_stop_returns_control_without_starting_leds(web, console):
     with web.ws() as peer:
         peer.enter()
-        for keys in (b"k\r", b"a\r"):
+        for keys in (b"ede\r", b"a\r"):
             peer.send(keys)
             text, _ = peer.collect(0.3)
         require(b"Enter = start" in text, "Guided test did not reach its first prompt")
@@ -661,13 +679,13 @@ def test_browser_letter_lists_keep_geometry_separate_and_tests_serial_only(web):
         peer.enter()
         peer.send(b"\x0c")
         text, _ = peer.collect(0.4)
-        require(b"A. Status" in text and b"M. Command Reference" in text, "Incomplete browser list")
+        require(b"A. Status" in text and b"E. Help" in text, "Incomplete browser list")
         require(b"\x1b" not in re.sub(rb"\x1b\[[0-9;]*m", b"", text), "Browser menu emitted cursor controls")
         for width in (80, 132, 255, 512):
             peer.send(f'{{"t":"size","cols":{width},"rows":25}}'.encode(), opcode=1)
             text, _ = peer.collect(0.2)
             require(not text, "Transport size repainted the browser list")
-        peer.send(b"la")
+        peer.send(b"edfa")
         text, _ = peer.collect(0.4)
         require(b"Client Tests run on serial only" in text, "Browser ran a serial diagnostic")
 
