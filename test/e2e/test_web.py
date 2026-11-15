@@ -179,13 +179,17 @@ def web(request, console):
 
 
 def test_assets_require_digest_and_have_correct_gzip_mime(web):
-    for path in ("/", "/app.js", "/upload.js", "/upload_flow.js", "/link.js", "/geometry.js", "/idle.js", "/toast.js", "/ui-data.js", "/ui-commands.js", "/menubar.js", "/menu-view.js", "/command-channel.js", "/menubar.css", "/api/session"):
+    for path in ("/", "/app.js", "/upload.js", "/upload_flow.js", "/link.js", "/geometry.js", "/idle.js", "/toast.js", "/ui-data.js", "/ui-commands.js", "/menubar.js", "/menu-view.js", "/command-channel.js", "/menubar.css", "/usr-logo.png", "/api/session"):
         code, _, _ = web.request(path, auth=False)
         require(code == 401, "Unauthenticated resource exposed")
     code, headers, body = web.request("/app.js")
     require(code == 200 and headers.get("Content-Encoding") == "gzip", "Missing gzip asset")
     require(b"connectModem" in gzip.decompress(body), "Wrong page asset")
     require("script-src 'self'" in headers.get("Content-Security-Policy", ""), "Missing CSP")
+    code, headers, body = web.request('/usr-logo.png')
+    require(code == 200 and headers.get_content_type() == 'image/png', 'Missing logo asset')
+    require(gzip.decompress(body) == (Path(__file__).resolve().parents[2] / 'web/src/usr-logo.png').read_bytes(),
+            'Served logo differs from supplied artwork')
     for path in ("/call-history.bin", "/image-id.txt", "/../call-history.bin", "/%2e%2e/call-history.bin"):
         require(web.request(path)[0] == 404, "Non-web file exposed")
 

@@ -42,7 +42,7 @@ def loaded_files():
     found = set()
     todo = []
     html = (SRC / "index.html").read_text(encoding="utf-8")
-    for match in re.finditer(r'(?:src|href)="([^":/][^":]*\.(?:js|mjs|css))"', html):
+    for match in re.finditer(r'(?:src|href)="([^":/][^":]*\.(?:js|mjs|css|png))"', html):
         todo.append(match.group(1))
     while todo:
         name = todo.pop()
@@ -88,12 +88,13 @@ def test_end_to_end_asset_check_names_only_files_that_are_served():
     text = (ROOT / "test" / "e2e" / "test_web.py").read_text(encoding="utf-8")
     block = text[text.index("def test_assets_require_digest"):]
     block = block[: block.index("for path in", block.index("for path in") + 1)]
-    named = {m.group(1).lstrip("/") for m in re.finditer(r'"(/[a-z_\-]+\.js)"', block)}
+    named = {m.group(1).lstrip("/") for m in re.finditer(r'"(/[a-z_\-]+\.(?:js|png))"', block)}
     assert named, "no assets found in the end-to-end test"
     assert named <= served_files()
     assert "upload_flow.js" in named
     assert "ui-commands.js" in named
     assert {"idle.js", "toast.js"} <= named
+    assert "usr-logo.png" in named
 
 
 def test_preview_modules_have_no_unresolved_relative_imports(tmp_path):

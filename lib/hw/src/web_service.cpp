@@ -387,6 +387,7 @@ esp_err_t WebService::serve(httpd_req_t *req) {
         const char *mime;
     };
     static const Asset assets[] = {{"/index.html", "text/html; charset=utf-8"},
+                                   {"/usr-logo.png", "image/png"},
                                    {"/menubar.css", "text/css"},
                                    {"/menubar.js", "text/javascript"},
                                    {"/menu-view.js", "text/javascript"},

@@ -33,6 +33,8 @@ def strip_source_map(text: str) -> str:
 def main(out: pathlib.Path) -> None:
     runpy.run_path(str(ROOT / "scripts/generate_ui.py"))["main"]([])
     html = (SRC / "index.html").read_text(encoding="utf-8")
+    html = html.replace('src="usr-logo.png"',
+                        f'src="{data_url("image/png", (SRC / "usr-logo.png").read_bytes())}"')
 
     style = (SRC / "style.css").read_text(encoding="utf-8")
     for weight in (400, 700):

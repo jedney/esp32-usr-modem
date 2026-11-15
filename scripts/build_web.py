@@ -23,6 +23,7 @@ def web_files(root: pathlib.Path) -> dict:
     vendor = root / "web" / "vendor"
     return {
         "index.html": src / "index.html",
+        "usr-logo.png": src / "usr-logo.png",
         "style.css": src / "style.css",
         "menubar.css": src / "menubar.css",
         "menubar.js": src / "menubar.js",
