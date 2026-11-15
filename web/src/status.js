@@ -158,3 +158,61 @@ export function parseMessage(text) {
         return null;
     }
 }
+
+export function terminalAccess(msg) {
+    return msg?.edit === true && msg.state === 'terminal';
+}
+
+export function browserCallConnected(call, owned) {
+    return owned && call?.state === 'connected' && call.browser === true;
+}
+
+const connected = call => ['connected', 'ppp', 'slip'].includes(call?.state);
+
+// Turn state transitions into passive notifications. Repeated snapshots are quiet.
+export function createStatusEvents(show) {
+    let owned = false, call = null, wasOnline = false, lost = false, away = false, line = '';
+    const decoder = new TextDecoder();
+    return {
+        access(msg, requested = false) {
+            const next = terminalAccess(msg);
+            if (next !== owned) show(next ? 'Terminal opened' : 'Terminal closed');
+            else if (requested && !next) show('Another browser has the terminal or the modem is busy');
+            owned = next;
+            line = '';
+        },
+        call(next) {
+            if (connected(next) && !connected(call)) {
+                show(`Connected to ${next.name || next.host || next.number || next.ip || 'remote caller'}`);
+            } else if (!connected(next) && connected(call)) {
+                show(`Disconnected: ${away ? 'Hung up because you were away' : next.reason || 'No carrier'}`);
+                away = false;
+            }
+            call = next;
+            line = '';
+        },
+        link(status) {
+            if (status === 'online') {
+                if (lost) show('Link restored');
+                wasOnline = true; lost = false;
+            } else if (status === 'offline' && wasOnline && !lost) {
+                lost = true;
+                show('Link lost');
+            }
+        },
+        away(value = true) { away = value; },
+        disconnected() {
+            if (owned) show('Terminal closed');
+            owned = false; call = null; away = false; line = '';
+        },
+        output(bytes) {
+            if (!owned || connected(call)) { line = ''; return; }
+            for (const ch of decoder.decode(bytes, {stream: true})) {
+                if (ch === '\r' || ch === '\n') {
+                    if (line === 'ERROR') show('Command refused');
+                    line = '';
+                } else line = (line + ch).slice(-256);
+            }
+        },
+    };
+}

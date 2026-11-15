@@ -31,6 +31,8 @@ def web_files(root: pathlib.Path) -> dict:
         "upload_flow.js": src / "upload_flow.js",
         "link.js": src / "link.js",
         "geometry.js": src / "geometry.js",
+        "idle.js": src / "idle.js",
+        "toast.js": src / "toast.js",
         "ui-data.js": src / "ui-data.js",
         "ui-commands.js": src / "ui-commands.js",
         "xterm.mjs": vendor / "xterm.mjs",

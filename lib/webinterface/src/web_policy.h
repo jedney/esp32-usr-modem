@@ -34,12 +34,27 @@ public:
     }
     bool owns(uint32_t id) const { return id && id == owner_; }
     void close(uint32_t id) {
-        if (owns(id))
+        if (owns(id)) {
             owner_ = 0;
+            hangup_ = false;
+        }
+    }
+    bool requestHangup(uint32_t id) {
+        if (!owns(id))
+            return false;
+        hangup_ = true;
+        return true;
+    }
+    bool takeHangup(uint32_t id) {
+        if (!owns(id) || !hangup_)
+            return false;
+        hangup_ = false;
+        return true;
     }
 
 private:
     uint32_t owner_ = 0;
+    bool hangup_ = false;
 };
 // Largest request header (request line and fields) the web server takes. The HTTP server's
 // own header limit (httpd_config_t::max_req_hdr_len) is set to the same value.

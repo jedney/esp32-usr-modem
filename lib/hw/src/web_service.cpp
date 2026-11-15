@@ -368,6 +368,8 @@ esp_err_t WebService::serve(httpd_req_t *req) {
                                    {"/upload_flow.js", "text/javascript"},
                                    {"/link.js", "text/javascript"},
                                    {"/geometry.js", "text/javascript"},
+                                   {"/idle.js", "text/javascript"},
+                                   {"/toast.js", "text/javascript"},
                                    {"/ui-data.js", "text/javascript"},
                                    {"/ui-commands.js", "text/javascript"},
                                    {"/xterm.mjs", "text/javascript"},
@@ -524,6 +526,10 @@ esp_err_t WebService::ws(httpd_req_t *req) {
             c->openRequested = true;
             return ESP_OK;
         }
+        if (message == "{\"t\":\"hangup\"}") {
+            terminalOwner_.requestHangup(c->id);
+            return ESP_OK;
+        }
         unsigned columns, rows;
         if (!webinterface::terminalSize(message, columns, rows))
             return ESP_FAIL;
@@ -611,6 +617,14 @@ bool WebService::takeOpen(uint32_t id) {
     if (!c || c->close || !c->openRequested)
         return false;
     c->openRequested = false;
+    return true;
+}
+bool WebService::takeHangup(uint32_t id) {
+    Lock lock(mutex_);
+    auto *c = find(id);
+    if (!c || c->close || !terminalOwner_.takeHangup(id))
+        return false;
+    c->input.clear();
     return true;
 }
 void WebService::terminal(uint32_t id, bool enabled) {

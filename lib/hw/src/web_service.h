@@ -26,6 +26,7 @@ public:
     void discardInput(uint32_t id);
     bool takeSize(uint32_t id, unsigned &columns, unsigned &rows);
     bool takeOpen(uint32_t id);
+    bool takeHangup(uint32_t id);
     void terminal(uint32_t id, bool enabled);
     bool write(uint32_t id, const uint8_t *data, size_t len);
     size_t space(uint32_t id);

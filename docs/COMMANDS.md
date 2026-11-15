@@ -206,6 +206,8 @@ The device password (user `admin`) protects the web interface, the network conso
 
 ### Configuration screen and terminal
 
+In the browser, **Open terminal** grants one authenticated tab its own AT session; **Close terminal** hangs up and reconnects read-only. Keyboard and menu commands use that terminal's bytes. A connected browser call warns after four minutes without user activity and hangs up after five, keeping the terminal open; activity cancels the warning and incoming BBS data does not count. This page policy adds no AT command and never applies to serial calls. See [the web protocol](../web/PROTOCOL.md#idle-guard-and-notifications) for the owner-only hang-up control and event toasts.
+
 | Command | What it does |
 |---|---|
 | `AT*CONFIG` | Open the wrapping letter menu now (`ATDT123` opens it after dial sounds). Letters open items, Enter confirms text/choices, X/Esc goes back, P/R pages, Q exits at the root. Friendly help, units and current values appear inline. A screen with no key for 5 minutes closes itself ("Screen closed after 5 minutes idle."), drops unsaved edits and frees the line. A running test or command is not cut off; the 5 minutes start again when it ends |

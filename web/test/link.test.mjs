@@ -4,6 +4,7 @@ import {createModemLink, BUSY_DELAY} from '../src/link.js';
 class Socket {
     readyState = 0;
     sent = [];
+    bufferedAmount = 0;
     close() { this.readyState = 2; }
     send(data) { this.sent.push(data); }
     open() { this.readyState = 1; this.onopen(); }
@@ -29,7 +30,59 @@ test('heartbeat proves liveness without sending terminal input', async () => {
     assert.deepEqual(ws.sent,['{"t":"ping"}']);
     ws.onmessage({data:'{"t":"pong"}'});
     r.setTime(19000); r.link.poll();
-    assert.equal(r.timers.length,0); assert.equal(r.link.send('key'),true);
+    assert.equal(r.timers.length,0); assert.equal(r.link.send(new Uint8Array([65])),false);
+    ws.onmessage({data:'{"t":"access","edit":true,"state":"terminal"}'});
+    assert.equal(r.link.send(new Uint8Array([65])),true);
+});
+
+test('opening is explicit, access must grant terminal mode, and closing reconnects read-only', async () => {
+    const r = rig(); await r.link.start(); const ws = r.sockets[0]; ws.open();
+    assert.deepEqual(ws.sent, []);
+    assert.equal(r.link.openTerminal(), true);
+    assert.deepEqual(ws.sent, ['{"t":"open"}']);
+    ws.onmessage({data:'{"t":"access","edit":true,"state":"read-only"}'});
+    assert.equal(r.link.send(new Uint8Array([65])), false);
+    ws.onmessage({data:'{"t":"access","edit":true,"state":"terminal"}'});
+    assert.equal(r.link.send('{"t":"size","cols":300,"rows":100}'), true);
+    await r.link.closeTerminal();
+    assert.equal(ws.readyState, 2);
+    r.sockets[1].open();
+    assert.equal(r.link.send(new Uint8Array([65])), false);
+    assert.deepEqual(r.sockets[1].sent, []);
+});
+
+test('paste is chunked, paced by bufferedAmount, ordered with keys and bounded', async () => {
+    const r = rig(); await r.link.start(); const ws = r.sockets[0]; ws.open();
+    ws.onmessage({data:'{"t":"access","edit":true,"state":"terminal"}'});
+    const paste = Uint8Array.from({length: 1600}, (_, i) => i % 256);
+    ws.bufferedAmount = 2048;
+    assert.equal(r.link.send(paste), true);
+    assert.deepEqual(ws.sent, []);
+    assert.equal(r.link.send(new Uint8Array(1024 * 1024)), false);
+    ws.bufferedAmount = 0;
+    r.timers.shift().fn();
+    assert.equal(ws.sent[0].length, 512);
+    r.link.send(new Uint8Array([13]));
+    while (r.timers.length) r.timers.shift().fn();
+    assert.ok(ws.sent.every(frame => frame.length <= 512));
+    assert.deepEqual(Uint8Array.from(ws.sent.flatMap(b => [...b])), Uint8Array.from([...paste, 13]));
+});
+
+test('revocation, upload, hangup and socket loss discard queued paste', async () => {
+    for (const action of ['access', 'upload', 'hangup', 'disconnect']) {
+        const r = rig(); await r.link.start(); const ws = r.sockets[0]; ws.open();
+        ws.onmessage({data:'{"t":"access","edit":true,"state":"terminal"}'});
+        ws.bufferedAmount = 2048;
+        r.link.send(new Uint8Array(2000));
+        if (action === 'access') ws.onmessage({data:'{"t":"access","edit":false,"state":"read-only"}'});
+        if (action === 'upload') r.link.pause(true);
+        if (action === 'hangup') assert.equal(r.link.hangup(), true);
+        if (action === 'disconnect') ws.onclose();
+        ws.bufferedAmount = 0;
+        if (action !== 'disconnect') while (r.timers.length) r.timers.shift().fn();
+        assert.ok(ws.sent.every(data => typeof data === 'string'));
+        if (action === 'hangup') assert.deepEqual(ws.sent, ['{"t":"hangup"}']);
+    }
 });
 test('a busy modem (update in progress) is asked again only every 30 seconds', async () => {
     const busy = Object.assign(new Error('Login unavailable'), {busy: true});

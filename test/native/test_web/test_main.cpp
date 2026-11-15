@@ -743,8 +743,25 @@ void test_terminal_queue_limits_retain_the_remainder() {
     TEST_ASSERT_EQUAL(16384, output.size());
     TEST_ASSERT_EQUAL(1024 * 1024, kTerminalFrameBytes);
 }
+void test_only_terminal_owner_can_request_hangup_and_ownership_survives() {
+    TerminalOwner owner;
+    TEST_ASSERT_FALSE(owner.requestHangup(1));
+    TEST_ASSERT_TRUE(owner.open(1, true));
+    TEST_ASSERT_FALSE(owner.requestHangup(2));
+    TEST_ASSERT_FALSE(owner.takeHangup(1));
+    TEST_ASSERT_TRUE(owner.requestHangup(1));
+    TEST_ASSERT_FALSE(owner.takeHangup(2));
+    TEST_ASSERT_TRUE(owner.takeHangup(1));
+    TEST_ASSERT_TRUE(owner.owns(1));
+    TEST_ASSERT_FALSE(owner.takeHangup(1));
+    TEST_ASSERT_TRUE(owner.requestHangup(1));
+    owner.close(1);
+    TEST_ASSERT_TRUE(owner.open(2, true));
+    TEST_ASSERT_FALSE(owner.takeHangup(2));
+}
 int main() {
     UNITY_BEGIN();
+    RUN_TEST(test_only_terminal_owner_can_request_hangup_and_ownership_survives);
     RUN_TEST(test_terminal_owner_requires_explicit_open);
     RUN_TEST(test_terminal_queue_limits_retain_the_remainder);
     RUN_TEST(test_terminal_geometry_is_bounded_and_cannot_be_terminal_input);

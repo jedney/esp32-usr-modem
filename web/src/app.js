@@ -1,5 +1,4 @@
-// USR Modem web interface: an 80 x 25 terminal showing the modem's configuration screen,
-// plus a status bar with the live front-panel lights, call state and modem clock.
+// Browser modem terminal with explicit ownership, live sizing and a passive status bar.
 //
 // Talks to the modem over one WebSocket (see web/PROTOCOL.md):
 //   binary frames = terminal bytes (UTF-8, ANSI) in both directions
@@ -13,6 +12,8 @@ import * as S from './status.js';
 import {createUploadFlow, xhrSender} from './upload_flow.js';
 import {createModemLink} from './link.js';
 import {terminalGeometry, sizeMessage} from './geometry.js';
+import {createIdleGuard} from './idle.js';
+import {createToasts} from './toast.js';
 
 const COLS = 80;
 const ROWS = 25;
@@ -50,9 +51,38 @@ const state = {
     clock: { epoch: 0, tzo: 0, at: 0 },
     wifi: null,
     cell: null, // measured { w, h } per px of font size
-    csrf: null, version: null, edit: false, upload: false,
+    csrf: null, version: null, edit: false, upload: false, online: false, opening: false,
     reloadWhenOnline: false, // set after a successful update: reload once the modem is back
 };
+
+const toasts = createToasts({container: $('toasts')});
+const events = S.createStatusEvents(text => toasts.show(text));
+const idle = createIdleGuard({
+    prompt: seconds => {
+        $('idle-guard').hidden = seconds === null;
+        if (seconds !== null) $('idle-countdown').textContent = `Hanging up in ${seconds} seconds.`;
+        else if (document.activeElement === $('here')) term.focus();
+    },
+    hangup: () => {
+        events.away();
+        if (!hangupCall()) {
+            events.away(false);
+            toasts.show('Could not hang up: the modem link is unavailable');
+        }
+    },
+});
+
+function updateControls(showOperation = true) {
+    $('open-terminal').disabled = !state.online || state.edit || state.opening || state.upload;
+    $('close-terminal').disabled = !state.edit || state.upload;
+    $('upload').disabled = !state.edit || state.upload;
+    term.options.disableStdin = !state.edit || state.upload;
+    if (showOperation && !state.upload) {
+        $('operation').textContent = state.edit ? 'Terminal open — type AT*HELP for commands'
+            : state.opening ? 'Opening terminal…' : 'Read-only live status — open the terminal to type';
+    }
+    idle.connected(S.browserCallConnected(state.call, state.edit) && state.online);
+}
 
 // ---------------------------------------------------------------- status bar
 
@@ -111,6 +141,8 @@ function showTimes() {
 }
 
 function setLink(status) {
+    events.link(status);
+    state.online = status === 'online' || status === 'demo';
     document.body.classList.toggle('online', status === 'online');
     document.body.classList.toggle('offline', status === 'offline');
     $('link-label').textContent =
@@ -118,6 +150,7 @@ function setLink(status) {
     if (status === 'demo') {
         document.body.classList.add('online');
     }
+    updateControls();
 }
 
 function handleMessage(msg) {
@@ -132,11 +165,15 @@ function handleMessage(msg) {
             requestAnimationFrame(fitTerminal);
             break;
         case 'access':
-            state.edit = msg.edit === true;
-            $('upload').disabled = !state.edit || state.upload;
-            $('enter').disabled = state.edit;
-            $('operation').textContent = state.edit ? 'Configuration active' : 'Read-only live status';
-            if (state.edit) requestAnimationFrame(fitTerminal);
+            events.access(msg, state.opening);
+            state.edit = S.terminalAccess(msg);
+            state.opening = false;
+            updateControls();
+            if (state.edit) {
+                reportedSize = null;
+                requestAnimationFrame(fitTerminal);
+                term.focus();
+            } else clearTimeout(sizeTimer);
             break;
         case 'hardware':
             $('line-controls').hidden = !msg.active || msg.mode !== 'lines';
@@ -150,8 +187,10 @@ function handleMessage(msg) {
             showTimes();
             break;
         case 'call':
+            events.call(msg);
             state.call = msg;
             showCall();
+            idle.connected(S.browserCallConnected(msg, state.edit) && state.online);
             break;
         case 'wifi':
             state.wifi = msg;
@@ -172,12 +211,14 @@ const term = new Terminal({
     lineHeight: 1.0,
     theme: VGA_THEME,
     cursorBlink: true,
-    scrollback: 0,
+    scrollback: 5000,
+    disableStdin: true,
     drawBoldTextInBrightColors: true,
     allowTransparency: false,
 });
 
 let sizeTimer = null;
+let reportedSize = null;
 // Adapt cell geometry at a readable base size, then fit the font to that grid.
 function fitTerminal() {
     const screen = $('screen');
@@ -195,14 +236,23 @@ function fitTerminal() {
     if (size !== term.options.fontSize) {
         term.options.fontSize = size;
     }
-    clearTimeout(sizeTimer);
-    if (state.edit) sizeTimer = setTimeout(() => send(sizeMessage(term.cols, term.rows)), 100);
+    const message = sizeMessage(term.cols, term.rows);
+    if (state.edit && message !== reportedSize) {
+        clearTimeout(sizeTimer);
+        sizeTimer = setTimeout(() => {
+            if (send(message)) reportedSize = message;
+        }, 100);
+    }
 }
 
 // ---------------------------------------------------------------- transport
 
 let send = () => {};
 let reconnectModem = () => {};
+let openTerminal = () => false;
+let closeTerminal = () => {};
+let hangupCall = () => false;
+let pauseInput = () => {};
 
 function connectModem() {
     const link = createModemLink({
@@ -227,7 +277,11 @@ function connectModem() {
         },
         receive: data => {
             if (typeof data === 'string') handleMessage(S.parseMessage(data));
-            else term.write(new Uint8Array(data));
+            else {
+                const bytes = new Uint8Array(data);
+                events.output(bytes);
+                term.write(bytes);
+            }
         },
         status: status => {
             setLink(status);
@@ -236,38 +290,63 @@ function connectModem() {
             term.focus();
         },
         disconnect: () => {
+            events.disconnected();
             state.csrf = null;
             state.edit = false;
+            state.opening = false;
+            reportedSize = null;
             clearTimeout(sizeTimer);
             $('upload').disabled = true;
             $('line-controls').hidden = true;
             $('stop-test').hidden = true;
+            updateControls();
         },
     });
     send = bytes => !state.upload && link.send(bytes);
     reconnectModem = () => link.reconnect();
+    openTerminal = () => link.openTerminal();
+    closeTerminal = () => link.closeTerminal();
+    hangupCall = () => link.hangup();
+    pauseInput = busy => link.pause(busy);
     setInterval(() => link.poll(state.upload), 5000);
     link.start();
 }
 
 async function startDemo() {
     setLink('demo');
-    $('enter').disabled = true;
-    $('operation').textContent = 'DEMO - synthetic values; Phonebook 4 simulates a call';
-    state.edit = true;
     const { startDemoModem } = await import('./demo.js');
     const modem = startDemoModem({
         message: handleMessage,
-        write: (data) => term.write(data),
+        write: data => {
+            events.output(typeof data === 'string' ? encoder.encode(data) : data);
+            term.write(data);
+        },
     });
-    send = (bytes) => modem.receive(bytes);
+    send = bytes => {
+        if (!state.edit || state.upload) return false;
+        modem.receive(bytes);
+        return true;
+    };
+    openTerminal = () => { modem.receive('{"t":"open"}'); return true; };
+    closeTerminal = () => modem.close();
+    hangupCall = () => { modem.receive('{"t":"hangup"}'); return true; };
     term.focus();
 }
 
 // ---------------------------------------------------------------- start
 
 async function main() {
-    $('enter').onclick = () => send(encoder.encode('e\r'));
+    $('open-terminal').onclick = () => {
+        state.opening = true;
+        updateControls();
+        if (!openTerminal()) {
+            state.opening = false;
+            updateControls();
+            toasts.show('Could not open the terminal: the modem link is unavailable');
+        }
+    };
+    $('close-terminal').onclick = () => closeTerminal();
+    $('here').onclick = () => { idle.activity(); term.focus(); };
     $('dcd').onclick = () => send(encoder.encode('d'));
     $('ri').onclick = () => send(encoder.encode('r'));
     $('cts').onclick = () => send(encoder.encode('c'));
@@ -276,17 +355,28 @@ async function main() {
     const uploadFlow = createUploadFlow({
         state,
         show: text => { $('operation').textContent = text; },
-        setBusy: busy => { $('upload').disabled = busy || !state.edit; },
+        setBusy: busy => {
+            pauseInput(busy);
+            updateControls(false);
+            if (!busy && state.edit) requestAnimationFrame(fitTerminal);
+        },
         confirm: text => window.confirm(text),
         read: async file => new Uint8Array(await file.arrayBuffer()),
         // Refresh expired Digest credentials with a small request before streaming a large
         // body. This does not replace the current socket.
         login: async () => (await fetch('api/session', {cache: 'no-store'})).ok,
         send: xhrSender(),
-        installed: () => { state.reloadWhenOnline = true; reconnectModem(); },
+        installed: () => {
+            toasts.show('Update uploaded — the modem is restarting');
+            state.reloadWhenOnline = true;
+            reconnectModem();
+        },
     });
     $('image').onchange = async () => {
-        try { await uploadFlow($('image').files[0]); } finally { $('image').value = ''; }
+        try {
+            const result = await uploadFlow($('image').files[0]);
+            if (['rejected', 'lost', 'failed'].includes(result)) toasts.show($('operation').textContent);
+        } finally { $('image').value = ''; }
     };
     buildLeds();
     showLeds(0);
@@ -298,8 +388,21 @@ async function main() {
     term.open($('term'));
     requestAnimationFrame(fitTerminal);
     window.addEventListener('resize', fitTerminal);
-    term.onData((data) => send(encoder.encode(data)));
-    term.onBinary((data) => send(Uint8Array.from(data, (c) => c.charCodeAt(0) & 0xff)));
+    const input = bytes => {
+        idle.activity();
+        if (!send(bytes)) toasts.show(state.edit
+            ? 'Input could not be sent. Wait for the modem before pasting again.'
+            : 'Open the terminal before typing');
+    };
+    // xterm maps Enter to CR, Backspace to DEL (Ctrl-H sends BS), and arrows /
+    // function keys to ANSI sequences. Preserve those bytes, including paste.
+    term.onData(data => input(encoder.encode(data)));
+    term.onBinary(data => input(Uint8Array.from(data, c => c.charCodeAt(0) & 0xff)));
+    for (const event of ['keydown', 'pointerdown', 'pointermove', 'click', 'wheel']) {
+        document.addEventListener(event, () => idle.activity(), {passive: true});
+    }
+    document.addEventListener('visibilitychange', () => idle.poll());
+    setInterval(() => idle.poll(), 1000);
     setInterval(showTimes, 1000);
     showCall();
     showWifi();

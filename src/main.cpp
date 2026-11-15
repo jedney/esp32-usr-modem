@@ -1251,6 +1251,8 @@ void publishCall(uint32_t now, bool force) {
                     ",\"peer\":" + webinterface::jsonString(peer);
         }
     }
+    call += std::string(",\"browser\":") +
+            (journal.active() && journal.session() == browserSession ? "true" : "false");
     webServer.snapshot(3, call + "}");
 }
 
@@ -1370,6 +1372,11 @@ void runBrowserDeparture() {
 
 void serveConfigBrowser(uint32_t id) {
     uint32_t now = millis();
+    if (webServer.takeHangup(id) && browserSession->callUp()) {
+        browserInput.clear();
+        browserSession->port().discardInput();
+        browserSession->hangUp();
+    }
     bool menuWasOpen = browserMenu->isOpen();
     unsigned columns, rows;
     if (webServer.takeSize(id, columns, rows)) {

@@ -48,6 +48,8 @@ def main(out: pathlib.Path) -> None:
         "usr-upload": (SRC / "upload.js").read_text(encoding="utf-8"),
         "usr-upload-flow": (SRC / "upload_flow.js").read_text(encoding="utf-8").replace("'./upload.js'", "'usr-upload'"),
         "usr-geometry": (SRC / "geometry.js").read_text(encoding="utf-8"),
+        "usr-idle": (SRC / "idle.js").read_text(encoding="utf-8"),
+        "usr-toast": (SRC / "toast.js").read_text(encoding="utf-8"),
         "usr-link": (SRC / "link.js").read_text(encoding="utf-8").replace("'./status.js'", "'usr-status'"),
     }
     app = (SRC / "app.js").read_text(encoding="utf-8")
@@ -56,6 +58,7 @@ def main(out: pathlib.Path) -> None:
     app = app.replace("'./upload_flow.js'", "'usr-upload-flow'")
     app = app.replace("'./link.js'", "'usr-link'")
     app = app.replace("'./geometry.js'", "'usr-geometry'")
+    app = app.replace("'./idle.js'", "'usr-idle'").replace("'./toast.js'", "'usr-toast'")
     import_map = {"imports": {k: data_url("text/javascript", v.encode()) for k, v in modules.items()}}
 
     # The modem's Content-Security-Policy forbids inline scripts; the preview needs them.
@@ -63,6 +66,9 @@ def main(out: pathlib.Path) -> None:
     html = html.replace('<link rel="stylesheet" href="xterm.css">',
                         f"<style>{(VENDOR / 'xterm.css').read_text(encoding='utf-8')}</style>")
     html = html.replace('<link rel="stylesheet" href="style.css">', f"<style>{style}</style>")
+    for name in ("idle", "toast"):
+        html = html.replace(f'<script type="module" src="{name}.js"></script>',
+                            f'<script type="module">import "usr-{name}";</script>')
     html = html.replace(
         '<script type="module" src="ui-commands.js"></script>',
         '<script type="module">import "usr-ui-commands";</script>',
@@ -75,7 +81,7 @@ def main(out: pathlib.Path) -> None:
     )
     html = html.replace("<title>USR Modem</title>", "<title>USR Modem (preview)</title>")
     out.write_text(html, encoding="utf-8")
-    print(f"Preview: {out} ({out.stat().st_size / 1024:.0f} KB). Letter menu preview; no device services connected.")
+    print(f"Preview: {out} ({out.stat().st_size / 1024:.0f} KB). Synthetic terminal; no device services connected.")
 
 
 if __name__ == "__main__":

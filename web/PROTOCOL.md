@@ -1,6 +1,6 @@
 # Web interface: files and protocol
 
-The page is an adaptive **80 × 25 to 132 × 50 terminal** (xterm.js) showing the modem's configuration screen, with a **status bar** along the bottom:
+The page is an adaptive **modem terminal**, minimum 80 × 25 and up to the firmware limit of 65535 × 65535 cells (xterm.js), with a **status bar** along the bottom. It fills the available window at a readable font size and fits the font on smaller windows. Open terminal explicitly to type AT commands, use the shared configuration list or dial a Telnet/raw BBS. Close terminal closes its socket, hangs up and reconnects as a read-only status observer; reopening is always explicit.
 
 | Item | Source |
 |---|---|
@@ -18,7 +18,7 @@ The shared configuration terminal prints wrapping lists in plain text or ANSI co
 
 ## Files
 
-`web/src/` holds the page; `web/vendor/` holds third-party files (xterm.js 6.0.0, MIT; IBM Plex Mono, OFL-1.1). `scripts/build_web.py` gzips both into `data/www/` when the LittleFS image is built (`pio run -e s3 -t buildfs` or `-t uploadfs`). The firmware serves `data/www/<file>.gz` with `Content-Encoding: gzip`.
+`web/src/` holds the page; `web/vendor/` holds third-party files (xterm.js 6.0.0, MIT; IBM Plex Mono, OFL-1.1). `idle.js` holds the timestamp-based call idle policy and `toast.js` the reusable passive notification stack. `scripts/build_web.py` gzips all 17 assets into `data/www/` when the LittleFS image is built (`pio run -e s3 -t buildfs` or `-t uploadfs`). The firmware serves `data/www/<file>.gz` with `Content-Encoding: gzip`.
 
 Assets are compressed into the existing LittleFS image, including the generated `ui-data.js` catalogue for the explicitly synthetic browser demo and `ui-commands.js` for typed command metadata. Both JavaScript catalogues are static assets behind the same login as the page. `ui-commands.js` exports the 91 menu bindings with friendly text, types, ranges, choices and raw command templates generated from `lib/config/ui-bindings.json`; it contains no live setting values or credentials. `ui/DESIGN_SPEC.md` defines the schema and unit conversion. These assets add no WebSocket messages or ownership changes.
 
@@ -43,7 +43,7 @@ Host accepts the current `<name>.local` or IPv4 address, optionally `:80`. Dupli
 
 - **Binary frames** are terminal bytes, both directions.
   - Modem → page: the session's screen output, UTF-8 with ANSI escape codes. A web session always renders in UTF-8, so the PC line-drawing style uses Unicode box characters (xterm.js draws them itself).
-  - Page → modem: keystrokes as UTF-8.
+  - Page → modem: keystrokes as UTF-8, only after `access` grants terminal mode. xterm sends Backspace as DEL (0x7F), Ctrl-H as BS (0x08), Enter as CR and arrows/function keys as ANSI sequences. Paste uses xterm's newline-to-CR normalization and preserves byte order with subsequent keys.
 - **Text frames** carry typed JSON status, heartbeat and geometry messages. The page ignores unknown server types and fields, so new firmware can add them.
 
 | `t` | Fields | When |
@@ -70,6 +70,16 @@ Every browser starts as a read-only status observer; opening the socket claims n
 BBS output defaults to CP437 translated by `terminalUtf8`, including the low control-byte glyphs; BEL, BS, TAB, LF, CR and ESC retain terminal semantics so ANSI screens work. `AT*STYLE=UTF8` passes UTF-8 BBS bytes unchanged; `AT*STYLE=CP437` restores translation. These choices are local to this browser connection and independent of PLAIN/ANSI configuration colour. UTF-8 sequences can span binary frames; decode them as a stream. File transfers, Client Tests and PPP/SLIP are refused in the browser. Bare `AT*PASS` generates and shows a replacement device password once on the requesting authenticated terminal, then closes authenticated connections; Wi-Fi passwords are never sent to the page.
 
 Browser hardware tests use the shared AT* handlers. UART-taking tests require idle exclusive ownership, with the browser menu's own reservation permitted. Binary bridge data appears in xterm; Ctrl-X exits. `hardware.mode=lines` enables D/R/C buttons, which send ordinary terminal keys. Disconnect stops an interactive test and restores modem control. The BBS byte-to-UTF-8 converter remains at the browser boundary; configuration lists use ASCII and ANSI colour.
+
+## Idle guard and notifications
+
+Only the terminal owner arms `idle.js`, and only while `call.state=connected` and `call.browser=true`. The `browser` boolean is included in every call snapshot and is true only for the browser session's current call. Other tabs and serial calls never arm the timer. Four minutes without typing, clicking, pointer movement or scrolling shows “Are you still there?” with a one-minute countdown and an “I'm here” button. Any user activity cancels the warning. Modem/BBS output does not count. Deadlines use wall-clock timestamps; polling and visibility changes check elapsed time, so delayed background callbacks do not extend the countdown.
+
+At expiry the owner sends the canonical control `{"t":"hangup"}`. The HTTP task accepts it only from the terminal owner, and the modem task hangs up only that browser session's existing call and clears pending terminal input. Ownership and the socket stay open. An observer's request is ignored. The page reports “Hung up because you were away” after the call ends. Closing the terminal instead closes its socket and reconnects read-only; it also cancels pending dials, prompts and tests through the normal disconnect cleanup.
+
+`link.js` queues at most 1 MiB of unsent input, sends frames of at most 512 bytes at ten-millisecond intervals and waits while WebSocket `bufferedAmount` is at least 2 KiB. TCP backpressure from the firmware's bounded input queue therefore reaches the page. An oversized paste is refused with a toast; uploads, access revocation, hang-up and link loss discard unsent input. Input is never replayed after reconnect. Size frames are debounced, sent on terminal acquisition and on geometry changes in terminal mode, independently of configuration menus.
+
+`toast.js` stacks at most five safe-text `role="status"` messages, dismissing each after five seconds without focus changes or animation, including with reduced motion. Notifications cover terminal opened/closed, call connected (host/name/number), disconnected (the reason, defaulting to “No carrier”), idle hang-up, link lost/restored, refused ownership, command `ERROR` results outside an active call and successful image upload. They never interpret BBS data as a command refusal during a connected call.
 
 ## Image upload
 
@@ -99,8 +109,8 @@ Example:
 
 ## Demo mode
 
-Open `index.html?demo` (or the single-file preview from `python scripts/make_preview.py`) to run the page against a simulated modem: in the phonebook, **4** (Dial) fakes a call after confirmation and **H** hangs up. All demo values are synthetic; the real screen comes from the firmware.
+Open `index.html?demo` (or the single-file preview from `python scripts/make_preview.py`) to run the page against a synthetic terminal. Open terminal, type `AT*CONFIG` for the friendly letter-list preview, or `ATDT1` for an echoed, coloured demo BBS and the real page's idle guard. Close terminal returns to read-only. All values are synthetic; no network call or device service is run.
 
 ## Tests
 
-`cd web && npm test` runs the five unit-test suites in `web/test/` (`demo`, `geometry`, `link`, `status`, `upload`) with Node's built-in test runner. GitHub Actions runs them on every push.
+`cd web; npm test` runs `web/test/` with Node's built-in test runner, including fake-clock idle deadlines, safe toast lifecycle, access transitions, bounded paste flow, terminal-mode resizing, app wiring, the demo and upload flows. GitHub Actions runs them on every push.
