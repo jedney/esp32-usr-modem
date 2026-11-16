@@ -19,11 +19,17 @@ def clean_state(request):
         return
     console = request.getfixturevalue("console")
     _hang_up(console)
+    # The factory model sets the default CONNECT speed; put the saved one back after.
+    before_model = console.command("AT*MODEL?")[0].split()[0]
+    assert console.command("AT*MODEL=14400")[-1] == "OK"
     console.raw(b"ATZ\r")
     assert console.command("AT&N8")[-1] == "OK"
-    yield
-    _hang_up(console)
-    console.raw(b"ATZ\r")
+    try:
+        yield
+    finally:
+        _hang_up(console)
+        console.raw(b"ATZ\r")
+        console.command("AT*MODEL=" + before_model)
 
 
 def _hang_up(console):
