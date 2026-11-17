@@ -93,7 +93,7 @@ bool History::begin() {
         r.sent = get(p, 4);
         r.received = get(p, 4);
         r.result = get(p, 2);
-        if (*p > 7) {
+        if ((*p >> 1) > uint8_t(calls::Kind::Ssh)) {
             return false;
         }
         r.incoming = (*p & 1) != 0;

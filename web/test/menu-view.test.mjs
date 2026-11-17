@@ -103,8 +103,10 @@ test('phonebook uses live reply data and disables actions while another command 
     const {doc,state,menu,sent,clickItem} = setup(t);
     clickItem('List entries');
     assert.equal(sent[0].line,'AT*PHONEBOOK?\r');
-    sent[0].done('01,bbs.example.net,23,TELNET,0\r\nOK\r\n');
+    sent[0].done('01,bbs.example.net,23,TELNET,0\r\n02,ssh.example.net,22,SSH,0\r\n03,raw.example.net,7,RAW,0\r\nOK\r\n');
     assert.match(doc.querySelector('table').textContent,/bbs.example.net:23/);
+    assert.match(doc.querySelector('table').textContent,/ssh.example.net:22SSH/);
+    assert.match(doc.querySelector('table').textContent,/raw.example.net:7Raw TCP/);
     const dial = doc.querySelectorAll('button').find(n => n.textContent === 'Dial');
     state.busy = true; menu.update(); assert.equal(dial.disabled,true);
     state.busy = false; menu.update(); dial.click(); assert.equal(sent[1].line,'AT*DIAL=01\r');

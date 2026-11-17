@@ -7,6 +7,7 @@
 #define FAKES_STORE
 #define FAKES_SOUND
 #include "../support/fakes.h"
+#include "../support/ssh_fakes.h"
 #include "outgoing.h"
 #include "wav.h"
 
@@ -92,7 +93,8 @@ struct Rig {
     hostport::Session session{modem, output, 115200, slot}, other{modem, otherOutput, 38400, slot};
     FakeSocket socket;
     FakeSound sound;
-    Outgoing call{modem, book, slot, socket, sound, clockNow, networkUp};
+    sshfake::FakeCrypto crypto;
+    Outgoing call{modem, book, slot, socket, sound, clockNow, networkUp, crypto};
     Rig() {
         modem.begin();
         book.begin();
@@ -129,14 +131,14 @@ void test_phonebook_defaults_exact_keys_validation_and_atomic_save() {
     strcpy(e.number, "01");
     strcpy(e.host, "127.0.0.1");
     e.port = 2323;
-    e.raw = true;
+    e.protocol = Protocol::Raw;
     e.speed = 56000;
     TEST_ASSERT_TRUE(book.put(e));
     TEST_ASSERT_TRUE(book.find("1") != book.find("01"));
     Phonebook again(store);
     TEST_ASSERT_TRUE(again.begin());
     TEST_ASSERT_EQUAL(2323, again.find("01")->port);
-    TEST_ASSERT_TRUE(again.find("01")->raw);
+    TEST_ASSERT_EQUAL(Protocol::Raw, again.find("01")->protocol);
     for (const char *invalid :
          {"123", "666", "667", "5517546", "5517545", "123456789012", "1-2", "a"}) {
         memset(e.number, 0, sizeof e.number);
@@ -342,7 +344,7 @@ void test_telnet_full_send_queue_stops_reading_the_socket() {
     socket.status = SocketState::kOpen;
     socket.stuck = true;
     TcpConnection conn(socket);
-    conn.begin(false);
+    conn.begin(Mode::Telnet);
     // DO 99 then DONT 99 over and over: each pair makes a reply, so the queue fills.
     const uint8_t pair[] = {255, 253, 99, 255, 254, 99};
     for (unsigned i = 0; i < 10000; ++i) {
@@ -438,7 +440,7 @@ void test_tcp_raw_all_bytes_and_partial_socket_writes() {
     socket.status = SocketState::kOpen;
     socket.chunk = 1;
     TcpConnection conn(socket);
-    conn.begin(true);
+    conn.begin(Mode::Raw);
     std::vector<uint8_t> bytes;
     for (unsigned i = 0; i < 4096; ++i) {
         bytes.push_back(i & 255);
@@ -1122,6 +1124,195 @@ void test_sound_that_breaks_while_playing_ends_the_call() {
     TEST_ASSERT_GREATER_OR_EQUAL(1, r.sound.stops);
 }
 
+// SSH calls: a FakeServer sits behind the FakeSocket.
+void exchange(Rig &r, sshfake::FakeServer &server, int rounds = 40) {
+    for (int i = 0; i < rounds; ++i) {
+        if (!r.socket.output.empty()) {
+            server.feed(r.socket.output.data(), r.socket.output.size());
+            r.socket.output.clear();
+        }
+        r.socket.input.insert(r.socket.input.end(), server.out.begin(), server.out.end());
+        server.out.clear();
+        r.poll();
+        uint8_t buf[512];
+        size_t n;
+        while ((n = r.session.toHost(buf, sizeof buf)) != 0) {
+            r.output.text.append(reinterpret_cast<char *>(buf), n);
+        }
+    }
+}
+class KindObserver : public Observer {
+public:
+    Kind kind = Kind::Ppp;
+    unsigned connections = 0;
+    void started(bool, const Entry &) override {}
+    void kindKnown(Kind k) override { kind = k; }
+    void connected(hostport::Session &) override { ++connections; }
+    void ended(atcmd::Result) override {}
+};
+Entry entry(const char *number, const char *host, uint16_t port, Protocol protocol) {
+    Entry e;
+    strcpy(e.number, number);
+    strcpy(e.host, host);
+    e.port = port;
+    e.protocol = protocol;
+    return e;
+}
+void test_phonebook_ssh_entries_round_trip() {
+    Rig r;
+    TEST_ASSERT_EQUAL(int(atcmd::Reply::kOk),
+                      int(r.book.command(r.session.port(), "=05,bbs.example.com,22,ssh", false)));
+    TEST_ASSERT_EQUAL(Protocol::Ssh, r.book.find("05")->protocol);
+    r.book.command(r.session.port(), "?", false);
+    TEST_ASSERT_NOT_NULL(strstr(r.output.take().c_str(), "05,bbs.example.com,22,SSH,0"));
+    // Stored as protocol byte 2 in the second record; 3 is not a protocol.
+    const size_t at = 5 + Phonebook::kRecordSize + 12 + 64 + 2;
+    TEST_ASSERT_EQUAL_UINT8(2, r.bookStore.bytes[at]);
+    Phonebook again(r.bookStore);
+    TEST_ASSERT_TRUE(again.begin());
+    TEST_ASSERT_EQUAL(Protocol::Ssh, again.find("05")->protocol);
+    auto &bytes = r.bookStore.bytes;
+    bytes[at] = 3;
+    const uint32_t crc = modemcfg::crc32(bytes.data(), bytes.size() - 4);
+    for (unsigned i = 0; i < 4; ++i) {
+        bytes[bytes.size() - 4 + i] = uint8_t(crc >> (8 * i));
+    }
+    Phonebook damaged(r.bookStore);
+    TEST_ASSERT_FALSE(damaged.begin());
+    TEST_ASSERT_EQUAL_STRING("SSH", protocolName(Protocol::Ssh));
+    TEST_ASSERT_EQUAL_STRING("SSH", kindName(kindOf(Protocol::Ssh)));
+}
+void test_ssh_entry_connects_after_the_key_exchange() {
+    Rig r;
+    KindObserver observer;
+    r.call.setObserver(&observer);
+    TEST_ASSERT_TRUE(r.book.put(entry("5", "bbs.example.com", 22, Protocol::Ssh)));
+    sshfake::FakeServer server;
+    server.start();
+    r.send("ATDT5\r");
+    r.socket.status = SocketState::kOpen;
+    r.poll();
+    TEST_ASSERT_FALSE(r.session.callUp());  // open, but no key exchange yet
+    TEST_ASSERT_EQUAL(int(CallStage::kConnecting), int(r.call.stage()));
+    exchange(r, server);
+    TEST_ASSERT_TRUE(r.session.callUp());
+    TEST_ASSERT_EQUAL(Kind::Ssh, observer.kind);
+    const std::string shown = r.output.take();
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, shown.find("CONNECT"));
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, shown.find("login as: "));
+    r.send("jon\r");
+    exchange(r, server, 5);
+    TEST_ASSERT_EQUAL_STRING("jon\r\njon@bbs.example.com's password: ", r.output.take().c_str());
+    r.send("pw\r");
+    exchange(r, server, 5);
+    TEST_ASSERT_EQUAL_STRING("\r\n", r.output.take().c_str());
+    server.send({ssh::kUserauthSuccess});
+    exchange(r, server, 5);
+    std::vector<uint8_t> confirm(17);
+    ssh::Writer(confirm.data(), confirm.size())
+        .byte(ssh::kChannelOpenConfirmation)
+        .u32(0)
+        .u32(3)
+        .u32(1000)
+        .u32(1000);
+    server.send(confirm);
+    server.send({ssh::kChannelSuccess, 0, 0, 0, 0});
+    std::vector<uint8_t> data(14);
+    ssh::Writer(data.data(), data.size()).byte(ssh::kChannelData).u32(0).string("hello");
+    server.send(data);
+    exchange(r, server, 5);
+    TEST_ASSERT_EQUAL_STRING("hello", r.output.take().c_str());
+    // The server closes the session: NO CARRIER.
+    server.send({ssh::kChannelClose, 0, 0, 0, 0});
+    exchange(r, server, 5);
+    TEST_ASSERT_FALSE(r.session.callUp());
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.output.take().find("NO CARRIER"));
+}
+void test_ssh_failure_before_connect_says_why() {
+    Rig r;
+    TEST_ASSERT_TRUE(r.book.put(entry("5", "bbs.example.com", 22, Protocol::Ssh)));
+    sshfake::FakeServer server;
+    server.cipherList = "chacha20-poly1305@openssh.com";
+    server.start();
+    r.send("ATDT5\r");
+    r.socket.status = SocketState::kOpen;
+    exchange(r, server);
+    TEST_ASSERT_FALSE(r.session.callUp());
+    const std::string shown = r.output.take();
+    const size_t why = shown.find("SSH: no common cipher");
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, why);
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, shown.find("NO CARRIER", why));
+    TEST_ASSERT_EQUAL(int(CallStage::kIdle), int(r.call.stage()));
+}
+void test_direct_dial_to_port_22_is_ssh_when_the_server_greets() {
+    Rig r;
+    KindObserver observer;
+    r.call.setObserver(&observer);
+    sshfake::FakeServer server;
+    server.start();
+    // The greeting arrives in pieces; "SS" alone decides nothing.
+    std::vector<uint8_t> greeting = server.out;
+    server.out.clear();
+    r.send("ATDTbbs.example.com:22\r");
+    TEST_ASSERT_EQUAL(22, r.socket.port);
+    r.socket.status = SocketState::kOpen;
+    r.socket.input = {'S', 'S'};
+    r.poll();
+    TEST_ASSERT_TRUE(r.socket.output.empty());  // nothing sent before the server is known
+    r.socket.input.assign(greeting.begin() + 2, greeting.end());
+    exchange(r, server);
+    TEST_ASSERT_TRUE(r.session.callUp());
+    TEST_ASSERT_EQUAL(Kind::Ssh, observer.kind);
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, r.output.take().find("login as: "));
+}
+void test_direct_dial_to_port_22_falls_back_to_telnet() {
+    {  // The server negotiates Telnet at once.
+        Rig r;
+        KindObserver observer;
+        r.call.setObserver(&observer);
+        r.send("ATDT10.0.0.15:22\r");
+        r.socket.status = SocketState::kOpen;
+        r.socket.input = {255, 253, 31};  // IAC DO NAWS
+        r.poll();
+        TEST_ASSERT_TRUE(r.session.callUp());
+        TEST_ASSERT_EQUAL(Kind::Telnet, observer.kind);
+        r.poll();
+        TEST_ASSERT_FALSE(r.socket.output.empty());
+        TEST_ASSERT_EQUAL_UINT8(255, r.socket.output[0]);  // Telnet negotiation
+    }
+    {  // A silent server: Telnet after three seconds.
+        Rig r;
+        r.send("ATDT10.0.0.15:22\r");
+        r.socket.status = SocketState::kOpen;
+        r.poll();
+        r.poll(TcpConnection::kSniffMs - 1);
+        TEST_ASSERT_FALSE(r.session.callUp());
+        r.poll(1);
+        TEST_ASSERT_TRUE(r.session.callUp());
+    }
+    {  // Plain text that is not an SSH greeting is Telnet, and is kept.
+        Rig r;
+        r.send("ATDT10.0.0.15:22\r");
+        r.socket.status = SocketState::kOpen;
+        r.socket.input = {'W', 'e', 'l', 'c', 'o', 'm', 'e'};
+        sshfake::FakeServer none;
+        exchange(r, none, 3);
+        TEST_ASSERT_TRUE(r.session.callUp());
+        TEST_ASSERT_NOT_EQUAL(std::string::npos, r.output.take().find("Welcome"));
+    }
+}
+void test_entry_type_wins_over_port_22() {
+    Rig r;
+    KindObserver observer;
+    r.call.setObserver(&observer);
+    TEST_ASSERT_TRUE(r.book.put(entry("6", "bbs.example.com", 22, Protocol::Telnet)));
+    r.send("ATDT6\r");
+    r.socket.status = SocketState::kOpen;
+    r.poll();
+    TEST_ASSERT_TRUE(r.session.callUp());
+    TEST_ASSERT_EQUAL(Kind::Telnet, observer.kind);
+    TEST_ASSERT_EQUAL_UINT8(255, r.socket.output.at(0));
+}
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_call_delay_commands_persist_validate_and_roll_back);
@@ -1161,5 +1352,11 @@ int main() {
     RUN_TEST(test_dtr_cancels_pending_call_and_timer_rollover);
     RUN_TEST(test_throttle_limits_both_directions_and_keeps_model_cosmetic);
     RUN_TEST(test_wav_validation_upsampling_and_handshake_mapping);
+    RUN_TEST(test_phonebook_ssh_entries_round_trip);
+    RUN_TEST(test_ssh_entry_connects_after_the_key_exchange);
+    RUN_TEST(test_ssh_failure_before_connect_says_why);
+    RUN_TEST(test_direct_dial_to_port_22_is_ssh_when_the_server_greets);
+    RUN_TEST(test_direct_dial_to_port_22_falls_back_to_telnet);
+    RUN_TEST(test_entry_type_wins_over_port_22);
     return UNITY_END();
 }

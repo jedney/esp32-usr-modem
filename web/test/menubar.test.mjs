@@ -92,6 +92,8 @@ test('network composite forms reject invalid subnets before dispatch', () => {
 test('phonebook replies become safe table data without trusting echoed commands or diagnostics', () => {
     assert.deepEqual(parsePhonebook('AT*PHONEBOOK?\r\n01,bbs.example.org,23,TELNET,0\r\nOK\r\n'),
         [{num:'01',host:'bbs.example.org',port:'23',proto:'TELNET',speed:'0'}]);
+    assert.deepEqual(parsePhonebook('5,ssh.example.org,22,SSH,0\r\n6,h,1,OTHER,0\r\n'),
+        [{num:'5',host:'ssh.example.org',port:'22',proto:'SSH',speed:'0'}]);
     assert.deepEqual(parsePhonebook('ERROR\r\n<script>\r\n'), []);
 });
 

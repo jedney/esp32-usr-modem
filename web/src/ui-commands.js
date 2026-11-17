@@ -78,7 +78,7 @@ export default [
       {
         "id": "proto",
         "friendly": "Connection type",
-        "help": "Choose terminal negotiation or an unchanged byte stream.",
+        "help": "Choose terminal negotiation, an unchanged byte stream or basic SSH.",
         "type": "enum",
         "values": [
           {
@@ -90,6 +90,11 @@ export default [
             "value": "RAW",
             "label": "Raw TCP",
             "description": "Send the bytes without Telnet negotiation."
+          },
+          {
+            "value": "SSH",
+            "label": "SSH (basic)",
+            "description": "Hobby use only: the server is not checked. Asks for login name and password after CONNECT."
           }
         ]
       },

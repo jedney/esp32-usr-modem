@@ -171,7 +171,7 @@ void Incoming::poll(bool available) {
                 socket_.close();
                 return;
             }
-            connection_.begin(false);
+            connection_.begin(Mode::Telnet);
             if (observer_) {
                 Entry peer;
                 strncpy(peer.host, socket_.peer(), sizeof peer.host - 1);

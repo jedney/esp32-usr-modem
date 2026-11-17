@@ -64,7 +64,7 @@ constexpr int kPot = USR_MODEM_PIN_POT;
 constexpr int kLeds[7] = {USR_MODEM_PIN_LED_AA, USR_MODEM_PIN_LED_CD, USR_MODEM_PIN_LED_RD,
                           USR_MODEM_PIN_LED_SD, USR_MODEM_PIN_LED_TR, USR_MODEM_PIN_LED_CS,
                           USR_MODEM_PIN_LED_ARQ};
-// GPIO -> resistor -> LED -> GND, so HIGH = lit.
+// GPIO -> LED anode; cathode -> GND, so HIGH = lit.
 constexpr bool kLedActiveHigh = true;
 
 // --- On-board RS232 test only (test/embedded/test_rs232) ---------------------------------

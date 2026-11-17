@@ -47,7 +47,7 @@ void test_phonebook_in_scratch_nvs() {
     TEST_ASSERT_TRUE(book->begin());
     calls::Entry entry = *book->find("1");
     strcpy(entry.number, "02");
-    entry.raw = true;
+    entry.protocol = calls::Protocol::Raw;
     entry.speed = 56000;
     TEST_ASSERT_TRUE(book->put(entry));
     delete book;

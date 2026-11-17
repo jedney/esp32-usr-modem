@@ -280,3 +280,16 @@ def wifi():
     if not ssid:
         pytest.skip("USR_MODEM_WIFI_SSID not set (.env or environment)")
     return ssid, password
+
+
+@pytest.fixture
+def ssh_server():
+    """(host, port, user, password) of an SSH server with password login, from .env or the
+    environment. Never printed."""
+    host = os.environ.get("USR_MODEM_SSH_TEST_HOST", "")
+    user = os.environ.get("USR_MODEM_SSH_TEST_USER", "")
+    password = os.environ.get("USR_MODEM_SSH_TEST_PASS", "")
+    if not host or not user or not password:
+        pytest.skip("USR_MODEM_SSH_TEST_HOST, _USER and _PASS not set (.env or environment)")
+    name, _, port = host.partition(":")
+    return name, int(port or 22), user, password

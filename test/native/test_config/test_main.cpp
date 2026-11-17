@@ -178,9 +178,25 @@ void test_history_persists_every_kind_and_refuses_another_layout() {
     record.kind = calls::Kind::Slip;
     record.incoming = true;
     TEST_ASSERT_TRUE(history.append(record));
+    record.kind = calls::Kind::Ssh;
+    TEST_ASSERT_TRUE(history.append(record));
     History restored(store);
     TEST_ASSERT_TRUE(restored.begin());
-    TEST_ASSERT_EQUAL(3, restored.size());
+    TEST_ASSERT_EQUAL(4, restored.size());
+    TEST_ASSERT_EQUAL(calls::Kind::Ssh, restored.at(3).kind);
+    TEST_ASSERT_TRUE(restored.at(3).incoming);
+    // A kind byte past SSH is damage.
+    {
+        Store bad = store;
+        const size_t kindAt = 6 + 8 + 4 + 4 + 4 + 2;
+        TEST_ASSERT_EQUAL_UINT8(uint8_t(calls::Kind::Raw) << 1, bad.bytes[kindAt]);
+        bad.bytes[kindAt] = uint8_t(calls::Kind::Ssh) << 1 | 2;
+        uint32_t sum = modemcfg::crc32(bad.bytes.data(), bad.bytes.size() - 4);
+        for (unsigned i = 0; i < 4; ++i)
+            bad.bytes[bad.bytes.size() - 4 + i] = uint8_t(sum >> (8 * i));
+        History damaged(bad);
+        TEST_ASSERT_FALSE(damaged.begin());
+    }
     TEST_ASSERT_EQUAL(calls::Kind::Raw, restored.at(0).kind);
     TEST_ASSERT_EQUAL(calls::Kind::Ppp, restored.at(1).kind);
     TEST_ASSERT_EQUAL(calls::Kind::Slip, restored.at(2).kind);

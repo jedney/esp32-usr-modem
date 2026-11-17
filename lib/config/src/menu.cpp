@@ -51,7 +51,7 @@ uint32_t entryHash(const calls::Entry &e) {
     // Compare semantic fields, never struct padding. A changed entry must be
     // reviewed again before a destructive operation or external connection.
     char text[144];
-    snprintf(text, sizeof text, "%s,%s,%u,%u,%lu", e.number, e.host, e.port, e.raw,
+    snprintf(text, sizeof text, "%s,%s,%u,%u,%lu", e.number, e.host, e.port, unsigned(e.protocol),
              static_cast<unsigned long>(e.speed));
     return modemcfg::crc32(reinterpret_cast<const uint8_t *>(text), strlen(text));
 }

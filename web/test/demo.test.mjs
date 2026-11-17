@@ -64,6 +64,7 @@ test('demo menu commands publish readiness, phonebook data and terminal-only fol
     assert.equal(messages.findLast(m => m.t === 'call').model,'US Robotics Sportster 28.8k');
     assert.equal(messages.at(-1).idle, true);
     send('AT*PHONEBOOK?\r'); assert.match(output, /1,bbs.example.net,23,TELNET,0/);
+    assert.match(output, /3,ssh.example.org,22,SSH,0/);
     send('AT*WIFISCAN\r'); assert.equal(messages.at(-1).idle, false);
     send(' '); assert.equal(messages.at(-1).idle, true);
     send('AT*WIFIJOIN="Demo"\r');

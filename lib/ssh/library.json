@@ -1,0 +1,6 @@
+{
+  "name": "ssh",
+  "description": "Basic SSH-2 client for the USR Modem Emulator: password login, one terminal session, crypto supplied by the platform. Hobby use only: the server's host key is not checked.",
+  "frameworks": "*",
+  "platforms": "*"
+}

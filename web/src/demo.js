@@ -9,7 +9,8 @@ export function startDemoModem({message, write}) {
     let opened = false, menu = false, call = false, onlineCommand = false, line = '', cols = 80, rows = 25;
     let pluses = 0;
     let received = 0, waiting = null;
-    const book = new Map([['1', '1,bbs.example.net,23,TELNET,0'], ['2', '2,retro.example.org,2323,TELNET,0']]);
+    const book = new Map([['1', '1,bbs.example.net,23,TELNET,0'], ['2', '2,retro.example.org,2323,TELNET,0'],
+        ['3', '3,ssh.example.org,22,SSH,0']]);
     const ready = () => message({t:'ready', idle:opened && !menu && !call && !waiting && !line, rx:received});
     const access = () => message({t: 'access', edit: opened, state: opened ? 'terminal' : 'read-only'});
     const hangup = () => {

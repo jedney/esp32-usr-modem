@@ -5,6 +5,7 @@ import {menuSections, menuDisabledReason, visibleMenuCount, commandForm, buildCo
 export function createMenuBar({state, run, focus, notify, ensureTerminal = action => action()}) {
 
 const $ = id => document.getElementById(id);
+const PROTOCOLS = {TELNET: 'Telnet', RAW: 'Raw TCP', SSH: 'SSH'};
 const withTerminal = action => {
     if (state().edit) action();
     else ensureTerminal(action);
@@ -243,7 +244,7 @@ function showPhonebook() {
     const body = element('tbody');
     for (const entry of entries) {
         const row = element('tr'); row.append(element('td', '', entry.num));
-        row.append(element('td', '', `${entry.host}:${entry.port}`), element('td', '', entry.proto === 'TELNET' ? 'Telnet' : 'Raw TCP'));
+        row.append(element('td', '', `${entry.host}:${entry.port}`), element('td', '', PROTOCOLS[entry.proto] || entry.proto));
         const cell = element('td');
         for (const [name, action] of [
             ['Dial', () => { dismiss(); execute(`AT*DIAL=${entry.num}\r`); }],

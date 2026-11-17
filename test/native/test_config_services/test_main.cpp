@@ -1,4 +1,5 @@
 #include <unity.h>
+#include <algorithm>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -6,10 +7,12 @@
 #define FAKES_SINK
 #define FAKES_SOUND
 #include "../support/fakes.h"
+#include "../support/ssh_fakes.h"
 #include "call_journal.h"
 #include "config.h"
 #include "config_dialer.h"
 #include "registry.h"
+sshfake::FakeCrypto sshCrypto;
 using namespace config;
 void setUp() {}
 void tearDown() {}
@@ -172,6 +175,7 @@ void test_export_replays_nondefault_profiles_and_phonebook_without_secrets() {
     source.device.change("DeviceCanary123");
     source.run("*BOOKCLEAR");
     source.run("*PHONEBOOK=42,bbs.example.com,2323,RAW,28800");
+    source.run("*PHONEBOOK=43,ssh.example.com,22,SSH");
     auto active = source.modem.active();
     auto stored = source.modem.nvram();
     auto script = source.run("*EXPORT");
@@ -204,6 +208,9 @@ void test_export_replays_nondefault_profiles_and_phonebook_without_secrets() {
     TEST_ASSERT_EQUAL_UINT32(4321, restored.modem.ringDelayMs());
     TEST_ASSERT_EQUAL_UINT32(567, restored.modem.connectDelayMs());
     TEST_ASSERT_NOT_NULL(restored.phonebook.find("42"));
+    TEST_ASSERT_NOT_EQUAL(std::string::npos,
+                          script.find("AT*PHONEBOOK=43,ssh.example.com,22,SSH,0"));
+    TEST_ASSERT_EQUAL(calls::Protocol::Ssh, restored.phonebook.find("43")->protocol);
     TEST_ASSERT_EQUAL(19200, restored.modem.hostBaud());
     TEST_ASSERT_NULL(restored.phonebook.find("1"));
     TEST_ASSERT_EQUAL_STRING("test-modem", restored.net.settings().host);
@@ -287,7 +294,7 @@ void test_reserved_dial_is_offline_local_and_can_escape_ato_hangup() {
     Terminal consoleMenu(r.session, false), hostMenu(host, true);
     Socket socket;
     Sound sound;
-    calls::Outgoing outgoing(r.modem, r.phonebook, r.slot, socket, sound, now, network);
+    calls::Outgoing outgoing(r.modem, r.phonebook, r.slot, socket, sound, now, network, sshCrypto);
     Dialer dialer(r.session, consoleMenu, hostMenu, outgoing, r.slot, sound, now);
     r.session.setDialer(&dialer);
     r.run("M0");
@@ -314,7 +321,7 @@ void test_reserved_dial_audio_stages_and_cancel_release_reservation() {
     Terminal menu(r.session, false), hostMenu(host, true);
     Socket socket;
     Sound sound;
-    calls::Outgoing outgoing(r.modem, r.phonebook, r.slot, socket, sound, now, network);
+    calls::Outgoing outgoing(r.modem, r.phonebook, r.slot, socket, sound, now, network, sshCrypto);
     Dialer dialer(r.session, menu, hostMenu, outgoing, r.slot, sound, now);
     r.session.setDialer(&dialer);
     r.run("DT123");
@@ -343,7 +350,7 @@ void test_browser_reserved_dial_uses_its_own_menu() {
     Terminal consoleMenu(r.session, false), hostMenu(host, true), browserMenu(browser, false);
     Socket socket;
     Sound sound;
-    calls::Outgoing outgoing(r.modem, r.phonebook, r.slot, socket, sound, now, network);
+    calls::Outgoing outgoing(r.modem, r.phonebook, r.slot, socket, sound, now, network, sshCrypto);
     Dialer dialer(r.session, consoleMenu, hostMenu, outgoing, r.slot, sound, now);
     dialer.setBrowser(&browser, &browserMenu);
     browser.setDialer(&dialer);
@@ -419,7 +426,7 @@ void test_outgoing_history_failure_and_same_burst_redial_are_recorded_once() {
     Socket socket;
     Sound sound;
     CallJournal journal(r.history, r.log, now, utc);
-    calls::Outgoing outgoing(r.modem, r.phonebook, r.slot, socket, sound, now, network);
+    calls::Outgoing outgoing(r.modem, r.phonebook, r.slot, socket, sound, now, network, sshCrypto);
     outgoing.setObserver(&journal);
     r.run("M0");
     TEST_ASSERT_TRUE(outgoing.start(r.session, "bbs.example.com", false));
@@ -436,6 +443,82 @@ void test_outgoing_history_failure_and_same_burst_redial_are_recorded_once() {
     TEST_ASSERT_EQUAL(2, r.history.size());
     outgoing.cancel();
     TEST_ASSERT_EQUAL(3, r.history.size());
+}
+// A socket joined to a scripted SSH server.
+class PipeSocket : public calls::Socket {
+public:
+    sshfake::FakeServer &server;
+    calls::SocketState value = calls::SocketState::kClosed;
+    explicit PipeSocket(sshfake::FakeServer &s) : server(s) {}
+    void begin(const char *, uint16_t) override { value = calls::SocketState::kOpen; }
+    void resolve(const char *) override { value = calls::SocketState::kResolved; }
+    const char *address() const override { return "192.0.2.1"; }
+    void poll() override {}
+    calls::SocketState state() const override { return value; }
+    size_t write(const uint8_t *data, size_t size) override {
+        server.feed(data, size);
+        return size;
+    }
+    size_t read(uint8_t *data, size_t capacity) override {
+        const size_t n = std::min(capacity, server.out.size());
+        memcpy(data, server.out.data(), n);
+        server.out.erase(server.out.begin(), server.out.begin() + n);
+        return n;
+    }
+    void close() override { value = calls::SocketState::kClosed; }
+};
+void test_ssh_call_is_journalled_and_its_password_never_shown() {
+    const char canary[] = "CanarySsh5K";
+    Rig r;
+    sshfake::FakeServer server;
+    server.start();
+    PipeSocket socket(server);
+    Sound sound;
+    CallJournal journal(r.history, r.log, now, utc);
+    calls::Outgoing outgoing(r.modem, r.phonebook, r.slot, socket, sound, now, network, sshCrypto);
+    outgoing.setObserver(&journal);
+    r.run("M0");
+    std::string seen;
+    auto pump = [&](int rounds) {
+        for (int i = 0; i < rounds; ++i) {
+            outgoing.poll();
+            r.session.tick(now(), true);
+            uint8_t buf[256];
+            size_t n;
+            while ((n = r.session.toHost(buf, sizeof buf)) != 0) {
+                seen.append(reinterpret_cast<char *>(buf), n);
+            }
+        }
+    };
+    auto type = [&](const char *text) {
+        r.session.fromHost(reinterpret_cast<const uint8_t *>(text), strlen(text), now());
+        pump(5);
+    };
+    // A direct dial to port 22 starts as Telnet in the journal and is recorded as SSH.
+    TEST_ASSERT_TRUE(outgoing.start(r.session, "ssh.example.com:22", false));
+    TEST_ASSERT_EQUAL(calls::Kind::Telnet, journal.current().kind);
+    pump(40);
+    TEST_ASSERT_TRUE(r.session.callUp());
+    TEST_ASSERT_EQUAL(calls::Kind::Ssh, journal.current().kind);
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, seen.find("login as: "));
+    type("jon\r");
+    type(canary);
+    type("\r");
+    TEST_ASSERT_EQUAL(2u, server.messages.size());  // service request and the login
+    r.session.hangUp();
+    pump(2);
+    TEST_ASSERT_EQUAL(1, r.history.size());
+    TEST_ASSERT_EQUAL(calls::Kind::Ssh, r.history.at(0).kind);
+    for (const char *command : {"*CALLLOG", "*LOG=0,200", "*EXPORT", "*PHONEBOOK?"}) {
+        seen += r.run(command);
+    }
+    TEST_ASSERT_EQUAL_MESSAGE(std::string::npos, seen.find(canary), "SSH password in output");
+    // A phonebook SSH entry is recorded as SSH from the start.
+    calls::Entry entry;
+    strcpy(entry.host, "ssh.example.com");
+    entry.protocol = calls::Protocol::Ssh;
+    journal.started(false, entry);
+    TEST_ASSERT_EQUAL(calls::Kind::Ssh, journal.current().kind);
 }
 void test_menu_export_retains_complete_replayable_lines_across_pages() {
     Rig r;
@@ -763,6 +846,7 @@ int main() {
     RUN_TEST(test_local_service_f0_never_echoes_password_and_escape_wipes_prompt);
     RUN_TEST(test_menu_command_results_are_readable_with_nonstandard_at_format);
     RUN_TEST(test_outgoing_history_failure_and_same_burst_redial_are_recorded_once);
+    RUN_TEST(test_ssh_call_is_journalled_and_its_password_never_shown);
     RUN_TEST(test_store_write_failures_are_reported_and_change_nothing);
     RUN_TEST(test_wifi_join_scan_and_address_change_are_refused_during_a_call);
     RUN_TEST(test_no_output_contains_either_password_or_its_stored_forms);

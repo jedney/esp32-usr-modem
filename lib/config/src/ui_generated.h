@@ -2,10 +2,11 @@
 #pragma once
 // clang-format off
 namespace config {
-constexpr uint32_t kBindingsFingerprint = 3546047027u;
+constexpr uint32_t kBindingsFingerprint = 1538264975u;
 constexpr UiValue kCommandMetadata_3_fields_3_values[] = {
     {"TELNET", "Telnet", "Negotiate terminal settings with the server."},
     {"RAW", "Raw TCP", "Send the bytes without Telnet negotiation."},
+    {"SSH", "SSH (basic)", "Hobby use only: the server is not checked. Asks for login name and password after CONNECT."},
 };
 constexpr UiValue kCommandMetadata_3_fields_4_values[] = {
     {"0", "Use modem setting", "Use the modem model and active profile."},
@@ -52,7 +53,7 @@ constexpr UiMetadata kCommandMetadata_3_fields[] = {
     {"num", "Phonebook number", "Enter up to eleven digits without formatting. The built-in configuration and internet numbers are reserved.", UiType::String, "digits", -1, -1, 1, 11, "(?!(?:123|666|667|5517545|5517546)$)[0-9]{1,11}", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "digits", 1},
     {"host", "Host address", "Enter a network name or IPv4 address.", UiType::String, "characters", -1, -1, 1, 63, "(?![.-])(?!.*\\.$)[A-Za-z0-9._-]+", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "characters", 1},
     {"port", "Network port", "Enter the destination TCP port.", UiType::Int, "port number", 1, 65535, -1, -1, "", nullptr, 0, "", nullptr, 0, nullptr, 0, false, false, false, "port number", 1},
-    {"proto", "Connection type", "Choose terminal negotiation or an unchanged byte stream.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_3_fields_3_values, 2, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
+    {"proto", "Connection type", "Choose terminal negotiation, an unchanged byte stream or basic SSH.", UiType::Enum, "", -1, -1, -1, -1, "", kCommandMetadata_3_fields_3_values, 3, "", nullptr, 0, nullptr, 0, false, false, false, "", 1},
     {"speed", "Connection speed", "Choose a speed override for this destination.", UiType::Enum, "bits per second", -1, -1, -1, -1, "", kCommandMetadata_3_fields_4_values, 39, "", nullptr, 0, nullptr, 0, true, false, false, "bits per second", 1},
 };
 constexpr UiValue kCommandMetadata_10_fields_0_values[] = {

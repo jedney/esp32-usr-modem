@@ -37,6 +37,8 @@ test('call status labels', () => {
         { label: 'Connected · Telnet · 33600', cls: 'up' });
     assert.equal(S.describeCall({ state: 'connected', dir: 'in', mode: 'raw' }).label,
         'Connected (incoming) · Raw');
+    assert.equal(S.describeCall({ state: 'connected', mode: 'ssh', speed: 28800 }).label,
+        'Connected · SSH · 28800');
     assert.equal(S.describeCall({ state: 'ppp' }).label, 'Internet (PPP)');
     assert.equal(S.describeCall({ state: 'bogus' }).label, 'Unknown');
     assert.equal(S.describeCall(null).label, 'Unknown');

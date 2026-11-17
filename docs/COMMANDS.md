@@ -137,6 +137,7 @@ What follows `ATDT`/`ATDP`:
 | `1` ... up to 11 digits | Phonebook entry with that number |
 | `bbs.example.com` | Host name, port 23. Any string with `.` or `:`, or in quotes, is a host |
 | `bbs.example.com:2323` / `"name:2323"` | Host and port |
+| `bbs.example.com:22` | Port 22: basic SSH if the server greets as SSH, otherwise Telnet (see [SSH](#ssh-basic)) |
 | `10.0.0.5:2323` | IP address and port |
 | `170064142064` | 12 digits: zero-padded IP address, port 23 (170.64.142.64) |
 | `0010020030047890` | 13-17 digits: zero-padded IP address then port (1.2.3.4:7890) |
@@ -146,7 +147,17 @@ What follows `ATDT`/`ATDP`:
 
 In numbers, spaces, `-`, brackets and the modifiers `, W @ ! ;` are ignored. Invalid strings give ERROR without any sound. `AT*DIALTEST <string>` shows how a string would be dialled.
 
-With the speaker on (`M1` or `M2`) an outgoing call plays: dial tone (`S6`), the digits (DTMF or pulse), ringing (`AT*RINGDELAY`), the handshake for the line speed, a pause (`AT*CONNECTDELAY`), then `CONNECT`. Host names and phonebook speed dials are resolved during the dial tone; the digits of the final IPv4 address are played, without the port or phonebook slot, and that address is used for the connection. Numeric IP dial strings retain their entered digits. `ATM0` connects without sounds or pauses; `ATM3` skips the dial tone and digit lookup stage. Pressing a key before `CONNECT` cancels the call. Telnet entries negotiate binary mode, ANSI terminal type and the session window size (serial defaults to 80x24; browser reports live dimensions); RAW entries pass bytes unchanged.
+With the speaker on (`M1` or `M2`) an outgoing call plays: dial tone (`S6`), the digits (DTMF or pulse), ringing (`AT*RINGDELAY`), the handshake for the line speed, a pause (`AT*CONNECTDELAY`), then `CONNECT`. Host names and phonebook speed dials are resolved during the dial tone; the digits of the final IPv4 address are played, without the port or phonebook slot, and that address is used for the connection. Numeric IP dial strings retain their entered digits. `ATM0` connects without sounds or pauses; `ATM3` skips the dial tone and digit lookup stage. Pressing a key before `CONNECT` cancels the call. Telnet entries negotiate binary mode, ANSI terminal type and the session window size (serial defaults to 80x24; browser reports live dimensions); RAW entries pass bytes unchanged. SSH entries use the basic SSH client below.
+
+### SSH (basic)
+
+**SSH support is basic and meant for novelty and hobby use, such as reaching BBSes that only offer SSH. It is not suitable for production or secure use: the server's host key is trusted without any check (so a man-in-the-middle cannot be detected), the cipher set is limited and not the most modern, and there is no public-key authentication.**
+
+- A phonebook entry of type `SSH` is always dialled as SSH. A direct dial (`ATDT`, `AT*DIAL=`) to port 22 waits up to 3 s for the server to speak first: an SSH greeting makes it an SSH call, anything else (or silence) a Telnet call on the same connection. Phonebook entries keep their type whatever the port.
+- The key exchange runs while the call is connecting; `CONNECT` follows it. If it fails, the modem shows the reason on its own line (for example `SSH: no common cipher`) and then `NO CARRIER`.
+- After `CONNECT` the modem asks in the terminal, as PuTTY does: `login as: ` (typed name shown; Backspace edits) and then `<name>@<host>'s password: ` (nothing shown). Nothing is stored: the name and password are asked for on every call, and the password is wiped from memory once it has been sent. Only password login is supported. A wrong password shows `Access denied` and asks again; after three the modem hangs up. A server that does not accept password login is told so and the call ends.
+- The session is one terminal: type `ansi`, the session's window size (updated when it changes), 8-bit clean. `+++` and `ATH` work as on any call. When the shell ends or the server disconnects, the modem gives `NO CARRIER`.
+- Algorithms offered: key exchange `curve25519-sha256`, `ecdh-sha2-nistp256` (with strict key exchange); ciphers `aes128-gcm@openssh.com`, `aes256-gcm@openssh.com`, `aes128-ctr`, `aes256-ctr`; MACs `hmac-sha2-256-etm@openssh.com`, `hmac-sha2-256`; no compression. Any host key type is accepted, because the key is not checked. Servers that only offer older algorithms (Diffie-Hellman groups, SHA-1, CBC ciphers) or only ChaCha20 cannot be reached.
 
 ## Project commands (`AT*`)
 
@@ -163,7 +174,7 @@ With the speaker on (`M1` or `M2`) an outgoing call plays: dial tone (`S6`), the
 | `AT*ANSWERPORT[?]` / `=?` / `=<RS232\|USB\|CONSOLE\|AUTO>` | Which port auto-answers (`S0`). AUTO uses the first port with DTR on, in the order RS232, USB, console (the console has no DTR, so it is the fallback). Not during a call. Saved; factory AUTO |
 | `AT*BAUD[?]` / `=AUTO` / `=<rate>` | RS232 speed: AUTO detects it from each "AT"; or fixed at 300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600 or 115200. Saved; factory AUTO (starting at 38400). Setting it from the console, USB or browser is refused (`ERROR`) while a call is up on the RS232 port; change it from the RS232 port, or hang up first |
 | `AT*PHONEBOOK[?]` | List the phonebook (64 entries) |
-| `AT*PHONEBOOK=<number>,<host>,<port>,<TELNET\|RAW>[,<speed>]` | Add or replace an entry. Number 1-11 digits (leading zeros count, special numbers refused); host up to 63 characters; port 1-65535; speed 0 or omitted = no override |
+| `AT*PHONEBOOK=<number>,<host>,<port>,<TELNET\|RAW\|SSH>[,<speed>]` | Add or replace an entry. Number 1-11 digits (leading zeros count, special numbers refused); host up to 63 characters; port 1-65535; type TELNET, RAW or SSH ([basic, hobby use only](#ssh-basic)); speed 0 or omitted = no override ||RAW>[,<speed>]` | Add or replace an entry. Number 1-11 digits (leading zeros count, special numbers refused); host up to 63 characters; port 1-65535; speed 0 or omitted = no override |
 | `AT*PHONEDELETE=<number>` | Delete an entry |
 | `AT*BOOKCLEAR` | Empty the phonebook (used by export restore). If the stored phonebook is damaged, `AT*PHONEBOOK=` and `AT*PHONEDELETE=` give `ERROR` and change nothing; this command is the way out |
 | `AT*DIAL=<number\|host:port>` | Dial like `ATDT` on the requesting session, including the browser terminal |

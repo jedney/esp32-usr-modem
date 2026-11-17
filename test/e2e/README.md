@@ -48,6 +48,7 @@ Every test has a 300 s time-out (`pytest.ini`, plugin `pytest-timeout`; install 
 | `test_wifi.py` | Console, Wi-Fi in `.env` | Join through the masked prompt, `ping usr-modem.local`, clock, the password appears in no output, prompt ownership across both ports |
 | `test_device.py` | Console | Device password, OTA policy; with options, password changes, factory reset and authenticated uploads |
 | `test_calls.py` | Console, `--call-server-ip` | RAW binary calls, Telnet negotiation, BUSY/NO ANSWER/NO DIAL TONE/NO CARRIER, Wi-Fi loss, model reporting, ring and connect delays, hostname digits |
+| `test_ssh.py` | Console, an SSH server with password login (`USR_MODEM_SSH_TEST_HOST`, `_USER`, `_PASS` in `.env`) | Basic SSH: phonebook entry, export, login prompts, wrong password, shell round trip, terminal size, `+++`/`ATH`, direct dial to port 22, `AT*STATUS` kind and stack headroom |
 | `test_answer.py` | Console | Calls the modem on port 23 from the PC: `ATA`, `S0`, binary data, remote-caller isolation, extra callers, Wi-Fi recovery, `AT*ANSWERPORT` |
 | `test_config.py` | Console (RS232 case: both ports) | Configuration screen styles, dial 123, escape/ATO, help and hardware screens, caller rejection, export, no idle repaint |
 | `test_client.py` | Both ports | Client Tests, per-port client settings kept across a restart, RTS pauses, cable lines |

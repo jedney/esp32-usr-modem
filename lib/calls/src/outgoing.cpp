@@ -39,6 +39,13 @@ bool Outgoing::start(hostport::Session &session, const char *text, bool pulse) {
         return false;
     }
     target_ = target;
+    // A direct dial to port 22 tries SSH and falls back to Telnet; an entry uses its type.
+    const bool direct = r.kind != dialstring::Kind::Phonebook;
+    mode_ = direct ? (target.port == 22 ? Mode::SshOrTelnet : Mode::Telnet)
+            : target.protocol == Protocol::Raw ? Mode::Raw
+            : target.protocol == Protocol::Ssh ? Mode::Ssh
+                                               : Mode::Telnet;
+    memcpy(name_, target.host, sizeof name_);
     session_ = &session;
     profile_ = modem_.active();
     ringDelayMs_ = modem_.ringDelayMs();
@@ -111,7 +118,7 @@ void Outgoing::connect(uint32_t now) {
     stage_ = CallStage::kConnecting;
     since_ = now;
     socket_.begin(target_.host, target_.port);
-    connection_.begin(target_.raw);
+    connection_.begin(mode_, name_);
 }
 void Outgoing::connected() {
     session_->port().finish(atcmd::Reply::kDone);
@@ -121,6 +128,7 @@ void Outgoing::connected() {
     }
     stage_ = CallStage::kOnline;
     if (observer_) {
+        observer_->kindKnown(kindOf(connection_.protocol()));
         observer_->connected(*session_);
     }
     sound_.stop();
@@ -145,6 +153,11 @@ void Outgoing::finish(atcmd::Result result) {
     endObservation(result);
     if (session_) {
         session_->port().finish(atcmd::Reply::kDone);
+        const char *why = connection_.reason();  // an SSH call that failed before CONNECT
+        if (*why) {
+            session_->port().beginInfo();
+            session_->port().line(why);
+        }
         if (session_->callUp()) {
             session_->hangUp();
         }
@@ -265,7 +278,7 @@ void Outgoing::poll() {
                                                 : atcmd::Result::kNoAnswer);
         return;
     }
-    if (stage_ == CallStage::kConnecting && state == SocketState::kOpen) {
+    if (stage_ == CallStage::kConnecting && state == SocketState::kOpen && connection_.ready()) {
         if (silent) {
             connected();
             return;

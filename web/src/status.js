@@ -65,7 +65,7 @@ const STATES = {
     test: { label: 'Client test', cls: 'busy' },
 };
 
-const MODES = { telnet: 'Telnet', raw: 'Raw' };
+const MODES = { telnet: 'Telnet', raw: 'Raw', ssh: 'SSH' };
 
 /** Call info -> { label, cls } for the connection-status item. */
 export function describeCall(call) {

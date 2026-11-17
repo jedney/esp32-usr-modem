@@ -103,9 +103,9 @@ void test_metadata_enumerations_match_firmware_tables() {
     for (unsigned i = 0; i < hwtest::kLedCount; ++i)
         TEST_ASSERT_TRUE(hasValue(leds, hwtest::ledName(i)));
     const auto &proto = field(metadata("phonebook.add-edit-entry"), "proto");
-    TEST_ASSERT_EQUAL(2, proto.valueCount);
-    TEST_ASSERT_TRUE(hasValue(proto, calls::kindName(calls::Kind::Telnet)));
-    TEST_ASSERT_TRUE(hasValue(proto, calls::kindName(calls::Kind::Raw)));
+    TEST_ASSERT_EQUAL(calls::kProtocolCount, proto.valueCount);
+    for (unsigned i = 0; i < calls::kProtocolCount; ++i)
+        TEST_ASSERT_TRUE(hasValue(proto, calls::protocolName(calls::Protocol(i))));
 }
 void test_metadata_profile_values_and_registers_match_firmware() {
     const auto &profile = metadata("settings.edit-profile-registers");

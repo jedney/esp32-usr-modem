@@ -346,7 +346,7 @@ atcmd::Reply Commands::exportConfig(atcmd::Port &p) {
         const auto &e = book_.at(i);
         if (*e.number && safe(e.host)) {
             p.printf("AT*PHONEBOOK=%s,%s,%u,%s,%lu\r\n", e.number, e.host, e.port,
-                     e.raw ? "RAW" : "TELNET", static_cast<unsigned long>(e.speed));
+                     calls::protocolName(e.protocol), static_cast<unsigned long>(e.speed));
         }
     }
     p.printf("AT*MODEL=%lu\r\nAT*THROTTLE=%s\r\nAT*ANSWERPORT=%s\r\n",

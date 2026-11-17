@@ -112,7 +112,7 @@ export function buildCommand(form, values = {}) {
 
 export function parsePhonebook(text) {
     return text.split(/[\r\n]+/).flatMap(line => {
-        const m = /^(\d{1,11}),([A-Za-z0-9._-]{1,63}),(\d{1,5}),(TELNET|RAW),(\d{1,6})$/.exec(line);
+        const m = /^(\d{1,11}),([A-Za-z0-9._-]{1,63}),(\d{1,5}),(TELNET|RAW|SSH),(\d{1,6})$/.exec(line);
         return m && Number(m[3]) > 0 && Number(m[3]) <= 65535
             ? [{num:m[1], host:m[2], port:m[3], proto:m[4], speed:m[5]}] : [];
     }).slice(0, 64);

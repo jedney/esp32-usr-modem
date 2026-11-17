@@ -8,7 +8,7 @@
 //     DTR, DCD, RI;
 //   - the USB modem port on the S3's native USB (usbport.cpp);
 //   - the browser terminal (web page, hw::WebService), explicitly opened by its owner.
-// One call at a time (hostport::CallSlot): outgoing Telnet/TCP (calls::Outgoing),
+// One call at a time (hostport::CallSlot): outgoing Telnet, raw TCP or SSH (calls::Outgoing),
 // incoming on port 23 (calls::Incoming), PPP/SLIP Internet dial-up (lib/internet) and the
 // AT*TESTCALL echo. Wi-Fi, mDNS and the NTP clock are in lib/netcfg; device credentials,
 // OTA and factory reset in lib/devicecfg. The front-panel LEDs follow spec 2.4.
@@ -51,6 +51,7 @@
 #include "registry.h"
 #include "rs232.h"
 #include "session.h"
+#include "ssh_crypto_psa.h"
 #include "tcp_listener.h"
 #include "tcp_socket.h"
 #include "usbport.h"
@@ -86,6 +87,7 @@ hw::NvsStore deviceStore("device", "cfg");
 hw::NvsStore bookStore("phonebook", "cfg");
 calls::Phonebook phonebook(bookStore);
 hw::TcpSocket tcpSocket;
+hw::PsaSshCrypto sshCrypto;  // basic SSH calls (hobby use only)
 hw::CallAudio callAudio;
 calls::Outgoing *outgoing = nullptr;
 hw::TcpSocket incomingSocket;
@@ -847,9 +849,11 @@ private:
                 break;
         }
         // The least free stack so far, for the bench record.
-        port.printf("Stack headroom: loop %d B, lwIP %d B, web %d B, upload %d B\r\n",
+        // -1: the task has not started yet (no upload, or no SSH call, since boot).
+        port.printf("Stack headroom: loop %d B, lwIP %d B, web %d B, upload %d B, SSH %d B\r\n",
                     hw::stackHeadroom("loopTask"), hw::stackHeadroom("tcpip"),
-                    hw::stackHeadroom("httpd"), hw::stackHeadroom("webupload"));
+                    hw::stackHeadroom("httpd"), hw::stackHeadroom("webupload"),
+                    hw::stackHeadroom("sshkex"));
         port.printf("Flow &H%u &R%u; DTR &D%u; DCD &C%u; serial &B%u\r\n",
                     modem->active().get(modemcfg::kAmpH), modem->active().get(modemcfg::kAmpR),
                     modem->active().get(modemcfg::kAmpD), modem->active().get(modemcfg::kAmpC),
@@ -1250,6 +1254,7 @@ void publishCall(uint32_t now, bool force) {
         call += std::string(",\"mode\":\"") +
                 (internet                     ? (r.kind == calls::Kind::Ppp ? "ppp" : "slip")
                  : r.kind == calls::Kind::Raw ? "raw"
+                 : r.kind == calls::Kind::Ssh ? "ssh"
                                               : "telnet") +
                 "\",\"dir\":\"" + (r.incoming ? "in" : "out") +
                 "\",\"number\":" + webinterface::jsonString(r.number) +
@@ -1550,8 +1555,8 @@ void startDiagnostics() {
 
 // Outgoing, Internet dial-up and incoming calls, connected to every serial session.
 void createCallServices() {
-    outgoing =
-        new calls::Outgoing(*modem, phonebook, callSlot, tcpSocket, callAudio, msNow, networkUp);
+    outgoing = new calls::Outgoing(*modem, phonebook, callSlot, tcpSocket, callAudio, msNow,
+                                   networkUp, sshCrypto);
     outgoing->setObserver(&journal);
     configDialer = new config::Dialer(*console, *consoleMenu, *hostMenu, *outgoing, callSlot,
                                       callAudio, msNow);
