@@ -97,8 +97,8 @@ void test_key_agreement_on_the_worker() {
     }
 }
 
-// SP 800-38A F.5.1 and F.5.5, in uneven pieces: the key stream runs on across calls.
-void test_aes_ctr_known_answer_in_pieces() {
+// SP 800-38A F.5.1 and F.5.5, block by block: the key stream runs on across calls.
+void test_aes_ctr_known_answer_block_by_block() {
     struct Case {
         ssh::Cipher cipher;
         const char *key, *expect;
@@ -117,8 +117,9 @@ void test_aes_ctr_known_answer_in_pieces() {
         hex("6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51", data);
         hex(c.expect, expect);
         TEST_ASSERT_TRUE(crypto.keys(1, c.cipher, key, iv, mac));
-        TEST_ASSERT_TRUE(crypto.ctr(1, data, 5));
-        TEST_ASSERT_TRUE(crypto.ctr(1, data + 5, 11));
+        uint8_t odd[5] = {};
+        TEST_ASSERT_FALSE(crypto.ctr(1, odd, sizeof odd));  // whole blocks only
+        TEST_ASSERT_TRUE(crypto.ctr(1, data, 16));
         TEST_ASSERT_TRUE(crypto.ctr(1, data + 16, 16));
         TEST_ASSERT_EQUAL_UINT8_ARRAY(expect, data, 32);
         crypto.forget(1);
@@ -199,7 +200,7 @@ void setup() {
     RUN_TEST(test_sha256_in_parts);
     RUN_TEST(test_x25519_known_answer);
     RUN_TEST(test_key_agreement_on_the_worker);
-    RUN_TEST(test_aes_ctr_known_answer_in_pieces);
+    RUN_TEST(test_aes_ctr_known_answer_block_by_block);
     RUN_TEST(test_aes_gcm_known_answer);
     RUN_TEST(test_hmac_matches_its_definition);
     RUN_TEST(test_random_bytes_differ);

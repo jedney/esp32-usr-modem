@@ -35,7 +35,7 @@ def _type(console, text):
 @pytest.fixture
 def ssh_console(console, ssh_server):
     _hangup(console)
-    console.raw(b"ATZ\r", wait=0.3)
+    assert console.command("ATZ", timeout=8)[-1] == "OK"
     assert console.command("ATE1Q0V1X4M0S7=30")[-1] == "OK"
     host, port, _, _ = ssh_server
     assert console.command(f"AT*PHONEBOOK={ENTRY},{host},{port},SSH")[-1] == "OK"
@@ -75,6 +75,8 @@ def test_wrong_password_is_refused_then_login_gives_a_shell(ssh_console, ssh_ser
     assert b"Access denied" in refused
     assert (password + "-wrong").encode() not in refused
     _type(ssh_console, password + "\r")
+    # Keys typed while the login is checked are dropped: wait for the shell prompt.
+    assert _read_until(ssh_console, b"$ ", 20).endswith(b"$ "), "no shell prompt"
     _type(ssh_console, "echo ssh-$((6*7))-ok; stty size\r")
     shell = _read_until(ssh_console, b"ssh-42-ok", 15)
     shell += _read_until(ssh_console, b"\n", 3)

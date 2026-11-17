@@ -188,8 +188,9 @@ bool PsaSshCrypto::keys(unsigned slot, ssh::Cipher cipher, const uint8_t *key, c
 bool PsaSshCrypto::ctr(unsigned slot, uint8_t *data, size_t size) {
     Slot &s = slots_[slot];
     size_t n = 0;
-    return s.streaming && psa_cipher_update(&s.stream, data, size, data, size, &n) == PSA_SUCCESS &&
-           n == size;
+    // Whole blocks only: the IDF driver does not hand back partial blocks consistently.
+    return s.streaming && size % 16 == 0 &&
+           psa_cipher_update(&s.stream, data, size, data, size, &n) == PSA_SUCCESS && n == size;
 }
 bool PsaSshCrypto::gcm(unsigned slot, bool seal, const uint8_t nonce[ssh::kNonceSize],
                        const uint8_t *aad, size_t aadSize, uint8_t *data, size_t size,

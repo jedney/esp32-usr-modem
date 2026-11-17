@@ -126,6 +126,9 @@ public:
         return true;
     }
     bool ctr(unsigned slot, uint8_t *data, size_t size) override {
+        if (size % 16) {
+            return false;  // whole blocks only, as on the modem
+        }
         Slot &s = slots[slot];
         for (size_t i = 0; i < size; ++i, ++s.position) {
             data[i] ^= s.key[s.position % s.key.size()] ^ s.iv[s.position % 16] ^

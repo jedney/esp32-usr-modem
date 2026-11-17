@@ -42,7 +42,8 @@ public:
     virtual void agreeEnd() = 0;
 
     // Packet protection. Slot 0 protects what this side sends, slot 1 what it receives.
-    // macKey is null for GCM. ctr() continues the slot's key stream across calls.
+    // macKey is null for GCM. ctr() takes whole 16-byte blocks (SSH packets always are) and
+    // continues the slot's key stream across calls.
     virtual bool keys(unsigned slot, Cipher cipher, const uint8_t *key, const uint8_t *iv,
                       const uint8_t *macKey) = 0;
     virtual bool ctr(unsigned slot, uint8_t *data, size_t size) = 0;
