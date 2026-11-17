@@ -1039,6 +1039,7 @@ void printBanner(modemcfg::LoadResult loaded, netcfg::LoadResult netLoaded) {
     consoleout::print(" | |_| |___) |  _ <  | |  | | (_) | (_| |  __/ | | | | |\r\n");
     consoleout::print("  \\___/|____/|_| \\_\\ |_|  |_|\\___/ \\__,_|\\___|_| |_| |_|\r\n");
     consoleout::printf("\r\nUSR Modem Emulator v%s (%s)\r\n", FW_VERSION, FW_COMMIT);
+    consoleout::print("Copyright 2026 Jon Edney. https://github.com/jedney/esp32-usr-modem\r\n");
     consoleout::printf("ESP32-S3, flash %u MB, PSRAM %u KB, reset: %s\r\n",
                        static_cast<unsigned>(ESP.getFlashChipSize() / (1024 * 1024)),
                        static_cast<unsigned>(ESP.getPsramSize() / 1024),
