@@ -159,9 +159,8 @@ def test_compact_about_and_project_repository(local):
     require('Zimodem: https://' in text and 'xterm.js: https://' in text, 'Project links missing')
     require('Copyright 2026 Jon Edney.' in text and 'neither affiliated with nor' in text, 'Copyright or trademark notice missing')
     require('3rd Party Libraries and Projects:' in text, 'Third-party heading missing')
-    require('Full credits and licences: credits/LICENSES.md' in text, 'Full credits pointer missing')
-    require(lines[-2] == 'https://github.com/jedney/esp32-usr-modem', 'About does not close with project URL')
-    require(local.command('AT*GITHUB')[-2] == lines[-2], 'GitHub command differs from About')
+    require('Full credits' not in text, 'About still has the full-credits pointer')
+    require(local.command('AT*GITHUB')[-2] == 'https://github.com/jedney/esp32-usr-modem', 'GitHub command wrong')
 
 
 def test_configuration_commands_export_and_credentials(local):

@@ -268,8 +268,6 @@ atcmd::Reply Commands::about(atcmd::Port &p, const char *args) {
     for (const char *credit : kCredits) {
         p.line(credit);
     }
-    p.line("Full credits and licences: credits/LICENSES.md in the project repository:");
-    p.line(kProjectUrl);
     return atcmd::Reply::kOk;
 }
 atcmd::Reply Commands::github(atcmd::Port &p, const char *args) {
