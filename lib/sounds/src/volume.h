@@ -3,7 +3,7 @@
 // There is no firmware volume cap. The CLS0361 speaker (8 ohm, 2 W) can take everything
 // the MAX98357A can give it: at its default 9 dB gain (GAIN pin unconnected) and 5 V,
 // full scale is about 3.6 V RMS, 1.6 W into 8 ohm, and the amp clips at about 1.4-1.8 W
-// (see docs/decisions-log.md). Fit a smaller speaker or raise the amp gain and this
+// (see docs/DECISIONS.md). Fit a smaller speaker or raise the amp gain and this
 // needs a cap again.
 //
 // No Arduino dependencies: this module is unit-tested on the PC.

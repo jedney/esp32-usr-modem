@@ -317,7 +317,7 @@ void test_speaker_levels_and_pot_stay_within_full_scale() {
     }
 }
 
-// No volume cap: full volume is full scale (CLS0361 2 W speaker; see docs/decisions-log.md).
+// No volume cap: full volume is full scale (CLS0361 2 W speaker; see docs/DECISIONS.md).
 void test_output_gain_is_clamped_with_no_cap() {
     TEST_ASSERT_EQUAL_FLOAT(1.0f, volume::outputGain(1.0f));
     TEST_ASSERT_EQUAL_FLOAT(1.0f, volume::outputGain(5.0f));

@@ -1,5 +1,5 @@
 // Front-panel LED rules (spec 2.4). Returns the LED mask in hwtest::Led bit
-// order (AA bit 0 ... ARQ bit 6, as in web/PROTOCOL.md); the board shows it with
+// order (AA bit 0 ... ARQ bit 6, as in web/README.md); the board shows it with
 // hw::ledsSet().
 //   AA   on when S0 >= 1; flashes while a call rings (answer mode)
 // Two host ports drive CD, RD, SD and TR: RS232 and the USB modem port

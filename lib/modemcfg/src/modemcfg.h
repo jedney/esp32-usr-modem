@@ -3,7 +3,7 @@
 // with &W0/&W1), the four stored phone numbers (&Z0-&Z3) and the saved format.
 //
 // Behaviour and defaults follow the USR Sportster technical reference; differences
-// decided for this project are listed in docs/decisions-log.md.
+// decided for this project are listed in docs/DECISIONS.md.
 //
 // No Arduino dependencies: this module is unit-tested on the PC. The board stores the
 // blob in NVS through hw::NvsStore (lib/hw).

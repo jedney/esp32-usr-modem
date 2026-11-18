@@ -1,4 +1,4 @@
-# Web interface: files and protocol
+# Web interface
 
 The page is an adaptive **modem terminal**, minimum 80 × 25 and up to the firmware limit of 65535 × 65535 cells (xterm.js), with a **status bar** along the bottom. It fills the available window at a readable font size and fits the font on smaller windows. The page automatically requests one terminal session on first opening. It never takes over another browser or a modem reserved by a serial call, incoming call, menu, test or update. An idle browser terminal does not reserve the call slot, so RS232 and USB can still dial or answer. After loss, reboot, refused access or idle expiry, the centred overlay says "Session Disconnected" and "Click the Terminal area, or select a menu item to reconnect". Transport status reconnects automatically; terminal access retries only on user action. There are no open/close buttons; close the tab to release a terminal, or use Help > Log out to end the login in every tab of this browser. A menu selection waits for granted access and firmware readiness before continuing.
 
@@ -20,13 +20,13 @@ An inert disabled "No call" button appears when there is no call. During diallin
 
 Help > Diagnostics > Recent console history reads authenticated, read-only `GET /api/boot` and writes the reply into the terminal. It returns the newest 16 KB of all maintenance-console output since boot, with a 1 KB fallback if PSRAM allocation fails. Long console replies can push the banner out. Device-password lines may be included for the authenticated browser; the Wi-Fi password is never included. Each chunk is copied under the console ring lock, then sent after releasing it, stopping at the captured end of the log. The endpoint itself does not require or acquire terminal ownership; the page gates this menu action on its terminal access.
 
-The configuration list and the menu bar share one inventory and one set of command metadata, described in [ui/DESIGN_SPEC.md](../ui/DESIGN_SPEC.md). `?demo` previews the same inventory with synthetic data and never invokes device services.
+The configuration list and the menu bar share one inventory and one set of command metadata, described in [ui/README.md](../ui/README.md). `?demo` previews the same inventory with synthetic data and never invokes device services.
 
 ## Files
 
 `web/src/` holds the page and the `usr-logo.png` masthead artwork; `web/vendor/` holds third-party files (xterm.js 6.0.0, MIT; IBM Plex Mono, OFL-1.1). `idle.js` holds the timestamp-based call idle policy and `toast.js` the reusable passive notification stack. `menubar.js` builds and validates commands, `menu-view.js` renders disclosures and dialogs, `menubar.css` defines the visual system and `command-channel.js` tracks consumed input and bounded command replies. `login.html` and `login.js` are the login page. `scripts/build_web.py` gzips all 24 assets into `data/www/` when the LittleFS image is built (`pio run -e s3 -t buildfs` or `-t uploadfs`). The firmware serves `data/www/<file>.gz` with `Content-Encoding: gzip`.
 
-Assets are compressed into the existing LittleFS image, including the generated `ui-data.js` catalogue for the explicitly synthetic browser demo and `ui-commands.js` for typed command metadata. Both JavaScript catalogues are static assets behind the same login as the page. `ui-commands.js` exports the 96 menu bindings with friendly text, types, ranges, choices and raw command templates generated from `lib/config/ui-bindings.json`; it contains no live setting values or credentials. `ui/DESIGN_SPEC.md` defines the schema and unit conversion. These assets add no WebSocket messages or ownership changes.
+Assets are compressed into the existing LittleFS image, including the generated `ui-data.js` catalogue for the explicitly synthetic browser demo and `ui-commands.js` for typed command metadata. Both JavaScript catalogues are static assets behind the same login as the page. `ui-commands.js` exports the 96 menu bindings with friendly text, types, ranges, choices and raw command templates generated from `lib/config/ui-bindings.json`; it contains no live setting values or credentials. `ui/README.md` defines the schema and unit conversion. These assets add no WebSocket messages or ownership changes.
 
 ## HTTP endpoints
 
@@ -111,7 +111,7 @@ At expiry the owner sends the canonical control `{"t":"hangup"}`. The HTTP task 
 
 ## Menu commands and dialogs
 
-The menus are the configuration screen's ([ui/DESIGN_SPEC.md](../ui/DESIGN_SPEC.md#inventory-and-navigation)): the browser leaves out Client Tests and adds Log out as the last Help item. Help > About sends `AT*ABOUT`; Help > GitHub opens https://github.com/jedney/esp32-usr-modem in a new browser tab (`AT*GITHUB` prints it in the terminal).
+The menus are the configuration screen's ([ui/README.md](../ui/README.md#inventory-and-navigation)): the browser leaves out Client Tests and adds Log out as the last Help item. Help > About sends `AT*ABOUT`; Help > GitHub opens https://github.com/jedney/esp32-usr-modem in a new browser tab (`AT*GITHUB` prints it in the terminal).
 
 Top-level controls follow the generated `AT*CONFIG` catalogue, with serial-only Client Tests omitted. No-input actions immediately send one raw `AT*...` line with CR as binary terminal input. Forms use the same friendly labels, help, enums, units and constraints as the text menu, including seconds-to-milliseconds conversion, field variants and individual profile/register selection. Large choice lists can be filtered and time zones are grouped by region. Optional trailing fields are omitted. The advanced disclosure previews the complete command, masking device-password values. Secrets are cleared on submit, cancel, access loss and a two-minute form timeout. The Wi-Fi password is only entered at the terminal's masked prompt.
 

@@ -3,8 +3,8 @@
 What the firmware does and the hardware it drives, as the code behaves now. Keep it current with the code: change this file in the same branch as the behaviour.
 
 - Every command and option is in [COMMANDS.md](COMMANDS.md); this file says what the firmware is for and why, and leaves out what the command reference already lists.
-- Decisions and the reasons behind them are in [decisions-log.md](decisions-log.md).
-- The page protocol is in [../web/PROTOCOL.md](../web/PROTOCOL.md); the test matrix is in [../test/README.md](../test/README.md).
+- Decisions and the reasons behind them are in [DECISIONS.md](DECISIONS.md).
+- The page protocol is in [../web/README.md](../web/README.md); the test matrix is in [../test/README.md](../test/README.md).
 - The case and the electronics keep their own files in `case/` and `electronics/`.
 
 Repository: `C:\repo\esp32-usr-modem` (`origin` is `https://github.com/jedney/esp32-usr-modem`).
@@ -160,7 +160,7 @@ The factory result set is `X4` (all codes). Numeric and verbal results follow th
 - **Style:** one compact wrapping list in plain ASCII text or ANSI colour. It works at any terminal width, with no cursor positioning, arrow navigation or box drawing. Letters open items, Enter confirms text and enum choices, X/Esc goes back, P/R changes pages and Q exits at the root. Friendly names, current values and units come from the shared metadata. Lists and enum choices omit explanatory help; the web menu retains it as hover tooltips. Input prompts retain units and limits.
 - **Content:** status (LEDs, Wi-Fi, call, host-serial settings), phonebook, every setting, Wi-Fi and clock tools, Internet, sounds, updates and password, logs and call log, About (`AT*ABOUT`), Hardware Tests (3.13), Client Tests (3.12), the command reference, configuration export and restart/factory reset with confirmation.
 - **Parity rule:** everything on the screen also has an `AT*` command, and `AT*HELP` and `AT*?` list them. The screen, the commands and the browser come from one data model (`lib/config`, `ui/`), so parity is unit-tested.
-- **Typed menu metadata:** `lib/config/ui-bindings.json` supplies friendly names, help, value types, ranges, units, choices and command templates for all 96 bindings in the five-menu hierarchy. `scripts/generate_ui.py` emits C++ metadata for the text menu and `web/src/ui-commands.js` for browser consumers; native tests compare it with the firmware tables. The schema, composite forms and display-unit conversion are defined in `ui/DESIGN_SPEC.md`.
+- **Typed menu metadata:** `lib/config/ui-bindings.json` supplies friendly names, help, value types, ranges, units, choices and command templates for all 96 bindings in the five-menu hierarchy. `scripts/generate_ui.py` emits C++ metadata for the text menu and `web/src/ui-commands.js` for browser consumers; native tests compare it with the firmware tables. The schema, composite forms and display-unit conversion are defined in `ui/README.md`.
 - A list prints on entry or explicit refresh and echoes only new text while editing. Idle lists produce no output. Commands and exports retain paged output, confirmations and masked secret entry. The screen closes after 5 minutes with no key and holds the call slot while open (incoming callers are turned away).
 - Results of Client Tests can be saved as the port's client settings (character set, size, Backspace code). Terminal dimensions remain available through `AT*SIZE` and browser size reports, independently of the wrapping configuration list.
 
@@ -188,7 +188,7 @@ The factory result set is `X4` (all codes). Numeric and verbal results follow th
 - **Menus:** the menu bar has the configuration screen's menus (without Client Tests), with dialogs built from the shared metadata. Wi-Fi passwords, confirmations and test keys stay in the terminal. Help > Log out ends the login in every tab of this browser.
 - **Updates:** the page uploads `firmware.bin` and `littlefs.bin`, streamed into the inactive app slot. Only images built for this project are accepted, checked by SHA-256; downgrades need confirmation; refused during a call. A LittleFS image replaces the sounds, web files and call history.
 - **Wi-Fi changes** from the page revert after 60 s if the new network does not connect.
-- The page (layout, terminal access, call buttons, idle guard, recent console history) and its protocol are in [web/PROTOCOL.md](../web/PROTOCOL.md); the menus and dialogs are in [ui/DESIGN_SPEC.md](../ui/DESIGN_SPEC.md). `?demo` and `web/preview.html` simulate a modem.
+- The page (layout, terminal access, call buttons, idle guard, recent console history) and its protocol are in [web/README.md](../web/README.md); the menus and dialogs are in [ui/README.md](../ui/README.md). `?demo` and `web/preview.html` simulate a modem.
 
 ### 3.12 Client Tests
 

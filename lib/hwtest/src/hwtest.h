@@ -10,7 +10,7 @@
 
 namespace hwtest {
 
-// Front-panel LEDs, in the bit order of the web page's `led` message (web/PROTOCOL.md).
+// Front-panel LEDs, in the bit order of the web page's `led` message (web/README.md).
 enum Led : uint8_t { kAA = 0, kCD, kRD, kSD, kTR, kCS, kARQ, kLedCount };
 
 // "AA", "CD", ... "ARQ".

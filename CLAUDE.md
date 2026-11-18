@@ -2,12 +2,14 @@
 
 ESP32-S3 Wi-Fi "modem" in a 3D-printed US Robotics Sportster replica, with a DB25 RS232 port, a USB modem port, the Hayes AT command set, dial/DTMF/handshake sounds and Telnet to BBSes. Windows 11 PC, VS Code + PlatformIO, repo at `C:\repo\esp32-usr-modem`.
 
+This file says how to work on the repository. What the firmware does is in `docs/SPEC.md`: read the sections a task needs.
+
 ## Where the requirements are
 
-- **`docs/project-brief.md`**: the firmware spec: what the firmware does and the hardware it drives (pin map, interfaces). Keep it current with the code: change it in the same branch as the behaviour.
-- **`docs/decisions-log.md`**: the current decisions, one row each. Append every new decision or spec change made while coding here (date, what, why); replace a row when a decision changes rather than keeping the old one.
+- **`docs/SPEC.md`**: the firmware spec: what the firmware does and the hardware it drives (pin map, interfaces). Keep it current with the code: change it in the same branch as the behaviour.
+- **`docs/DECISIONS.md`**: the current decisions, one row each. Append every new decision or spec change made while coding here (date, what, why); replace a row when a decision changes rather than keeping the old one.
 - `docs/COMMANDS.md`: the complete command reference. Update it with every command or option change, together with `AT*HELP` and the README.
-- `test/README.md`: feature-to-test matrix. `web/PROTOCOL.md`: the web page (layout, terminal access, idle guard) and its protocol with the firmware. `ui/DESIGN_SPEC.md`: the menus and dialogs of the configuration screen and the browser menu bar.
+- `test/README.md`: feature-to-test matrix. `web/README.md`: the web page (layout, terminal access, idle guard) and its protocol with the firmware. `ui/README.md`: the menus and dialogs of the configuration screen and the browser menu bar.
 - `CREDITS.md`: licensing record. Update it whenever third-party code, a library or a sound file is added or removed (`python scripts/generate_credits.py` rebuilds the About screen's list).
 - **Each fact has one home.** Write the details in the document that owns them (above) and link to it from the others; the spec and the decisions log summarise in a sentence. Copied paragraphs drift apart.
 
@@ -75,9 +77,10 @@ PlatformIO's `pio` is on the PATH inside VS Code tasks and the PlatformIO termin
 - Commit when the native tests, build and lint pass. Push and open a pull request (`gh pr create`) unless the user says otherwise. CI runs on every push; merging to `main` tags `vX.Y` and publishes a GitHub release with the binaries.
 - Never force-push `main`. Don't commit `.pio/`, `data/www/` or `web/preview.html`.
 
-## Hardware summary
+## Hardware on the bench
 
-- ESP32-S3 N16R8 DevKitC-1 clone: 16 MB flash, 8 MB octal PSRAM, Arduino core 3.3.12 on ESP-IDF 6.1.0 (`espressif32@8.0.0`, framework packages pinned in `platformio.ini`). Partitions: 2 × 4 MB OTA app slots, ≈7.9 MB LittleFS.
-- UART0 (GPIO43/44, USB-serial chip) = maintenance console, 115200. UART1 = host RS232 via 2× RS232 Pal (MAX3232) modules (DCE). Native USB (GPIO19/20), also wired to the rear USB-C socket = the USB modem port (TinyUSB CDC); the built-in USB-JTAG debugger is therefore not available.
-- MAX98357A I2S amp (SD pin = shutdown), GAIN pin unconnected (9 dB), Same Sky CLS0361 8 Ω 2 W speaker, WH148 10 kΩ pot on ADC1, 7 front LEDs (AA CD RD SD TR CS ARQ; ARQ = Wi-Fi status). The S3 board's own RGB LED (GPIO47) is hidden in the case and not used; GPIO47 stays reserved.
-- Bench prototype uses a DB9 wired as DCE; the final build uses a DB25.
+The board, pin map and interfaces are in `docs/SPEC.md` section 2. What matters when working on the board:
+
+- The S3 board has two USB-C ports. The **UART** port (USB-serial chip, UART0) is the maintenance console at 115200 and the one to flash over. The native USB port (GPIO19/20, also wired to the rear USB-C socket) is the modem's USB port (TinyUSB CDC), so the built-in USB-JTAG debugger is not available.
+- UART1 is the host RS232 port, through two RS232 Pal (MAX3232) modules wired as DCE: a DB9 on the bench, a DB25 in the final build.
+- GPIO47 (the board's RGB LED, hidden in the case) is not used and stays reserved.

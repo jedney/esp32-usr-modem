@@ -16,7 +16,7 @@ The **network console** is the USB maintenance console over Wi-Fi, on TCP port 2
 
 ## Standard commands
 
-The menu's friendly names, input types, units, ranges and choices are defined in `lib/config/ui-bindings.json` and generated for C++ and the browser in `web/src/ui-commands.js`. Templates omit the leading `AT`; callers add it once when sending a complete command. `ui/DESIGN_SPEC.md` documents composite forms, optional fields and validation. The metadata describes the command set below; `AT*HELP` continues to list the production registry.
+The menu's friendly names, input types, units, ranges and choices are defined in `lib/config/ui-bindings.json` and generated for C++ and the browser in `web/src/ui-commands.js`. Templates omit the leading `AT`; callers add it once when sending a complete command. `ui/README.md` documents composite forms, optional fields and validation. The metadata describes the command set below; `AT*HELP` continues to list the production registry.
 
 These follow the US Robotics Sportster. "Profile" means the setting is part of the active profile: `AT&W` saves it, `ATZ` reloads it.
 
@@ -219,7 +219,7 @@ The device password (user `admin`) protects the web interface, the network conso
 
 ### Configuration screen and terminal
 
-The menus, keys and dialogs of the configuration screen and the browser menu bar are described in [ui/DESIGN_SPEC.md](../ui/DESIGN_SPEC.md). The browser terminal (automatic access, reconnecting, the idle guard for browser calls, recent console history) is described in [the web protocol](../web/PROTOCOL.md). None of these adds an AT command.
+The menus, keys and dialogs of the configuration screen and the browser menu bar are described in [ui/README.md](../ui/README.md). The browser terminal (automatic access, reconnecting, the idle guard for browser calls, recent console history) is described in [the web protocol](../web/README.md). None of these adds an AT command.
 
 | Command | What it does |
 |---|---|

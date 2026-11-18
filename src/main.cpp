@@ -1165,7 +1165,7 @@ void browserAccess(uint32_t id, bool edit) {
 void browserWaiting(uint32_t id) {
     browserAccess(id, false);
 }
-// --- Web page status messages (web/PROTOCOL.md) ---------------------------------------
+// --- Web page status messages (web/README.md) ---------------------------------------
 // Each one is rebuilt on its own interval or when it changes; `force` rebuilds it now.
 
 void publishLeds(uint32_t now, bool force) {

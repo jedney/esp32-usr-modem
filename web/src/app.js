@@ -1,6 +1,6 @@
 // Browser modem terminal with automatic initial access, live sizing and a passive status bar.
 //
-// Talks to the modem over one WebSocket (see web/PROTOCOL.md):
+// Talks to the modem over one WebSocket (see web/README.md):
 //   binary frames = terminal bytes (UTF-8, ANSI) in both directions
 //   text frames   = JSON status messages from the modem
 //

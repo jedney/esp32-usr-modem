@@ -19,7 +19,7 @@ On the fitted board the RS232 receivers drive the UART pins, so the internal-loo
 
 ## Feature matrix
 
-Section numbers refer to the firmware spec (`docs/project-brief.md`).
+Section numbers refer to the firmware spec (`docs/SPEC.md`).
 
 | Feature (spec §) | Unit | On-board | End-to-end |
 |---|---|---|---|

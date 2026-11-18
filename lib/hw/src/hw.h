@@ -15,7 +15,7 @@
 namespace hw {
 
 // --- Front-panel LEDs ------------------------------------------------------------------
-// Bit i = hwtest::Led i (AA bit 0 ... ARQ bit 6), as in web/PROTOCOL.md.
+// Bit i = hwtest::Led i (AA bit 0 ... ARQ bit 6), as in web/README.md.
 void ledsSet(uint8_t mask);
 uint8_t ledsMask();
 // Firmware-update progress: the LEDs fill from AA to ARQ (hwtest::progressMask). Writes the

@@ -627,12 +627,12 @@ For everyday use, the [complete AT command reference](docs/COMMANDS.md) is the n
 | [`src/`](src/) | Main firmware and the code joining serial ports, console and diagnostics together |
 | [`lib/`](lib/) | Modem commands, calls, networking, settings, sound and other modules; `lib/hw` contains the hardware access layer |
 | [`components/`](components/) | Project-specific framework component configuration, including native USB |
-| [`web/`](web/) | Browser interface source, bundled third-party assets, tests and the [browser/firmware protocol](web/PROTOCOL.md) |
-| [`ui/`](ui/) | Shared menu definitions, theme data, previews and the [configuration UI design](ui/DESIGN_SPEC.md) |
+| [`web/`](web/) | Browser interface source, bundled third-party assets, tests and the [page and protocol description](web/README.md) |
+| [`ui/`](ui/) | Shared menu definitions, theme data, previews and the [menu design](ui/README.md) |
 | [`sound/`](sound/) and [`data/`](data/) | Source handshake recordings and filesystem content; `data/sounds` holds the packaged WAVs and `data/www` is generated during the filesystem build |
 | [`scripts/`](scripts/) | Build, upload, version, sound, web asset and test helpers |
 | [`test/`](test/) | PC unit tests, board tests, serial/network end-to-end tests and independent protocol checks; start with the [test guide](test/README.md) |
-| [`docs/`](docs/) | [Firmware specification](docs/project-brief.md), [decisions](docs/decisions-log.md) and [command reference](docs/COMMANDS.md) |
+| [`docs/`](docs/) | [Firmware specification](docs/SPEC.md), [decisions](docs/DECISIONS.md) and [command reference](docs/COMMANDS.md) |
 | [`CREDITS.md`](CREDITS.md) | Third-party attribution and licensing details |
 | [`platformio.ini`](platformio.ini) | Pinned build tools and the `s3`, `s3_ota` and `native` environments |
 | [`VERSION`](VERSION) and [`CHANGES.md`](CHANGES.md) | Current firmware version and change history |
