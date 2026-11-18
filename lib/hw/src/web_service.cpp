@@ -121,13 +121,21 @@ esp_err_t redirect(httpd_req_t *req, const char *location, const std::string &co
     }
     return httpd_resp_send(req, nullptr, 0);
 }
+// With lwIP IPv6 on, the server's socket is IPv6 and IPv4 clients come back as ::ffff:a.b.c.d.
 void peerAddress(httpd_req_t *req, char out[16]) {
     out[0] = 0;
-    sockaddr_in peer = {};
+    sockaddr_storage peer = {};
     socklen_t len = sizeof peer;
-    if (lwip_getpeername(httpd_req_to_sockfd(req), reinterpret_cast<sockaddr *>(&peer), &len) ==
+    if (lwip_getpeername(httpd_req_to_sockfd(req), reinterpret_cast<sockaddr *>(&peer), &len) !=
         0) {
-        ip4addr_ntoa_r(reinterpret_cast<const ip4_addr_t *>(&peer.sin_addr), out, 16);
+        return;
+    }
+    if (peer.ss_family == AF_INET) {
+        const auto &v4 = reinterpret_cast<const sockaddr_in &>(peer);
+        webinterface::formatPeer(reinterpret_cast<const uint8_t *>(&v4.sin_addr), 4, out);
+    } else if (peer.ss_family == AF_INET6) {
+        const auto &v6 = reinterpret_cast<const sockaddr_in6 &>(peer);
+        webinterface::formatPeer(reinterpret_cast<const uint8_t *>(&v6.sin6_addr), 16, out);
     }
 }
 // The media type alone: "application/x-www-form-urlencoded; charset=UTF-8" is still a form.

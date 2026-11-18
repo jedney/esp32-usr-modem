@@ -326,6 +326,23 @@ void test_login_events_name_the_interface_and_peer_but_nothing_secret() {
     formatLogin(LoginKind::kWeb, "", line, sizeof line);
     TEST_ASSERT_EQUAL_STRING("Login: web admin from unknown", line);
 }
+void test_peer_address_unwraps_ipv4_mapped_ipv6() {
+    char out[16] = "x";
+    const uint8_t v4[4] = {10, 0, 0, 208};
+    formatPeer(v4, sizeof v4, out);
+    TEST_ASSERT_EQUAL_STRING("10.0.0.208", out);
+    // The web server's socket is IPv6 when lwIP has IPv6: IPv4 clients are ::ffff:a.b.c.d.
+    const uint8_t mapped[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 192, 168, 255, 254};
+    formatPeer(mapped, sizeof mapped, out);
+    TEST_ASSERT_EQUAL_STRING("192.168.255.254", out);
+    const uint8_t native6[16] = {0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 10, 0, 0, 1};
+    formatPeer(native6, sizeof native6, out);
+    TEST_ASSERT_EQUAL_STRING("", out);
+    formatPeer(v4, 3, out);
+    TEST_ASSERT_EQUAL_STRING("", out);
+    formatPeer(nullptr, 4, out);
+    TEST_ASSERT_EQUAL_STRING("", out);
+}
 void test_login_events_queue_in_order_and_report_overflow() {
     LoginEvents events;
     char line[80];
@@ -369,6 +386,7 @@ int main() {
     RUN_TEST(test_ninth_browser_is_refused_without_ending_anyone_until_a_slot_frees);
     RUN_TEST(test_logout_and_password_change_end_sessions_and_serials_are_never_reused);
     RUN_TEST(test_login_events_name_the_interface_and_peer_but_nothing_secret);
+    RUN_TEST(test_peer_address_unwraps_ipv4_mapped_ipv6);
     RUN_TEST(test_login_events_queue_in_order_and_report_overflow);
     return UNITY_END();
 }

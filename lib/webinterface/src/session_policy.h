@@ -87,6 +87,10 @@ private:
 // and the next line taken says how many were lost.
 enum class LoginKind : uint8_t { kWeb, kNetConsole, kOta };
 void formatLogin(LoginKind kind, const char *peer, char *out, size_t cap);
+// A client's address as "a.b.c.d": `addr` is 4 bytes (IPv4) or 16 (IPv6, as the web
+// server's socket reports IPv4 clients: ::ffff:a.b.c.d). Anything else gives "" ("unknown"
+// in the login line); the modem does not use IPv6 on its network.
+void formatPeer(const uint8_t *addr, size_t len, char out[16]);
 class LoginEvents {
 public:
     static constexpr unsigned kCapacity = 8;

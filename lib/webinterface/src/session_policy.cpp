@@ -306,6 +306,17 @@ void formatLogin(LoginKind kind, const char *peer, char *out, size_t cap) {
             break;
     }
 }
+void formatPeer(const uint8_t *addr, size_t len, char out[16]) {
+    static const uint8_t kMappedPrefix[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff};
+    out[0] = 0;
+    if (addr && len == 16 && memcmp(addr, kMappedPrefix, sizeof kMappedPrefix) == 0) {
+        addr += sizeof kMappedPrefix;
+        len = 4;
+    }
+    if (addr && len == 4) {
+        snprintf(out, 16, "%u.%u.%u.%u", addr[0], addr[1], addr[2], addr[3]);
+    }
+}
 void LoginEvents::push(LoginKind kind, const char *peer) {
     if (count_ == kCapacity) {
         head_ = (head_ + 1) % kCapacity;

@@ -1195,7 +1195,9 @@ def test_each_web_login_is_logged_once_on_the_console(web, console):
     with Web(web.host) as browser:
         text = console_output(console, 2.0)
         require(text.count(b"Login: web admin from ") == 1, "Web login not logged exactly once")
-        require(re.search(rb"Login: web admin from \d+\.\d+\.\d+\.\d+\r\n", text), "Login line lacks the peer")
+        with socket.create_connection((web.host, 80), timeout=5) as probe:
+            own_ip = probe.getsockname()[0]  # this PC's address as the modem sees it
+        require(f"Login: web admin from {own_ip}\r\n".encode() in text, "Login line lacks this PC's address")
         for secret in (browser.cookie, browser.auth()["csrf"], os.environ["USR_MODEM_PASSWORD"]):
             require(secret.encode() not in text, "Login line holds a secret")
         # Routine requests, a reconnecting socket and a failed login are not logins.
