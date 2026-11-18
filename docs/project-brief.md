@@ -4,7 +4,6 @@ What the firmware does and the hardware it drives, as the code behaves now. Keep
 
 - Every command and option is in [COMMANDS.md](COMMANDS.md); this file says what the firmware is for and why, and leaves out what the command reference already lists.
 - Decisions and the reasons behind them are in [decisions-log.md](decisions-log.md).
-- The order the firmware was built in and what is left is in [ROADMAP.md](ROADMAP.md).
 - The page protocol is in [../web/PROTOCOL.md](../web/PROTOCOL.md); the test matrix is in [../test/README.md](../test/README.md).
 - The case and the electronics keep their own files in `case/` and `electronics/`.
 
@@ -224,7 +223,7 @@ A Client Tests section of the configuration screen (and `AT*TEST`, `AT*SX/SY/SZ`
 ## 4. Attribution
 
 - Case model: **luizpacheco** (Luiz Pacheco), Thingiverse thing:7063155, **CC BY-NC**. Modified versions keep the attribution and stay non-commercial. The front label art is inspired by two of luizpacheco's designs, with higher resolution, more model designs and hole alignment improvements added by ChatGPT.
-- Firmware base: **Zimodem** by Bo Zimmerman, **Apache-2.0**. Keep its LICENSE and NOTICE and mark every ported or changed file as changed. Its ZMODEM code derives from the Synchronet/SyncTERM code (licence not stated in the file).
+- Firmware base: **Zimodem** by Bo Zimmerman, **Apache-2.0**. Keep its licence headers, mark every ported or changed file as changed, and keep its attribution in the project's NOTICE; its own LICENSE and NOTICE are in the [upstream repository](https://github.com/bozimmerman/Zimodem). Its ZMODEM code derives from the Synchronet/SyncTERM code (licence not stated in the file).
 - Concept: **RetroExternalModem** by caiot5 (GPL-3.0), which builds on WiFi2DialUp (Luis Miguel Silva), PodSix pimodem (Matt Whitted) and tcpser (Jim Brain / FozzTexx).
 - Handshake recordings: Gough Lui's 2016 modem sound collection.
 - The licensing record is **`CREDITS.md`**: every third-party component, file and library with its source, licence and obligations. The About column supplies short, deduplicated names and URLs for About; full credits and licences stay in the repository.

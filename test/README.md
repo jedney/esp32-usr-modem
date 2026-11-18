@@ -86,5 +86,3 @@ Section numbers refer to the firmware spec (`docs/project-brief.md`).
 | Build: compiler warnings apply to the project's own code only (`lib/`, `src/`), the two lists agree, a deprecated API is an error | `scripts/test_project_warnings.py` | — | — |
 
 The matrix records coverage, not the outcome of the latest run.
-
-Checks that need a person (sound, LEDs, loopback plug, Amiga and Windows 9x clients) are listed in `docs/ROADMAP.md`.

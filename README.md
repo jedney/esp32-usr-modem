@@ -536,7 +536,7 @@ For **SLIP**, use **`667`** (`ATDT667`) and configure addresses manually: client
 
 Let the client's PPP driver negotiate after `CONNECT`; typing in a terminal instead will not start an Internet session. Hang up through the client's disconnect action, by dropping DTR with `&D2`, or with `AT*INTERNET=HANGUP` from another local modem port.
 
-The implementation supports IPv4, a 1500-byte serial MTU, no fragmented packets and no header compression. The computer's own browser and TLS support still determine which websites it can use. Modern-stack interoperability tests are included, while real Amiga and Windows 9x TCP/IP/browser checks remain listed in the [roadmap](docs/ROADMAP.md); client setup screens depend on the stack you choose.
+The implementation supports IPv4, a 1500-byte serial MTU, no fragmented packets and no header compression. The computer's own browser and TLS support still determine which websites it can use. Modern-stack interoperability tests are included; client setup screens depend on the stack you choose.
 
 ## 11. Finish the case and learn the controls
 
@@ -632,7 +632,7 @@ For everyday use, the [complete AT command reference](docs/COMMANDS.md) is the n
 | [`sound/`](sound/) and [`data/`](data/) | Source handshake recordings and filesystem content; `data/sounds` holds the packaged WAVs and `data/www` is generated during the filesystem build |
 | [`scripts/`](scripts/) | Build, upload, version, sound, web asset and test helpers |
 | [`test/`](test/) | PC unit tests, board tests, serial/network end-to-end tests and independent protocol checks; start with the [test guide](test/README.md) |
-| [`docs/`](docs/) | [Firmware specification](docs/project-brief.md), [decisions](docs/decisions-log.md), [remaining checks](docs/ROADMAP.md) and command reference |
+| [`docs/`](docs/) | [Firmware specification](docs/project-brief.md), [decisions](docs/decisions-log.md) and [command reference](docs/COMMANDS.md) |
 | [`CREDITS.md`](CREDITS.md) | Third-party attribution and licensing details |
 | [`platformio.ini`](platformio.ini) | Pinned build tools and the `s3`, `s3_ota` and `native` environments |
 | [`VERSION`](VERSION) and [`CHANGES.md`](CHANGES.md) | Current firmware version and change history |
