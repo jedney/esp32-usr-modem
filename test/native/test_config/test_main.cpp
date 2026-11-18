@@ -163,6 +163,8 @@ void test_history_eviction_reload_and_atomic_rollback() {
     TEST_ASSERT_EQUAL(51, history.at(49).duration);
     TEST_ASSERT_FALSE(history.clear());
     TEST_ASSERT_EQUAL(50, history.size());
+    // the history reads it through its reference
+    // cppcheck-suppress redundantAssignment
     store.failSave = store.failErase = false;
     TEST_ASSERT_TRUE(history.clear());
     TEST_ASSERT_TRUE(store.bytes.empty());

@@ -1,9 +1,11 @@
 // Modem settings: see modemcfg.h.
 #include "modemcfg.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstring>
 #include <initializer_list>
+#include <iterator>
 
 namespace modemcfg {
 
@@ -110,12 +112,7 @@ int findSetting(char prefix, char letter) {
 }
 
 bool isHostRate(uint32_t baud) {
-    for (uint32_t r : kHostRates) {
-        if (r == baud) {
-            return true;
-        }
-    }
-    return false;
+    return std::find(std::begin(kHostRates), std::end(kHostRates), baud) != std::end(kHostRates);
 }
 
 bool settingAllows(Setting s, unsigned value) {

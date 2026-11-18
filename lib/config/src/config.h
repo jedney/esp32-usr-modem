@@ -195,7 +195,6 @@ private:
     void feedback(const char *text);
     void clearInput();
     void clearOutput();
-    void append(const char *text);
     const Action *item(size_t index) const;
     size_t itemCount() const;
     void profileAction(size_t index);

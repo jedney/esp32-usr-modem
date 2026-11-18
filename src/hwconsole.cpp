@@ -767,7 +767,9 @@ void runGuided() {
             tones::DtmfSource dtmf("0123456789*#");
             tones::PulseSource pulse("21");
             tones::ToneSource busy(tones::kUkBusyTone, 2250);
-            tones::Source *seq[] = {&t1, &sw, &dial, &dtmf, &pulse, &busy};
+            // play() fills from each source, so the sources stay writable
+            // cppcheck-suppress constVariable
+            tones::Source *const seq[] = {&t1, &sw, &dial, &dtmf, &pulse, &busy};
             for (tones::Source *s : seq) {
                 if (!play(*s)) {
                     break;

@@ -961,6 +961,8 @@ void test_failed_nvram_updates_do_not_leak_into_later_saves() {
     TEST_ASSERT_EQUAL(before.y, modem.nvram().y);
     TEST_ASSERT_FALSE(modem.setPhone(0, "test.example"));
     TEST_ASSERT_EQUAL_STRING(before.phone[0], modem.nvram().phone[0]);
+    // the modem reads it through its reference
+    // cppcheck-suppress redundantAssignment
     store.failSave = false;
     TEST_ASSERT_TRUE(modem.setModel(56000));
     modemcfg::Nvram restored;

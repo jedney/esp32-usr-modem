@@ -79,7 +79,7 @@ jobs:
           key: pio-check-${{ hashFiles('platformio.ini') }}
       - run: pip install platformio==6.2.0
       - name: cppcheck
-        run: pio check -e native --fail-on-defect=medium --fail-on-defect=high
+        run: pio check -e native --fail-on-defect=low
       - name: clang-format
         run: |
           files=$(git ls-files '*.cpp' '*.h')

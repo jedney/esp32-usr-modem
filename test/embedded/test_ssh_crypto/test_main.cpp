@@ -102,7 +102,7 @@ void test_aes_ctr_known_answer_block_by_block() {
     struct Case {
         ssh::Cipher cipher;
         const char *key, *expect;
-    } cases[] = {
+    } const cases[] = {
         {ssh::Cipher::kAes128Ctr, "2b7e151628aed2a6abf7158809cf4f3c",
          "874d6191b620e3261bef6864990db6ce9806f66b7970fdff8617187bb9fffdff"},
         {ssh::Cipher::kAes256Ctr,

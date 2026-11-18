@@ -114,10 +114,10 @@ public:
               const uint8_t *macKey) override {
         Slot &s = slots[slot];
         const bool small = cipher == ssh::Cipher::kAes128Ctr || cipher == ssh::Cipher::kAes128Gcm;
-        const bool gcm = cipher == ssh::Cipher::kAes128Gcm || cipher == ssh::Cipher::kAes256Gcm;
+        const bool isGcm = cipher == ssh::Cipher::kAes128Gcm || cipher == ssh::Cipher::kAes256Gcm;
         s.cipher = cipher;
         s.key.assign(key, key + (small ? 16 : 32));
-        s.iv.assign(iv, iv + (gcm ? 12 : 16));
+        s.iv.assign(iv, iv + (isGcm ? 12 : 16));
         s.macKey.clear();
         if (macKey) {
             s.macKey.assign(macKey, macKey + 32);
@@ -146,8 +146,8 @@ public:
             all.insert(all.end(), data, data + size);
             digest(all, 0x47, out, ssh::kTagSize);
         };
-        uint8_t expected[ssh::kTagSize];
         if (!seal) {
+            uint8_t expected[ssh::kTagSize];
             check(expected);
             if (memcmp(expected, tag, ssh::kTagSize) != 0) {
                 return false;
@@ -219,7 +219,7 @@ public:
     void sendKexInit() {
         std::vector<uint8_t> p(1024);
         ssh::Writer w(p.data(), p.size());
-        uint8_t cookie[16] = {};
+        const uint8_t cookie[16] = {};
         w.byte(ssh::kKexInit).raw(cookie, 16);
         w.string(kexList.c_str()).string(hostKeyList.c_str());
         w.string(cipherList.c_str()).string(cipherList.c_str());
@@ -368,15 +368,15 @@ private:
     }
     uint32_t lastSeq = 0;
     static std::string pick(const uint8_t *client, size_t size, const std::string &server) {
-        size_t start = 0;
+        size_t first = 0;
         for (size_t i = 0; i <= size; ++i) {
             if (i == size || client[i] == ',') {
-                std::string name(reinterpret_cast<const char *>(client) + start, i - start);
+                std::string name(reinterpret_cast<const char *>(client) + first, i - first);
                 if (ssh::listHas(reinterpret_cast<const uint8_t *>(server.data()), server.size(),
                                  name.c_str())) {
                     return name;
                 }
-                start = i + 1;
+                first = i + 1;
             }
         }
         return "";

@@ -107,6 +107,8 @@ void test_phonebook_defaults_exact_keys_validation_and_atomic_save() {
     TEST_ASSERT_EQUAL_UINT32(56000, book.find("01")->speed);
     TEST_ASSERT_FALSE(book.remove("01"));
     TEST_ASSERT_NOT_NULL(book.find("01"));
+    // the phonebook reads it through its reference
+    // cppcheck-suppress redundantAssignment
     store.failSave = false;
     TEST_ASSERT_TRUE(book.remove("01"));
     Phonebook removed(store);
@@ -232,6 +234,8 @@ void test_telnet_resize_negotiation_escapes_and_backpressure() {
     TEST_ASSERT_EQUAL_UINT8_ARRAY(first, data, sizeof first);
     t.resize(132, 50);
     TEST_ASSERT_EQUAL(0, t.tx.size());
+    // cppcheck follows one fresh queue; its space changes as bytes come and go
+    // cppcheck-suppress knownConditionTrueFalse
     while (t.tx.space())
         t.tx.put(0);
     t.resize(255, 511);
@@ -496,9 +500,9 @@ void test_redial_uses_the_complete_last_destination_and_rejects_empty() {
 }
 void test_speed_floor_rejects_entry_before_sound_and_dns_deadline_reports_no_tone() {
     Rig r;
-    Entry entry = *r.book.find("1");
-    entry.speed = 2400;
-    TEST_ASSERT_TRUE(r.book.put(entry));
+    Entry edited = *r.book.find("1");
+    edited.speed = 2400;
+    TEST_ASSERT_TRUE(r.book.put(edited));
     r.send("AT&U8\r");
     r.output.take();
     r.send("ATDT1\r");
@@ -690,11 +694,11 @@ void test_ringback_snapshot_wrap_and_cancellation_keep_call_slot_safe() {
 void test_speed_dial_uses_destination_ip_for_tones_and_pulses() {
     for (bool pulse : {false, true}) {
         Rig r;
-        Entry entry;
-        strcpy(entry.number, "42");
-        strcpy(entry.host, "198.51.100.24");
-        entry.port = 2323;
-        TEST_ASSERT_TRUE(r.book.put(entry));
+        Entry added;
+        strcpy(added.number, "42");
+        strcpy(added.host, "198.51.100.24");
+        added.port = 2323;
+        TEST_ASSERT_TRUE(r.book.put(added));
         r.modem.active().v[modemcfg::kM] = 1;
         r.socket.resolvedAddress = "198.51.100.24";
         r.send(pulse ? "ATDP42\r" : "ATDT42\r");

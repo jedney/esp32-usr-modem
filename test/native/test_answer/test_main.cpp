@@ -762,6 +762,8 @@ void test_failed_host_speed_transition_releases_call_and_recovers() {
     public:
         bool fail = true;
         unsigned commands = 0;
+        // the test clears fail later
+        // cppcheck-suppress knownConditionTrueFalse
         bool online(uint32_t) override { return !fail; }
         void command() override { ++commands; }
     } baud;

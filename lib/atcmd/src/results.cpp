@@ -2,7 +2,9 @@
 // reference (CREDITS.md).
 #include "results.h"
 
+#include <algorithm>
 #include <cstdio>
+#include <iterator>
 
 namespace atcmd {
 
@@ -37,12 +39,8 @@ bool isConnect(Result r) {
     if (r == Result::kConnect) {
         return true;
     }
-    for (const Speed &s : kSpeeds) {
-        if (s.code == r) {
-            return true;
-        }
-    }
-    return false;
+    return std::any_of(std::begin(kSpeeds), std::end(kSpeeds),
+                       [r](const Speed &s) { return s.code == r; });
 }
 
 }  // namespace

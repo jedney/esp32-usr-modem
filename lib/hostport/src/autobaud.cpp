@@ -88,6 +88,8 @@ uint32_t rateOfA(const Run *runs, size_t n) {
     while (i < n && runs[i].level != 0) {
         ++i;  // idle before the start bit
     }
+    // a capture can hold fewer runs than a character needs
+    // cppcheck-suppress knownConditionTrueFalse
     if (n - i < 6) {
         return 0;  // start, b0, b1.., b6.., b7 and the stop bit
     }

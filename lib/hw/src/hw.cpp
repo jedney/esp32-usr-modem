@@ -124,7 +124,7 @@ void i2sWriteFrames(const int16_t *mono, size_t n, float gain) {
 }
 
 void i2sSilence(uint32_t ms) {
-    int16_t zeros[kBlockFrames] = {};
+    const int16_t zeros[kBlockFrames] = {};
     uint32_t frames = tones::samplesFor(ms);
     while (frames > 0) {
         size_t n = frames < kBlockFrames ? frames : kBlockFrames;

@@ -1,7 +1,9 @@
 #include "phonebook.h"
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <iterator>
 
 namespace calls {
 namespace {
@@ -62,9 +64,7 @@ bool Phonebook::valid(const Entry &e) {
 bool Phonebook::begin() {
     loaded_ = true;
     healthy_ = false;
-    for (auto &e : entries_) {
-        e = Entry{};
-    }
+    std::fill(std::begin(entries_), std::end(entries_), Entry{});
     size_t size = store_.load(blob_, sizeof blob_);
     if (size) {
         if (size < 9 || size > kSize || (size - 9) % kRecordSize != 0 ||
@@ -104,9 +104,7 @@ bool Phonebook::begin() {
                 return true;
             }
         }
-        for (auto &e : entries_) {
-            e = Entry{};
-        }
+        std::fill(std::begin(entries_), std::end(entries_), Entry{});
     }
     strcpy(entries_[0].number, "1");
     strcpy(entries_[0].host, "www.amigaretro.com");
@@ -195,9 +193,7 @@ bool Phonebook::clear() {
     if (!store_.save(blob_, 9)) {
         return false;
     }
-    for (auto &e : entries_) {
-        e = Entry{};
-    }
+    std::fill(std::begin(entries_), std::end(entries_), Entry{});
     healthy_ = true;
     return true;
 }

@@ -27,10 +27,10 @@ bool TcpSocket::adopt(int fd) {
         return false;
     }
     fd_ = fd;
-    sockaddr_in peer = {};
-    socklen_t len = sizeof peer;
-    if (lwip_getpeername(fd_, reinterpret_cast<sockaddr *>(&peer), &len) == 0) {
-        ip4addr_ntoa_r(reinterpret_cast<const ip4_addr_t *>(&peer.sin_addr), peer_, sizeof peer_);
+    sockaddr_in remote = {};
+    socklen_t len = sizeof remote;
+    if (lwip_getpeername(fd_, reinterpret_cast<sockaddr *>(&remote), &len) == 0) {
+        ip4addr_ntoa_r(reinterpret_cast<const ip4_addr_t *>(&remote.sin_addr), peer_, sizeof peer_);
     }
     int flags = fcntl(fd_, F_GETFL, 0);
     if (flags < 0 || fcntl(fd_, F_SETFL, flags | O_NONBLOCK) < 0) {
@@ -87,15 +87,17 @@ void TcpSocket::found(uint32_t address) {
 void TcpSocket::lookup(const char *host) {
     resolved_[0] = 0;
     state_ = SocketState::kResolving;
-    ip_addr_t address;
-    if (ipaddr_aton(host, &address) && IP_IS_V4(&address)) {
-        found(ip4_addr_get_u32(ip_2_ip4(&address)));
+    ip_addr_t ip;
+    if (ipaddr_aton(host, &ip) && IP_IS_V4(&ip)) {
+        found(ip4_addr_get_u32(ip_2_ip4(&ip)));
         return;
     }
     if (pending_.load() >= 4) {
         state_ = SocketState::kDnsError;
         return;
     }
+    // lwIP hands the request to resolved(), which deletes it; cppcheck cannot follow the void *
+    // cppcheck-suppress [unreadVariable,unusedAllocatedMemory,constVariablePointer]
     Request *request = new (std::nothrow) Request{this, generation_.load()};
     if (!request) {
         state_ = SocketState::kDnsError;
@@ -104,13 +106,13 @@ void TcpSocket::lookup(const char *host) {
     ++pending_;
     // DNS cache and callbacks belong to lwIP's TCP/IP core.
     LOCK_TCPIP_CORE();
-    err_t result = dns_gethostbyname(host, &address, resolved, request);
+    err_t result = dns_gethostbyname(host, &ip, resolved, request);
     UNLOCK_TCPIP_CORE();
     if (result != ERR_INPROGRESS) {
         --pending_;
         delete request;
-        if (result == ERR_OK && IP_IS_V4(&address)) {
-            found(ip4_addr_get_u32(ip_2_ip4(&address)));
+        if (result == ERR_OK && IP_IS_V4(&ip)) {
+            found(ip4_addr_get_u32(ip_2_ip4(&ip)));
         } else {
             state_ = SocketState::kDnsError;
         }
@@ -158,10 +160,10 @@ void TcpSocket::poll() {
     if (fd_ < 0) {
         portENTER_CRITICAL(&dnsLock_);
         unsigned result = dnsState_.exchange(0);
-        uint32_t address = address_.load();
+        uint32_t ip = address_.load();
         portEXIT_CRITICAL(&dnsLock_);
         if (result == 1) {
-            found(address);
+            found(ip);
         } else if (result == 2) {
             state_ = SocketState::kDnsError;
         }

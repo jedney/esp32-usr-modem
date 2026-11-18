@@ -506,6 +506,8 @@ bool Transport::finishKex() {
     }
     static const char kLetters[2][3] = {{'A', 'C', 'E'}, {'B', 'D', 'F'}};
     for (unsigned slot = 0; slot < 2 && ok; ++slot) {
+        // derive() writes the new keys into it
+        // cppcheck-suppress constVariableReference
         Keys &keys = next_[slot];
         const bool small = keys.cipher == Cipher::kAes128Ctr || keys.cipher == Cipher::kAes128Gcm;
         ok = derive(kLetters[slot][0], k, kSize, hash, keys.iv, gcm(keys.cipher) ? 12 : 16) &&

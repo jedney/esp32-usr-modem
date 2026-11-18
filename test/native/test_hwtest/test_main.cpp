@@ -22,6 +22,8 @@ std::vector<int16_t> render(tones::Source &src, size_t maxSamples) {
         size_t chunk = maxSamples - got < 256 ? maxSamples - got : 256;
         size_t n = src.fill(out.data() + got, chunk);
         got += n;
+        // a finite source returns fewer samples at its end
+        // cppcheck-suppress knownConditionTrueFalse
         if (n < chunk) {
             break;
         }

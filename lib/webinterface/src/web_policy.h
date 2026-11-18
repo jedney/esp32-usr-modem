@@ -1,7 +1,9 @@
 // Browser trust boundaries. No Arduino, sockets or filesystem dependencies.
 #pragma once
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <string>
 #include "modemcfg.h"
 
@@ -117,9 +119,7 @@ public:
     size_t space() const { return N - count_; }
     size_t size() const { return count_; }
     void clear() {
-        for (auto &b : bytes_) {
-            b = 0;
-        }
+        std::fill(std::begin(bytes_), std::end(bytes_), uint8_t{0});
         head_ = count_ = 0;
     }
     bool push(const uint8_t *data, size_t len) {

@@ -97,7 +97,8 @@ void test_settings_default_persist_failure_and_corruption_fail_closed() {
 }
 void test_queue_wrap_overflow_and_secret_cleanup() {
     Queue<4> queue;
-    uint8_t input[] = {1, 2, 3, 4}, output[4] = {};
+    const uint8_t input[] = {1, 2, 3, 4};
+    uint8_t output[4] = {};
     TEST_ASSERT_TRUE(queue.push(input, 4));
     TEST_ASSERT_FALSE(queue.push(input, 1));
     TEST_ASSERT_EQUAL(2, queue.pop(output, 2));

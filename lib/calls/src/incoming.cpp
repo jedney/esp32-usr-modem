@@ -64,6 +64,8 @@ void Incoming::ring(uint32_t now) {
     hostport::Session &target = autoAnswerTarget();
     // S0 above kMaxRings answers on the last ring: the call is dropped after it.
     const uint8_t s0 = modem_.active().s[0];
+    // rings_ counts up to kMaxRings across calls; cppcheck sees only this one
+    // cppcheck-suppress knownConditionTrueFalse
     if (s0 && rings_ >= (s0 < kMaxRings ? s0 : kMaxRings) && eligible(target)) {
         answer(target);
     }

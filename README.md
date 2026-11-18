@@ -646,7 +646,7 @@ For development, the common checks are:
 |---|---|
 | PC unit tests, no board needed | `pio test -e native` |
 | Firmware build | `pio run -e s3` |
-| Static analysis | `pio check -e native` |
+| Static analysis | `pio check -e native --fail-on-defect=low` |
 | Browser tests, with Node.js 26 | `npm --prefix web test` |
 | Script tests, with Python test dependencies installed | `python -m pytest test/scripts` |
 | UI checks | `python -m unittest discover -s ui/tests` |

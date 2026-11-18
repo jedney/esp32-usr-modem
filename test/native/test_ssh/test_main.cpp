@@ -232,7 +232,7 @@ void test_negotiation_failures_name_the_part() {
     struct Case {
         std::string FakeServer::*list;
         const char *value, *reason;
-    } cases[] = {
+    } const cases[] = {
         {&FakeServer::kexList, "diffie-hellman-group14-sha256", "SSH: no common key exchange"},
         {&FakeServer::hostKeyList, "ssh-dss", "SSH: no common host key type"},
         {&FakeServer::cipherList, "chacha20-poly1305@openssh.com", "SSH: no common cipher"},

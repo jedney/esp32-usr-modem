@@ -45,7 +45,7 @@ PlatformIO's `pio` is on the PATH inside VS Code tasks and the PlatformIO termin
 | End-to-end tests | `python -m pytest test/e2e --console-port COMx` (or `socket://usr-modem.local:2001`) | Modem: end-to-end tests |
 | Web tests | `cd web; npm test` | Modem: web interface tests |
 | Script and UI tests | `python -m pytest test/scripts`; `python -m unittest discover -s ui/tests` | |
-| Lint | `pio check -e native --fail-on-defect=medium --fail-on-defect=high` | Modem: lint (cppcheck) |
+| Lint | `pio check -e native --fail-on-defect=low` | Modem: lint (cppcheck) |
 | Format | `clang-format --dry-run --Werror <files>` | |
 | Version | `python scripts/check_version.py` | |
 

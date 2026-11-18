@@ -243,7 +243,7 @@ void test_journal_records_payload_and_cleanup_once_with_clock_wrap() {
     r.session.startCall(echo);
     clockMs = UINT32_MAX - 499;
     journal.connected(r.session);
-    uint8_t data[] = {1, 2, 255};
+    const uint8_t data[] = {1, 2, 255};
     r.session.fromHost(data, 3, clockMs);
     uint8_t out[3];
     r.session.toHost(out, 3);
@@ -301,6 +301,8 @@ void test_reserved_dial_audio_stages_and_cancel_release_reservation() {
     TEST_ASSERT_FALSE(r.session.callUp());
     sound.active = false;
     dialer.poll();
+    // the dialer reads it through its reference
+    // cppcheck-suppress redundantAssignment
     sound.active = false;
     dialer.poll();
     clockMs += 1501;
@@ -407,6 +409,8 @@ void test_outgoing_history_failure_and_same_burst_redial_are_recorded_once() {
     TEST_ASSERT_EQUAL(1, r.history.size());
     TEST_ASSERT_EQUAL(static_cast<unsigned>(atcmd::Result::kBusy), r.history.at(0).result);
     TEST_ASSERT_TRUE(outgoing.start(r.session, "bbs.example.com", false));
+    // the call reads it through its reference
+    // cppcheck-suppress redundantAssignment
     socket.status = calls::SocketState::kOpen;
     outgoing.poll();
     TEST_ASSERT_TRUE(r.session.callUp());

@@ -381,6 +381,8 @@ bool WebService::used() {
     while (millis() - start < 2000) {
         {
             Lock lock(mutex_);
+            // the modem loop sets usedAck_ under the lock while this task waits
+            // cppcheck-suppress knownConditionTrueFalse
             if (usedAck_) {
                 return true;
             }
@@ -714,6 +716,8 @@ esp_err_t WebService::upgrade(httpd_req_t *req) {
     const uint32_t id = self->prepareUpgrade(httpd_req_to_sockfd(req), header(req, "Host"),
                                              header(req, "Origin"), req->uri);
     if (id) {
+        // the server keeps it in sess_ctx and frees it with freeContext()
+        // cppcheck-suppress unreadVariable
         auto *context = new (std::nothrow) Context{self, id};
         if (context) {
             req->sess_ctx = context;  // the frame handler's link to the client; freed on close
@@ -728,7 +732,7 @@ esp_err_t WebService::upgrade(httpd_req_t *req) {
     return ESP_FAIL;
 }
 esp_err_t WebService::ws(httpd_req_t *req) {
-    auto *context = static_cast<Context *>(req->sess_ctx);
+    const auto *context = static_cast<const Context *>(req->sess_ctx);
     if (!context) {
         return ESP_FAIL;
     }
@@ -770,9 +774,9 @@ esp_err_t WebService::ws(httpd_req_t *req) {
                         !sessions_.valid(c->session, uptimeMs())) {
                         offset = n;  // observers and ended sessions never queue commands
                     } else {
-                        size_t used = c->input.append(data + offset, n - offset);
-                        offset += used;
-                        if (used)
+                        size_t taken = c->input.append(data + offset, n - offset);
+                        offset += taken;
+                        if (taken)
                             progress = millis();
                     }
                 }
@@ -865,9 +869,9 @@ uint32_t WebService::prepareUpgrade(int fd, const std::string &host, const std::
     if (!available) {
         return 0;
     }
-    const uint32_t session = tickets_.consume(target.substr(prefix.size()), millis());
+    const uint32_t ticketSession = tickets_.consume(target.substr(prefix.size()), millis());
     char csrf[33];
-    if (!session || !sessions_.valid(session, uptimeMs()) ||
+    if (!ticketSession || !sessions_.valid(ticketSession, uptimeMs()) ||
         !webinterface::makeToken(crypto_, csrf)) {
         return 0;
     }
@@ -887,7 +891,7 @@ uint32_t WebService::prepareUpgrade(int fd, const std::string &host, const std::
     available->fd = fd;
     available->id = nextId_++;
     available->active = true;
-    available->session = session;
+    available->session = ticketSession;
     available->csrf = csrf;
     available->messages[4] =
         "{\"t\":\"hello\",\"name\":" + webinterface::jsonString(name_.c_str()) +
@@ -901,7 +905,7 @@ uint32_t WebService::clientId(unsigned index) {
 }
 bool WebService::connected(uint32_t id) {
     Lock lock(mutex_);
-    auto *c = find(id);
+    const auto *c = find(id);
     return c && !c->close;
 }
 size_t WebService::read(uint32_t id, uint8_t *data, size_t cap) {
@@ -1002,7 +1006,7 @@ void WebService::sendClients() {
     for (unsigned i = 0; i < kClients; ++i) {
         int fd;
         uint32_t id;
-        bool close;
+        bool closing;
         uint8_t bytes[512];
         size_t n;
         std::string messages[7];
@@ -1014,7 +1018,7 @@ void WebService::sendClients() {
             }
             fd = c.fd;
             id = c.id;
-            close = c.close && c.output.size() == 0;
+            closing = c.close && c.output.size() == 0;
             n = c.output.pop(bytes, sizeof bytes);
             for (unsigned j = 0; j < 4; ++j) {
                 if (c.sent[j] != self.revision_[j]) {
@@ -1031,7 +1035,7 @@ void WebService::sendClients() {
         }
         // hello precedes the initial snapshots and terminal bytes.
         for (unsigned j : {4u, 0u, 1u, 2u, 3u, 5u}) {
-            if (messages[j].empty() || close) {
+            if (messages[j].empty() || closing) {
                 continue;
             }
             httpd_ws_frame_t frame = {};
@@ -1039,26 +1043,26 @@ void WebService::sendClients() {
             frame.final = true;
             frame.payload = reinterpret_cast<uint8_t *>(&messages[j][0]);
             frame.len = messages[j].size();
-            close = httpd_ws_send_frame_async(self.server_, fd, &frame) != ESP_OK;
+            closing = httpd_ws_send_frame_async(self.server_, fd, &frame) != ESP_OK;
         }
-        if (n && !close) {
+        if (n && !closing) {
             httpd_ws_frame_t frame = {};
             frame.type = HTTPD_WS_TYPE_BINARY;
             frame.final = true;
             frame.payload = bytes;
             frame.len = n;
-            close = httpd_ws_send_frame_async(self.server_, fd, &frame) != ESP_OK;
+            closing = httpd_ws_send_frame_async(self.server_, fd, &frame) != ESP_OK;
         }
-        if (!messages[6].empty() && !close) {
+        if (!messages[6].empty() && !closing) {
             httpd_ws_frame_t frame = {};
             frame.type = HTTPD_WS_TYPE_TEXT;
             frame.final = true;
             frame.payload = reinterpret_cast<uint8_t *>(&messages[6][0]);
             frame.len = messages[6].size();
-            close = httpd_ws_send_frame_async(self.server_, fd, &frame) != ESP_OK;
+            closing = httpd_ws_send_frame_async(self.server_, fd, &frame) != ESP_OK;
         }
         devicecfg::wipe(bytes, sizeof bytes);
-        if (close) {
+        if (closing) {
             self.disconnect(id);
             httpd_sess_trigger_close(self.server_, fd);
         }
@@ -1141,7 +1145,7 @@ esp_err_t WebService::upload(httpd_req_t *req) {
     std::string csrf = header(req, "X-CSRF-Token", 32);
     {
         Lock lock(mutex_);
-        for (auto &c : clients_) {
+        for (const auto &c : clients_) {
             if (c.active && !c.close && c.session == serial &&
                 webinterface::equalSecret(c.csrf, csrf)) {
                 job.owner = c.id;

@@ -1,4 +1,5 @@
 #include "web_policy.h"
+#include <algorithm>
 #include <cctype>
 #include <cstdio>
 #include <cstring>
@@ -33,9 +34,8 @@ bool terminalSize(const std::string &message, unsigned &columns, unsigned &rows)
 }
 namespace {
 std::string lower(std::string value) {
-    for (char &c : value) {
-        c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
-    }
+    std::transform(value.begin(), value.end(), value.begin(),
+                   [](unsigned char c) { return static_cast<char>(tolower(c)); });
     return value;
 }
 bool version(const std::string &s, unsigned &major, unsigned &minor) {
@@ -110,11 +110,11 @@ bool HeaderGate::accept(const uint8_t *data, size_t len) {
                 return false;
             }
             std::string key = lower(head_.substr(pos, colon - pos));
-            for (char c : key) {
-                if (!isalnum(static_cast<unsigned char>(c)) && c != '-') {
-                    bad_ = true;
-                    return false;
-                }
+            if (std::any_of(key.begin(), key.end(), [](char c) {
+                    return !isalnum(static_cast<unsigned char>(c)) && c != '-';
+                })) {
+                bad_ = true;
+                return false;
             }
             if (++counts[key] > 1 &&
                 (key == "host" || key == "origin" || key == "cookie" || key == "content-length" ||
@@ -237,7 +237,13 @@ int compareVersions(const std::string &a, const std::string &b) {
     if (!version(a, am, an) || !version(b, bm, bn)) {
         return -2;
     }
-    return am == bm && an == bn ? 0 : (am < bm || (am == bm && an < bn) ? -1 : 1);
+    if (am != bm) {
+        return am < bm ? -1 : 1;
+    }
+    if (an != bn) {
+        return an < bn ? -1 : 1;
+    }
+    return 0;
 }
 bool makeToken(Crypto &crypto, char out[33]) {
     uint8_t bytes[16] = {};

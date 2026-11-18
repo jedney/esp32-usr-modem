@@ -61,6 +61,8 @@ void Telnet::resize(unsigned columns, unsigned rows) {
 }
 void Telnet::poll() {
     // Coalesce resizes until negotiation and queue space permit a complete frame.
+    // cppcheck follows one fresh queue; its space changes as bytes come and go
+    // cppcheck-suppress knownConditionTrueFalse
     if (!sizePending_ || local_[NAWS] != 2 || tx.space() < 13)
         return;
     const uint8_t size[] = {uint8_t(columns_ >> 8), uint8_t(columns_), uint8_t(rows_ >> 8),

@@ -1,6 +1,8 @@
 #include "session_policy.h"
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <iterator>
 #include "devicecfg.h"
 
 namespace webinterface {
@@ -21,12 +23,8 @@ bool lowerHex(const std::string &text, size_t n) {
     if (text.size() != n) {
         return false;
     }
-    for (char c : text) {
-        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
-            return false;
-        }
-    }
-    return true;
+    return std::all_of(text.begin(), text.end(),
+                       [](char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); });
 }
 // Decodes one form value into out. False if it is too long or holds a control character.
 bool decode(const std::string &body, size_t begin, size_t end, char *out) {
@@ -282,11 +280,8 @@ size_t Sessions::expire(uint64_t now, uint32_t out[kSessionSlots]) {
     return n;
 }
 size_t Sessions::count() const {
-    size_t n = 0;
-    for (const auto &s : slots_) {
-        n += s.serial ? 1 : 0;
-    }
-    return n;
+    return static_cast<size_t>(std::count_if(std::begin(slots_), std::end(slots_),
+                                             [](const Slot &s) { return s.serial != 0; }));
 }
 
 void formatLogin(LoginKind kind, const char *peer, char *out, size_t cap) {

@@ -1,7 +1,9 @@
 #include "net_console.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <iterator>
 
 #include "devicecfg.h"
 
@@ -83,12 +85,9 @@ Console::State Console::state() const {
     if (ready()) {
         return State::kReady;
     }
-    for (const auto &client : clients_) {
-        if (client.stage == Stage::kLogin) {
-            return State::kLogin;
-        }
-    }
-    return State::kListening;
+    const bool loggingIn = std::any_of(std::begin(clients_), std::end(clients_),
+                                       [](const Client &c) { return c.stage == Stage::kLogin; });
+    return loggingIn ? State::kLogin : State::kListening;
 }
 
 const char *Console::peer() const {

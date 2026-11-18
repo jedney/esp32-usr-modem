@@ -56,7 +56,7 @@ bool Service::start(const char *command, const char *args, uint32_t now) {
         if (strlen(nested) < 2 || (nested[2] && nested[2] != '=') ||
             (nested[0] != 'S' && nested[0] != 'R') || !strchr("XYZ", nested[1]))
             return false;
-        char name[3] = {nested[0], nested[1], 0};
+        const char name[3] = {nested[0], nested[1], 0};
         return start(name, nested + 2, now);
     }
     output_.clear();
@@ -244,6 +244,8 @@ void Service::summary() {
         "HS9600.WAV/HS14400.WAV/HS28800.WAV/HS33600.WAV/HS56000.WAV; ALL batch.\r\n");
 }
 size_t Service::space() const {
+    // cppcheck follows one fresh queue; its space changes as bytes come and go
+    // cppcheck-suppress knownConditionTrueFalse
     if (!open_ || (finished_ && !hold_) || output_.space() < 512)
         return 0;
     if (mode_ == Mode::Transfer && !finished_)

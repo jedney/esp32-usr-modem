@@ -101,6 +101,8 @@ void onWifiEvent(arduino_event_id_t event, arduino_event_info_t info) {
     }
 }
 
+// the SNTP callback type fixes the parameter
+// cppcheck-suppress constParameterCallback
 void onTimeSync(struct timeval *tv) {
     portENTER_CRITICAL(&syncLock);
     syncedAt = tv->tv_sec;

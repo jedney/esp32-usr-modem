@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <iterator>
 #include "config.h"
 #include "ui_generated.h"
 
@@ -76,8 +77,7 @@ bool Terminal::open() {
     open_ = true;
     screen_ = S::Main;
     depth_ = 0;
-    for (auto &offset : offsets_)
-        offset = 0;
+    std::fill(std::begin(offsets_), std::end(offsets_), size_t{0});
     focus_ = Focus::Menu;
     capturing_ = response_ = skipLf_ = departure_ = false;
     clearInput();
@@ -107,9 +107,6 @@ void Terminal::clearOutput() {
     devicecfg::wipe(output_, sizeof output_);
     length_ = pos_ = responseLine_ = responseLines_ = 0;
     more_ = overflow_ = false;
-}
-void Terminal::append(const char *text) {
-    write(text, strlen(text));
 }
 void Terminal::write(const char *data, size_t len) {
     // Only trusted renderer strings may contain controls. Service output cannot
@@ -230,11 +227,9 @@ const Action *Terminal::item(size_t index) const {
 size_t Terminal::itemCount() const {
     if (screen_ == S::Profile)
         return findAction("settings.edit-profile-registers")->metadata->fieldCount;
-    size_t n = 0;
-    for (const auto &a : kActions)
-        if (a.screen == screen_)
-            ++n;
-    return n;
+    return static_cast<size_t>(
+        std::count_if(std::begin(kActions), std::end(kActions),
+                      [this](const Action &a) { return a.screen == screen_; }));
 }
 void Terminal::changeScreen(Screen screen) {
     if (screen_ != screen && depth_ < 10)
@@ -374,7 +369,7 @@ void Terminal::drawMenu() {
         emit("\r\n");
     }
     if (screen_ == S::Phonebook && services_ && services_->phonebook()) {
-        auto *book = services_->phonebook();
+        const auto *book = services_->phonebook();
         size_t savedCount = 0;
         for (size_t i = 0; i < calls::kPhonebookCount; ++i)
             if (*book->at(i).number)

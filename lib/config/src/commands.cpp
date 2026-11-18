@@ -231,6 +231,8 @@ atcmd::Reply Commands::profileControl(atcmd::Port &p, const char *args) {
 atcmd::Reply Commands::bookClear(atcmd::Port &, const char *args) {
     return !*args && book_.clear() ? atcmd::Reply::kOk : atcmd::Reply::kError;
 }
+// The same signature as every handler in the table above.
+// cppcheck-suppress constParameterReference
 atcmd::Reply Commands::dial(atcmd::Port &p, const char *args) {
     if (*args != '=' || !args[1] || !p.link()) {
         return atcmd::Reply::kError;

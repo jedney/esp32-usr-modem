@@ -104,7 +104,7 @@
     {
       "label": "Modem: lint (cppcheck)",
       "type": "shell",
-      "command": "pio check -e native",
+      "command": "pio check -e native --fail-on-defect=low",
       "problemMatcher": []
     },
     {

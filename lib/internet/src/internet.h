@@ -37,6 +37,8 @@ public:
     void stop(Reason reason);
     bool isOpen() const override { return open_; }
     bool binaryService() const override { return true; }
+    // cppcheck follows one fresh queue; its space changes as bytes come and go
+    // cppcheck-suppress knownConditionTrueFalse
     size_t space() const override { return open_ && !closing_ && tx_.space() >= 4096 ? 256 : 0; }
     size_t write(const uint8_t *data, size_t length) override;
     size_t read(uint8_t *data, size_t capacity) override;

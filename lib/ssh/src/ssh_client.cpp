@@ -1,4 +1,5 @@
 #include "ssh_client.h"
+#include <algorithm>
 #include <cstring>
 
 namespace ssh {
@@ -313,11 +314,8 @@ bool Client::sendAuth() {
 }
 bool Client::sendData() {
     while (typed_.size() && remoteWindow_) {
-        size_t n = typed_.size();
-        const size_t limits[] = {remoteWindow_, remoteMax_, kMaxChannelPacket};
-        for (size_t limit : limits) {
-            n = n < limit ? n : limit;
-        }
+        const size_t n = std::min(
+            {typed_.size(), size_t{remoteWindow_}, size_t{remoteMax_}, size_t{kMaxChannelPacket}});
         // Built in place: the loop task's stack is small.
         Writer w(scratch_, sizeof scratch_);
         w.byte(kChannelData).u32(remote_).u32(uint32_t(n));

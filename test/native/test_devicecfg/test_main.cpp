@@ -477,19 +477,19 @@ void test_help_includes_every_device_command_without_credentials() {
 void test_password_separator_and_only_value_masked() {
     Rig r;
     std::string text = r.type("AT*PASS=abc=defg\r");
-    TEST_ASSERT_TRUE(text.find("AT*PASS=********\r") == 0);
+    TEST_ASSERT_TRUE(text.starts_with("AT*PASS=********\r"));
     TEST_ASSERT_FALSE(has(text, "abc=defg"));
     TEST_ASSERT_TRUE(has(r.type("A/"), "ERROR"));
     text = r.type("at*pass=abcdefgh\x7fZ\r");
-    TEST_ASSERT_TRUE(text.find("at*pass=********\b \b*\r") == 0);
-    TEST_ASSERT_TRUE(text.find("at*pass=") == 0);
+    TEST_ASSERT_TRUE(text.starts_with("at*pass=********\b \b*\r"));
+    TEST_ASSERT_TRUE(text.starts_with("at*pass="));
     TEST_ASSERT_FALSE(has(text, "abcdefgh"));
     r.type("ATE0\r");
     text = r.type("AT*PASS=abcdefgh\r");
     TEST_ASSERT_EQUAL_STRING("\r\nDevice password changed.\r\n\r\nOK\r\n", text.c_str());
     r.type("ATE1\r");
     text = r.type("AT*PASS=\b=abcdefgh\r");
-    TEST_ASSERT_TRUE(text.find("AT*PASS=\b \b=********\r") == 0);
+    TEST_ASSERT_TRUE(text.starts_with("AT*PASS=\b \b=********\r"));
     TEST_ASSERT_FALSE(has(text, "abcdefgh"));
 }
 

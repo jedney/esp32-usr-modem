@@ -42,12 +42,14 @@ bool NetProbe::start(const char *host, bool ping, uint32_t now) {
     ended_ = false;
     dns_ = 0;
     address_ = 0;
-    ip_addr_t address;
-    if (ipaddr_aton(host, &address) && IP_IS_V4(&address)) {
-        address_ = ip4_addr_get_u32(ip_2_ip4(&address));
+    ip_addr_t ip;
+    if (ipaddr_aton(host, &ip) && IP_IS_V4(&ip)) {
+        address_ = ip4_addr_get_u32(ip_2_ip4(&ip));
         dns_ = 1;
         return true;
     }
+    // lwIP hands the request to resolved(), which deletes it; cppcheck cannot follow the void *
+    // cppcheck-suppress unreadVariable
     auto *request = new (std::nothrow) Request{this, generation_.load()};
     if (!request) {
         active_ = false;
@@ -55,11 +57,11 @@ bool NetProbe::start(const char *host, bool ping, uint32_t now) {
     }
     ++pending_;
     LOCK_TCPIP_CORE();
-    err_t result = dns_gethostbyname(host, &address, resolved, request);
+    err_t result = dns_gethostbyname(host, &ip, resolved, request);
     UNLOCK_TCPIP_CORE();
     if (result != ERR_INPROGRESS) {
-        if (result == ERR_OK && IP_IS_V4(&address)) {
-            address_ = ip4_addr_get_u32(ip_2_ip4(&address));
+        if (result == ERR_OK && IP_IS_V4(&ip)) {
+            address_ = ip4_addr_get_u32(ip_2_ip4(&ip));
             dns_ = 1;
         } else {
             dns_ = 2;

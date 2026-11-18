@@ -817,7 +817,7 @@ private:
                                                            : "off");
         if (journal.active()) {
             const auto &r = journal.current();
-            auto *session = journal.session();
+            const auto *session = journal.session();
             port.printf("Call %s %s %s duration %lus, speed %lu TX=%lu RX=%lu\r\n",
                         r.incoming ? "incoming" : "outgoing", calls::kindName(r.kind), r.host,
                         static_cast<unsigned long>(journal.duration()),
@@ -1287,9 +1287,10 @@ void publishCall(uint32_t now, bool force) {
 // Nothing is built while no browser is connected. A browser that arrives
 // after none gets all four messages rebuilt in the same pass.
 void publishWebStatus() {
-    static uint32_t readyClient = 0, readyBytes = 0;
-    static bool wasReady = false;
+    static uint32_t readyClient = 0;
     if (browserClient) {
+        static uint32_t readyBytes = 0;
+        static bool wasReady = false;
         bool ready = !hardwareRunning && !browserSession->callUp() && !browserMenu->isOpen() &&
                      !browserSession->port().busy() && browserSession->port().lineEmpty() &&
                      !browserInput.size() &&
@@ -1515,8 +1516,10 @@ void createPorts() {
     usbport::begin(*modem, callSlot);
     auto makeMenu = [](hostport::Session &session, bool rs232Port) {
         void *memory = ps_malloc(sizeof(config::Terminal));
-        return memory ? new (memory) config::Terminal(session, rs232Port)
-                      : new config::Terminal(session, rs232Port);
+        if (memory) {
+            return new (memory) config::Terminal(session, rs232Port);
+        }
+        return new config::Terminal(session, rs232Port);  // internal RAM
     };
     consoleMenu = makeMenu(*console, false);
     hostMenu = makeMenu(rs232::session(), true);

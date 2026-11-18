@@ -178,7 +178,7 @@ The factory result set is `X4` (all codes). Numeric and verbal results follow th
   - on-board tests (`test/embedded/`), which replace the firmware while they run;
   - end-to-end tests (`test/e2e/`, pytest and pyserial) against the console, the RS232 port and the USB port; `lrzsz` and `pppd` are the interoperability peers (`test/interop/`).
 - **Gate:** every upload first runs the PC unit tests and stops if any fail (`scripts/pre_upload_tests.py`; `USR_MODEM_SKIP_TESTS=1` is for emergencies only).
-- Lint is `pio check` (cppcheck) and clang-format (100 columns); CI checks both.
+- Lint is `pio check` (cppcheck, no findings at any severity) and clang-format (100 columns); CI checks both.
 
 ### 3.11 Web interface
 

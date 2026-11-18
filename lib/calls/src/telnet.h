@@ -28,6 +28,8 @@ public:
     void poll();
     void feed(uint8_t byte);
     size_t write(const uint8_t *data, size_t len);
+    // cppcheck follows one fresh queue; its space changes as bytes come and go
+    // cppcheck-suppress knownConditionTrueFalse
     size_t space() const { return tx.space() > 64 ? (tx.space() - 64) / 2 : 0; }
     ByteQueue<8192> rx, tx;
 
