@@ -6,6 +6,8 @@
 #include <initializer_list>
 #include <vector>
 
+#define FAKES_STORE
+#include "../support/fakes.h"
 #include "modemcfg.h"
 
 using namespace modemcfg;
@@ -14,31 +16,6 @@ void setUp() {}
 void tearDown() {}
 
 // In-memory stand-in for NVS.
-class MemStore : public Store {
-public:
-    size_t load(uint8_t *buf, size_t cap) override {
-        size_t n = len < cap ? len : cap;
-        memcpy(buf, data, n);
-        return n;
-    }
-    bool save(const uint8_t *d, size_t n) override {
-        if (n > sizeof data) {
-            return false;
-        }
-        memcpy(data, d, n);
-        len = n;
-        ++saves;
-        return true;
-    }
-    bool erase() override {
-        len = 0;
-        return true;
-    }
-    uint8_t data[1024] = {};
-    size_t len = 0;
-    int saves = 0;
-};
-
 // --- Factory settings ---------------------------------------------------------------------
 
 void test_factory_f1_has_the_decided_defaults() {
@@ -244,18 +221,14 @@ void test_stored_line_end_registers_out_of_range_fall_back_to_factory() {
                       static_cast<int>(deserialize(blob, sizeof blob, &out)));
 }
 
-class FailingStore : public MemStore {
-public:
-    size_t load(uint8_t *, size_t) override { return kLoadError; }
-};
-
 void test_unreadable_store_is_a_bad_size_and_stays_untouched() {
-    FailingStore store;
+    fakes::MemoryStore store;
+    store.failLoad = true;
     Nvram n;
     TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kBadSize),
                       static_cast<int>(loadNvram(store, &n)));
     TEST_ASSERT_EQUAL(0, store.saves);
-    TEST_ASSERT_EQUAL(0, static_cast<int>(store.len));
+    TEST_ASSERT_EQUAL(0, static_cast<int>(store.bytes.size()));
 }
 
 void test_host_baud_round_trip_and_range() {
@@ -282,7 +255,7 @@ void test_crc32_known_value() {
 }
 
 void test_store_round_trip_is_the_restart_case() {
-    MemStore store;
+    fakes::MemoryStore store;
     Nvram n;
     TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kEmpty), static_cast<int>(loadNvram(store, &n)));
     n.tmpl[0].s[7] = 45;
@@ -299,7 +272,7 @@ void test_load_result_texts() {
 }
 
 void test_extended_speed_profiles_survive_restart() {
-    MemStore store;
+    fakes::MemoryStore store;
     Nvram n = factoryNvram();
     n.tmpl[0].v[kAmpN] = 38;
     n.tmpl[0].v[kAmpU] = 32;

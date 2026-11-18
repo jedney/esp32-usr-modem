@@ -8,6 +8,9 @@
 #include <string>
 #include <vector>
 
+#define FAKES_STORE
+#define FAKES_SINK
+#include "../support/fakes.h"
 #include "autobaud.h"
 #include "connection.h"
 #include "hwtest.h"
@@ -422,39 +425,10 @@ void test_echo_connection() {
 
 // --- Session ------------------------------------------------------------------------------
 
-class MemStore : public modemcfg::Store {
-public:
-    size_t load(uint8_t *buf, size_t cap) override {
-        size_t n = len < cap ? len : cap;
-        memcpy(buf, data, n);
-        return n;
-    }
-    bool save(const uint8_t *d, size_t n) override {
-        memcpy(data, d, n);
-        len = n;
-        return true;
-    }
-    bool erase() override {
-        len = 0;
-        return true;
-    }
-    uint8_t data[1024] = {};
-    size_t len = 0;
-};
-
-class StrSink : public atcmd::Sink {
-public:
-    void write(const char *d, size_t n) override { s.append(d, n); }
-    std::string take() {
-        std::string r = s;
-        s.clear();
-        return r;
-    }
-    std::string s;
-};
+using StrSink = fakes::TextSink;
 
 struct Rig {
-    MemStore store;
+    fakes::MemoryStore store;
     atcmd::Modem modem{store, nullptr, 0};
     CallSlot slot;
     StrSink out;
@@ -719,7 +693,7 @@ void test_interactive_handler_can_read_prefetched_input() {
         InputBuffer &input_;
         std::string output, tail;
     } sink(input);
-    MemStore store;
+    fakes::MemoryStore store;
     atcmd::Modem modem(store, nullptr, 0);
     modem.begin();
     CallSlot slot;

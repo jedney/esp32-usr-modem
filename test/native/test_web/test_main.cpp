@@ -3,6 +3,8 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#define FAKES_STORE
+#include "../support/fakes.h"
 #include "image_check.h"
 #include "upload_handshake.h"
 #include "web_policy.h"
@@ -72,29 +74,8 @@ void test_tokens_are_32_lower_case_hex_from_16_random_bytes() {
     TEST_ASSERT_FALSE(makeToken(crypto, token));
     TEST_ASSERT_EQUAL_STRING("", token);
 }
-class Store : public modemcfg::Store {
-public:
-    std::vector<uint8_t> data;
-    bool fail = false;
-    size_t load(uint8_t *out, size_t cap) override {
-        size_t n = data.size() < cap ? data.size() : cap;
-        memcpy(out, data.data(), n);
-        return n;
-    }
-    bool save(const uint8_t *in, size_t n) override {
-        if (fail) {
-            return false;
-        }
-        data.assign(in, in + n);
-        return true;
-    }
-    bool erase() override {
-        data.clear();
-        return true;
-    }
-};
 void test_settings_default_persist_failure_and_corruption_fail_closed() {
-    Store store;
+    fakes::MemoryStore store;
     Settings s(store);
     TEST_ASSERT_TRUE(s.begin());
     TEST_ASSERT_TRUE(s.enabled());
@@ -102,10 +83,10 @@ void test_settings_default_persist_failure_and_corruption_fail_closed() {
     Settings reboot(store);
     TEST_ASSERT_TRUE(reboot.begin());
     TEST_ASSERT_FALSE(reboot.enabled());
-    store.fail = true;
+    store.failSave = true;
     TEST_ASSERT_FALSE(reboot.setEnabled(true));
     TEST_ASSERT_FALSE(reboot.enabled());
-    store.data[6] ^= 1;
+    store.bytes[6] ^= 1;
     Settings damaged(store);
     TEST_ASSERT_FALSE(damaged.begin());
     TEST_ASSERT_FALSE(damaged.enabled());

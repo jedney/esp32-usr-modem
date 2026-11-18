@@ -91,8 +91,7 @@ void test_psram_log_capacity_and_wrap() {
 }
 void test_atomic_history_files_reload_and_capacity() {
     TEST_ASSERT_TRUE(LittleFS.begin(false));
-    hw::FileStore store("/v010-test-history.bin", "/v010-test-history.tmp",
-                        "/v010-test-history.bak");
+    hw::FileStore store("/test-history.bin", "/test-history.tmp", "/test-history.bak");
     TEST_ASSERT_TRUE(store.erase());
     auto *history = new config::History(store);
     TEST_ASSERT_TRUE(history->begin());
@@ -109,7 +108,7 @@ void test_atomic_history_files_reload_and_capacity() {
     TEST_ASSERT_EQUAL(2, history->at(0).duration);
     TEST_ASSERT_EQUAL(51, history->at(49).duration);
     delete history;
-    File damaged = LittleFS.open("/v010-test-history.bin", "w");
+    File damaged = LittleFS.open("/test-history.bin", "w");
     TEST_ASSERT_TRUE(bool(damaged));
     damaged.print("broken");
     damaged.close();
@@ -118,6 +117,13 @@ void test_atomic_history_files_reload_and_capacity() {
     TEST_ASSERT_EQUAL(50, history->at(49).duration);
     delete history;
     TEST_ASSERT_TRUE(store.erase());
+}
+// AT*FACTORY must finish without a file system: an unmounted store has nothing to erase.
+void test_file_store_erase_without_file_system_succeeds() {
+    hw::FileStore store("/test-history.bin", "/test-history.tmp", "/test-history.bak");
+    LittleFS.end();
+    TEST_ASSERT_TRUE(store.erase());
+    TEST_ASSERT_TRUE(LittleFS.begin(false));
 }
 void test_numeric_dns_probe_and_cancel_without_network_peer() {
     hw::NetProbe probe;
@@ -151,6 +157,7 @@ void setup() {
     RUN_TEST(test_idle_menu_has_no_periodic_display_output);
     RUN_TEST(test_psram_log_capacity_and_wrap);
     RUN_TEST(test_atomic_history_files_reload_and_capacity);
+    RUN_TEST(test_file_store_erase_without_file_system_succeeds);
     RUN_TEST(test_numeric_dns_probe_and_cancel_without_network_peer);
     RUN_TEST(test_preview_streams_and_shuts_down_amp);
     UNITY_END();

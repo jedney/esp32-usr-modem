@@ -9,6 +9,10 @@
 #include <string>
 #include <vector>
 
+#define FAKES_STORE
+#define FAKES_SINK
+#define FAKES_RADIO
+#include "../support/fakes.h"
 #include "atcmd.h"
 #include "net_commands.h"
 #include "net_settings.h"
@@ -22,105 +26,7 @@ void tearDown() {}
 
 // --- Test rig ---------------------------------------------------------------------------
 
-class MemStore : public modemcfg::Store {
-public:
-    size_t load(uint8_t *buf, size_t cap) override {
-        size_t n = len < cap ? len : cap;
-        memcpy(buf, data, n);
-        return n;
-    }
-    bool save(const uint8_t *d, size_t n) override {
-        if (fail) {
-            return false;
-        }
-        memcpy(data, d, n);
-        len = n;
-        ++saves;
-        return true;
-    }
-    bool erase() override {
-        len = 0;
-        return true;
-    }
-    uint8_t data[1024] = {};
-    size_t len = 0;
-    int saves = 0;
-    bool fail = false;
-};
-
-class FakeRadio : public Radio {
-public:
-    void connect(const Settings &s) override {
-        last = s;
-        ++connects;
-        info.state = LinkState::kConnecting;
-        info.reason = Reason::kNone;
-    }
-    void leave() override {
-        ++leaves;
-        info.state = LinkState::kDown;
-        info.reason = Reason::kNone;
-    }
-    void off() override {
-        ++offs;
-        info.state = LinkState::kOff;
-    }
-    LinkInfo link() override { return info; }
-    bool scanStart() override {
-        ++scans;
-        scanDone = false;
-        return scanOk;
-    }
-    int scanResult(ScanEntry *out, int max) override {
-        if (!scanDone) {
-            return -1;
-        }
-        if (scanFail) {
-            return -2;
-        }
-        int n = 0;
-        for (const ScanEntry &e : found) {
-            if (n < max) {
-                out[n++] = e;
-            }
-        }
-        return n;
-    }
-    void startServices(const Settings &s) override {
-        ++services;
-        host = s.host;
-        ntp = s.ntp;
-    }
-    int64_t utcNow() override { return utc; }
-    int64_t lastSync() override { return sync; }
-    void mac(uint8_t out[6]) override {
-        const uint8_t m[6] = {0x24, 0x6F, 0x28, 0x01, 0x02, 0x03};
-        memcpy(out, m, 6);
-    }
-
-    void up(uint32_t ip = 0xC0A8012A) {  // 192.168.1.42
-        info.state = LinkState::kUp;
-        info.reason = Reason::kNone;
-        info.rssi = -54;
-        info.channel = 6;
-        info.ip = ip;
-        info.mask = 0xFFFFFF00;
-        info.gateway = 0xC0A80101;
-        info.dns = 0xC0A80101;
-    }
-    void fail(Reason r) {
-        info.state = LinkState::kDown;
-        info.reason = r;
-    }
-
-    LinkInfo info = {};
-    Settings last = {};
-    int connects = 0, leaves = 0, offs = 0, scans = 0, services = 0;
-    bool scanOk = true, scanDone = false, scanFail = false;
-    std::vector<ScanEntry> found;
-    std::string host, ntp;
-    int64_t utc = 0, sync = 0;
-};
+using FakeRadio = fakes::Radio;
 
 ScanEntry entry(const char *ssid, int rssi, unsigned ch, Security sec) {
     ScanEntry e = {};
@@ -170,9 +76,9 @@ void test_settings_round_trip() {
     snprintf(s.host, sizeof s.host, "%s", "retro");
     snprintf(s.ntp, sizeof s.ntp, "%s", "nz.pool.ntp.org");
     snprintf(s.tz, sizeof s.tz, "%s", "Europe/London");
-    MemStore st;
+    fakes::MemoryStore st;
     TEST_ASSERT_TRUE(save(st, s));
-    TEST_ASSERT_EQUAL(kBlobSize, st.len);
+    TEST_ASSERT_EQUAL(kBlobSize, st.bytes.size());
     Settings back;
     TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kSaved), static_cast<int>(load(st, &back)));
     TEST_ASSERT_EQUAL_STRING(s.ssid, back.ssid);
@@ -189,23 +95,23 @@ void test_settings_round_trip() {
 }
 
 void test_missing_or_damaged_settings_give_defaults() {
-    MemStore st;
+    fakes::MemoryStore st;
     Settings s;
     TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kEmpty), static_cast<int>(load(st, &s)));
     TEST_ASSERT_FALSE(s.hasNetwork());
 
     TEST_ASSERT_TRUE(save(st, saved("HomeNet", "password1")));
-    st.data[10] ^= 0x40;  // bad CRC
+    st.bytes[10] ^= 0x40;  // bad CRC
     TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kDamaged), static_cast<int>(load(st, &s)));
     TEST_ASSERT_FALSE(s.hasNetwork());
     TEST_ASSERT_EQUAL_STRING("", s.pass);
 
     TEST_ASSERT_TRUE(save(st, saved("HomeNet", "password1")));
-    st.len -= 1;  // wrong size
+    st.bytes.pop_back();  // wrong size
     TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kDamaged), static_cast<int>(load(st, &s)));
 
     TEST_ASSERT_TRUE(save(st, saved("HomeNet", "password1")));
-    st.data[0] = 'X';  // not ours
+    st.bytes[0] = 'X';  // not ours
     TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kDamaged), static_cast<int>(load(st, &s)));
 }
 
@@ -439,7 +345,7 @@ void test_format_local_time() {
 // --- Controller: connecting, retrying, lights -----------------------------------------------
 
 struct NetRig {
-    MemStore store;
+    fakes::MemoryStore store;
     FakeRadio radio;
     Net net{store, radio};
     explicit NetRig(const Settings *s = nullptr) {
@@ -751,11 +657,7 @@ void test_radio_goes_off_again_after_a_scan_with_wifi_off() {
 
 // --- AT* commands -----------------------------------------------------------------------
 
-class StrSink : public atcmd::Sink {
-public:
-    void write(const char *d, size_t n) override { s.append(d, n); }
-    std::string s;
-};
+using StrSink = fakes::TextSink;
 
 uint32_t gNow = 0;
 uint32_t fakeMillis() {
@@ -773,8 +675,8 @@ const atcmd::StarCommand kStar[] = {
 };
 
 struct CmdRig {
-    MemStore modemStore;
-    MemStore netStore;
+    fakes::MemoryStore modemStore;
+    fakes::MemoryStore netStore;
     FakeRadio radio;
     Net net{netStore, radio};
     atcmd::Modem modem{modemStore, kStar, sizeof kStar / sizeof kStar[0]};
@@ -791,19 +693,19 @@ struct CmdRig {
         attachCommands(net, fakeMillis);
     }
     std::string type(const char *typed) {
-        out.s.clear();
+        out.text.clear();
         for (const char *p = typed; *p != '\0'; ++p) {
             port.feed(*p);
         }
-        return out.s;
+        return out.text;
     }
     // Lets time pass: the controller and the commands' late results run.
     std::string run(uint32_t ms) {
-        out.s.clear();
+        out.text.clear();
         gNow += ms;
         net.tick(gNow);
         pollCommands();
-        return out.s;
+        return out.text;
     }
 };
 
@@ -1084,7 +986,7 @@ void test_browser_join_storage_failure_restores_previous_before_reporting_succes
     r.net.tick(1);
     r.net.guardBrowserChange(10);
     TEST_ASSERT_TRUE(r.net.join("Candidate", "password2", 10, 60000));
-    r.store.fail = true;
+    r.store.failSave = true;
     r.radio.up();
     r.net.tick(100);
     TEST_ASSERT_EQUAL(static_cast<int>(JoinResult::kFailed), static_cast<int>(r.net.joinResult()));
@@ -1132,22 +1034,22 @@ void test_password_prompt_reserves_ssid_and_releases_on_cancel_timeout_disconnec
     StrSink out;
     atcmd::Port second(r.modem, out, 38400);
     auto typeSecond = [&](const char *text) {
-        out.s.clear();
+        out.text.clear();
         while (*text)
             second.feed(*text++);
     };
     r.type("AT*WIFIJOIN=\"FirstNet\"\r");
     typeSecond("AT*WIFIJOIN=\"SecondNet\"\r");
-    CONTAINS(out.s, "ERROR");
+    CONTAINS(out.text, "ERROR");
     typeSecond("AT*WIFISCAN\r");
-    CONTAINS(out.s, "ERROR");
+    CONTAINS(out.text, "ERROR");
     r.type("password1\r");
     TEST_ASSERT_EQUAL_STRING("FirstNet", r.radio.last.ssid);
     TEST_ASSERT_EQUAL(1, r.radio.connects);
     r.type("x");
     r.type("AT*WIFIJOIN=\"Cancelled\"\r\x1b");
     typeSecond("AT*WIFIJOIN=\"SecondNet\"\r");
-    CONTAINS(out.s, "Password");
+    CONTAINS(out.text, "Password");
     second.feed(27);
     pollCommands();
     r.type("AT*WIFIJOIN=\"Timeout\"\r");
@@ -1157,7 +1059,7 @@ void test_password_prompt_reserves_ssid_and_releases_on_cancel_timeout_disconnec
     detachCommands(r.port);
     TEST_ASSERT_FALSE(r.port.busy());
     typeSecond("AT*WIFIJOIN=\"FinalNet\"\r");
-    CONTAINS(out.s, "Password");
+    CONTAINS(out.text, "Password");
     typeSecond("password2\r");
     TEST_ASSERT_EQUAL_STRING("FinalNet", r.radio.last.ssid);
 }
@@ -1182,7 +1084,7 @@ void test_all_failed_network_setters_keep_live_and_saved_state() {
         serialize(r.net.settings(), before);
         int connects = r.radio.connects, leaves = r.radio.leaves, offs = r.radio.offs,
             services = r.radio.services;
-        r.store.fail = true;
+        r.store.failSave = true;
         bool result = true;
         switch (action) {
             case 0:
@@ -1214,7 +1116,7 @@ void test_all_failed_network_setters_keep_live_and_saved_state() {
         TEST_ASSERT_EQUAL(leaves, r.radio.leaves);
         TEST_ASSERT_EQUAL(offs, r.radio.offs);
         TEST_ASSERT_EQUAL(services, r.radio.services);
-        r.store.fail = false;
+        r.store.failSave = false;
         TEST_ASSERT_TRUE(r.net.setNtp("saved.example"));
         Settings disk;
         TEST_ASSERT_EQUAL(LoadResult::kSaved, load(r.store, &disk));
@@ -1232,10 +1134,10 @@ void test_wifi_off_during_browser_join_commits_only_after_successful_save() {
     r.net.begin(0);
     r.net.guardBrowserChange(100);
     TEST_ASSERT_TRUE(r.net.join("Candidate", "password2", 100));
-    r.store.fail = true;
+    r.store.failSave = true;
     TEST_ASSERT_FALSE(r.net.setEnabled(false));
     TEST_ASSERT_EQUAL(JoinResult::kRunning, r.net.joinResult());
-    r.store.fail = false;
+    r.store.failSave = false;
     TEST_ASSERT_TRUE(r.net.setEnabled(false));
     r.net.tick(101);
     TEST_ASSERT_FALSE(r.net.settings().enabled);

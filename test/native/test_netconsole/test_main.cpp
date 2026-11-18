@@ -7,6 +7,7 @@
 #include <vector>
 
 #define FAKES_STORE
+#define FAKES_SOCKET
 #include "../support/fakes.h"
 #include "console_log.h"
 #include "net_console.h"
@@ -19,45 +20,13 @@ void tearDown() {}
 
 namespace {
 
-class FakeSocket : public calls::Socket {
+// A console client: it moves bytes only while connected, and reads everything at once.
+class FakeSocket : public fakes::Socket {
 public:
-    SocketState status = SocketState::kClosed;
-    std::string input, output;
-    size_t room = 1u << 20;  // bytes write() takes now; 0 = the client stopped reading
-    unsigned closes = 0;
-    void begin(const char *, uint16_t) override {}
-    void resolve(const char *) override {}
-    const char *address() const override { return ""; }
-    void poll() override {}
-    SocketState state() const override { return status; }
-    size_t write(const uint8_t *data, size_t n) override {
-        if (status != SocketState::kOpen) {
-            return 0;
-        }
-        n = std::min(n, room);
-        room -= n;
-        output.append(reinterpret_cast<const char *>(data), n);
-        return n;
-    }
-    size_t read(uint8_t *data, size_t cap) override {
-        if (status != SocketState::kOpen) {
-            return 0;
-        }
-        size_t n = std::min(cap, input.size());
-        memcpy(data, input.data(), n);
-        input.erase(0, n);
-        return n;
-    }
-    void close() override {
-        status = SocketState::kClosed;
-        input.clear();
-        ++closes;
-    }
-    const char *peer() const override { return "10.0.0.5"; }
-    std::string take() {
-        std::string out = output;
-        output.clear();
-        return out;
+    FakeSocket() {
+        openOnly = true;
+        chunk = kUnlimited;
+        peerAddress = "10.0.0.5";
     }
 };
 

@@ -6,6 +6,7 @@
 #define FAKES_STORE
 #define FAKES_SINK
 #define FAKES_SOUND
+#define FAKES_RADIO
 #include "../support/fakes.h"
 #include "input_buffer.h"
 #include "internet.h"
@@ -360,20 +361,7 @@ void test_binary_call_suppresses_echo_escape_and_software_flow() {
     session.hangUp();
     TEST_ASSERT_FALSE(slot.busy());
 }
-class Radio : public netcfg::Radio {
-public:
-    netcfg::LinkInfo info{};
-    void connect(const netcfg::Settings &) override {}
-    void leave() override {}
-    void off() override {}
-    netcfg::LinkInfo link() override { return info; }
-    bool scanStart() override { return false; }
-    int scanResult(netcfg::ScanEntry *, int) override { return -2; }
-    void startServices(const netcfg::Settings &) override {}
-    int64_t utcNow() override { return 0; }
-    int64_t lastSync() override { return 0; }
-    void mac(uint8_t out[6]) override { memset(out, 0, 6); }
-};
+using Radio = fakes::Radio;
 using Sound = fakes::RecordingSound;
 class Fallback : public hostport::Session::Dialer {
 public:

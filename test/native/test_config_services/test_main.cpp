@@ -6,6 +6,8 @@
 #define FAKES_STORE
 #define FAKES_SINK
 #define FAKES_SOUND
+#define FAKES_RADIO
+#define FAKES_SOCKET
 #include "../support/fakes.h"
 #include "../support/ssh_fakes.h"
 #include "call_journal.h"
@@ -18,26 +20,7 @@ void setUp() {}
 void tearDown() {}
 using Store = fakes::MemoryStore;
 using Sink = fakes::TextSink;
-class Radio : public netcfg::Radio {
-public:
-    bool up = false;  // a join succeeds at once
-    void connect(const netcfg::Settings &) override {}
-    void leave() override {}
-    void off() override {}
-    netcfg::LinkInfo link() override {
-        netcfg::LinkInfo info = {};
-        if (up) {
-            info.state = netcfg::LinkState::kUp;
-        }
-        return info;
-    }
-    bool scanStart() override { return false; }
-    int scanResult(netcfg::ScanEntry *, int) override { return -2; }
-    void startServices(const netcfg::Settings &) override {}
-    int64_t utcNow() override { return 123456789; }
-    int64_t lastSync() override { return 0; }
-    void mac(uint8_t out[6]) override { memset(out, 0, 6); }
-};
+using Radio = fakes::Radio;
 class Crypto : public devicecfg::Crypto {
 public:
     uint32_t value = 0;
@@ -115,6 +98,7 @@ struct Rig {
     Commands commands{log, history, phonebook, net, device, hardware};
     devicecfg::Commands deviceCommands{device, control, nullptr, 0};
     Rig() {
+        radio.utc = 123456789;
         modem.begin();
         phonebook.begin();
         net.begin(0);
@@ -273,18 +257,7 @@ void test_journal_records_payload_and_cleanup_once_with_clock_wrap() {
     TEST_ASSERT_EQUAL(3, record.received);
     TEST_ASSERT_EQUAL(123456789, record.utc);
 }
-class Socket : public calls::Socket {
-public:
-    calls::SocketState value = calls::SocketState::kClosed;
-    void begin(const char *, uint16_t) override { value = calls::SocketState::kPending; }
-    void resolve(const char *) override { value = calls::SocketState::kResolved; }
-    const char *address() const override { return "192.0.2.1"; }
-    void poll() override {}
-    calls::SocketState state() const override { return value; }
-    size_t write(const uint8_t *, size_t) override { return 0; }
-    size_t read(uint8_t *, size_t) override { return 0; }
-    void close() override {}
-};
+using Socket = fakes::Socket;
 using Sound = fakes::RecordingSound;
 void test_reserved_dial_is_offline_local_and_can_escape_ato_hangup() {
     Rig r;
@@ -429,12 +402,12 @@ void test_outgoing_history_failure_and_same_burst_redial_are_recorded_once() {
     outgoing.setObserver(&journal);
     r.run("M0");
     TEST_ASSERT_TRUE(outgoing.start(r.session, "bbs.example.com", false));
-    socket.value = calls::SocketState::kRefused;
+    socket.status = calls::SocketState::kRefused;
     outgoing.poll();
     TEST_ASSERT_EQUAL(1, r.history.size());
     TEST_ASSERT_EQUAL(static_cast<unsigned>(atcmd::Result::kBusy), r.history.at(0).result);
     TEST_ASSERT_TRUE(outgoing.start(r.session, "bbs.example.com", false));
-    socket.value = calls::SocketState::kOpen;
+    socket.status = calls::SocketState::kOpen;
     outgoing.poll();
     TEST_ASSERT_TRUE(r.session.callUp());
     r.session.hangUp();
@@ -714,7 +687,7 @@ void test_no_output_contains_either_password_or_its_stored_forms() {
     const char wifiCanary[] = "CanaryWiFi7Q";
     const char deviceCanary[] = "CanaryDev3Z9";
     Rig r;
-    r.radio.up = true;
+    r.radio.connectsAtOnce = true;
     TEST_ASSERT_TRUE(r.net.join("CanaryNet", wifiCanary, 0));
     r.net.tick(10);
     TEST_ASSERT_EQUAL(int(netcfg::JoinResult::kJoined), int(r.net.joinResult()));

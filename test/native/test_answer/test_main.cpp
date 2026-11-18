@@ -5,6 +5,8 @@
 #include <vector>
 #define FAKES_STORE
 #define FAKES_SOUND
+#define FAKES_SINK
+#define FAKES_SOCKET
 #include "../support/fakes.h"
 #include "incoming.h"
 
@@ -23,50 +25,8 @@ void setUp() {
 }
 void tearDown() {}
 using Memory = fakes::MemoryStore;
-class Output : public atcmd::Sink {
-public:
-    std::string text;
-    std::string unsolicited;  // what came through writeUnsolicited()
-    bool full = false;        // a port nobody reads: unsolicited output is dropped
-    void write(const char *s, size_t n) override { text.append(s, n); }
-    void writeUnsolicited(const char *s, size_t n) override {
-        if (!full) {
-            unsolicited.append(s, n);
-            text.append(s, n);
-        }
-    }
-    std::string take() {
-        std::string result = text;
-        text.clear();
-        return result;
-    }
-};
-class FakeSocket : public Socket {
-public:
-    SocketState status = SocketState::kClosed;
-    std::string input, output;
-    size_t chunk = 256;
-    void begin(const char *, uint16_t) override {}
-    void resolve(const char *) override {}
-    const char *address() const override { return ""; }
-    void poll() override {}
-    SocketState state() const override { return status; }
-    size_t write(const uint8_t *data, size_t n) override {
-        n = std::min(n, chunk);
-        output.append(reinterpret_cast<const char *>(data), n);
-        return n;
-    }
-    size_t read(uint8_t *data, size_t cap) override {
-        size_t n = std::min(std::min(cap, chunk), input.size());
-        memcpy(data, input.data(), n);
-        input.erase(0, n);
-        return n;
-    }
-    void close() override {
-        status = SocketState::kClosed;
-        input.clear();
-    }
-};
+using Output = fakes::TextSink;
+using FakeSocket = fakes::Socket;
 class FakeListener : public Listener {
 public:
     FakeSocket &socket;

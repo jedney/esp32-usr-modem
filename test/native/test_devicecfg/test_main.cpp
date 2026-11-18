@@ -5,55 +5,22 @@
 #include <string>
 #include <vector>
 
+#define FAKES_STORE
+#define FAKES_SINK
+#include "../support/fakes.h"
 #include "device_commands.h"
 
 using namespace devicecfg;
 void setUp() {}
 void tearDown() {}
 
-class Memory : public modemcfg::Store {
-public:
-    std::vector<uint8_t> bytes;
-    bool failSave = false;
-    bool failLoad = false;
-    bool failErase = false;
-    bool noFilesystem = false;  // FileStore::erase(): not mounted means nothing to erase
-    unsigned saves = 0;
-    size_t load(uint8_t *out, size_t cap) override {
-        if (failLoad)
-            return modemcfg::kLoadError;
-        size_t n = bytes.size() < cap ? bytes.size() : cap;
-        if (n != 0) {
-            memcpy(out, bytes.data(), n);
-        }
-        return n;
+// Seals an edited device record again, so a test can show what the CRC alone does not catch.
+void fixCrc(fakes::MemoryStore &store) {
+    uint32_t crc = modemcfg::crc32(store.bytes.data(), kBlobSize - 4);
+    for (size_t i = 0; i < 4; ++i) {
+        store.bytes[kBlobSize - 4 + i] = static_cast<uint8_t>(crc >> (8 * i));
     }
-    bool save(const uint8_t *data, size_t n) override {
-        if (failSave) {
-            return false;
-        }
-        bytes.assign(data, data + n);
-        ++saves;
-        return true;
-    }
-    bool erase() override {
-        if (failErase && !noFilesystem) {
-            return false;
-        }
-        bytes.clear();
-        return true;
-    }
-    bool contains(const char *text) const {
-        std::string data(bytes.begin(), bytes.end());
-        return data.find(text) != std::string::npos;
-    }
-    void fixCrc() {
-        uint32_t crc = modemcfg::crc32(bytes.data(), kBlobSize - 4);
-        for (size_t i = 0; i < 4; ++i) {
-            bytes[kBlobSize - 4 + i] = static_cast<uint8_t>(crc >> (8 * i));
-        }
-    }
-};
+}
 
 // A deliberately fake, deterministic hash; the real SHA-256 vector is checked on-board.
 class FakeCrypto : public Crypto {
@@ -87,15 +54,11 @@ public:
     bool wifiUp() override { return connected; }
     void restart() override { reboot = true; }
 };
-class Output : public atcmd::Sink {
-public:
-    std::string text;
-    void write(const char *data, size_t n) override { text.append(data, n); }
-};
+using Output = fakes::TextSink;
 
 const atcmd::StarCommand table[] = {DEVICECFG_STAR_COMMANDS};
 struct Rig {
-    Memory auth, modemStore, netStore, bookStore;
+    fakes::MemoryStore auth, modemStore, netStore, bookStore;
     FakeCrypto crypto;
     Device device;
     FakeControl control;
@@ -129,7 +92,7 @@ bool has(const std::string &text, const char *part) {
 }
 
 void test_first_boot_is_random_twelve_and_saved_for_display() {
-    Memory store;
+    fakes::MemoryStore store;
     FakeCrypto crypto;
     Device device(store, crypto);
     TEST_ASSERT_TRUE(device.begin());
@@ -214,7 +177,7 @@ void test_failed_changes_keep_previous_credentials() {
 }
 
 void test_failed_initial_save_never_enables_unauthenticated_ota() {
-    Memory store;
+    fakes::MemoryStore store;
     store.failSave = true;
     FakeCrypto crypto;
     Device device(store, crypto);
@@ -253,7 +216,7 @@ void test_valid_crc_cannot_hide_invalid_hash_or_missing_terminator() {
     for (size_t index : {size_t(39), size_t(40), size_t(103), size_t(104)}) {
         r.auth.bytes = original;
         r.auth.bytes[index] = 0xFF;
-        r.auth.fixCrc();
+        fixCrc(r.auth);
         Device again(r.auth, r.crypto);
         TEST_ASSERT_FALSE(again.begin());
     }
@@ -270,7 +233,7 @@ void test_record_holds_the_sha256_hash() {
     TEST_ASSERT_EQUAL_MEMORY(r.device.otaHash(), r.auth.bytes.data() + 40, 65);
     // A short OTA hash (32 characters) is refused, even with a valid CRC.
     r.auth.bytes[72] = 0;
-    r.auth.fixCrc();
+    fixCrc(r.auth);
     Device shortOta(r.auth, r.crypto);
     TEST_ASSERT_FALSE(shortOta.begin());
 }
@@ -493,16 +456,6 @@ void test_factory_last_erase_failure_keeps_recovery_marker() {
     TEST_ASSERT_TRUE(again.factoryReset(r.stores, 3));
 }
 
-void test_factory_completes_when_a_store_has_no_filesystem() {
-    Rig r;
-    r.bookStore.failErase = true;     // would stop the reset ...
-    r.bookStore.noFilesystem = true;  // ... but "not mounted" counts as erased
-    TEST_ASSERT_TRUE(r.device.factoryReset(r.stores, 3));
-    Device again(r.auth, r.crypto);
-    TEST_ASSERT_TRUE(again.begin());
-    TEST_ASSERT_FALSE(again.needsReset());
-}
-
 void test_modem_factory_templates_and_reset_keep_device_credentials() {
     Rig r;
     auto saved = r.auth.bytes;
@@ -555,7 +508,7 @@ void test_browser_password_generation_discloses_once_to_requesting_port() {
 }
 
 void test_unreadable_device_record_never_generates_replacement_credentials() {
-    Memory memory;
+    fakes::MemoryStore memory;
     FakeCrypto crypto;
     Device first(memory, crypto);
     TEST_ASSERT_TRUE(first.begin());
@@ -601,7 +554,6 @@ int main() {
     RUN_TEST(test_factory_interruption_is_retried_after_restart);
     RUN_TEST(test_factory_marker_failure_does_not_erase_anything);
     RUN_TEST(test_factory_last_erase_failure_keeps_recovery_marker);
-    RUN_TEST(test_factory_completes_when_a_store_has_no_filesystem);
     RUN_TEST(test_modem_factory_templates_and_reset_keep_device_credentials);
     RUN_TEST(test_help_includes_every_device_command_without_credentials);
     return UNITY_END();

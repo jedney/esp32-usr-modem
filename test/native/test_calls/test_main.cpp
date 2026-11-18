@@ -6,6 +6,8 @@
 #include <vector>
 #define FAKES_STORE
 #define FAKES_SOUND
+#define FAKES_SINK
+#define FAKES_SOCKET
 #include "../support/fakes.h"
 #include "../support/ssh_fakes.h"
 #include "outgoing.h"
@@ -27,57 +29,8 @@ void setUp() {
 void tearDown() {}
 
 using Memory = fakes::MemoryStore;
-class Output : public atcmd::Sink {
-public:
-    std::string text;
-    void write(const char *s, size_t n) override { text.append(s, n); }
-    std::string take() {
-        std::string result = text;
-        text.clear();
-        return result;
-    }
-};
-class FakeSocket : public Socket {
-public:
-    SocketState status = SocketState::kClosed, initial = SocketState::kPending;
-    std::string host;
-    uint16_t port = 0;
-    unsigned begins = 0;
-    std::vector<uint8_t> input, output;
-    size_t chunk = 256;
-    bool stuck = false;  // the network takes no output at all
-    void begin(const char *h, uint16_t p) override {
-        host = h;
-        port = p;
-        ++begins;
-        status = initial;
-    }
-    SocketState lookupResult = SocketState::kResolved;
-    std::string looked, resolvedAddress = "203.0.113.47";
-    unsigned resolves = 0;
-    void resolve(const char *h) override {
-        looked = h;
-        ++resolves;
-        status = lookupResult;
-    }
-    const char *address() const override { return resolvedAddress.c_str(); }
-    void poll() override {}
-    SocketState state() const override { return status; }
-    size_t write(const uint8_t *data, size_t n) override {
-        n = stuck ? 0 : std::min(n, chunk);
-        output.insert(output.end(), data, data + n);
-        return n;
-    }
-    size_t read(uint8_t *data, size_t cap) override {
-        size_t n = std::min(std::min(cap, chunk), input.size());
-        if (n) {
-            memcpy(data, input.data(), n);
-            input.erase(input.begin(), input.begin() + n);
-        }
-        return n;
-    }
-    void close() override { status = SocketState::kClosed; }
-};
+using Output = fakes::TextSink;
+using FakeSocket = fakes::Socket;
 using FakeSound = fakes::RecordingSound;
 const atcmd::StarCommand commands[] = {
     {"MODEL", "AT*MODEL", "model", atcmd::cmdModel, false},
@@ -342,7 +295,7 @@ void test_telnet_mixed_storm_is_bounded_and_two_ends_settle() {
 void test_telnet_full_send_queue_stops_reading_the_socket() {
     FakeSocket socket;
     socket.status = SocketState::kOpen;
-    socket.stuck = true;
+    socket.room = 0;
     TcpConnection conn(socket);
     conn.begin(Mode::Telnet);
     // DO 99 then DONT 99 over and over: each pair makes a reply, so the queue fills.
@@ -358,7 +311,7 @@ void test_telnet_full_send_queue_stops_reading_the_socket() {
     TEST_ASSERT_TRUE(socket.input.size() < total);  // but it did read while there was room
     TEST_ASSERT_EQUAL(0, conn.space());             // the queue is full
     // Once the network takes output again, reading resumes and the input drains.
-    socket.stuck = false;
+    socket.room = FakeSocket::kUnlimited;
     for (unsigned i = 0; i < 100000 && !socket.input.empty(); ++i) {
         conn.poll(i);
     }
@@ -401,7 +354,7 @@ void test_naws_uses_live_session_size_during_dial_handshake() {
     r.sound.active = false;
     r.poll();
     r.socket.status = SocketState::kOpen;
-    r.socket.input = {255, 253, 31};
+    r.socket.input = "\xff\xfd\x1f";  // IAC DO NAWS
     r.poll();
     r.socket.output.clear();
     r.poll();
@@ -446,11 +399,11 @@ void test_tcp_raw_all_bytes_and_partial_socket_writes() {
         bytes.push_back(i & 255);
     }
     TEST_ASSERT_EQUAL(bytes.size(), conn.write(bytes.data(), bytes.size()));
-    socket.input = bytes;
+    socket.input.assign(bytes.begin(), bytes.end());
     for (unsigned i = 0; i < 5000; ++i) {
         conn.poll(i);
     }
-    TEST_ASSERT_TRUE(bytes == socket.output);
+    TEST_ASSERT_TRUE(std::string(bytes.begin(), bytes.end()) == socket.output);
     std::vector<uint8_t> received(4096);
     TEST_ASSERT_EQUAL(4096, conn.read(received.data(), received.size()));
     TEST_ASSERT_TRUE(bytes == received);
@@ -1128,7 +1081,8 @@ void test_sound_that_breaks_while_playing_ends_the_call() {
 void exchange(Rig &r, sshfake::FakeServer &server, int rounds = 40) {
     for (int i = 0; i < rounds; ++i) {
         if (!r.socket.output.empty()) {
-            server.feed(r.socket.output.data(), r.socket.output.size());
+            server.feed(reinterpret_cast<const uint8_t *>(r.socket.output.data()),
+                        r.socket.output.size());
             r.socket.output.clear();
         }
         r.socket.input.insert(r.socket.input.end(), server.out.begin(), server.out.end());
@@ -1272,7 +1226,7 @@ void test_direct_dial_to_port_22_falls_back_to_telnet() {
         r.call.setObserver(&observer);
         r.send("ATDT10.0.0.15:22\r");
         r.socket.status = SocketState::kOpen;
-        r.socket.input = {255, 253, 31};  // IAC DO NAWS
+        r.socket.input = "\xff\xfd\x1f";  // IAC DO NAWS
         r.poll();
         TEST_ASSERT_TRUE(r.session.callUp());
         TEST_ASSERT_EQUAL(Kind::Telnet, observer.kind);
