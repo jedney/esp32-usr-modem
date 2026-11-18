@@ -219,11 +219,7 @@ The device password (user `admin`) protects the web interface, the network conso
 
 ### Configuration screen and terminal
 
-The shared top-level order is Status, Phone Book, Call History, Settings and Help (A-E in AT*CONFIG). Settings contains General Settings, Sounds, Wi-Fi, Clock, Updates, Reset and Export Configuration. Help contains About, GitHub, Command Reference and Diagnostics. Diagnostics retains its log and reset-information tools plus Hardware Tests and serial-only Client Tests; the browser omits Client Tests. Nested groups have Back controls in the browser and X/Esc in the terminal.
-
-A fresh browser terminal feeds `AT` followed by CR through the real modem parser, showing `AT` and `OK` with the default settings and no session banner; configured echo, quiet and result formats still apply. The browser title is "Web Terminal - {model name}" and follows the selected model.
-
-The browser automatically requests one authenticated AT terminal on page open, respecting existing modem reservations and browser ownership. Terminal loss shows a centred reconnect overlay; click the terminal or select a menu item to request access again. Close the tab to release the terminal. Keyboard and menu commands use that terminal's bytes. A connected browser call warns after four minutes without user activity and hangs up and closes the terminal after five; activity cancels the warning and incoming BBS data does not count. This page policy adds no AT command and never applies to serial calls. Help > Diagnostics > Recent console history reads the newest 16 KB of maintenance-console output (1 KB fallback without PSRAM), including device-password lines if still present. No AT command is added. See [the web protocol](../web/PROTOCOL.md#idle-guard-and-notifications) for the owner-only hang-up control and event toasts.
+The menus, keys and dialogs of the configuration screen and the browser menu bar are described in [ui/DESIGN_SPEC.md](../ui/DESIGN_SPEC.md). The browser terminal (automatic access, reconnecting, the idle guard for browser calls, recent console history) is described in [the web protocol](../web/PROTOCOL.md). None of these adds an AT command.
 
 | Command | What it does |
 |---|---|

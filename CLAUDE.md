@@ -7,8 +7,9 @@ ESP32-S3 Wi-Fi "modem" in a 3D-printed US Robotics Sportster replica, with a DB2
 - **`docs/project-brief.md`**: the firmware spec: what the firmware does and the hardware it drives (pin map, interfaces). Keep it current with the code: change it in the same branch as the behaviour.
 - **`docs/decisions-log.md`**: the current decisions, one row each. Append every new decision or spec change made while coding here (date, what, why); replace a row when a decision changes rather than keeping the old one.
 - `docs/COMMANDS.md`: the complete command reference. Update it with every command or option change, together with `AT*HELP` and the README.
-- `test/README.md`: feature-to-test matrix. `web/PROTOCOL.md`: web page ↔ firmware protocol. `ui/DESIGN_SPEC.md`: the configuration screen design.
+- `test/README.md`: feature-to-test matrix. `web/PROTOCOL.md`: the web page (layout, terminal access, idle guard) and its protocol with the firmware. `ui/DESIGN_SPEC.md`: the menus and dialogs of the configuration screen and the browser menu bar.
 - `CREDITS.md`: licensing record. Update it whenever third-party code, a library or a sound file is added or removed (`python scripts/generate_credits.py` rebuilds the About screen's list).
+- **Each fact has one home.** Write the details in the document that owns them (above) and link to it from the others; the spec and the decisions log summarise in a sentence. Copied paragraphs drift apart.
 
 ## Rules
 
@@ -53,7 +54,7 @@ PlatformIO's `pio` is on the PATH inside VS Code tasks and the PlatformIO termin
 - If an upload stalls at "Connecting…": hold BOOT, tap RST, release BOOT, retry. On the S3 board use the **UART** USB-C port; the native USB port is the modem's USB port.
 - The first flash after a full erase is over USB. Wi-Fi tests that cut the connection (`AT*WIFI=OFF`, a join) need the cable, not the network console.
 - Ask the user for the COM port numbers (console = the S3's UART USB-C port; RS232 = the Unitek PL2303 adapter; the USB modem port is its own COM port) and for what is wired on the bench before testing hardware. Things a person must see or hear (sound, LEDs, cables) are for the user.
-- Setup credentials are in `.env`: `USR_MODEM_WIFI_SSID`, `USR_MODEM_WIFI_PASS` and `USR_MODEM_PASSWORD`. Use them only through the project's scripts and test fixtures (`scripts/load_env.py`, `scripts/ota_upload.py`, the e2e `conftest.py`).
+- Setup credentials are in `.env`: `USR_MODEM_WIFI_SSID`, `USR_MODEM_WIFI_PASS` and `USR_MODEM_PASSWORD`. Use them only through the project's scripts and test fixtures (`scripts/ota_upload_action.py`, `scripts/ota_upload.py`, the e2e `conftest.py`).
 
 ### Build tips
 

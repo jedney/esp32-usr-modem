@@ -12,15 +12,19 @@ The page is an adaptive **modem terminal**, minimum 80 × 25 and up to the firmw
 | Modem time (the modem's time zone) | `clock` messages, ticked by the page |
 | Page ↔ modem link (Online / Offline / Connecting) | WebSocket state |
 
-The masthead shows the full selected model name supplied by the firmware, such as "US Robotics Sportster 14.4k", and updates for every browser when the model changes, including changes from a serial port. The compact menu stays on one row, moving overflow entries into More. The terminal header holds the call indicator, remote destination, duration and call-only Hang up button; the top badge shows the page-to-modem link once. The bottom status bar holds the LEDs, one guidance message, a Wi-Fi icon and the clock. Wi-Fi arcs increase with signal strength; hovering shows the network, dBm and address. The clock shows time with the full date on hover. Narrow windows hide secondary call details and shorten guidance, retaining the Wi-Fi icon and time. Light and dark themes follow the browser preference.
+The masthead shows the full selected model name supplied by the firmware, such as "US Robotics Sportster 14.4k", and updates for every browser when the model changes, including changes from a serial port. The compact menu stays on one row, moving overflow entries into More. The terminal header holds the call indicator, remote destination, duration and call-only Hang up button; the top badge shows the page-to-modem link once. The bottom status bar holds the LEDs, one guidance message, a Wi-Fi icon and the clock. Wi-Fi arcs increase with signal strength; hovering shows the network, dBm and address. The clock shows time with the full date on hover. Narrow windows hide secondary call details and shorten guidance, retaining the Wi-Fi icon and time. Light and dark themes follow the browser preference. The masthead logo is the supplied USRobotics artwork, cropped to its lettering and registered mark, dark red (#8B0000) on a transparent background, 29 px high (24 px on narrow screens) at its own aspect ratio; the single-file preview embeds the same PNG and follows its in-memory model selection.
 
 The rounded terminal panel has a teal title bar and a black output area, with a 4 px black inset on every side of the output at all window sizes. The terminal is aligned at the top left and uses the remaining area for cells; unused fractional-cell space stays black. Resizing measures the area inside the inset when fitting rows, columns and font size.
 
-The shared configuration terminal prints compact wrapping lists in plain text or ANSI colour, with letter selection, friendly names and current values. Menu entries and enum choices omit explanatory help; browser menu entries retain it as hover tooltips rather than a second line. Input prompts retain units and limits. No cell grid, cursor positioning or box drawing is emitted. Settings > General Settings selects the live Sportster model through `AT*MODEL=14400|28800|33600|56000`; the factory model remains 14.4k. Model selection changes identity and default CONNECT reporting, while explicit phonebook/`&N` speeds and a current call's reporting remain stable. `?demo` previews the same inventory using synthetic data and never invokes device services.
+An inert disabled "No call" button appears when there is no call. During dialling, ringing or a connected call it is replaced by a dark red "Hang up" button with a handset icon. Hang up is enabled only for this browser's call, uses the owner-only control to cancel dialling or hang up directly in command or online mode, and retains terminal ownership.
+
+Help > Diagnostics > Recent console history reads authenticated, read-only `GET /api/boot` and writes the reply into the terminal. It returns the newest 16 KB of all maintenance-console output since boot, with a 1 KB fallback if PSRAM allocation fails. Long console replies can push the banner out. Device-password lines may be included for the authenticated browser; the Wi-Fi password is never included. Each chunk is copied under the console ring lock, then sent after releasing it, stopping at the captured end of the log. The endpoint itself does not require or acquire terminal ownership; the page gates this menu action on its terminal access.
+
+The configuration list and the menu bar share one inventory and one set of command metadata, described in [ui/DESIGN_SPEC.md](../ui/DESIGN_SPEC.md). `?demo` previews the same inventory with synthetic data and never invokes device services.
 
 ## Files
 
-`web/src/` holds the page and the cropped, transparent dark red (#8B0000) `usr-logo.png` masthead artwork (29 px high, 24 px on narrow screens, preserving its aspect ratio); `web/vendor/` holds third-party files (xterm.js 6.0.0, MIT; IBM Plex Mono, OFL-1.1). `idle.js` holds the timestamp-based call idle policy and `toast.js` the reusable passive notification stack. `menubar.js` builds and validates commands, `menu-view.js` renders disclosures and dialogs, `menubar.css` defines the visual system and `command-channel.js` tracks consumed input and bounded command replies. `login.html` and `login.js` are the login page. `scripts/build_web.py` gzips all 24 assets into `data/www/` when the LittleFS image is built (`pio run -e s3 -t buildfs` or `-t uploadfs`). The firmware serves `data/www/<file>.gz` with `Content-Encoding: gzip`.
+`web/src/` holds the page and the `usr-logo.png` masthead artwork; `web/vendor/` holds third-party files (xterm.js 6.0.0, MIT; IBM Plex Mono, OFL-1.1). `idle.js` holds the timestamp-based call idle policy and `toast.js` the reusable passive notification stack. `menubar.js` builds and validates commands, `menu-view.js` renders disclosures and dialogs, `menubar.css` defines the visual system and `command-channel.js` tracks consumed input and bounded command replies. `login.html` and `login.js` are the login page. `scripts/build_web.py` gzips all 24 assets into `data/www/` when the LittleFS image is built (`pio run -e s3 -t buildfs` or `-t uploadfs`). The firmware serves `data/www/<file>.gz` with `Content-Encoding: gzip`.
 
 Assets are compressed into the existing LittleFS image, including the generated `ui-data.js` catalogue for the explicitly synthetic browser demo and `ui-commands.js` for typed command metadata. Both JavaScript catalogues are static assets behind the same login as the page. `ui-commands.js` exports the 96 menu bindings with friendly text, types, ranges, choices and raw command templates generated from `lib/config/ui-bindings.json`; it contains no live setting values or credentials. `ui/DESIGN_SPEC.md` defines the schema and unit conversion. These assets add no WebSocket messages or ownership changes.
 
@@ -38,10 +42,6 @@ Assets are compressed into the existing LittleFS image, including the generated 
 | `GET /api/session` | Session | `{"token": "<random>"}`: a single-use token for the WebSocket, valid 30 s, bound to the session |
 | `GET /ws?token=<token>` | Token | WebSocket upgrade; the socket belongs to the token's session |
 | `POST /api/update` | Session + terminal CSRF token | Firmware or LittleFS image upload (spec 3.11) |
-
-Help > Diagnostics > Recent console history reads authenticated, read-only `GET /api/boot` and writes the reply into the terminal. It returns the newest 16 KB of all maintenance-console output since boot, with a 1 KB fallback if PSRAM allocation fails. Long console replies can push the banner out. Device-password lines may be included for the authenticated browser; the Wi-Fi password is never included. Each chunk is copied under the console ring lock, then sent after releasing it, stopping at the captured end of the log. The endpoint itself does not require or acquire terminal ownership; the page gates this menu action on its terminal access.
-
-An inert disabled "No call" button appears when there is no call. During dialling, ringing or a connected call it is replaced by a dark red "Hang up" button with a handset icon. Hang up is enabled only for this browser's call, uses the owner-only control to cancel dialling or hang up directly in command or online mode, and retains terminal ownership.
 
 Every request: check the `Host` header is the modem's mDNS name or IP (blocks DNS rebinding). Login, logout and uploads also need an `Origin` of this modem. Logout needs the session's CSRF token (from `GET /api/auth`); an upload needs the CSRF token of one of the session's terminals (sent on the WebSocket).
 
@@ -78,6 +78,13 @@ Host accepts the current `<name>.local` or IPv4 address, optionally `:80`. Dupli
 | `ready` | `idle`: boolean; `rx`: unsigned 32-bit consumed browser input byte count, reset on terminal acquisition and the hang-up control; `errors`: unsigned 32-bit command-error counter for this parser | Owner only, on change, after its queued terminal output. Partial input, configuration lists, prompts, tests, calls and network operations make `idle` false. The error counter increments even when Q1 suppresses result text |
 | `pong` | None | Reply to the browser's `{"t":"ping"}` text heartbeat |
 
+Example:
+
+```json
+{"t":"call","state":"connected","mode":"telnet","dir":"out","number":"1",
+ "host":"www.amigaretro.com","ip":"170.64.142.64","port":23,"speed":33600,"since":1792745225}
+```
+
 Serial Client Tests publish call state `test`. The browser menu bar omits Client Tests. The `AT*CONFIG` text list can show their section, but selecting a test explains that it runs on serial only; execution and transfer handlers also reject browser-originated requests. Serial tests retain the shared reservation, keeping other browsers read-only. Serial protocol bytes never enter WebSocket output.
 
 The browser sends `{"t":"ping"}` every five seconds and reconnects after 15 seconds without a frame, covering half-open TCP connections after a power cycle. The watchdog pauses during its own upload; success explicitly starts a new connection and, once the modem answers again, reloads the page (new firmware may bring new web files). While the modem answers the ticket request with 503 (an update is being written) a browser asks again only every 30 seconds instead of every few seconds. A 401 means the login has ended (logout in another tab, expiry, password change or restart): the page stops reconnecting and shows the login page. Before connecting, the page reads `GET /api/auth`; it checks again at the reported deadline and whenever the tab becomes visible. The upload button stays disabled from the first press until the result, and the upload code lives in `upload_flow.js` (browser calls passed in, tested in Node). Old socket callbacks and ticket fetches cannot replace the new session. Heartbeats are handled in the transport and never enter terminal input or light RD/SD.
@@ -104,9 +111,7 @@ At expiry the owner sends the canonical control `{"t":"hangup"}`. The HTTP task 
 
 ## Menu commands and dialogs
 
-The shared top-level order is Status, Phone Book, Call History, Settings and Help (A-E in AT*CONFIG). Settings contains General Settings, Sounds, Wi-Fi, Clock, Updates, Reset and Export Configuration. Help contains About, GitHub, Command Reference and Diagnostics; the browser adds Log out as its last item. Diagnostics retains its log and reset-information tools plus Hardware Tests and serial-only Client Tests; the browser omits Client Tests. Nested groups have Back controls in the browser and X/Esc in the terminal.
-
-About shows the version, copyright, the project URL, the US Robotics acknowledgement and the third-party projects' short names and URLs; full credits and licences are in CREDITS.md. Help > GitHub opens https://github.com/jedney/esp32-usr-modem in a new browser tab; AT*GITHUB prints the same URL in the terminal.
+The menus are the configuration screen's ([ui/DESIGN_SPEC.md](../ui/DESIGN_SPEC.md#inventory-and-navigation)): the browser leaves out Client Tests and adds Log out as the last Help item. Help > About sends `AT*ABOUT`; Help > GitHub opens https://github.com/jedney/esp32-usr-modem in a new browser tab (`AT*GITHUB` prints it in the terminal).
 
 Top-level controls follow the generated `AT*CONFIG` catalogue, with serial-only Client Tests omitted. No-input actions immediately send one raw `AT*...` line with CR as binary terminal input. Forms use the same friendly labels, help, enums, units and constraints as the text menu, including seconds-to-milliseconds conversion, field variants and individual profile/register selection. Large choice lists can be filtered and time zones are grouped by region. Optional trailing fields are omitted. The advanced disclosure previews the complete command, masking device-password values. Secrets are cleared on submit, cancel, access loss and a two-minute form timeout. The Wi-Fi password is only entered at the terminal's masked prompt.
 
@@ -135,14 +140,9 @@ An admitted upload is written by a separate upload worker task, so the web serve
 
 LittleFS replaces sounds, web assets and call history together. Its raw image must be exactly 0x7E0000 bytes. It is first staged in the inactive app slot using bounded literal/blank-run records. The filesystem is unmounted only after full identity and SHA verification. Images that cannot fit the 4 MiB staging slot are rejected before the live filesystem changes. Staging replaces any old inactive firmware copy; it does not change the active app or boot selection. The final copy has no second filesystem partition for power-loss rollback. USB `uploadfs` is the recovery path; the firmware never auto-formats a damaged filesystem. Missing assets return an authenticated recovery message, while serial access remains available.
 
+## Wi-Fi changes from the page
+
 Browser joins use a 60-second candidate transaction, which continues after socket loss. DHCP/static and hostname changes use the same rollback guard. Successful connection commits automatically; failure restores the previous saved network. Serial joins keep their existing 20-second timeout. Intentional Wi-Fi OFF/forget ends browser access.
-
-Example:
-
-```json
-{"t":"call","state":"connected","mode":"telnet","dir":"out","number":"1",
- "host":"www.amigaretro.com","ip":"170.64.142.64","port":23,"speed":33600,"since":1792745225}
-```
 
 ## Demo mode
 

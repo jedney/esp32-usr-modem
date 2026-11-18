@@ -11,7 +11,7 @@ Every change that is pushed bumps `VERSION` and adds an entry here (`python scri
 
 ## [Unreleased]
 
-## [3.0] - 2026-11-13
+## [3.0] - 2026-11-18
 
 A fresh start on a new platform. Nothing from v2 is migrated: flash over USB after a full erase.
 
