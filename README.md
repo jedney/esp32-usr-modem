@@ -74,7 +74,7 @@ Use the specified ESP32 board and modules if you want the printed mounts and def
 | Data-capable USB cable for the ESP32's Console USB port | 1 | Programming and initial setup |
 | Straight-through RS232 modem cable suitable for your computer | 1 | Connects the finished modem to the computer |
 
-The [final electronics brief](electronics/USR%20Modem%20Electronics%20Final%20Brief.md) gives the complete netlist and board-header positions. A [PDF copy](electronics/USR%20Modem%20Electronics%20Final%20Brief.pdf), component datasheets and an [ESP32 pinmap](electronics/ESP32-S3-Pinmap.png) are also in [`electronics/`](electronics/). Refer to the printed GPIO labels on your own board before making connections.
+The [final electronics brief](electronics/README.md) gives the complete netlist and board-header positions. A [PDF copy](electronics/USR%20Modem%20Electronics%20Final%20Brief.pdf), component datasheets and an [ESP32 pinmap](electronics/ESP32-S3-Pinmap.png) are also in [`electronics/`](electronics/). Refer to the printed GPIO labels on your own board before making connections.
 
 ### Case, label and fasteners
 
@@ -269,7 +269,7 @@ Only one program can open a COM port at a time. Close the serial monitor before 
 
 Work with **all USB cables and power disconnected**. Solder each connection, insulate exposed joints, and check it against the tables before moving to the next group. The final build brief describes direct soldered wiring, with screw terminals at the DB9 board; removable connectors can be added if you keep the same electrical connections.
 
-GPIO numbers name the ESP32's programmable pins; they are not physical header positions. In the brief, `L1` means the first pin on the left header, counted from the antenna end with the board viewed from above. Use its [header tables](electronics/USR%20Modem%20Electronics%20Final%20Brief.md#4-esp32-s3-pinout-a1) alongside the GPIO labels.
+GPIO numbers name the ESP32's programmable pins; they are not physical header positions. In the brief, `L1` means the first pin on the left header, counted from the antenna end with the board viewed from above. Use its [header tables](electronics/README.md#4-esp32-s3-pinout-a1) alongside the GPIO labels.
 
 At a high level, the connections are:
 

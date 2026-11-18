@@ -1,6 +1,6 @@
 # USR Modem Emulator: Electronics (final build)
 
-This describes the finished, working electronics of a Wi-Fi modem built into a US Robotics Sportster 33.6 replica. It covers only what is fitted and connected.
+This describes the finished, working electronics of a Wi-Fi modem built into a US Robotics Sportster replica.
 
 ## 1. Summary
 
