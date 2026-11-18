@@ -174,7 +174,7 @@ With the speaker on (`M1` or `M2`) an outgoing call plays: dial tone (`S6`), the
 | `AT*ANSWERPORT[?]` / `=?` / `=<RS232\|USB\|CONSOLE\|AUTO>` | Which port auto-answers (`S0`). AUTO uses the first port with DTR on, in the order RS232, USB, console (the console has no DTR, so it is the fallback). Not during a call. Saved; factory AUTO |
 | `AT*BAUD[?]` / `=AUTO` / `=<rate>` | RS232 speed: AUTO detects it from each "AT"; or fixed at 300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600 or 115200. Saved; factory AUTO (starting at 38400). Setting it from the console, USB or browser is refused (`ERROR`) while a call is up on the RS232 port; change it from the RS232 port, or hang up first |
 | `AT*PHONEBOOK[?]` | List the phonebook (64 entries) |
-| `AT*PHONEBOOK=<number>,<host>,<port>,<TELNET\|RAW\|SSH>[,<speed>]` | Add or replace an entry. Number 1-11 digits (leading zeros count, special numbers refused); host up to 63 characters; port 1-65535; type TELNET, RAW or SSH ([basic, hobby use only](#ssh-basic)); speed 0 or omitted = no override ||RAW>[,<speed>]` | Add or replace an entry. Number 1-11 digits (leading zeros count, special numbers refused); host up to 63 characters; port 1-65535; speed 0 or omitted = no override |
+| `AT*PHONEBOOK=<number>,<host>,<port>,<TELNET\|RAW\|SSH>[,<speed>]` | Add or replace an entry. Number 1-11 digits (leading zeros count, special numbers refused); host up to 63 characters; port 1-65535; type TELNET, RAW or SSH ([basic, hobby use only](#ssh-basic)); speed 0 or omitted = no override |
 | `AT*PHONEDELETE=<number>` | Delete an entry |
 | `AT*BOOKCLEAR` | Empty the phonebook (used by export restore). If the stored phonebook is damaged, `AT*PHONEBOOK=` and `AT*PHONEDELETE=` give `ERROR` and change nothing; this command is the way out |
 | `AT*DIAL=<number\|host:port>` | Dial like `ATDT` on the requesting session, including the browser terminal |
@@ -228,13 +228,13 @@ The browser automatically requests one authenticated AT terminal on page open, r
 | Command | What it does |
 |---|---|
 | `AT*CONFIG` | Open the wrapping letter menu now (`ATDT123` opens it after dial sounds). Letters open items, Enter confirms text/choices, X/Esc goes back, P/R pages, Q exits at the root. Entries show friendly names, units and available current values; explanatory help is reserved for browser tooltips. A screen with no key for 5 minutes closes itself ("Screen closed after 5 minutes idle."), drops unsaved edits and frees the line. A running test or command is not cut off; the 5 minutes start again when it ends |
-| `AT*STYLE[?]` / `=<ANSI\|PLAIN\|CP437\|UTF8>` | Browser BBS encoding: CP437 (default) or UTF8; independent of the wrapping configuration list: ANSI colour or plain text, without cursor positioning. This port, this boot |
+| `AT*STYLE[?]` / `=<ANSI\|PLAIN\|CP437\|UTF8>` | `ANSI` or `PLAIN`: this port's configuration list in colour or plain text (never cursor positioning). `CP437` (default) or `UTF8`: the BBS character set, browser terminal only. This port, this boot |
 | `AT*SIZE[?]` / `=<cols>,<rows>` | Transport dimensions for this port: serial 1-132 by 1-50; browser 80-65535 by 25-65535, also sent as Telnet NAWS. Independent of menu layout; this boot |
-| `AT*STATUS` | Model, front panel, ports, call, Wi-Fi, the network console's client, and the least free stack so far of the main loop, the network (lwIP) task and the web server, in bytes (-1: task not running) |
+| `AT*STATUS` | Model, front panel, ports, call, Wi-Fi, the network console's client, and the least free stack so far of the main loop, the network (lwIP) task, the web server, the upload worker and the SSH key agreement, in bytes (-1: task not started) |
 | `AT*SETTING[?]` / `=<modem command>` | Show the profiles, or change a setting through the normal checks (`AT*SETTING=S0=2`). Exactly one setting command is accepted (`E0`, `&N8`, `S7=45`, `S7.1=1`, `&Z2=host`); anything after it, such as `E0DT555`, gives `ERROR` |
 | `AT*HELP` / `AT*?` | List project commands and hardware tests; in the browser, also explain that menus send these commands, prompts stay in the terminal, history is under Help > Diagnostics and Hang up appears during calls |
 | `AT*REFERENCE` | All AT and AT* commands |
-| `AT*ABOUT` | Version, project names and URLs; full credits/licences are in the linked GitHub repository |
+| `AT*ABOUT` | Version, copyright, the project URL, the US Robotics acknowledgement and the third-party projects with their URLs. Full credits and licences are in `CREDITS.md` |
 | `AT*GITHUB` | Print the project repository URL; Help > GitHub opens it in a new browser tab |
 | `AT*SOUNDS` | List generated tones and sound files |
 | `AT*PLAY=<name\|speed>` | Play `DIAL`, `BUSY`, `RING`, `DTMF`, `PULSE`, `SWEEP`, a line speed (handshake) or a `/sounds/...` file. Any key stops it |
@@ -302,7 +302,7 @@ On the USB console, the USB modem port and in the browser all tests run. On the 
 
 - A test that waits for a key (`AT*HWLED` patterns, `AT*HWTONE`, `AT*HWDTMF`, `AT*HWPULSE`, `AT*HWPOT`, `AT*HWLINES`, `AT*HWBRIDGE`, the `AT*HWTEST` prompts) stops by itself after **5 minutes with no key**, printing `Stopped: no key for 5 minutes`.
 - It also stops when its terminal goes away: DTR drops on the RS232 or USB port, or the browser closes or leaves. The console UART has no DTR, so only the time-out applies there.
-- During a call on another port, `AT*HWLED=CHASE`, `=WALK` and `AT*HWLED` with no argument are refused (`ERROR`, "LED patterns are not available during a call."). Lighting one LED, `ALL`, `OFF`, `NONE` and `AUTO` still work. Tones, volume and the other audio tests are refused during a call, as before.
+- During a call on another port, `AT*HWLED=CHASE`, `=WALK` and `AT*HWLED` with no argument are refused (`ERROR`, "LED patterns are not available during a call."). Lighting one LED, `ALL`, `OFF`, `NONE` and `AUTO` still work. Tones, volume and the other audio tests are refused during a call.
 - When the browser leaves, it gives back only the LEDs, amp mode and RS232 outputs it set itself. Holds made from the console, USB or RS232 stay until `AUTO`.
 
 There is no volume cap: full volume is full scale, which the 2 W speaker can take. The tests play at full scale. Call sounds (dial, ring, busy, carrier, DTMF) are 10.5 dB below it, so they are as loud as the handshake recordings.

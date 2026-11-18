@@ -12,7 +12,7 @@
 // incoming on port 23 (calls::Incoming), PPP/SLIP Internet dial-up (lib/internet) and the
 // AT*TESTCALL echo. Wi-Fi, mDNS and the NTP clock are in lib/netcfg; device credentials,
 // OTA and factory reset in lib/devicecfg. The front-panel LEDs follow spec 2.4.
-// Project commands are in lib/config (registry.cpp) with the hooks below; AT*HW... are
+// Project commands are in lib/config (registry.h) with the hooks below; AT*HW... are
 // the hardware tests (hwconsole.cpp), run on the port they were typed on.
 #include <Arduino.h>
 #include <LittleFS.h>
@@ -1343,7 +1343,7 @@ void finishUpload() {
     }
 }
 
-// Only the browser with the configuration screen may upload, and only while no port has a
+// Only the browser that owns the terminal may upload, and only while no port has a
 // half-typed command and no Wi-Fi join or scan runs. The upload holds the call slot.
 void answerUploadRequest() {
     uint32_t uploadClient;
@@ -1380,7 +1380,7 @@ void answerUploadRequest() {
 }
 
 // The terminal belongs to its browser until that socket closes, including command mode.
-void releaseConfigBrowser() {
+void releaseTerminalOwner() {
     if (!browserClient || webServer.connected(browserClient))
         return;
     netcfg::detachCommands(browserSession->port());
@@ -1391,8 +1391,9 @@ void releaseConfigBrowser() {
     browserClient = 0;
 }
 
-// A status tab claims nothing; opening the terminal is a separate control message.
-void serveReadOnlyBrowser(uint32_t id, bool fresh) {
+// A browser that does not own the terminal only watches the status. Its {"t":"open"}
+// request gets it the terminal while no other browser, call, menu or test holds the modem.
+void serveObserver(uint32_t id, bool fresh) {
     if (fresh)
         browserWaiting(id);
     if (!webServer.takeOpen(id))
@@ -1424,7 +1425,8 @@ void runBrowserDeparture() {
     devicecfg::wipe(departure, sizeof departure);
 }
 
-void serveConfigBrowser(uint32_t id) {
+// The terminal owner's hang-up control, size reports, input and output.
+void serveTerminalOwner(uint32_t id) {
     uint32_t now = millis();
     if (webServer.takeHangup(id)) {
         webServer.discardInput(id);
@@ -1485,7 +1487,7 @@ void pollBrowser() {
     if (webServer.uploading()) {
         return;
     }
-    releaseConfigBrowser();
+    releaseTerminalOwner();
     static uint32_t seen[hw::WebService::kClients] = {};
     for (unsigned i = 0; i < hw::WebService::kClients; ++i) {
         uint32_t id = webServer.clientId(i);
@@ -1495,9 +1497,9 @@ void pollBrowser() {
             continue;
         }
         if (id == browserClient) {
-            serveConfigBrowser(id);
+            serveTerminalOwner(id);
         } else {
-            serveReadOnlyBrowser(id, fresh);
+            serveObserver(id, fresh);
         }
     }
     publishWebStatus();
@@ -1597,10 +1599,10 @@ void waitForNetwork() {
 void setup() {
     (void)imageMarker[0];  // retain project identity in the linked application image
     // Console replies go into the UART driver's buffer and out at 115200 while the loop
-    // runs on, instead of holding it (AT*REFERENCE, 5.5 KB, used to hold it for 0.5 s). The
-    // largest reply, AT*ABOUT, is 9.4 KB. Only more output than this at once (several long
-    // replies back to back) waits for the cable, for the rest. The UART interrupt empties
-    // it, so output still gets out if the loop hangs. Internal RAM (UART driver).
+    // runs on, instead of holding it: a long reply such as AT*REFERENCE fits at once. Only
+    // more output than the buffer holds at once (several long replies back to back) waits
+    // for the cable, for the rest. The UART interrupt empties it, so output still gets out
+    // if the loop hangs. Internal RAM (UART driver).
     Serial.setTxBufferSize(kConsoleTxBuffer);
     Serial.begin(kConsoleBaud);
     consoleout::begin();  // before anything is printed: the network console replays it
@@ -1610,7 +1612,8 @@ void setup() {
     }
     // No ESP-IDF driver messages on the console. A long stream on the RS232 port in
     // command mode overflows the speed capture, and the RMT driver would print an error
-    // from its interrupt for every chunk it drops (switchable with AT*LOG).
+    // from its interrupt for every chunk it drops. To debug a framework component, enable
+    // its tag at ESP_LOG_WARN in a throwaway build.
     esp_log_level_set("*", ESP_LOG_NONE);
     delay(500);
     LittleFS.begin(false);  // mount before recovering a reset which erases history
@@ -1725,7 +1728,7 @@ void loop() {
     // Departures are dispatched after Session has closed the local service. No
     // listener poll occurs between releasing its slot and starting the action.
     char departure[atcmd::kLineMax + 1];
-    for (unsigned i = 0; i < kSerialPorts; ++i) {  // console, RS232, USB, as before
+    for (unsigned i = 0; i < kSerialPorts; ++i) {  // console, RS232, USB, as above
         if (serialMenu(i)->takeDeparture(departure, sizeof departure)) {
             serialSession(i).port().execute(departure);
         }

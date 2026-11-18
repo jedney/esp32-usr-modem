@@ -120,7 +120,7 @@ public:
             {"DIAL", "AT*DIAL=<number|host:port>", "dial using shared call engine", registryDIAL,
              false},
             {"REFERENCE", "AT*REFERENCE", "AT and AT* reference", registryREFERENCE, false},
-            {"ABOUT", "AT*ABOUT", "version, project names and URLs; full credits on GitHub",
+            {"ABOUT", "AT*ABOUT", "version, copyright, third-party projects and URLs",
              registryABOUT, false},
             {"GITHUB", "AT*GITHUB", "project repository URL", registryGITHUB, false},
             {"SOUNDS", "AT*SOUNDS", "list generated tones and WAVs", registrySOUNDS, false},

@@ -52,10 +52,8 @@ public:
             snprintf(out + word * 8, 9, "%08x", unsigned(h));
         }
     }
-    bool hashes(const char *password, char a[devicecfg::kOtaHashLength + 1],
-                char b[devicecfg::kDigestHashLength + 1]) override {
-        hex(1, password, a, devicecfg::kOtaHashLength);
-        hex(2, password, b, devicecfg::kDigestHashLength);
+    bool hash(const char *password, char ota[devicecfg::kOtaHashLength + 1]) override {
+        hex(1, password, ota, devicecfg::kOtaHashLength);
         return true;
     }
 };
@@ -134,7 +132,7 @@ struct Rig {
         return sink.text;
     }
 };
-void test_about_is_compact_names_and_urls_and_ends_at_project_repository() {
+void test_about_is_compact_names_and_urls() {
     Rig r;
     const auto text = r.run("*ABOUT");
     TEST_ASSERT_LESS_THAN(3500, text.size());
@@ -592,12 +590,12 @@ void test_store_write_failures_are_reported_and_change_nothing() {
 
     // A password change that cannot be stored is refused and the old password still works.
     r.auth.failSave = true;
-    const std::string digest = r.device.digestHash();
+    const std::string hash = r.device.otaHash();
     TEST_ASSERT_FALSE(r.device.change("NewPassword99"));
-    TEST_ASSERT_EQUAL_STRING(digest.c_str(), r.device.digestHash());
+    TEST_ASSERT_EQUAL_STRING(hash.c_str(), r.device.otaHash());
     r.auth.failSave = false;
     TEST_ASSERT_TRUE(r.device.change("NewPassword99"));
-    TEST_ASSERT_NOT_EQUAL(0, strcmp(digest.c_str(), r.device.digestHash()));
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(hash.c_str(), r.device.otaHash()));
 }
 
 // A join, a scan or an address change would drop the call, so each is refused.
@@ -725,12 +723,9 @@ void test_no_output_contains_either_password_or_its_stored_forms() {
     r.run("*LOG=2");
     r.run("*PHONEBOOK=42,bbs.example.com,2323,RAW,28800");
     // Everything that must stay out of every output.
-    std::vector<std::string> secrets = {wifiCanary, deviceCanary, r.device.otaHash(),
-                                        r.device.digestHash()};
+    std::vector<std::string> secrets = {wifiCanary, deviceCanary, r.device.otaHash()};
     TEST_ASSERT_EQUAL(64, strlen(r.device.otaHash()));
-    TEST_ASSERT_EQUAL(32, strlen(r.device.digestHash()));
-    TEST_ASSERT_NOT_EQUAL(0, strcmp(r.device.otaHash(), r.device.digestHash()));
-    const std::string ota = r.device.otaHash(), digest = r.device.digestHash();
+    const std::string ota = r.device.otaHash();
 
     // Commands that would destroy the canaries, restart, or take over the port. They are
     // skipped by name; their other argument forms are not (AT*PASS? and the like).
@@ -784,7 +779,6 @@ void test_no_output_contains_either_password_or_its_stored_forms() {
     // The sweep itself must not have changed the secrets it is looking for.
     TEST_ASSERT_EQUAL_STRING(wifiCanary, r.net.settings().pass);
     TEST_ASSERT_EQUAL_STRING(ota.c_str(), r.device.otaHash());
-    TEST_ASSERT_EQUAL_STRING(digest.c_str(), r.device.digestHash());
 
     Services services(r.phonebook);
     services.commands = &r.commands;
@@ -833,7 +827,7 @@ void test_letter_profile_editor_dispatches_real_setting_commands() {
 }
 int main() {
     UNITY_BEGIN();
-    RUN_TEST(test_about_is_compact_names_and_urls_and_ends_at_project_repository);
+    RUN_TEST(test_about_is_compact_names_and_urls);
     RUN_TEST(test_letter_profile_editor_dispatches_real_setting_commands);
     RUN_TEST(test_menu_export_retains_complete_replayable_lines_across_pages);
     RUN_TEST(test_export_replays_nondefault_profiles_and_phonebook_without_secrets);

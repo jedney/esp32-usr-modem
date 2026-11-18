@@ -15,14 +15,12 @@ bool cryptoReady = false;
 void setUp() {}
 void tearDown() {}
 
-void test_real_hashes_match_ota_and_fixed_digest_realm() {
-    char ota[devicecfg::kOtaHashLength + 1] = {}, digest[devicecfg::kDigestHashLength + 1] = {};
-    TEST_ASSERT_TRUE(crypto.hashes("password", ota, digest));
-    // SHA-256("password"): the OTA and login hash. MD5("admin:usr-modem:password"): the HA1 the
-    // record keeps.
+void test_real_hash_is_sha256() {
+    char ota[devicecfg::kOtaHashLength + 1] = {};
+    TEST_ASSERT_TRUE(crypto.hash("password", ota));
+    // SHA-256("password"): the OTA and login hash.
     TEST_ASSERT_EQUAL_STRING("5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8",
                              ota);
-    TEST_ASSERT_EQUAL_STRING("3ba84c8c9a93845740a46d37bf97bd5d", digest);
 }
 
 void test_random_words_are_distinct_and_never_the_rejection_value() {
@@ -153,7 +151,7 @@ void setup() {
     delay(2000);
     UNITY_BEGIN();
     RUN_TEST(test_oversized_nvs_is_not_missing_and_preserves_credentials);
-    RUN_TEST(test_real_hashes_match_ota_and_fixed_digest_realm);
+    RUN_TEST(test_real_hash_is_sha256);
     RUN_TEST(test_random_words_are_distinct_and_never_the_rejection_value);
     RUN_TEST(test_random_words_are_refused_until_the_boot_seed_is_drawn);
     RUN_TEST(test_random_passwords_are_distinct_and_have_the_decided_alphabet);

@@ -1,1 +1,7 @@
-{"name":"webinterface","description":"Portable HTTP authentication and browser session policy","build":{"includeDir":"src"}}
+{
+  "name": "webinterface",
+  "description": "Web interface policy: login sessions, Host, Origin and CSRF checks, upload hand-shakes, image identity and terminal UTF-8; hardware-independent (spec 3.11)",
+  "frameworks": "*",
+  "platforms": "*",
+  "dependencies": [{"name": "devicecfg"}, {"name": "modemcfg"}]
+}

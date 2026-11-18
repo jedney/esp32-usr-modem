@@ -54,7 +54,7 @@ void test_phonebook_in_scratch_nvs() {
     book = new calls::Phonebook(store);
     TEST_ASSERT_TRUE(book->begin());
     TEST_ASSERT_EQUAL_STRING("www.amigaretro.com", book->find("1")->host);
-    TEST_ASSERT_TRUE(book->find("02")->raw);
+    TEST_ASSERT_EQUAL(int(calls::Protocol::Raw), int(book->find("02")->protocol));
     TEST_ASSERT_EQUAL_UINT32(56000, book->find("02")->speed);
     TEST_ASSERT_TRUE(book->remove("02"));
     delete book;

@@ -259,10 +259,11 @@ atcmd::Reply Commands::about(atcmd::Port &p, const char *args) {
     p.line("Copyright 2026 Jon Edney.");
     p.line(kProjectUrl);
     p.line("");
-    p.line("We respectfully acknowledge US Robotics' trademarks, copyrights and other intellectual "
-           "property rights in its names, logos, designs and original materials. Those rights "
-           "remain with their respective owners. This tribute is neither affiliated with nor "
-           "authorised, sponsored or endorsed by US Robotics.");
+    p.line(
+        "We respectfully acknowledge US Robotics' trademarks, copyrights and other intellectual "
+        "property rights in its names, logos, designs and original materials. Those rights "
+        "remain with their respective owners. This tribute is neither affiliated with nor "
+        "authorised, sponsored or endorsed by US Robotics.");
     p.line("");
     p.line("3rd Party Libraries and Projects:");
     for (const char *credit : kCredits) {

@@ -2,6 +2,9 @@
 #include <cstring>
 
 namespace calls {
+static_assert(sizeof(Entry::host) == sizeof(dialstring::Result::host),
+              "a dialled host name must fit a phonebook entry");
+
 bool Outgoing::start(hostport::Session &session, const char *text, bool pulse) {
     // ATH followed by ATD can arrive in one serial burst, before poll() observes
     // the old Session closing. Finish that lifecycle before replacing its target.
@@ -20,8 +23,8 @@ bool Outgoing::start(hostport::Session &session, const char *text, bool pulse) {
         strcpy(target.host, r.host);
         target.port = r.port;
     } else {
-        return false;
-    }  // future reserved-number services are not TCP destinations
+        return false;  // special numbers (configuration screen, PPP, SLIP) are not TCP calls
+    }
     if (slot_.busy()) {
         session.port().result(atcmd::Result::kBusy);
         return true;

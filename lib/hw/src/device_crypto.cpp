@@ -4,7 +4,6 @@
 #include <esp_random.h>
 #include <psa/crypto.h>
 
-#include <cstdio>
 #include <cstring>
 
 namespace hw {
@@ -88,18 +87,12 @@ bool hexHash(const char *text, char *out) {
     return ok;
 }
 static_assert(2 * PSA_HASH_LENGTH(PSA_ALG_SHA_256) == devicecfg::kOtaHashLength, "OTA hash");
-static_assert(2 * PSA_HASH_LENGTH(PSA_ALG_MD5) == devicecfg::kDigestHashLength, "Digest HA1");
 }  // namespace
 
-// The OTA hash is what ArduinoOTA's setPasswordHash() takes: SHA-256 of the password. The
-// web page's HTTP Digest HA1 is MD5 of "admin:usr-modem:password", the algorithm browsers use.
-bool EspCrypto::hashes(const char *password, char ota[devicecfg::kOtaHashLength + 1],
-                       char digest[devicecfg::kDigestHashLength + 1]) {
-    char text[sizeof "admin:usr-modem:" + devicecfg::kPasswordMax] = {};
-    snprintf(text, sizeof text, "admin:usr-modem:%s", password);
-    bool ok = hexHash<PSA_ALG_SHA_256>(password, ota) && hexHash<PSA_ALG_MD5>(text, digest);
-    devicecfg::wipe(text, sizeof text);
-    return ok;
+// What ArduinoOTA's setPasswordHash() takes, and what every login checks: SHA-256 of the
+// password.
+bool EspCrypto::hash(const char *password, char ota[devicecfg::kOtaHashLength + 1]) {
+    return hexHash<PSA_ALG_SHA_256>(password, ota);
 }
 
 }  // namespace hw

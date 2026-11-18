@@ -1,6 +1,6 @@
 {
   "name": "hw",
-  "description": "USR Modem Emulator hardware layer (LEDs, I2S audio, pot, RS232 lines). ESP32-S3 only; not built for the native unit tests.",
+  "description": "USR Modem Emulator hardware layer: pins, LEDs, I2S audio, pot, RS232 and USB ports, Wi-Fi, TCP sockets, NVS and LittleFS stores, crypto, OTA and the web server. ESP32-S3 only; not built for the native unit tests.",
   "frameworks": "arduino",
   "platforms": "espressif32"
 }

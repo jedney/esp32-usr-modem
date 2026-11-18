@@ -1,1 +1,7 @@
-{"name":"config","frameworks":"*","platforms":"*","dependencies":[{"name":"calls"},{"name":"netcfg"},{"name":"devicecfg"}]}
+{
+  "name": "config",
+  "description": "Configuration screen, AT* configuration commands, shared typed menu metadata, call history and debug log; hardware-independent (spec 3.8)",
+  "frameworks": "*",
+  "platforms": "*",
+  "dependencies": [{"name": "calls"}, {"name": "devicecfg"}, {"name": "netcfg"}]
+}

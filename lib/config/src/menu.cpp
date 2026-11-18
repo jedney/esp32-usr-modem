@@ -108,10 +108,6 @@ void Terminal::clearOutput() {
     length_ = pos_ = responseLine_ = responseLines_ = 0;
     more_ = overflow_ = false;
 }
-void Terminal::line(const char *text) {
-    append(text);
-    append("\n");
-}
 void Terminal::append(const char *text) {
     write(text, strlen(text));
 }

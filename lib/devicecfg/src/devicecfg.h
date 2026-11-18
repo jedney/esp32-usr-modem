@@ -11,12 +11,12 @@ namespace devicecfg {
 constexpr size_t kPasswordMax = 32;
 constexpr size_t kGeneratedLength = 12;
 constexpr uint32_t kWindowMs = 10 * 60 * 1000;
-constexpr size_t kOtaHashLength = 64;     // SHA-256 of the password, lower-case hex (ArduinoOTA)
-constexpr size_t kDigestHashLength = 32;  // MD5 HA1, lower-case hex: kept in the record, unused
-// USRA, layout, policy, reset marker, then the password and both hashes with their
+// SHA-256 of the password, lower-case hex: ArduinoOTA's password hash, and what every web,
+// network console and OTA login checks.
+constexpr size_t kOtaHashLength = 64;
+// USRA, layout, policy, reset marker, then the password and the hash with their
 // terminators, then a CRC-32.
-constexpr size_t kBlobSize =
-    7 + (kPasswordMax + 1) + (kOtaHashLength + 1) + (kDigestHashLength + 1) + 4;
+constexpr size_t kBlobSize = 7 + (kPasswordMax + 1) + (kOtaHashLength + 1) + 4;
 constexpr const char *kAlphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz";
 
 // Hardware implementation uses the ESP entropy source and PSA hashes.
@@ -24,8 +24,7 @@ class Crypto {
 public:
     virtual ~Crypto() = default;
     virtual uint32_t randomWord() = 0;
-    virtual bool hashes(const char *password, char ota[kOtaHashLength + 1],
-                        char digest[kDigestHashLength + 1]) = 0;
+    virtual bool hash(const char *password, char ota[kOtaHashLength + 1]) = 0;
 };
 
 void wipe(void *data, size_t size);
@@ -44,7 +43,6 @@ public:
     bool needsReset() const { return resetPending_; }
     const char *bootPassword() const { return ready() ? password_ : ""; }
     const char *otaHash() const { return ready() ? ota_ : ""; }
-    const char *digestHash() const { return ready() ? digest_ : ""; }
     Policy policy() const { return policy_; }
     // A user replacement never remains available for subsequent boot display.
     bool change(const char *password);
@@ -68,7 +66,7 @@ public:
 
 private:
     bool replace(const char *password, bool showAtBoot);
-    bool save(Policy policy, bool reset, const char *password, const char *ota, const char *digest);
+    bool save(Policy policy, bool reset, const char *password, const char *ota);
     modemcfg::Store &store_;
     Crypto &crypto_;
     Policy policy_ = Policy::kAlways;
@@ -78,7 +76,6 @@ private:
     uint32_t openedAt_ = 0;
     char password_[kPasswordMax + 1] = {};
     char ota_[kOtaHashLength + 1] = {};
-    char digest_[kDigestHashLength + 1] = {};
 };
 
 }  // namespace devicecfg

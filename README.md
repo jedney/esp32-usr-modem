@@ -22,7 +22,7 @@ The finished modem provides:
 - Selectable Sportster identities: 14.4k, 28.8k, 33.6k and 56k.
 - Guided electronics tests and serial terminal/cable diagnostics.
 
-The network connection replaces the telephone line. The replica's telephone socket is cosmetic and has no connection to the modem electronics. Leave it disconnected from telephone wiring. The fax light indicates wifi status; fax operation is not implemented.
+The network connection replaces the telephone line. The replica's telephone socket is cosmetic and has no connection to the modem electronics. Leave it disconnected from telephone wiring. The ARQ/FAX light shows the Wi-Fi status; fax operation is not implemented.
 
 ## Follow the build
 
@@ -80,7 +80,7 @@ The [final electronics brief](electronics/USR%20Modem%20Electronics%20Final%20Br
 
 You will need cream or beige PLA for the enclosure and knob, red or black (as suits) for the logo, and black for the rear power trim. The supplied print projects also include a grey/silver DB9 insert option. A single-colour printer can make separate parts in separate print jobs.
 
-Use M2.5 brass heat-set inserts: these are small threaded sleeves pressed into the plastic with a heated tool - a soldering iron with a fine point tip set to 220'c works well. The measurements below are **insert lengths**, not hole diameters.
+Use M2.5 brass heat-set inserts: these are small threaded sleeves pressed into the plastic with a heated tool - a soldering iron with a fine point tip set to 220 °C works well. The measurements below are **insert lengths**, not hole diameters.
 
 | Location | Inserts |
 |---|---|
@@ -148,7 +148,7 @@ For a **DB9 rear socket**, also print `db9-insert-v4.stl` to fill the wider seri
 
 Remove supports and loose strands carefully. Check the lid meets the base, the LEDs and switch fit their openings, the knob fits its shaft, and the boards sit in their mounts. Correct the fit before installing inserts or soldering. Keep the original scale: resizing the enclosure also moves its mounting holes and connector openings.
 
-If you need to modify the case and you aren't familiar with 3D modelling softwaree, AI is you best option. This was how I modified luizpacheco's design.
+If you need to modify the case and you aren't familiar with 3D modelling software, an AI assistant can help: that is how luizpacheco's design was modified for this build.
 
 Credit: This wouldn't have been possible without the excellent RetroExternalModem design by luizpacheco on Thingiverse: https://www.thingiverse.com/thing:7063155.
 

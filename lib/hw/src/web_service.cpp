@@ -1291,7 +1291,7 @@ void WebService::install(const Job &job) {
             if (record & 0x80000000u) {
                 memset(buffer, 0xff, n);
             } else {
-                ok = esp_partition_read(staging, offset, buffer, n) == ESP_OK && ok;
+                ok = esp_partition_read(staging, offset, buffer, n) == ESP_OK;
                 offset += n;
             }
             ok = ok && Update.write(buffer, n) == n;
