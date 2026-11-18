@@ -633,7 +633,7 @@ For everyday use, the [complete AT command reference](docs/COMMANDS.md) is the n
 | [`scripts/`](scripts/) | Build, upload, version, sound, web asset and test helpers |
 | [`test/`](test/) | PC unit tests, board tests, serial/network end-to-end tests and independent protocol checks; start with the [test guide](test/README.md) |
 | [`docs/`](docs/) | [Firmware specification](docs/project-brief.md), [decisions](docs/decisions-log.md), [remaining checks](docs/ROADMAP.md) and command reference |
-| [`credits/`](credits/) | Third-party attribution and licensing details |
+| [`CREDITS.md`](CREDITS.md) | Third-party attribution and licensing details |
 | [`platformio.ini`](platformio.ini) | Pinned build tools and the `s3`, `s3_ota` and `native` environments |
 | [`VERSION`](VERSION) and [`CHANGES.md`](CHANGES.md) | Current firmware version and change history |
 | [`.github/workflows/`](.github/workflows/) | Automated checks and release-image builds |
@@ -660,4 +660,8 @@ The project keeps its version in `VERSION`. Development changes use `python scri
 
 Firmware and project by **Jon Edney**. The case is adapted from **luizpacheco's RetroExternalModem model**, firmware modules are adapted from **Bo Zimmerman's Zimodem**, the concept draws on **caiot5's RetroExternalModem**, and the handshake recordings come from **Gough Lui's modem sound collection**.
 
-See [credits/LICENSES.md](credits/LICENSES.md) for source links, attribution and the terms applying to each component. The case and label artwork have non-commercial terms, and some bundled materials have unspecified redistribution terms. Check that record before redistributing the project or using it commercially. `AT*ABOUT` and **Help → About** show the project's short credits on the modem.
+Copyright 2026 Jon Edney. Except where otherwise identified in a file or the licensing record, original project contributions are licensed under the **Apache License, Version 2.0** ([LICENSE](LICENSE)). See [NOTICE](NOTICE) for attribution and the scope of this grant. The project's non-commercial purpose describes its intent; Apache-2.0 permits commercial reuse of covered contributions.
+
+Third-party material retains its existing terms. This licence grants no rights in US Robotics trademarks, copyrighted artwork, designs or patents that the project contributors do not own or have authority to license.
+
+See [CREDITS.md](CREDITS.md) for source links, attribution and the terms applying to each component. The case and label artwork have non-commercial terms, and some bundled materials have unspecified redistribution terms. Check that record before redistributing the project or using it commercially. `AT*ABOUT` and **Help → About** show the project's short credits on the modem.

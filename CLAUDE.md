@@ -9,7 +9,7 @@ ESP32-S3 Wi-Fi "modem" in a 3D-printed US Robotics Sportster replica, with a DB2
 - **`docs/decisions-log.md`**: the current decisions, one row each. Append every new decision or spec change made while coding here (date, what, why); replace a row when a decision changes rather than keeping the old one.
 - `docs/COMMANDS.md`: the complete command reference. Update it with every command or option change, together with `AT*HELP` and the README.
 - `test/README.md`: feature-to-test matrix. `web/PROTOCOL.md`: web page ↔ firmware protocol. `ui/DESIGN_SPEC.md`: the configuration screen design.
-- `credits/LICENSES.md`: licensing record. Update it whenever third-party code, a library or a sound file is added or removed (`python scripts/generate_credits.py` rebuilds the About screen's list).
+- `CREDITS.md`: licensing record. Update it whenever third-party code, a library or a sound file is added or removed (`python scripts/generate_credits.py` rebuilds the About screen's list).
 
 ## Rules
 

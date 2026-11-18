@@ -1,7 +1,7 @@
 // PPP/SLIP framing adapted from Bo Zimmerman's Zimodem, Apache-2.0,
 // revision a534e5129d88b8b09aa01fe17498d5cd5368569e, zpppmode/zslipmode.
 // Modified for USR Modem: bounded portable codecs, RFC negotiation and lifecycle.
-// Original attribution and licence: credits/zimodem/LICENSE and NOTICE.
+// Original attribution and licence: https://github.com/bozimmerman/Zimodem (LICENSE and NOTICE).
 #pragma once
 #include "byte_queue.h"
 #include "connection.h"

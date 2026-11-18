@@ -17,7 +17,7 @@
 // source, discard-only receives, deadlines; adapted from proto_xmodem at a534e512.
 // ZMODEM framing/CRC adaptation from proto_zmodem (Synchronet):
 // (C) Mattheij Computer Service 1994; rights transferred to Stephen Hurd, 2015.
-// Original ZMODEM notices and transfer-of-rights text: credits/zimodem/zmodem-notice.txt.
+// Original ZMODEM notices and transfer-of-rights text: https://github.com/bozimmerman/Zimodem.
 #include "transfer.h"
 #include <algorithm>
 #include <cstdio>

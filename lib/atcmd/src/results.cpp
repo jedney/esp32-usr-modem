@@ -1,5 +1,5 @@
 // Result codes: see results.h. Numbers and texts from the USR Sportster technical
-// reference (credits/LICENSES.md).
+// reference (CREDITS.md).
 #include "results.h"
 
 #include <cstdio>

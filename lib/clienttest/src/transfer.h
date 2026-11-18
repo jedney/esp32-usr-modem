@@ -14,7 +14,7 @@
    limitations under the License.
 */
 // Changed for USR Modem: incremental X/Y/ZMODEM adaptation of Zimodem (Apache-2.0); provenance
-// and original notices in credits/zimodem.
+// and original notices: https://github.com/bozimmerman/Zimodem.
 #pragma once
 #include "byte_queue.h"
 

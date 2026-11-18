@@ -14,7 +14,8 @@
    limitations under the License.
 */
 // Adapted from Zimodem's handleAsciiIAC (pet2asc.ino), Copyright 2016-2026 Bo Zimmerman.
-// Apache-2.0; see credits/zimodem. Changed: incremental bounded parsing, BINARY both
+// Apache-2.0, see https://github.com/bozimmerman/Zimodem.
+// Changed: incremental bounded parsing, BINARY both
 // directions, live NAWS dimensions, ANSI terminal type, and negotiation state to avoid loops.
 #pragma once
 #include "byte_queue.h"

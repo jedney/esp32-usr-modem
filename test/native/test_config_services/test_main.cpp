@@ -143,8 +143,9 @@ void test_about_is_compact_names_and_urls_and_ends_at_project_repository() {
     TEST_ASSERT_NOT_EQUAL(std::string::npos, text.find("xterm.js: https://"));
     TEST_ASSERT_EQUAL(std::string::npos, text.find("Obligations"));
     TEST_ASSERT_EQUAL(std::string::npos, text.find("Keep upstream"));
-    TEST_ASSERT_NOT_EQUAL(std::string::npos,
-                          text.find("Full credits and licences: credits/LICENSES.md"));
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, text.find("Copyright 2026 Jon Edney."));
+    TEST_ASSERT_NOT_EQUAL(std::string::npos, text.find("3rd Party Libraries and Projects:"));
+    TEST_ASSERT_EQUAL(std::string::npos, text.find("Full credits"));
     const auto repo = r.run("*GITHUB");
     TEST_ASSERT_NOT_EQUAL(std::string::npos,
                           repo.find("https://github.com/jedney/esp32-usr-modem"));

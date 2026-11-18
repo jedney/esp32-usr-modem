@@ -1,7 +1,7 @@
 // ATI0-ATI7, ATI9 and settings screens: selectable Sportster series.
 // Commands and selectable speeds retain the later USR capabilities through 56000.
 //
-// Sources (credits/LICENSES.md):
+// Sources (CREDITS.md):
 //   - Settings and diagnostic screen layout: a capture from a real
 //     "Sportster 33600/Fax V2.31", posted in the fido7.ru.modem echo (2004), archived at
 //     https://fido7.ru.modem.narkive.com/YzTdiljZ/sportster-33600

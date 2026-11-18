@@ -8,7 +8,7 @@ What the firmware does and the hardware it drives, as the code behaves now. Keep
 - The page protocol is in [../web/PROTOCOL.md](../web/PROTOCOL.md); the test matrix is in [../test/README.md](../test/README.md).
 - The case and the electronics keep their own files in `case/` and `electronics/`.
 
-Repository: `C:\repo\esp32-usr-modem` (private; `origin` is `https://github.com/jedney/esp32-usr-modem`).
+Repository: `C:\repo\esp32-usr-modem` (`origin` is `https://github.com/jedney/esp32-usr-modem`).
 
 ## 1. Goal
 
@@ -106,7 +106,7 @@ From reset until the firmware sets the pins (and throughout flashing) the S3's G
 
 - Order: dial tone, DTMF of the digits (generated live), ringback, the handshake for the emulated speed, a short pause, `CONNECT`. `ATM0` skips the audio and connects at once; `ATM1`/`ATM2`/`ATL0-3` follow the Sportster. `AT*RINGDELAY` and `AT*CONNECTDELAY` set the ringback length and the pause.
 - UK tones, generated in firmware: dial 350+450 Hz, busy 400 Hz 0.375 s on and off, ring 400+450 Hz 0.4 s on, 0.2 off, 0.4 on, 2.0 off; pulse dialling at 10 pulses per second (digit *n* = *n* pulses, 0 = 10). DTMF is the same worldwide.
-- Handshakes are 8 kHz mono 16-bit PCM WAVs in LittleFS for 1200, 2400, 9600, 14400, 28800, 33600 and 56000 (`sound/`, credits in `credits/LICENSES.md`), played over I2S. An intermediate speed uses the nearest lower file, 300 uses 1200.
+- Handshakes are 8 kHz mono 16-bit PCM WAVs in LittleFS for 1200, 2400, 9600, 14400, 28800, 33600 and 56000 (`sound/`, credits in `CREDITS.md`), played over I2S. An intermediate speed uses the nearest lower file, 300 uses 1200.
 - `AT*PLAY` previews any sound or tone; the configuration screen lists them.
 
 ### 3.5 Result codes
@@ -190,7 +190,7 @@ The factory result set is `X4` (all codes). Numeric and verbal results follow th
 - **Updates:** the page uploads `firmware.bin` and `littlefs.bin`, streamed into the inactive app slot. Only images built for this project are accepted, checked by SHA-256; downgrades need confirmation; refused during a call. A LittleFS image replaces the sounds, web files and call history.
 - **Menu hierarchy:** The shared top-level order is Status, Phone Book, Call History, Settings and Help (A-E in AT*CONFIG). Settings contains General Settings, Sounds, Wi-Fi, Clock, Updates, Reset and Export Configuration. Help contains About, GitHub, Command Reference and Diagnostics. Diagnostics retains its log and reset-information tools plus Hardware Tests and serial-only Client Tests; the browser omits Client Tests. Nested groups have Back controls in the browser and X/Esc in the terminal.
 - **Session start and title:** A fresh browser terminal feeds `AT` followed by CR through the real modem parser, showing `AT` and `OK` with the default settings and no session banner; configured echo, quiet and result formats still apply. The browser title is "Web Terminal - {model name}" and follows the selected model.
-- **About and GitHub:** About lists the version, short project names and URLs, ending with the project repository containing the full credits and licences in credits/LICENSES.md. Help > GitHub opens https://github.com/jedney/esp32-usr-modem in a new browser tab; AT*GITHUB prints the same URL in the terminal.
+- **About and GitHub:** About lists the version, short project names and URLs, ending with the project repository containing the full credits and licences in CREDITS.md. Help > GitHub opens https://github.com/jedney/esp32-usr-modem in a new browser tab; AT*GITHUB prints the same URL in the terminal.
 - **Friendly menu:** one compact row follows `AT*CONFIG`, with overflow under More and serial-only Client Tests omitted. Generated metadata supplies icons' labels, help, units, ranges, choices and templates for validated dialogs; profile/register and command variants select one operation at a time. No-input commands run immediately as terminal input. Phonebook opens as a live table with add/edit/delete/dial actions. Wi-Fi passwords, confirmations and interactive test keys remain in the terminal. A firmware readiness acknowledgement includes consumed input bytes, preventing commands from being appended to partial input or prompts. Upload is under Updates; DCD/RI/CTS toggles and Stop test are under Hardware Tests. Link state appears once in the top badge, call state and Hang up share the terminal header, and LEDs plus guidance, Wi-Fi strength (dBm on hover) and time occupy the bottom strip. Light/dark themes follow the browser preference; overflow and secondary details adapt to narrow windows.
 - **Wi-Fi changes** from the page revert after 60 s if the new network does not connect.
 - The protocol is in `web/PROTOCOL.md`. `?demo` and `web/preview.html` simulate a modem.
@@ -225,4 +225,4 @@ A Client Tests section of the configuration screen (and `AT*TEST`, `AT*SX/SY/SZ`
 - Firmware base: **Zimodem** by Bo Zimmerman, **Apache-2.0**. Keep its LICENSE and NOTICE and mark every ported or changed file as changed. Its ZMODEM code derives from the Synchronet/SyncTERM code (licence not stated in the file).
 - Concept: **RetroExternalModem** by caiot5 (GPL-3.0), which builds on WiFi2DialUp (Luis Miguel Silva), PodSix pimodem (Matt Whitted) and tcpser (Jim Brain / FozzTexx).
 - Handshake recordings: Gough Lui's 2016 modem sound collection.
-- The repository stays private. The licensing record is **`credits/LICENSES.md`**: every third-party component, file and library with its source, licence and obligations. The About column supplies short, deduplicated names and URLs for About; full credits and licences stay in the repository.
+- The licensing record is **`CREDITS.md`**: every third-party component, file and library with its source, licence and obligations. The About column supplies short, deduplicated names and URLs for About; full credits and licences stay in the repository.

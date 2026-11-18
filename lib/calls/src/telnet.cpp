@@ -14,7 +14,8 @@
    limitations under the License.
 */
 // Adapted from Zimodem's handleAsciiIAC, Copyright 2016-2026 Bo Zimmerman.
-// Apache-2.0; see credits/zimodem. Changed for this project: nonblocking parser,
+// Apache-2.0, see https://github.com/bozimmerman/Zimodem.
+// Changed for this project: nonblocking parser,
 // bounded subnegotiation, stateful option replies, BINARY, ANSI, and live NAWS dimensions.
 #include "telnet.h"
 #include <cstring>

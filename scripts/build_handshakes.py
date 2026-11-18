@@ -1,6 +1,6 @@
 """Package the supplied PCM handshake recordings without changing their audio.
 
-Inputs are already mono 8000 Hz PCM16 WAVs. See credits/LICENSES.md for provenance.
+Inputs are already mono 8000 Hz PCM16 WAVs. See CREDITS.md for provenance.
 """
 from pathlib import Path
 import shutil

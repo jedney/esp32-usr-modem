@@ -11,7 +11,7 @@ def test_about_generation_keeps_only_names_and_urls_and_is_stable(tmp_path):
     module.ROOT = tmp_path
     (tmp_path / "credits").mkdir()
     (tmp_path / "lib/config/src").mkdir(parents=True)
-    (tmp_path / "credits/LICENSES.md").write_text(
+    (tmp_path / "CREDITS.md").write_text(
         '| Component | Used for | Author / source | Licence | Obligations | Status | About |\n'
         '|---|---|---|---|---|---|---|\n'
         '| Test "tone" | Sounds | Caf\u00e9 | CC0 | Credit | Used | [Test tone](https://example.org/tone) |\n'

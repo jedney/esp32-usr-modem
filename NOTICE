@@ -1,0 +1,33 @@
+USR Wi-Fi Modem
+Copyright 2026 Jon Edney
+
+Except where otherwise identified in a file or CREDITS.md, original
+contributions to this project are licensed under the Apache License, Version 2.0.
+See LICENSE for the full licence text.
+
+Third-party material
+--------------------
+Third-party components and adapted material retain their applicable licences,
+copyright notices and attribution requirements. The project's Apache-2.0 grant
+covers only rights held by its contributors; it does not relicense third-party
+code, case and label designs, recordings, fonts, artwork or supplier references.
+Some materials have no recorded redistribution permission. Their inclusion is
+not a grant of permission to redistribute them. See CREDITS.md and the
+component-specific licence and notice files.
+
+This project includes software adapted from C64Net WiFi Firmware / Zimodem,
+Copyright 2016-2026 Bo Zimmerman, http://www.zimmers.net. Its Apache-2.0
+licence and NOTICE are in the upstream repository: https://github.com/bozimmerman/Zimodem.
+Other component attributions are in CREDITS.md.
+
+US Robotics
+-----------
+US Robotics and Sportster names, marks, logos, original artwork and other
+intellectual property remain the property of their respective rights holders.
+The project contributors grant no rights in US Robotics trademarks, copyrighted
+material, designs or patents that they do not own or have authority to license.
+
+This is an independent, unsanctioned, non-commercial hobby tribute. It is not
+affiliated with, authorised, sponsored or endorsed by US Robotics. The project's
+non-commercial purpose is not an additional restriction on the Apache-2.0 licence
+for covered contributions.
