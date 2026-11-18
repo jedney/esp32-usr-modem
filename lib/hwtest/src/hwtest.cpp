@@ -48,6 +48,18 @@ uint8_t chaseMask(uint32_t step) {
     return static_cast<uint8_t>(1u << led);
 }
 
+uint8_t progressMask(uint32_t done, uint32_t total) {
+    if (total == 0 || done == 0) {
+        return 0;
+    }
+    if (done >= total) {
+        return (1u << kLedCount) - 1;
+    }
+    // AA from the first byte, then one more LED per sixth; ARQ only at the end.
+    uint64_t lit = 1 + uint64_t(done) * (kLedCount - 1) / total;
+    return static_cast<uint8_t>((1u << lit) - 1);
+}
+
 const char *outSignalName(OutSignal s) {
     switch (s) {
         case OutSignal::kDCD:

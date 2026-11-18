@@ -54,6 +54,7 @@ Section numbers refer to the firmware spec (`docs/project-brief.md`).
 | Handshake WAV playback per speed (3.4) | `test_calls`, `scripts/test_sound_catalog.py` | `test_calls` | `test_calls.py` |
 | Volume: pot, `ATL`, `ATM`, no cap (full volume = full scale); call tones at the recordings' RMS (2.3, 3.4) | `test_hwtest`, `test_calls` | `test_calls`, `test_hw` | `AT*HWPOT=TONE`, `AT*HWTEST` |
 | LEDs per table 2.4, `AT*HWLED=AUTO`; CD/TR/RD/SD follow RS232 or USB | `test_hostport` | `test_hw` | `test_session.py`, `AT*HWTEST` |
+| LEDs fill AA to ARQ with OTA and web-upload progress (2.4) | `test_hwtest` (`test_progress_*`) | — | bench: watch the panel during an upload |
 | Hardware tests `AT*HW...`; line, loopback and bridge refused on RS232 (3.13); 5-minute key time-out, LED patterns refused during a call, per-owner holds | `test_hwtest`, `test_config` | `test_hw` | `test_hwtest.py`, `test_config.py` |
 | Wi-Fi: scan, masked join (UTF-8 passphrases), retry, static IP, mDNS, ARQ light, radio off after a scan with Wi-Fi off, join/scan/IP refused during a call, banner (3.6, 3.7) | `test_netcfg`, `test_config_services`, `test_atcmd` | `test_wifi`, `test_rs232` | `test_wifi.py`, `test_calls.py`, `test_answer.py` |
 | Clock: NTP (no empty labels), time zones, daylight saving, cached offset for the web status (3.8) | `test_netcfg` | `test_wifi` | `test_wifi.py` |

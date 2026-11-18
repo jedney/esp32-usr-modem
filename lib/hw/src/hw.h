@@ -18,6 +18,9 @@ namespace hw {
 // Bit i = hwtest::Led i (AA bit 0 ... ARQ bit 6), as in web/PROTOCOL.md.
 void ledsSet(uint8_t mask);
 uint8_t ledsMask();
+// Firmware-update progress: the LEDs fill from AA to ARQ (hwtest::progressMask). Writes the
+// pins only when the mask changes, so it can be called for every chunk.
+void ledsProgress(uint32_t done, uint32_t total);
 
 // --- Amplifier shutdown pin --------------------------------------------------------------
 enum class AmpMode : uint8_t { kAuto, kOn, kOff };  // Auto: on only while a sound plays

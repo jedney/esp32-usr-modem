@@ -56,6 +56,8 @@ Seven front-panel LEDs, each connected directly from its GPIO to the LED anode, 
 
 CD, TR, RD and SD follow either host port (RS232 or USB); CS follows RS232 only.
 
+During a firmware update over Wi-Fi (OTA) or from the web page, the LEDs show its progress instead: AA lights with the first data, CD to CS light one by one through the update, and ARQ lights when the image is complete. A LittleFS image from the web page fills the first half while it is received and the second half while it is written. After a failed update the LEDs return to the table above; after a good one the modem restarts. Flashing over USB runs in the chip's boot ROM, so the LEDs show nothing.
+
 ### 2.5 Pin map
 
 The pin numbers live in **`lib/hw/src/pins.h`** (which reads `USR_MODEM_PIN_*` values from `.env.example`, then `.env`, then the environment) and are locked by `test/native/test_pins`. `AT*HWPINS` prints the map in use.

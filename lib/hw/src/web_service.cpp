@@ -8,6 +8,7 @@
 #include <psa/crypto.h>
 #include <cstring>
 #include <new>
+#include "hw.h"
 #include "image_check.h"
 
 #ifndef FW_VERSION
@@ -1214,6 +1215,9 @@ void WebService::install(const Job &job) {
     ok = psa_hash_setup(&sha, PSA_ALG_SHA_256) == PSA_SUCCESS && ok;
     uint8_t buffer[1024];
     size_t received = 0, staged = 0;
+    // The modem loop does not refresh the panel during an upload, so the LEDs show the
+    // progress. A LittleFS image fills them in two halves: receive, then copy.
+    const size_t progressTotal = fs ? 2 * req->content_len : req->content_len;
     while (ok && received < req->content_len && millis() - start < 180000) {
         size_t wanted = req->content_len - received;
         if (wanted > sizeof buffer) {
@@ -1234,6 +1238,7 @@ void WebService::install(const Job &job) {
                     : Update.write(buffer, size_t(n)) == size_t(n);
         }
         received += size_t(n);
+        hw::ledsProgress(received, progressTotal);
     }
     uint8_t digest[32] = {};
     size_t digestLength = 0;
@@ -1283,6 +1288,7 @@ void WebService::install(const Job &job) {
             }
             ok = ok && Update.write(buffer, n) == n;
             written += n;
+            hw::ledsProgress(received + written, progressTotal);
             delay(1);
         }
         ok = ok && written == req->content_len;
@@ -1290,6 +1296,7 @@ void WebService::install(const Job &job) {
     ok = ok && Update.end(false);
     if (!ok) {
         Update.abort();
+        hw::ledsSet(0);  // the modem loop restores the panel
     }
     devicecfg::wipe(buffer, sizeof buffer);
     reply(req, ok ? "200 OK" : "400 Bad Request",

@@ -97,6 +97,26 @@ void test_chase_sweeps_there_and_back() {
     }
 }
 
+void test_progress_fills_from_the_left() {
+    TEST_ASSERT_EQUAL_HEX8(0x00, hwtest::progressMask(0, 700));
+    TEST_ASSERT_EQUAL_HEX8(0x01, hwtest::progressMask(1, 700));
+    TEST_ASSERT_EQUAL_HEX8(0x01, hwtest::progressMask(116, 700));
+    TEST_ASSERT_EQUAL_HEX8(0x03, hwtest::progressMask(117, 700));
+    TEST_ASSERT_EQUAL_HEX8(0x0F, hwtest::progressMask(350, 700));
+    TEST_ASSERT_EQUAL_HEX8(0x3F, hwtest::progressMask(699, 700));
+    TEST_ASSERT_EQUAL_HEX8(0x7F, hwtest::progressMask(700, 700));
+}
+
+void test_progress_edge_cases() {
+    TEST_ASSERT_EQUAL_HEX8(0x00, hwtest::progressMask(0, 0));
+    TEST_ASSERT_EQUAL_HEX8(0x00, hwtest::progressMask(5, 0));
+    TEST_ASSERT_EQUAL_HEX8(0x7F, hwtest::progressMask(900, 700));
+    // No overflow near the top of the 32-bit range.
+    TEST_ASSERT_EQUAL_HEX8(0x3F, hwtest::progressMask(0xFFFFFFFEu, 0xFFFFFFFFu));
+    TEST_ASSERT_EQUAL_HEX8(0x7F, hwtest::progressMask(0xFFFFFFFFu, 0xFFFFFFFFu));
+    TEST_ASSERT_EQUAL_HEX8(0x07, hwtest::progressMask(0x7FFFFFFFu, 0xFFFFFFFFu));
+}
+
 void test_arg_start_accepts_equals_or_space() {
     TEST_ASSERT_EQUAL_STRING("CD", hwtest::argStart("=CD"));
     TEST_ASSERT_EQUAL_STRING("CD", hwtest::argStart(" CD"));
@@ -438,6 +458,8 @@ int main(int, char **) {
     RUN_TEST(test_led_names_match_web_protocol_bits);
     RUN_TEST(test_parse_led);
     RUN_TEST(test_chase_sweeps_there_and_back);
+    RUN_TEST(test_progress_fills_from_the_left);
+    RUN_TEST(test_progress_edge_cases);
     RUN_TEST(test_arg_start_accepts_equals_or_space);
     RUN_TEST(test_word_is_and_rest);
     RUN_TEST(test_parse_uint_ranges);

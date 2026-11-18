@@ -181,6 +181,13 @@ uint8_t ledsMask() {
     return ledMask;
 }
 
+void ledsProgress(uint32_t done, uint32_t total) {
+    uint8_t mask = hwtest::progressMask(done, total);
+    if (!ledsReady || mask != ledMask) {
+        ledsSet(mask);
+    }
+}
+
 // --- Amp ---------------------------------------------------------------------------------
 
 void ampSetMode(AmpMode mode) {

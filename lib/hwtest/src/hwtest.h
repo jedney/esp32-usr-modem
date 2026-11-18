@@ -23,6 +23,11 @@ int parseLed(const char *s);
 // LED mask for one step of a back-and-forth sweep: AA, CD ... ARQ, CS ... CD, AA, ...
 uint8_t chaseMask(uint32_t step);
 
+// LED mask for a firmware update `done` of `total` bytes through: the LEDs fill from AA
+// (left) to ARQ (right). AA lights with the first byte, CD to CS one per sixth of the
+// update, and ARQ only when done >= total.
+uint8_t progressMask(uint32_t done, uint32_t total);
+
 // RS232 handshake outputs the tests can drive (DSR is hard-wired on, spec 2.2).
 enum class OutSignal : uint8_t { kDCD, kRI, kCTS };
 const char *outSignalName(OutSignal s);
