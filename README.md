@@ -164,7 +164,7 @@ The label folder contains designs for all four modem identities. Choose the appe
 6. Clean the front recess, let it dry, and apply the label gradually from one end. Smooth it down without stretching it. It is easier to do this while the lid is empty.
 7. Once the adhesive is dry, cut the switch/LED openings with a sharp knife on a cutting mat. The switch and LED holes make the cutting easier.
 
-The [label folder](case/labels/) also contains individual PNGs, a high-resolution STL-aligned A4 PNG and an alternative A4 print sheet. Prefer the STL-aligned PDF for this enclosure: image editors and printer software can interpret PNG scale differently.
+The [label folder](case/labels/) also contains an STL-aligned PNG of each model's label and of the whole A4 sheet, at 2400 dpi. Prefer the STL-aligned PDF for this enclosure: image editors and printer software can interpret PNG scale differently.
 
 ## 4. Prepare the case and mount the parts
 
