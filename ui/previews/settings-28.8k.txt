@@ -1,25 +1,18 @@
-╔══════════════════════════════════════════════════════════════════════════════╗
-║  USRobotics          Sportster 28.8k Series                                  ║
-║ ──────────────────────────────────────────────────────────────────────────── ║
-║  MAIN  >  SETTINGS                                                           ║
-║  KEY   OPTION                                                                ║
-║  >  [1]   Current and stored profiles                                        ║
-║     [2]   Edit profile / registers                                           ║
-║     [3]   Model                                                              ║
-║     [4]   Auto-answer rings (S0)                                             ║
-║     [5]   Auto-answer destination                                            ║
-║     [6]   Host baud                                                          ║
-║     [7]   Data throttle                                                      ║
-║     [8]   Save active profile                                                ║
-║     [9]   Load stored/factory profile                                        ║
-║     [A]   Load factory profile                                               ║
-║     [B]   Power-on profile                                                   ║
-║     [C]   Stored number                                                      ║
-║     [D]   Terminal style                                                     ║
-║     No further options                                                       ║
-║                                                                              ║
-║  UP/DOWN Select  ENTER Open  ESC Back  Q Back                                ║
-║  F1 Help  F2 Main  |  Model: 28.8k  Link: UNKNOWN                            ║
-║  All actions depend on existing project services.                            ║
-║  Command > █                                                                 ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+General Settings
+Illustration only: current values appear on the modem.
+
+A. Current and stored profiles
+B. Modem profile settings
+C. Modem model
+D. Rings before answering
+E. Answer incoming calls on
+F. RS232 serial speed
+G. Limit data to modem speed
+H. Save active profile
+I. Load stored/factory profile
+J. Load factory profile
+K. Power-on profile
+L. Saved dial string
+M. Terminal style
+
+X. Back / Q. Exit; Esc goes back.

@@ -1,6 +1,5 @@
 {
   "name": "devicecfg",
-  "version": "0.7.0",
   "description": "Device credentials, OTA policy and confirmed factory reset; hardware-independent",
   "frameworks": "*",
   "platforms": "*",

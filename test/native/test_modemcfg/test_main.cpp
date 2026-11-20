@@ -1,4 +1,4 @@
-// Unit tests for the modem settings and their saved format (brief 6.2, 6.6, 6.7).
+// Unit tests for the modem settings and their saved format (spec 3.2, 3.6, 3.7).
 // Run with: pio test -e native
 #include <unity.h>
 
@@ -6,6 +6,8 @@
 #include <initializer_list>
 #include <vector>
 
+#define FAKES_STORE
+#include "../support/fakes.h"
 #include "modemcfg.h"
 
 using namespace modemcfg;
@@ -14,31 +16,6 @@ void setUp() {}
 void tearDown() {}
 
 // In-memory stand-in for NVS.
-class MemStore : public Store {
-public:
-    size_t load(uint8_t *buf, size_t cap) override {
-        size_t n = len < cap ? len : cap;
-        memcpy(buf, data, n);
-        return n;
-    }
-    bool save(const uint8_t *d, size_t n) override {
-        if (n > sizeof data) {
-            return false;
-        }
-        memcpy(data, d, n);
-        len = n;
-        ++saves;
-        return true;
-    }
-    bool erase() override {
-        len = 0;
-        return true;
-    }
-    uint8_t data[1024] = {};
-    size_t len = 0;
-    int saves = 0;
-};
-
 // --- Factory settings ---------------------------------------------------------------------
 
 void test_factory_f1_has_the_decided_defaults() {
@@ -46,15 +23,15 @@ void test_factory_f1_has_the_decided_defaults() {
     TEST_ASSERT_EQUAL(1, p.get(kE));
     TEST_ASSERT_EQUAL(0, p.get(kQ));
     TEST_ASSERT_EQUAL(1, p.get(kV));
-    TEST_ASSERT_EQUAL(4, p.get(kX));  // all result codes (v0.4 decision)
+    TEST_ASSERT_EQUAL(4, p.get(kX));  // all result codes
     TEST_ASSERT_EQUAL(1, p.get(kM));
     TEST_ASSERT_EQUAL(2, p.get(kL));
-    TEST_ASSERT_EQUAL(0, p.get(kAmpA));  // plain CONNECT result (Q34)
-    TEST_ASSERT_EQUAL(1, p.get(kAmpB));  // speed stays as detected from "AT" (v0.5)
-    TEST_ASSERT_EQUAL(1, p.get(kAmpC));  // Q33
-    TEST_ASSERT_EQUAL(2, p.get(kAmpD));  // Q33
-    TEST_ASSERT_EQUAL(1, p.get(kAmpH));  // Q33
-    TEST_ASSERT_EQUAL(2, p.get(kAmpR));  // Q33
+    TEST_ASSERT_EQUAL(0, p.get(kAmpA));  // plain CONNECT result
+    TEST_ASSERT_EQUAL(1, p.get(kAmpB));  // speed stays as detected from "AT"
+    TEST_ASSERT_EQUAL(1, p.get(kAmpC));  // DCD follows the connection
+    TEST_ASSERT_EQUAL(2, p.get(kAmpD));  // DTR drop hangs up
+    TEST_ASSERT_EQUAL(1, p.get(kAmpH));  // hardware transmit flow control
+    TEST_ASSERT_EQUAL(2, p.get(kAmpR));  // RTS receive flow control
     TEST_ASSERT_EQUAL(0, p.get(kAmpS));  // DSR hard-wired
     TEST_ASSERT_EQUAL(8, p.get(kAmpN));  // 14400
     TEST_ASSERT_EQUAL(1, p.get(kTone));
@@ -69,7 +46,7 @@ void test_factory_s_registers() {
     TEST_ASSERT_EQUAL(10, p.s[4]);
     TEST_ASSERT_EQUAL(8, p.s[5]);
     TEST_ASSERT_EQUAL(60, p.s[7]);
-    TEST_ASSERT_EQUAL(50, p.s[12]);  // 1 s guard time (brief 6.2)
+    TEST_ASSERT_EQUAL(50, p.s[12]);  // 1 s guard time (spec 3.2)
 }
 
 void test_factory_f0_and_f2_differ_only_in_flow_control_and_results() {
@@ -244,18 +221,14 @@ void test_stored_line_end_registers_out_of_range_fall_back_to_factory() {
                       static_cast<int>(deserialize(blob, sizeof blob, &out)));
 }
 
-class FailingStore : public MemStore {
-public:
-    size_t load(uint8_t *, size_t) override { return kLoadError; }
-};
-
 void test_unreadable_store_is_a_bad_size_and_stays_untouched() {
-    FailingStore store;
+    fakes::MemoryStore store;
+    store.failLoad = true;
     Nvram n;
     TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kBadSize),
                       static_cast<int>(loadNvram(store, &n)));
     TEST_ASSERT_EQUAL(0, store.saves);
-    TEST_ASSERT_EQUAL(0, static_cast<int>(store.len));
+    TEST_ASSERT_EQUAL(0, static_cast<int>(store.bytes.size()));
 }
 
 void test_host_baud_round_trip_and_range() {
@@ -276,49 +249,13 @@ void test_host_baud_round_trip_and_range() {
     TEST_ASSERT_FALSE(isHostRate(230400) || isHostRate(0));
 }
 
-// A v0.4 (layout 1) blob: the layout 2 bytes without hostBaud, version 1, its own CRC.
-size_t makeV1Blob(const Nvram &n, uint8_t *v1) {
-    uint8_t v2[kBlobSize];
-    serialize(n, v2);
-    memcpy(v1, v2, kBlobSizeV1 - 4);
-    v1[4] = 1;
-    uint32_t crc = crc32(v1, kBlobSizeV1 - 4);
-    for (int i = 0; i < 4; ++i) {
-        v1[kBlobSizeV1 - 4 + i] = static_cast<uint8_t>(crc >> (8 * i));
-    }
-    return kBlobSizeV1;
-}
-
-void test_layout_1_is_migrated() {
-    Nvram old = sample();
-    old.tmpl[0].v[kAmpB] = 0;  // v0.4's "detect from AT"
-    old.tmpl[1].v[kAmpB] = 1;  // v0.4's "fixed"
-    uint8_t v1[kBlobSizeV1];
-    size_t len = makeV1Blob(old, v1);
-    Nvram out;
-    TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kMigrated),
-                      static_cast<int>(deserialize(v1, len, &out)));
-    TEST_ASSERT_EQUAL(1, out.tmpl[0].get(kAmpB));
-    TEST_ASSERT_EQUAL(1, out.tmpl[1].get(kAmpB));
-    TEST_ASSERT_EQUAL(0, out.tmpl[1].get(kE));  // everything else kept
-    TEST_ASSERT_EQUAL_UINT32(115200, out.tmpl[1].baud);
-    TEST_ASSERT_EQUAL(1, out.y);
-    TEST_ASSERT_EQUAL_STRING("170064142064", out.phone[0]);
-    TEST_ASSERT_EQUAL_UINT32(0, out.hostBaud);
-    TEST_ASSERT_NOT_NULL(strstr(loadResultText(LoadResult::kMigrated), "saved settings"));
-
-    v1[30] ^= 0x01;  // a damaged v1 blob is still refused
-    assertLoadFails(v1, len, LoadResult::kBadCrc);
-    assertLoadFails(v1, kBlobSize, LoadResult::kBadSize);  // v1 header, v2 size
-}
-
 void test_crc32_known_value() {
     const char *s = "123456789";
     TEST_ASSERT_EQUAL_HEX32(0xCBF43926u, crc32(reinterpret_cast<const uint8_t *>(s), 9));
 }
 
 void test_store_round_trip_is_the_restart_case() {
-    MemStore store;
+    fakes::MemoryStore store;
     Nvram n;
     TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kEmpty), static_cast<int>(loadNvram(store, &n)));
     n.tmpl[0].s[7] = 45;
@@ -334,19 +271,18 @@ void test_load_result_texts() {
     TEST_ASSERT_NOT_NULL(strstr(loadResultText(LoadResult::kBadCrc), "damaged"));
 }
 
-void test_extended_speed_profiles_survive_restart_and_keep_old_auto() {
-    MemStore store;
+void test_extended_speed_profiles_survive_restart() {
+    fakes::MemoryStore store;
     Nvram n = factoryNvram();
     n.tmpl[0].v[kAmpN] = 38;
     n.tmpl[0].v[kAmpU] = 32;
-    n.tmpl[1].v[kAmpN] = 0;  // old saved auto setting is kept, not rewritten to 8
+    n.tmpl[1].v[kAmpN] = 0;  // highest speed, kept as saved
     n.tmpl[1].v[kAmpU] = 16;
     TEST_ASSERT_TRUE(saveNvram(store, n));
     Nvram out;
     TEST_ASSERT_EQUAL(static_cast<int>(LoadResult::kOk), static_cast<int>(loadNvram(store, &out)));
     TEST_ASSERT_TRUE(n.tmpl[0] == out.tmpl[0]);
     TEST_ASSERT_TRUE(n.tmpl[1] == out.tmpl[1]);
-    TEST_ASSERT_EQUAL_UINT8(5, kLayoutVersion);  // adds outgoing call delays
     n.tmpl[0].v[kAmpN] = 39;
     uint8_t blob[kBlobSize];
     serialize(n, blob);
@@ -357,78 +293,63 @@ void test_extended_speed_profiles_survive_restart_and_keep_old_auto() {
     assertLoadFails(blob, sizeof blob, LoadResult::kBadValue);
 }
 
-void test_layout_2_migration_preserves_speeds_and_validates_new_metadata() {
-    Nvram n = factoryNvram();
-    n.tmpl[0].v[kAmpN] = 0;
-    n.tmpl[1].v[kAmpN] = 8;
-    uint8_t current[kBlobSize];
-    serialize(n, current);
-    uint8_t old[kBlobSizeV2];
-    memcpy(old, current, sizeof old);
-    old[4] = 2;
-    uint32_t crc = crc32(old, sizeof old - 4);
+// Seals `blob` again after a byte was changed, so only the value is wrong.
+void reseal(uint8_t *blob) {
+    const uint32_t crc = crc32(blob, kBlobSize - 4);
     for (unsigned i = 0; i < 4; ++i) {
-        old[sizeof old - 4 + i] = crc >> (8 * i);
-    }
-    Nvram out;
-    TEST_ASSERT_EQUAL(int(LoadResult::kMigrated), int(deserialize(old, sizeof old, &out)));
-    TEST_ASSERT_TRUE(out.tmpl[0].lineExplicit && out.tmpl[1].lineExplicit);
-    TEST_ASSERT_EQUAL(0, out.tmpl[0].get(kAmpN));
-    TEST_ASSERT_EQUAL(8, out.tmpl[1].get(kAmpN));
-    TEST_ASSERT_EQUAL_UINT32(14400, out.model);
-    TEST_ASSERT_FALSE(out.throttle);
-    for (size_t index : {kBlobSizeV2 - 4, kBlobSizeV4 - 9, kBlobSizeV4 - 5}) {
-        serialize(n, current);
-        current[index] = 255;
-        crc = crc32(current, sizeof current - 4);
-        for (unsigned i = 0; i < 4; ++i) {
-            current[sizeof current - 4 + i] = crc >> (8 * i);
-        }
-        TEST_ASSERT_EQUAL(int(LoadResult::kBadValue),
-                          int(deserialize(current, sizeof current, &out)));
+        blob[kBlobSize - 4 + i] = static_cast<uint8_t>(crc >> (8 * i));
     }
 }
 
-void test_layout_3_migration_preserves_model_and_defaults_answerport() {
+void test_model_throttle_and_line_speed_flag_survive_restart() {
     Nvram n = factoryNvram();
     n.model = 56000;
     n.throttle = true;
-    n.answerPort = AnswerPort::kConsole;
     n.tmpl[0].lineExplicit = true;
     n.tmpl[0].s[0] = 3;
-    uint8_t current[kBlobSize];
-    serialize(n, current);
-    uint8_t old[kBlobSizeV3];
-    memcpy(old, current, sizeof old);
-    old[4] = 3;
-    uint32_t crc = crc32(old, sizeof old - 4);
-    for (unsigned i = 0; i < 4; ++i)
-        old[sizeof old - 4 + i] = crc >> (8 * i);
+    uint8_t blob[kBlobSize];
+    serialize(n, blob);
     Nvram out;
-    TEST_ASSERT_EQUAL(int(LoadResult::kMigrated), int(deserialize(old, sizeof old, &out)));
+    TEST_ASSERT_EQUAL(int(LoadResult::kOk), int(deserialize(blob, sizeof blob, &out)));
     TEST_ASSERT_EQUAL_UINT32(56000, out.model);
     TEST_ASSERT_TRUE(out.throttle);
     TEST_ASSERT_TRUE(out.tmpl[0].lineExplicit);
+    TEST_ASSERT_FALSE(out.tmpl[1].lineExplicit);
     TEST_ASSERT_EQUAL(3, out.tmpl[0].s[0]);
-    // Layout 3 had no answer port: the v2.0 factory default (AUTO) applies.
-    TEST_ASSERT_EQUAL(int(AnswerPort::kAuto), int(out.answerPort));
-    TEST_ASSERT_EQUAL(int(LoadResult::kOk), int(deserialize(current, sizeof current, &out)));
+}
+
+void test_flag_bytes_above_one_are_refused() {
+    // The bytes after the phone numbers and hostBaud: two lineExplicit flags, the model (4
+    // bytes), the throttle flag, the answer port and the two call delays, then the CRC.
+    const size_t lineExplicit0 = kBlobSize - 4 - 8 - 1 - 1 - 4 - 1 - kTemplates;
+    const size_t throttle = kBlobSize - 4 - 8 - 1 - 1;
+    for (size_t index : {lineExplicit0, lineExplicit0 + 1, throttle}) {
+        uint8_t blob[kBlobSize];
+        serialize(factoryNvram(), blob);
+        blob[index] = 2;
+        reseal(blob);
+        assertLoadFails(blob, sizeof blob, LoadResult::kBadValue);
+    }
+}
+
+void test_answer_port_values_load_as_themselves_and_larger_are_refused() {
+    Nvram n = factoryNvram();
+    n.answerPort = AnswerPort::kConsole;
+    uint8_t blob[kBlobSize];
+    serialize(n, blob);
+    Nvram out;
+    TEST_ASSERT_EQUAL(int(LoadResult::kOk), int(deserialize(blob, sizeof blob, &out)));
     TEST_ASSERT_EQUAL(int(AnswerPort::kConsole), int(out.answerPort));
-    // Every saved value loads as itself (0, 1 from v0.9; 2 USB and 3 AUTO from v2.0) ...
+    const size_t answerPort = kBlobSize - 4 - 8 - 1;
     for (uint8_t value = 0; value < kAnswerPortCount; ++value) {
-        current[kBlobSizeV4 - 5] = value;
-        crc = crc32(current, sizeof current - 4);
-        for (unsigned i = 0; i < 4; ++i)
-            current[sizeof current - 4 + i] = crc >> (8 * i);
-        TEST_ASSERT_EQUAL(int(LoadResult::kOk), int(deserialize(current, sizeof current, &out)));
+        blob[answerPort] = value;
+        reseal(blob);
+        TEST_ASSERT_EQUAL(int(LoadResult::kOk), int(deserialize(blob, sizeof blob, &out)));
         TEST_ASSERT_EQUAL(value, static_cast<uint8_t>(out.answerPort));
     }
-    // ... and anything above is rejected.
-    current[kBlobSizeV4 - 5] = kAnswerPortCount;
-    crc = crc32(current, sizeof current - 4);
-    for (unsigned i = 0; i < 4; ++i)
-        current[sizeof current - 4 + i] = crc >> (8 * i);
-    assertLoadFails(current, sizeof current, LoadResult::kBadValue);
+    blob[answerPort] = kAnswerPortCount;
+    reseal(blob);
+    assertLoadFails(blob, sizeof blob, LoadResult::kBadValue);
 }
 
 void test_answer_port_names_parse_and_factory_default() {
@@ -452,39 +373,27 @@ void test_answer_port_names_parse_and_factory_default() {
     }
 }
 
-void test_layout_4_migrates_with_default_delays_and_validates_new_values() {
+void test_call_delays_round_trip_and_are_limited() {
     Nvram n = factoryNvram();
-    n.model = 33600;
-    n.throttle = true;
-    n.answerPort = AnswerPort::kUsb;
+    TEST_ASSERT_EQUAL_UINT32(1500, n.ringDelayMs);
+    TEST_ASSERT_EQUAL_UINT32(250, n.connectDelayMs);
     n.ringDelayMs = 5000;
     n.connectDelayMs = 60000;
-    uint8_t current[kBlobSize], old[kBlobSizeV4];
-    serialize(n, current);
-    memcpy(old, current, sizeof old);
-    old[4] = 4;
-    uint32_t crc = crc32(old, sizeof old - 4);
-    for (unsigned i = 0; i < 4; ++i)
-        old[sizeof old - 4 + i] = crc >> (8 * i);
+    uint8_t blob[kBlobSize];
+    serialize(n, blob);
     Nvram out;
-    TEST_ASSERT_EQUAL(int(LoadResult::kMigrated), int(deserialize(old, sizeof old, &out)));
-    TEST_ASSERT_EQUAL_UINT32(1500, out.ringDelayMs);
-    TEST_ASSERT_EQUAL_UINT32(250, out.connectDelayMs);
-    TEST_ASSERT_EQUAL_UINT32(n.model, out.model);
-    TEST_ASSERT_TRUE(out.throttle);
-    TEST_ASSERT_EQUAL(int(AnswerPort::kUsb), int(out.answerPort));
-    TEST_ASSERT_EQUAL(int(LoadResult::kOk), int(deserialize(current, sizeof current, &out)));
+    TEST_ASSERT_EQUAL(int(LoadResult::kOk), int(deserialize(blob, sizeof blob, &out)));
     TEST_ASSERT_EQUAL_UINT32(5000, out.ringDelayMs);
     TEST_ASSERT_EQUAL_UINT32(60000, out.connectDelayMs);
     for (bool ring : {false, true}) {
         (ring ? n.ringDelayMs : n.connectDelayMs) = 60001;
-        serialize(n, current);
-        assertLoadFails(current, sizeof current, LoadResult::kBadValue);
+        serialize(n, blob);
+        assertLoadFails(blob, sizeof blob, LoadResult::kBadValue);
         n = factoryNvram();
     }
 }
 
-// --- 5.5-06: recovering a blob saved through file, temporary file and backup -----------------
+// --- Recovering a blob saved through file, temporary file and backup -----------------
 
 // A blob ending in its CRC-32, `size` bytes long in all.
 std::vector<uint8_t> sealed(uint8_t fill, size_t size = 20) {
@@ -564,12 +473,20 @@ void test_recovery_returns_nothing_when_no_slot_has_a_good_blob() {
     TEST_ASSERT_EQUAL(0, recoverBlob(readSlot, &big, tiny, sizeof tiny));
 }
 
+void test_product_name_follows_the_model() {
+    TEST_ASSERT_EQUAL_STRING("US Robotics Sportster 14.4k", productName(14400));
+    TEST_ASSERT_EQUAL_STRING("US Robotics Sportster 28.8k", productName(28800));
+    TEST_ASSERT_EQUAL_STRING("US Robotics Sportster 33.6k", productName(33600));
+    TEST_ASSERT_EQUAL_STRING("US Robotics Sportster 56k", productName(56000));
+}
+
 int main() {
     UNITY_BEGIN();
-    RUN_TEST(test_layout_4_migrates_with_default_delays_and_validates_new_values);
+    RUN_TEST(test_call_delays_round_trip_and_are_limited);
     RUN_TEST(test_answer_port_names_parse_and_factory_default);
-    RUN_TEST(test_layout_3_migration_preserves_model_and_defaults_answerport);
-    RUN_TEST(test_layout_2_migration_preserves_speeds_and_validates_new_metadata);
+    RUN_TEST(test_answer_port_values_load_as_themselves_and_larger_are_refused);
+    RUN_TEST(test_flag_bytes_above_one_are_refused);
+    RUN_TEST(test_model_throttle_and_line_speed_flag_survive_restart);
     RUN_TEST(test_stored_line_end_registers_out_of_range_fall_back_to_factory);
     RUN_TEST(test_unreadable_store_is_a_bad_size_and_stays_untouched);
     RUN_TEST(test_factory_f1_has_the_decided_defaults);
@@ -585,13 +502,13 @@ int main() {
     RUN_TEST(test_damaged_blobs_fall_back_to_factory);
     RUN_TEST(test_out_of_range_value_is_refused_even_with_good_crc);
     RUN_TEST(test_host_baud_round_trip_and_range);
-    RUN_TEST(test_layout_1_is_migrated);
     RUN_TEST(test_crc32_known_value);
     RUN_TEST(test_store_round_trip_is_the_restart_case);
     RUN_TEST(test_load_result_texts);
     RUN_TEST(test_crc_sealed_checks_the_trailing_crc);
     RUN_TEST(test_recovery_prefers_file_then_temporary_then_backup);
     RUN_TEST(test_recovery_returns_nothing_when_no_slot_has_a_good_blob);
-    RUN_TEST(test_extended_speed_profiles_survive_restart_and_keep_old_auto);
+    RUN_TEST(test_extended_speed_profiles_survive_restart);
+    RUN_TEST(test_product_name_follows_the_model);
     return UNITY_END();
 }

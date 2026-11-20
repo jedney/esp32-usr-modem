@@ -1,4 +1,4 @@
-"""GPIO rules for the S3 N16R8 board, and the rev B defaults in .env.example."""
+"""GPIO rules for the S3 N16R8 board, and the defaults in .env.example."""
 import importlib.util
 from pathlib import Path
 
@@ -18,7 +18,7 @@ rules = load("pin_rules")
 ota = load("ota_upload")
 
 
-def test_rev_b_defaults_pass_every_rule():
+def test_defaults_pass_every_rule():
     pins = {k: int(v) for k, v in ota.read_env_file(ROOT / ".env.example").items()
             if k.startswith("USR_MODEM_PIN_")}
     assert len(pins) > 20

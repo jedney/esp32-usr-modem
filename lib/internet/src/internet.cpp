@@ -98,10 +98,10 @@ bool Engine::begin(Protocol protocol, const Options &options, uint32_t now) {
             stop(Reason::Network);
         return open_;
     }
-    const uint8_t request[] = {1, 4, 5, 220, 2, 6, 0, 0, 0, 0, 5, 6, 0, 0, 0, 0};
-    memcpy(lcpRequest_, request, sizeof request);
+    const uint8_t lcpOptions[] = {1, 4, 5, 220, 2, 6, 0, 0, 0, 0, 5, 6, 0, 0, 0, 0};
+    memcpy(lcpRequest_, lcpOptions, sizeof lcpOptions);
     put32(lcpRequest_ + 12, now ^ 0x55535231u);
-    lcpLength_ = sizeof request;
+    lcpLength_ = sizeof lcpOptions;
     ipcpRequest_[0] = 3;
     ipcpRequest_[1] = 6;
     put32(ipcpRequest_ + 2, options_.local);
@@ -157,14 +157,14 @@ void Engine::control(uint16_t protocol, uint8_t code, uint8_t id, const uint8_t 
         ++dropped_;
         return;
     }
-    uint8_t *packet = packet_;  // a member: the loop task's stack is small (v2.17)
-    packet[0] = code;
-    packet[1] = id;
-    packet[2] = uint8_t((length + 4) >> 8);
-    packet[3] = uint8_t(length + 4);
+    uint8_t *message = packet_;  // a member: the loop task's stack is small
+    message[0] = code;
+    message[1] = id;
+    message[2] = uint8_t((length + 4) >> 8);
+    message[3] = uint8_t(length + 4);
     if (length)
-        memcpy(packet + 4, data, length);
-    if (!frame(protocol, packet, length + 4))
+        memcpy(message + 4, data, length);
+    if (!frame(protocol, message, length + 4))
         stop(Reason::Overflow);
 }
 void Engine::request(bool ipc) {
@@ -386,7 +386,7 @@ void Engine::ipcp(const uint8_t *p, size_t n) {
     } else if (p[0] == 5) {
         control(kIpcp, 6, p[1], data, length);
         // Only a link that was up gets a fresh deadline to renegotiate. Before that, the
-        // 30 s run from the start, so a peer cannot keep a half-open link for ever (5.5-09).
+        // 30 s run from the start, so a peer cannot keep a half-open link for ever.
         const bool wasUp = ready_;
         closeNetwork();
         if (wasUp) {
@@ -407,7 +407,7 @@ void Engine::packet() {
     }
     const uint8_t *p = rx_;
     size_t length = rxLength_;
-    uint16_t protocol = kIp;
+    uint16_t pppProtocol = kIp;
     if (protocol_ == Protocol::Ppp) {
         if (length < 4 || fcs16(p, length) != 0xf0b8) {
             ++dropped_;
@@ -426,17 +426,17 @@ void Engine::packet() {
         if (*p & 1) {
             if (!peerPfc_)
                 return;
-            protocol = *p++;
+            pppProtocol = *p++;
             --length;
         } else {
             if (length < 2)
                 return;
-            protocol = be16(p);
+            pppProtocol = be16(p);
             p += 2;
             length -= 2;
         }
     }
-    if (protocol == kIp) {
+    if (pppProtocol == kIp) {
         if (ready_ && validIpv4(p, length, options_.peer) && network_.send(p, length))
             ++sent_;
         else
@@ -448,11 +448,11 @@ void Engine::packet() {
         return;
     }
     length = be16(p + 2);
-    if (protocol == kLcp)
+    if (pppProtocol == kLcp)
         lcp(p, length);
-    else if (protocol == kIpcp)
+    else if (pppProtocol == kIpcp)
         ipcp(p, length);
-    else if (protocol == kPap && lcpLocal_ && lcpPeer_ && p[0] == 1) {
+    else if (pppProtocol == kPap && lcpLocal_ && lcpPeer_ && p[0] == 1) {
         // Validate both length-prefixed fields; do not copy or retain credentials.
         if (length >= 6 && size_t(p[4]) + 6 <= length &&
             size_t(p[4]) + size_t(p[5 + p[4]]) + 6 == length) {
@@ -460,10 +460,10 @@ void Engine::packet() {
             control(kPap, 2, p[1], accepted, 1);
         } else
             ++dropped_;
-    } else if (lcpLocal_ && lcpPeer_ && protocol != kPap) {
+    } else if (lcpLocal_ && lcpPeer_ && pppProtocol != kPap) {
         uint8_t *reject = reply_;
-        reject[0] = uint8_t(protocol >> 8);
-        reject[1] = uint8_t(protocol);
+        reject[0] = uint8_t(pppProtocol >> 8);
+        reject[1] = uint8_t(pppProtocol);
         length = std::min(length, size_t(peerMru_ - 6));
         memcpy(reject + 2, p, length);
         control(kLcp, 8, lcpId_, reject, length + 2);
@@ -537,6 +537,8 @@ void Engine::poll(uint32_t now) {
         else
             request(true);
     }
+    // cppcheck follows one fresh queue; its space changes as bytes come and go
+    // cppcheck-suppress knownConditionTrueFalse
     for (unsigned i = 0; ready_ && i < 4 && tx_.space() >= 4096; ++i) {
         const size_t n = network_.receive(ip_, sizeof ip_);
         if (!n)

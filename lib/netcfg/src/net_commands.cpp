@@ -32,7 +32,7 @@ bool confirmationForget = false;
 uint32_t now() {
     return clockMs != nullptr ? clockMs() : 0;
 }
-// A join, scan or address change would drop a call in progress without a word (5.5-05).
+// A join, scan or address change would drop a call in progress without a word.
 bool refusedDuringCall(Port &port) {
     if (callUp == nullptr || !callUp()) {
         return false;

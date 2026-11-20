@@ -64,6 +64,8 @@ void Incoming::ring(uint32_t now) {
     hostport::Session &target = autoAnswerTarget();
     // S0 above kMaxRings answers on the last ring: the call is dropped after it.
     const uint8_t s0 = modem_.active().s[0];
+    // rings_ counts up to kMaxRings across calls; cppcheck sees only this one
+    // cppcheck-suppress knownConditionTrueFalse
     if (s0 && rings_ >= (s0 < kMaxRings ? s0 : kMaxRings) && eligible(target)) {
         answer(target);
     }
@@ -171,7 +173,7 @@ void Incoming::poll(bool available) {
                 socket_.close();
                 return;
             }
-            connection_.begin(false);
+            connection_.begin(Mode::Telnet);
             if (observer_) {
                 Entry peer;
                 strncpy(peer.host, socket_.peer(), sizeof peer.host - 1);
@@ -207,7 +209,7 @@ void Incoming::poll(bool available) {
             }
             if (now - ringAt_ >= kRingPeriodMs) {
                 if (rings_ >= kMaxRings) {
-                    clear(true);  // SEC-01: nobody answered. End it like a caller who hung up.
+                    clear(true);  // nobody answered. End it like a caller who hung up.
                 } else {
                     ring(now);  // no catch-up burst after a delayed poll
                 }

@@ -1,4 +1,4 @@
-// On-board checks of the hardware layer (project brief 6.14). These pass with nothing
+// On-board checks of the hardware layer (spec 3.13). These pass with nothing
 // wired to the S3, so they check the drivers, not the electronics; AT*HWTEST checks the
 // electronics. Run with the board connected: pio test -e s3
 #include <Arduino.h>

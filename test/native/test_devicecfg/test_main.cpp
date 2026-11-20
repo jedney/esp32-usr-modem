@@ -1,78 +1,44 @@
-// v0.7 lifecycle, input privacy, policy timing and reset recovery. No board required.
+// Device password lifecycle, input privacy, policy timing and reset recovery. No board required.
 #include <unity.h>
 
 #include <cstring>
 #include <string>
 #include <vector>
 
+#define FAKES_STORE
+#define FAKES_SINK
+#include "../support/fakes.h"
 #include "device_commands.h"
 
 using namespace devicecfg;
 void setUp() {}
 void tearDown() {}
 
-class Memory : public modemcfg::Store {
-public:
-    std::vector<uint8_t> bytes;
-    bool failSave = false;
-    bool failLoad = false;
-    bool failErase = false;
-    bool noFilesystem = false;  // FileStore::erase(): not mounted means nothing to erase
-    unsigned saves = 0;
-    size_t load(uint8_t *out, size_t cap) override {
-        if (failLoad)
-            return modemcfg::kLoadError;
-        size_t n = bytes.size() < cap ? bytes.size() : cap;
-        if (n != 0) {
-            memcpy(out, bytes.data(), n);
-        }
-        return n;
+// Seals an edited device record again, so a test can show what the CRC alone does not catch.
+void fixCrc(fakes::MemoryStore &store) {
+    uint32_t crc = modemcfg::crc32(store.bytes.data(), kBlobSize - 4);
+    for (size_t i = 0; i < 4; ++i) {
+        store.bytes[kBlobSize - 4 + i] = static_cast<uint8_t>(crc >> (8 * i));
     }
-    bool save(const uint8_t *data, size_t n) override {
-        if (failSave) {
-            return false;
-        }
-        bytes.assign(data, data + n);
-        ++saves;
-        return true;
-    }
-    bool erase() override {
-        if (failErase && !noFilesystem) {
-            return false;
-        }
-        bytes.clear();
-        return true;
-    }
-    bool contains(const char *text) const {
-        std::string data(bytes.begin(), bytes.end());
-        return data.find(text) != std::string::npos;
-    }
-    void fixCrc() {
-        uint32_t crc = modemcfg::crc32(bytes.data(), kBlobSize - 4);
-        for (size_t i = 0; i < 4; ++i) {
-            bytes[kBlobSize - 4 + i] = static_cast<uint8_t>(crc >> (8 * i));
-        }
-    }
-};
+}
 
-// Deliberately fake, deterministic hashes; real MD5/realm vectors are checked on-board.
+// A deliberately fake, deterministic hash; the real SHA-256 vector is checked on-board.
 class FakeCrypto : public Crypto {
 public:
     uint32_t next = 0;
     bool brokenRandom = false;
     bool failHash = false;
     uint32_t randomWord() override { return brokenRandom ? UINT32_MAX : next++; }
-    bool hashes(const char *password, char ota[33], char digest[33]) override {
+    bool hash(const char *password, char ota[kOtaHashLength + 1]) override {
         unsigned sum = 0;
         for (const char *p = password; *p; ++p) {
             sum = sum * 31 + static_cast<unsigned char>(*p);
         }
         const char *hex = "0123456789abcdef";
-        for (size_t i = 0; i < 32; ++i) {
-            ota[i] = hex[(sum >> (i % 8 * 4)) & 15];
-            digest[i] = hex[((sum + 73) >> (i % 8 * 4)) & 15];
+        for (size_t i = 0; i < kOtaHashLength; ++i) {
+            ota[i] = hex[((sum + i / 8) >> (i % 8 * 4)) & 15];
         }
-        ota[32] = digest[32] = 0;
+        ota[kOtaHashLength] = 0;
         return !failHash;
     }
 };
@@ -88,15 +54,11 @@ public:
     bool wifiUp() override { return connected; }
     void restart() override { reboot = true; }
 };
-class Output : public atcmd::Sink {
-public:
-    std::string text;
-    void write(const char *data, size_t n) override { text.append(data, n); }
-};
+using Output = fakes::TextSink;
 
 const atcmd::StarCommand table[] = {DEVICECFG_STAR_COMMANDS};
 struct Rig {
-    Memory auth, modemStore, netStore, bookStore;
+    fakes::MemoryStore auth, modemStore, netStore, bookStore;
     FakeCrypto crypto;
     Device device;
     FakeControl control;
@@ -130,7 +92,7 @@ bool has(const std::string &text, const char *part) {
 }
 
 void test_first_boot_is_random_twelve_and_saved_for_display() {
-    Memory store;
+    fakes::MemoryStore store;
     FakeCrypto crypto;
     Device device(store, crypto);
     TEST_ASSERT_TRUE(device.begin());
@@ -144,14 +106,12 @@ void test_first_boot_is_random_twelve_and_saved_for_display() {
     TEST_ASSERT_TRUE(again.begin());
     TEST_ASSERT_EQUAL_STRING(password.c_str(), again.bootPassword());
     TEST_ASSERT_EQUAL_STRING(device.otaHash(), again.otaHash());
-    TEST_ASSERT_EQUAL_STRING(device.digestHash(), again.digestHash());
     TEST_ASSERT_EQUAL(1, store.saves);
 }
 
-void test_first_use_erases_plaintext_but_keeps_both_hashes() {
+void test_first_use_erases_plaintext_but_keeps_the_hash() {
     Rig r;
     std::string password(r.device.bootPassword()), ota(r.device.otaHash());
-    std::string digest(r.device.digestHash());
     TEST_ASSERT_TRUE(r.device.markUsed());
     TEST_ASSERT_EQUAL_STRING("", r.device.bootPassword());
     TEST_ASSERT_FALSE(r.auth.contains(password.c_str()));
@@ -159,10 +119,25 @@ void test_first_use_erases_plaintext_but_keeps_both_hashes() {
     TEST_ASSERT_TRUE(again.begin());
     TEST_ASSERT_EQUAL_STRING("", again.bootPassword());
     TEST_ASSERT_EQUAL_STRING(ota.c_str(), again.otaHash());
-    TEST_ASSERT_EQUAL_STRING(digest.c_str(), again.digestHash());
     unsigned saves = r.auth.saves;
     TEST_ASSERT_TRUE(r.device.markUsed());
     TEST_ASSERT_EQUAL(saves, r.auth.saves);
+}
+
+void test_matches_checks_the_password_through_its_hash() {
+    Rig r;
+    std::string password(r.device.bootPassword());
+    TEST_ASSERT_TRUE(r.device.matches(password.c_str()));
+    TEST_ASSERT_TRUE(r.device.markUsed());  // the plaintext is gone; the hash still checks
+    TEST_ASSERT_TRUE(r.device.matches(password.c_str()));
+    TEST_ASSERT_FALSE(r.device.matches((password + "x").c_str()));
+    TEST_ASSERT_FALSE(r.device.matches(""));
+    TEST_ASSERT_FALSE(r.device.matches("short"));
+    TEST_ASSERT_TRUE(r.device.change("NewPassword!"));
+    TEST_ASSERT_FALSE(r.device.matches(password.c_str()));
+    TEST_ASSERT_TRUE(r.device.matches("NewPassword!"));
+    r.crypto.failHash = true;
+    TEST_ASSERT_FALSE(r.device.matches("NewPassword!"));
 }
 
 void test_password_validation_preserves_spaces_and_punctuation() {
@@ -202,7 +177,7 @@ void test_failed_changes_keep_previous_credentials() {
 }
 
 void test_failed_initial_save_never_enables_unauthenticated_ota() {
-    Memory store;
+    fakes::MemoryStore store;
     store.failSave = true;
     FakeCrypto crypto;
     Device device(store, crypto);
@@ -216,7 +191,7 @@ void test_failed_initial_save_never_enables_unauthenticated_ota() {
 void test_damaged_and_future_records_fail_closed_without_overwriting() {
     Rig r;
     const std::vector<uint8_t> original = r.auth.bytes;
-    for (size_t index : {size_t(0), size_t(4), size_t(5), size_t(6), size_t(20), size_t(109)}) {
+    for (size_t index : {size_t(0), size_t(4), size_t(5), size_t(6), size_t(20), kBlobSize - 1}) {
         r.auth.bytes = original;
         r.auth.bytes[index] ^= 0xFF;
         auto damaged = r.auth.bytes;
@@ -237,13 +212,30 @@ void test_damaged_and_future_records_fail_closed_without_overwriting() {
 void test_valid_crc_cannot_hide_invalid_hash_or_missing_terminator() {
     Rig r;
     auto original = r.auth.bytes;
-    for (size_t index : {size_t(39), size_t(40), size_t(72), size_t(105)}) {
+    // The password's terminator, the hash's first and last characters, the hash's terminator.
+    for (size_t index : {size_t(39), size_t(40), size_t(103), size_t(104)}) {
         r.auth.bytes = original;
         r.auth.bytes[index] = 0xFF;
-        r.auth.fixCrc();
+        fixCrc(r.auth);
         Device again(r.auth, r.crypto);
         TEST_ASSERT_FALSE(again.begin());
     }
+}
+
+// Layout 1: USRA, layout, policy, reset marker, password (33 bytes from 7), OTA hash
+// (SHA-256 hex, 65 bytes from 40), CRC-32.
+void test_record_holds_the_sha256_hash() {
+    Rig r;
+    TEST_ASSERT_EQUAL(109, kBlobSize);
+    TEST_ASSERT_EQUAL(kBlobSize, r.auth.bytes.size());
+    TEST_ASSERT_EQUAL(1, r.auth.bytes[4]);
+    TEST_ASSERT_EQUAL(64, strlen(r.device.otaHash()));
+    TEST_ASSERT_EQUAL_MEMORY(r.device.otaHash(), r.auth.bytes.data() + 40, 65);
+    // A short OTA hash (32 characters) is refused, even with a valid CRC.
+    r.auth.bytes[72] = 0;
+    fixCrc(r.auth);
+    Device shortOta(r.auth, r.crypto);
+    TEST_ASSERT_FALSE(shortOta.begin());
 }
 
 void test_broken_entropy_is_bounded_and_rejected() {
@@ -322,8 +314,8 @@ void test_inline_password_is_masked_not_repeated_or_disclosed_by_show_commands()
 void test_lower_case_password_and_backspace_never_reveal_arguments() {
     Rig r;
     TEST_ASSERT_FALSE(has(r.type("at*pass=HiddenXY\bZ\r"), "Hidden"));
-    char ota[33], digest[33];
-    r.crypto.hashes("HiddenXZ", ota, digest);
+    char ota[kOtaHashLength + 1];
+    r.crypto.hash("HiddenXZ", ota);
     TEST_ASSERT_EQUAL_STRING(ota, r.device.otaHash());
 }
 
@@ -464,16 +456,6 @@ void test_factory_last_erase_failure_keeps_recovery_marker() {
     TEST_ASSERT_TRUE(again.factoryReset(r.stores, 3));
 }
 
-void test_factory_completes_when_a_store_has_no_filesystem() {
-    Rig r;
-    r.bookStore.failErase = true;     // would stop the reset ...
-    r.bookStore.noFilesystem = true;  // ... but "not mounted" counts as erased
-    TEST_ASSERT_TRUE(r.device.factoryReset(r.stores, 3));
-    Device again(r.auth, r.crypto);
-    TEST_ASSERT_TRUE(again.begin());
-    TEST_ASSERT_FALSE(again.needsReset());
-}
-
 void test_modem_factory_templates_and_reset_keep_device_credentials() {
     Rig r;
     auto saved = r.auth.bytes;
@@ -495,30 +477,30 @@ void test_help_includes_every_device_command_without_credentials() {
 void test_password_separator_and_only_value_masked() {
     Rig r;
     std::string text = r.type("AT*PASS=abc=defg\r");
-    TEST_ASSERT_TRUE(text.find("AT*PASS=********\r") == 0);
+    TEST_ASSERT_TRUE(text.starts_with("AT*PASS=********\r"));
     TEST_ASSERT_FALSE(has(text, "abc=defg"));
     TEST_ASSERT_TRUE(has(r.type("A/"), "ERROR"));
     text = r.type("at*pass=abcdefgh\x7fZ\r");
-    TEST_ASSERT_TRUE(text.find("at*pass=********\b \b*\r") == 0);
-    TEST_ASSERT_TRUE(text.find("at*pass=") == 0);
+    TEST_ASSERT_TRUE(text.starts_with("at*pass=********\b \b*\r"));
+    TEST_ASSERT_TRUE(text.starts_with("at*pass="));
     TEST_ASSERT_FALSE(has(text, "abcdefgh"));
     r.type("ATE0\r");
     text = r.type("AT*PASS=abcdefgh\r");
     TEST_ASSERT_EQUAL_STRING("\r\nDevice password changed.\r\n\r\nOK\r\n", text.c_str());
     r.type("ATE1\r");
     text = r.type("AT*PASS=\b=abcdefgh\r");
-    TEST_ASSERT_TRUE(text.find("AT*PASS=\b \b=********\r") == 0);
+    TEST_ASSERT_TRUE(text.starts_with("AT*PASS=\b \b=********\r"));
     TEST_ASSERT_FALSE(has(text, "abcdefgh"));
 }
 
-void test_browser_password_generation_cannot_disclose_plaintext() {
+void test_browser_password_generation_discloses_once_to_requesting_port() {
     Rig r;
     r.port.setBrowser(true);
     std::string hash = r.device.otaHash();
     auto text = r.type("AT*PASS\r");
-    TEST_ASSERT_FALSE(has(text, "Device password:"));
-    TEST_ASSERT_TRUE(has(text, "ERROR"));
-    TEST_ASSERT_EQUAL_STRING(hash.c_str(), r.device.otaHash());
+    TEST_ASSERT_TRUE(has(text, "Device password:"));
+    TEST_ASSERT_TRUE(has(text, "OK"));
+    TEST_ASSERT_FALSE(hash == r.device.otaHash());
     text = r.type("AT*PASS=WriteOnlyExample\r");
     TEST_ASSERT_FALSE(has(text, "WriteOnlyExample"));
     TEST_ASSERT_TRUE(has(text, "OK"));
@@ -526,7 +508,7 @@ void test_browser_password_generation_cannot_disclose_plaintext() {
 }
 
 void test_unreadable_device_record_never_generates_replacement_credentials() {
-    Memory memory;
+    fakes::MemoryStore memory;
     FakeCrypto crypto;
     Device first(memory, crypto);
     TEST_ASSERT_TRUE(first.begin());
@@ -544,16 +526,18 @@ int main() {
     UNITY_BEGIN();
     RUN_TEST(test_unreadable_device_record_never_generates_replacement_credentials);
 
-    RUN_TEST(test_browser_password_generation_cannot_disclose_plaintext);
+    RUN_TEST(test_browser_password_generation_discloses_once_to_requesting_port);
     RUN_TEST(test_password_separator_and_only_value_masked);
     RUN_TEST(test_first_boot_is_random_twelve_and_saved_for_display);
-    RUN_TEST(test_first_use_erases_plaintext_but_keeps_both_hashes);
+    RUN_TEST(test_first_use_erases_plaintext_but_keeps_the_hash);
     RUN_TEST(test_password_validation_preserves_spaces_and_punctuation);
+    RUN_TEST(test_matches_checks_the_password_through_its_hash);
     RUN_TEST(test_change_stores_only_hashes_even_without_first_use);
     RUN_TEST(test_failed_changes_keep_previous_credentials);
     RUN_TEST(test_failed_initial_save_never_enables_unauthenticated_ota);
     RUN_TEST(test_damaged_and_future_records_fail_closed_without_overwriting);
     RUN_TEST(test_valid_crc_cannot_hide_invalid_hash_or_missing_terminator);
+    RUN_TEST(test_record_holds_the_sha256_hash);
     RUN_TEST(test_broken_entropy_is_bounded_and_rejected);
     RUN_TEST(test_ota_always_default_requires_credentials_wifi_and_idle);
     RUN_TEST(test_demand_window_expires_exactly_at_ten_minutes_and_can_reopen);
@@ -570,7 +554,6 @@ int main() {
     RUN_TEST(test_factory_interruption_is_retried_after_restart);
     RUN_TEST(test_factory_marker_failure_does_not_erase_anything);
     RUN_TEST(test_factory_last_erase_failure_keeps_recovery_marker);
-    RUN_TEST(test_factory_completes_when_a_store_has_no_filesystem);
     RUN_TEST(test_modem_factory_templates_and_reset_keep_device_credentials);
     RUN_TEST(test_help_includes_every_device_command_without_credentials);
     return UNITY_END();

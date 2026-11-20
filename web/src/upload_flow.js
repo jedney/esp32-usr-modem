@@ -1,4 +1,4 @@
-// The image upload flow: preflight, confirmation, login refresh, sending, result.
+// The image upload flow: preflight, confirmation, login check, sending, result.
 // Every browser call is passed in, so Node can run the whole flow in tests.
 import {inspectImage, compareVersions} from './upload.js';
 
@@ -10,7 +10,7 @@ export const MAX_IMAGE = 0x7e0000;
  * second press during the preflight is ignored.
  * env.show(text): status line.   env.setBusy(bool): disables the upload button.
  * env.confirm(text) -> bool.     env.read(file) -> Promise<Uint8Array>.
- * env.login() -> Promise<bool>:  a small authenticated request that refreshes Digest credentials.
+ * env.login() -> Promise<bool>:  checks the login session is still valid (GET api/auth).
  * env.send(request) -> Promise<{status, text}>, rejects when the connection fails.
  * env.installed(): called after HTTP 200.
  */

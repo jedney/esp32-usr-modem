@@ -10,6 +10,8 @@ public:
     size_t space() const { return N - count_; }
     void clear() { head_ = count_ = 0; }
     bool put(uint8_t b) {
+        // cppcheck follows one fresh queue; its space changes as bytes come and go
+        // cppcheck-suppress knownConditionTrueFalse
         if (!space()) {
             return false;
         }

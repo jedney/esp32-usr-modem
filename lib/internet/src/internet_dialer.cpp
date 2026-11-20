@@ -169,6 +169,7 @@ atcmd::Reply Dialer::command(atcmd::Port &port, const char *args) {
                          : o.dns  ? o.dns
                                   : net_.link().dns,
                          dns, sizeof dns);
+        port.beginInfo();
         port.printf("Internet: %s; reason=%s\r\n",
                     !active()                     ? "idle"
                     : !connected()                ? "dialling"

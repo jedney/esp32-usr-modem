@@ -1,4 +1,4 @@
-// How a serial port's result sink writes (STA-01): a port that the computer does not read
+// How a serial port's result sink writes: a port that the computer does not read
 // (RTS held off, or a program that holds the USB port open and never reads) must never
 // stop the modem.
 //   - Unsolicited output (RING): written whole if the port has room for it now, otherwise

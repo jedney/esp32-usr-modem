@@ -47,6 +47,7 @@ bool Session::startCall(Connection &conn, uint32_t operationalSpeed, uint32_t re
         return false;
     }
     conn_ = &conn;
+    conn_->terminalSize(columns_, rows_);
     payloadSent_ = payloadReceived_ = 0;
     answered_ = answered;
     const unsigned n = profile().get(modemcfg::kAmpN);
@@ -82,6 +83,14 @@ void Session::sendConnect() {
 
 bool Session::dial(const char *text, bool pulse) {
     return dialer_ != nullptr && dialer_->start(*this, text, pulse);
+}
+void Session::resize(unsigned columns, unsigned rows) {
+    if (!columns || columns > 65535 || !rows || rows > 65535)
+        return;
+    columns_ = columns;
+    rows_ = rows;
+    if (conn_)
+        conn_->terminalSize(columns, rows);
 }
 
 size_t Session::allowance(unsigned direction) const {

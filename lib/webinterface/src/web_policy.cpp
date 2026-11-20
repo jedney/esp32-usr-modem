@@ -1,4 +1,5 @@
 #include "web_policy.h"
+#include <algorithm>
 #include <cctype>
 #include <cstdio>
 #include <cstring>
@@ -22,10 +23,10 @@ bool terminalSize(const std::string &message, unsigned &columns, unsigned &rows)
         return offset > start && (offset - start == 1 || message[start] != '0');
     };
     unsigned c, r;
-    if (!number(c, 132) || c < 1 || message.compare(offset, 8, ",\"rows\":") != 0)
+    if (!number(c, 65535) || c < 80 || message.compare(offset, 8, ",\"rows\":") != 0)
         return false;
     offset += 8;
-    if (!number(r, 50) || r < 1 || message.substr(offset) != "}")
+    if (!number(r, 65535) || r < 25 || message.substr(offset) != "}")
         return false;
     columns = c;
     rows = r;
@@ -33,81 +34,9 @@ bool terminalSize(const std::string &message, unsigned &columns, unsigned &rows)
 }
 namespace {
 std::string lower(std::string value) {
-    for (char &c : value) {
-        c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
-    }
+    std::transform(value.begin(), value.end(), value.begin(),
+                   [](unsigned char c) { return static_cast<char>(tolower(c)); });
     return value;
-}
-bool hex(const std::string &text, size_t n) {
-    if (text.size() != n) {
-        return false;
-    }
-    for (char c : text) {
-        if (!isxdigit(static_cast<unsigned char>(c))) {
-            return false;
-        }
-    }
-    return true;
-}
-bool fields(const std::string &header, std::map<std::string, std::string> &out) {
-    if (header.size() > 900 || header.compare(0, 7, "Digest ") != 0) {
-        return false;
-    }
-    size_t i = 7;
-    while (i < header.size()) {
-        while (i < header.size() && header[i] == ' ') {
-            ++i;
-        }
-        size_t start = i;
-        while (i < header.size() && isalnum(static_cast<unsigned char>(header[i]))) {
-            ++i;
-        }
-        std::string key = header.substr(start, i - start);
-        if (key.empty() || i == header.size() || header[i++] != '=') {
-            return false;
-        }
-        std::string value;
-        if (i < header.size() && header[i] == '"') {
-            ++i;
-            bool closed = false;
-            while (i < header.size()) {
-                char c = header[i++];
-                if (c == '"') {
-                    closed = true;
-                    break;
-                }
-                if (c == '\\') {
-                    if (i == header.size()) {
-                        return false;
-                    }
-                    c = header[i++];
-                }
-                if (static_cast<unsigned char>(c) < 32 || c == 127) {
-                    return false;
-                }
-                value += c;
-            }
-            if (!closed) {
-                return false;
-            }
-        } else {
-            start = i;
-            while (i < header.size() && header[i] != ',' && header[i] != ' ') {
-                ++i;
-            }
-            value = header.substr(start, i - start);
-        }
-        if (!out.emplace(key, value).second || out.size() > 12) {
-            return false;
-        }
-        while (i < header.size() && header[i] == ' ') {
-            ++i;
-        }
-        if (i < header.size() && (header[i++] != ',' || i == header.size())) {
-            return false;
-        }
-    }
-    return true;
 }
 bool version(const std::string &s, unsigned &major, unsigned &minor) {
     size_t dot = s.find('.');
@@ -158,7 +87,7 @@ bool HeaderGate::accept(const uint8_t *data, size_t len) {
             continue;
         }
         head_ += static_cast<char>(data[i]);
-        if (head_.size() > 4096) {
+        if (head_.size() > kMaxHeader) {
             bad_ = true;
             return false;
         }
@@ -171,8 +100,6 @@ bool HeaderGate::accept(const uint8_t *data, size_t len) {
             bad_ = true;
             return false;
         }
-        target_ = head_.substr(pathStart + 1, pathEnd - pathStart - 1);
-        filtered_ = head_.substr(0, lineEnd + 2);
         size_t pos = lineEnd + 2;
         std::map<std::string, unsigned> counts;
         while (pos + 2 < head_.size()) {
@@ -183,15 +110,15 @@ bool HeaderGate::accept(const uint8_t *data, size_t len) {
                 return false;
             }
             std::string key = lower(head_.substr(pos, colon - pos));
-            for (char c : key) {
-                if (!isalnum(static_cast<unsigned char>(c)) && c != '-') {
-                    bad_ = true;
-                    return false;
-                }
+            if (std::any_of(key.begin(), key.end(), [](char c) {
+                    return !isalnum(static_cast<unsigned char>(c)) && c != '-';
+                })) {
+                bad_ = true;
+                return false;
             }
             if (++counts[key] > 1 &&
-                (key == "host" || key == "origin" || key == "authorization" ||
-                 key == "content-length" || key == "upgrade" || key.compare(0, 2, "x-") == 0)) {
+                (key == "host" || key == "origin" || key == "cookie" || key == "content-length" ||
+                 key == "upgrade" || key.compare(0, 2, "x-") == 0)) {
                 bad_ = true;
                 return false;
             }
@@ -216,32 +143,17 @@ bool HeaderGate::accept(const uint8_t *data, size_t len) {
                     remaining_ = remaining_ * 10 + unsigned(c - '0');
                 }
             }
-            if (key == "host") {
-                host_ = value;
-            }
-            if (key == "origin") {
-                origin_ = value;
-            }
             if (key == "upgrade") {
                 websocket_ = lower(value) == "websocket";
             }
-            if (key == "host" || key == "origin" || key == "authorization" ||
-                key == "content-length" || key == "content-type" || key == "connection" ||
-                key == "upgrade" || key == "sec-websocket-key" || key == "sec-websocket-version" ||
-                key == "x-csrf-token" || key == "x-image-sha256" || key == "x-confirm-downgrade" ||
-                key == "x-confirm-filesystem") {
-                filtered_ += key + ": " + value + "\r\n";
-            }
             pos = end + 2;
         }
-        filtered_ += "\r\n";
-        complete_ = counts["host"] == 1 && remaining_ <= 0x7e0000u && filtered_.size() <= 1024;
+        complete_ = counts["host"] == 1 && remaining_ <= 0x7e0000u;
         if (!complete_) {
             bad_ = true;
             return false;
         }
         devicecfg::wipe(&head_[0], head_.size());
-        headerLength_ = head_.size();
         head_.clear();
     }
     return true;
@@ -291,7 +203,7 @@ std::string jsonString(const char *value) {
             result += '\\';
             result += static_cast<char>(*p);
         } else if (*p >= 0xC2) {
-            // Valid UTF-8 passes through, so a network named "Café" is readable (5.5-16).
+            // Valid UTF-8 passes through, so a network named "Café" is readable.
             // utf8Length() reads at most three bytes ahead; a NUL ends the string safely
             // because it is never a continuation byte.
             const size_t n = utf8Length(p);
@@ -325,11 +237,17 @@ int compareVersions(const std::string &a, const std::string &b) {
     if (!version(a, am, an) || !version(b, bm, bn)) {
         return -2;
     }
-    return am == bm && an == bn ? 0 : (am < bm || (am == bm && an < bn) ? -1 : 1);
+    if (am != bm) {
+        return am < bm ? -1 : 1;
+    }
+    if (an != bn) {
+        return an < bn ? -1 : 1;
+    }
+    return 0;
 }
-bool Auth::token(char out[33]) {
+bool makeToken(Crypto &crypto, char out[33]) {
     uint8_t bytes[16] = {};
-    if (!crypto_.random(bytes, sizeof bytes)) {
+    if (!crypto.random(bytes, sizeof bytes)) {
         out[0] = 0;
         return false;
     }
@@ -342,89 +260,39 @@ bool Auth::token(char out[33]) {
     devicecfg::wipe(bytes, sizeof bytes);
     return true;
 }
-void Auth::reset() {
-    for (auto &n : nonce_) {
-        n = {};
-    }
-    wrong_ = false;
-}
-std::string Auth::challenge(uint32_t now, bool stale) {
-    char value[33];
-    if (!token(value)) {
-        return "";
-    }
-    nonce_[next_] = {value, now, 0};
-    next_ = (next_ + 1) % 8;
-    return std::string("Digest realm=\"usr-modem\", qop=\"auth\", algorithm=MD5, nonce=\"") +
-           value + '"' + (stale ? ", stale=true" : "");
-}
-Check Auth::check(const std::string &header, const std::string &method, const std::string &uri,
-                  const char *ha1, uint32_t now) {
-    std::map<std::string, std::string> f;
-    if (!ha1 || !hex(ha1, 32) || !fields(header, f) || f["username"] != "admin" ||
-        f["realm"] != "usr-modem" || f["uri"] != uri || f["qop"] != "auth" ||
-        (f.count("algorithm") && f["algorithm"] != "MD5") || !hex(f["nc"], 8) ||
-        !hex(f["response"], 32) || f["cnonce"].empty() || f["cnonce"].size() > 128 ||
-        !hex(f["nonce"], 32)) {
-        return Check::kMissing;
-    }
-    if (lockedOut(now)) {
-        return Check::kWrong;
-    }
-    uint32_t count = 0;
-    for (char c : f["nc"]) {
-        count = (count << 4) | unsigned(c <= '9' ? c - '0' : tolower(c) - 'a' + 10);
-    }
-    // The response is checked against the nonce the browser sent. Only a fresh nonce
-    // that we issued, used with a higher count than before, logs in. A correct
-    // response for any other nonce proves the password, so it is only "stale".
-    char ha2[33] = {}, expected[33] = {};
-    bool correct = crypto_.md5(method + ':' + uri, ha2) &&
-                   crypto_.md5(std::string(ha1) + ':' + f["nonce"] + ':' + f["nc"] + ':' +
-                                   f["cnonce"] + ":auth:" + ha2,
-                               expected) &&
-                   equalSecret(lower(f["response"]), expected);
-    devicecfg::wipe(ha2, sizeof ha2);
-    devicecfg::wipe(expected, sizeof expected);
-    if (!correct) {
-        wrong_ = true;
-        wrongAt_ = now;
-        return Check::kWrong;
-    }
-    for (auto &n : nonce_) {
-        if (!n.value.empty() && equalSecret(f["nonce"], n.value) && now - n.at < 60000 &&
-            count > n.count) {
-            n.count = count;
-            return Check::kOk;
-        }
-    }
-    return Check::kStale;
-}
 void Tickets::reset() {
     for (auto &t : ticket_) {
         t = {};
     }
 }
-std::string Tickets::issue(uint32_t now) {
+std::string Tickets::issue(uint32_t session, uint32_t now) {
     char value[33];
-    if (!auth_.token(value)) {
+    if (!session || !makeToken(crypto_, value)) {
         return "";
     }
-    ticket_[next_] = {value, now};
+    ticket_[next_] = {value, now, session};
     next_ = (next_ + 1) % 4;
     return value;
 }
-bool Tickets::consume(const std::string &token, uint32_t now) {
+uint32_t Tickets::consume(const std::string &token, uint32_t now) {
     if (token.size() != 32) {
-        return false;
+        return 0;
     }
     for (auto &t : ticket_) {
         if (!t.value.empty() && equalSecret(t.value, token) && now - t.at < 30000) {
+            uint32_t session = t.session;
             t = {};
-            return true;
+            return session;
         }
     }
-    return false;
+    return 0;
+}
+void Tickets::revoke(uint32_t session) {
+    for (auto &t : ticket_) {
+        if (t.session == session) {
+            t = {};
+        }
+    }
 }
 bool Settings::begin() {
     uint8_t data[10] = {};

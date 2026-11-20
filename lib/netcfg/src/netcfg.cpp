@@ -287,20 +287,6 @@ const char *Net::stateText() const {
 
 // --- Lights ---------------------------------------------------------------------------------
 
-Rgb Net::rgb(uint32_t nowMs) const {
-    const Rgb flash = (nowMs / kFlashMs) % 2 == 0 ? Rgb::kGreen : Rgb::kOff;
-    if (join_ == JoinResult::kRunning) {
-        return flash;
-    }
-    if (!s_.enabled) {
-        return Rgb::kOff;
-    }
-    if (!s_.hasNetwork()) {
-        return Rgb::kRed;
-    }
-    return up() ? Rgb::kGreen : flash;
-}
-
 Arq Net::arq() const {
     if (join_ == JoinResult::kRunning) {
         return Arq::kBlink;
@@ -572,7 +558,7 @@ bool Net::scanStart(uint32_t nowMs) {
 }
 
 // A scan switches the radio on even with Wi-Fi off, and the radio still reports "off", so
-// tick() would never switch it back (5.5-01).
+// tick() would never switch it back.
 void Net::radioOffIfDisabled() {
     if (!s_.enabled) {
         radio_.off();

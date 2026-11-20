@@ -1,4 +1,5 @@
-// v0.7 hardware checks. Only scratch NVS namespaces are written; no extra wiring.
+// Hardware checks for the device password and OTA policy. Only scratch NVS namespaces are written;
+// no extra wiring.
 #include <Arduino.h>
 #include <unity.h>
 
@@ -14,11 +15,31 @@ bool cryptoReady = false;
 void setUp() {}
 void tearDown() {}
 
-void test_real_hashes_match_ota_and_fixed_digest_realm() {
-    char ota[33] = {}, digest[33] = {};
-    TEST_ASSERT_TRUE(crypto.hashes("password", ota, digest));
-    TEST_ASSERT_EQUAL_STRING("5f4dcc3b5aa765d61d8327deb882cf99", ota);
-    TEST_ASSERT_EQUAL_STRING("3ba84c8c9a93845740a46d37bf97bd5d", digest);
+void test_real_hash_is_sha256() {
+    char ota[devicecfg::kOtaHashLength + 1] = {};
+    TEST_ASSERT_TRUE(crypto.hash("password", ota));
+    // SHA-256("password"): the OTA and login hash.
+    TEST_ASSERT_EQUAL_STRING("5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8",
+                             ota);
+}
+
+void test_random_words_are_distinct_and_never_the_rejection_value() {
+    TEST_ASSERT_TRUE(cryptoReady);
+    uint32_t words[64];
+    for (size_t i = 0; i < 64; ++i) {
+        words[i] = crypto.randomWord();
+        TEST_ASSERT_TRUE(words[i] != UINT32_MAX);
+        for (size_t j = 0; j < i; ++j) {
+            TEST_ASSERT_TRUE(words[i] != words[j]);  // 32-bit collision odds: about 5 in 10 million
+        }
+    }
+}
+
+void test_random_words_are_refused_until_the_boot_seed_is_drawn() {
+    hw::EspCrypto unseeded;
+    TEST_ASSERT_EQUAL_UINT32(UINT32_MAX, unseeded.randomWord());
+    TEST_ASSERT_TRUE(crypto.begin());  // a second begin() keeps the seed it has
+    TEST_ASSERT_TRUE(crypto.randomWord() != UINT32_MAX);
 }
 
 void test_random_passwords_are_distinct_and_have_the_decided_alphabet() {
@@ -52,7 +73,7 @@ void test_credentials_and_first_use_survive_in_nvs() {
     TEST_ASSERT_TRUE(store.erase());
     devicecfg::Device first(store, crypto);
     TEST_ASSERT_TRUE(first.begin());
-    char password[33] = {}, hash[33] = {};
+    char password[devicecfg::kPasswordMax + 1] = {}, hash[devicecfg::kOtaHashLength + 1] = {};
     memcpy(password, first.bootPassword(), sizeof password);
     memcpy(hash, first.otaHash(), sizeof hash);
     hw::NvsStore reopened("authtest", "cfg");
@@ -86,7 +107,7 @@ void test_factory_wipes_each_project_namespace_and_generates_a_new_password() {
     TEST_ASSERT_TRUE(auth.erase());
     devicecfg::Device device(auth, crypto);
     TEST_ASSERT_TRUE(device.begin());
-    char oldHash[33] = {};
+    char oldHash[devicecfg::kOtaHashLength + 1] = {};
     memcpy(oldHash, device.otaHash(), sizeof oldHash);
     uint8_t sample[] = {1, 2, 3};
     TEST_ASSERT_TRUE(modem.save(sample, sizeof sample));
@@ -130,7 +151,9 @@ void setup() {
     delay(2000);
     UNITY_BEGIN();
     RUN_TEST(test_oversized_nvs_is_not_missing_and_preserves_credentials);
-    RUN_TEST(test_real_hashes_match_ota_and_fixed_digest_realm);
+    RUN_TEST(test_real_hash_is_sha256);
+    RUN_TEST(test_random_words_are_distinct_and_never_the_rejection_value);
+    RUN_TEST(test_random_words_are_refused_until_the_boot_seed_is_drawn);
     RUN_TEST(test_random_passwords_are_distinct_and_have_the_decided_alphabet);
     RUN_TEST(test_offline_password_generation_preserves_pot_adc);
     RUN_TEST(test_credentials_and_first_use_survive_in_nvs);

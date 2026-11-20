@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "description": "Web interface for the USR Modem Emulator (served from the modem's LittleFS)",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=26"
+  },
   "scripts": {
     "test": "node --test test/*.test.mjs"
   }

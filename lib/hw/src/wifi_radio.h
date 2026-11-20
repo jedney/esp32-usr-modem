@@ -1,4 +1,4 @@
-// The S3's Wi-Fi, mDNS and NTP behind netcfg::Radio (project brief 6.6), using the
+// The S3's Wi-Fi, mDNS and NTP behind netcfg::Radio (spec 3.6), using the
 // Arduino core's WiFi, ESPmDNS and SNTP. All decisions (when to join, retry, scan) are
 // made by netcfg::Net; this only does what it is told and reports what happened.
 //
@@ -25,10 +25,8 @@ public:
     void mac(uint8_t out[6]) override;
 };
 
-// --- On-board RGB LED (GPIO47, pins::kRgbLed): Wi-Fi status (v0.6) --------------------------
-// Uses the core's neopixelWrite() (RMT transmit channel 0); the speed capture uses receive
-// channel 4. Written only when the colour changes.
-void rgbSet(uint8_t r, uint8_t g, uint8_t b);
-void rgbShow(netcfg::Rgb colour);  // red / green / off at a low brightness
+// The Wi-Fi station MAC address (the one AT*HWINFO shows), read from eFuse: works before
+// Wi-Fi starts and with Wi-Fi off.
+void wifiMac(uint8_t out[6]);
 
 }  // namespace hw

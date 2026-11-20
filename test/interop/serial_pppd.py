@@ -112,7 +112,8 @@ def main():
                         dns = re.search(r'DNS=.*\(([0-9.]+)\)', status).group(1)
                         if os.environ.get('USR_MODEM_PASSWORD'):
                             from test_web import Web
-                            code, _, _ = Web(args.web_host).request('/api/session')
+                            with Web(args.web_host) as web:
+                                code, _, _ = web.request('/api/session')
                             if code != 200:
                                 raise RuntimeError('Local authenticated HTTP failed during PPP')
                             report['local_authenticated_http'] = 'passed'

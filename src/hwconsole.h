@@ -1,4 +1,4 @@
-// AT*HW... hardware-test commands (project brief 6.14). They run on any local port: the
+// AT*HW... hardware-test commands (spec 3.13). They run on any local port: the
 // maintenance console, the USB modem port, the RS232 host port, or the browser terminal.
 // A test prints and reads keys on the port the command came from. Every "any key" test
 // ends by itself when that terminal closes (DTR drops, the browser leaves) or when no key
@@ -24,8 +24,8 @@ public:
     void printf(const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 };
 
-// What the RS232 line, loopback and bridge tests need from the rest of the firmware
-// (Q79): they run only on the USB console, only with no call up, and the RS232 session is
+// What the RS232 line, loopback and bridge tests need from the rest of the firmware:
+// they run only on the USB console, only with no call up, and the RS232 session is
 // suspended while they use the port.
 struct PortControl {
     bool (*idle)();     // no call on any port

@@ -1,8 +1,9 @@
 """End-to-end checks of the AT command parser and stored settings on the USB console
-(v0.4, brief 6.2, 6.5, 6.6, 6.7).
+(spec 3.2, 3.5, 3.6, 3.7).
 
 These tests change settings. Each one starts and ends with ATZ (back to the stored
-template). The restart test saves the factory &F1 template to Y0 when it finishes.
+template) and runs with the factory model, restoring the saved model after. The restart
+test saves the factory &F1 template to Y0 when it finishes.
 """
 
 import pytest
@@ -14,9 +15,15 @@ def stored_settings(request):
         yield
         return
     console = request.getfixturevalue("console")
+    # The identity checks expect the factory model; put the saved one back after.
+    before_model = console.command("AT*MODEL?")[0].split()[0]
+    assert console.command("AT*MODEL=14400")[-1] == "OK"
     console.raw(b"ATZ\r")
-    yield
-    console.raw(b"ATZ\r")
+    try:
+        yield
+    finally:
+        console.raw(b"ATZ\r")
+        console.command("AT*MODEL=" + before_model)
 
 
 def test_echo_off_and_on(console):
@@ -103,7 +110,7 @@ def test_project_commands_still_work(console):
 
 
 def test_saved_settings_survive_a_restart(console):
-    """Roadmap v0.4 "done when": AT&V shows the saved profile after a restart."""
+    """AT&V shows the saved profile after a restart."""
     try:
         assert console.command("AT&F1 S7=45 X3 &W")[-1] == "OK"
         console.command("AT&F1")  # change the active settings so the restart matters

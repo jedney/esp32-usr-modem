@@ -1,1 +1,7 @@
-{"name":"calls","version":"0.8.0","frameworks":"*","platforms":"*","dependencies":[{"name":"hostport"},{"name":"dialstring"},{"name":"modemcfg"}]}
+{
+  "name": "calls",
+  "description": "USR Modem Emulator calls: outgoing Telnet, raw TCP and basic SSH calls, answer mode on port 23, the phonebook and Telnet negotiation (spec 3.3, 3.5, 3.6)",
+  "frameworks": "*",
+  "platforms": "*",
+  "dependencies": [{"name": "atcmd"}, {"name": "dialstring"}, {"name": "hostport"}, {"name": "modemcfg"}, {"name": "ssh"}]
+}

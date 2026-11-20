@@ -14,8 +14,9 @@
    limitations under the License.
 */
 // Adapted from Zimodem's handleAsciiIAC (pet2asc.ino), Copyright 2016-2026 Bo Zimmerman.
-// Apache-2.0; see credits/zimodem. Changed: incremental bounded parsing, BINARY both
-// directions, NAWS 80x24, ANSI terminal type, and negotiation state to avoid loops.
+// Apache-2.0, see https://github.com/bozimmerman/Zimodem.
+// Changed: incremental bounded parsing, BINARY both
+// directions, live NAWS dimensions, ANSI terminal type, and negotiation state to avoid loops.
 #pragma once
 #include "byte_queue.h"
 
@@ -23,8 +24,12 @@ namespace calls {
 class Telnet {
 public:
     void begin();
+    void resize(unsigned columns, unsigned rows);
+    void poll();
     void feed(uint8_t byte);
     size_t write(const uint8_t *data, size_t len);
+    // cppcheck follows one fresh queue; its space changes as bytes come and go
+    // cppcheck-suppress knownConditionTrueFalse
     size_t space() const { return tx.space() > 64 ? (tx.space() - 64) / 2 : 0; }
     ByteQueue<8192> rx, tx;
 
@@ -37,5 +42,7 @@ private:
     uint8_t sub_[32] = {};
     size_t subLen_ = 0;
     bool subOverflow_ = false;
+    unsigned columns_ = 80, rows_ = 24;
+    bool sizePending_ = false;
 };
 }  // namespace calls

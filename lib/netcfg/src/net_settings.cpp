@@ -189,7 +189,7 @@ bool validPassword(const char *s) {
     }
     for (size_t i = 0; i < n; ++i) {
         // A WPA2 passphrase is 8-63 bytes. Anything but control bytes is allowed, so UTF-8
-        // text works (5.5-15).
+        // text works.
         unsigned char c = static_cast<unsigned char>(s[i]);
         if (c < ' ' || c == 0x7F) {
             return false;
@@ -238,7 +238,7 @@ bool validServer(const char *s) {
             return false;
         }
         if (c == '.' && i > 0 && s[i - 1] == '.') {
-            return false;  // an empty label (5.5-15)
+            return false;  // an empty label
         }
     }
     return true;

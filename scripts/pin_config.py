@@ -3,7 +3,7 @@
 Reads USR_MODEM_PIN_* from .env.example (the defaults, always present in the repo), then
 .env, then real environment variables, and defines each one as a compile-time macro for
 lib/hw/src/pins.h. Also defines USR_MODEM_PINS_DEFAULT=1 when the map equals
-.env.example, so the unit test can lock in the confirmed map for that case. A changed map
+.env.example, so the unit test can lock in the map for that case. A changed map
 fails the pin test unless USR_MODEM_PINS_OVERRIDDEN=1 is set (USR_MODEM_PINS_OVERRIDE_OK).
 Pin numbers are checked by scripts/pin_rules.py.
 """

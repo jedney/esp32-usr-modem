@@ -1,4 +1,4 @@
-"""End-to-end checks of the port sessions on the USB console (v0.5, brief 6.2):
+"""End-to-end checks of the port sessions on the USB console (spec 3.2):
 AT*TESTCALL, the +++ escape with guard time, ATO, ATH, NO CARRIER, AT*BAUD, the boot
 banner and the LED / line hand-back commands. They need only the console.
 
@@ -19,11 +19,17 @@ def clean_state(request):
         return
     console = request.getfixturevalue("console")
     _hang_up(console)
+    # The factory model sets the default CONNECT speed; put the saved one back after.
+    before_model = console.command("AT*MODEL?")[0].split()[0]
+    assert console.command("AT*MODEL=14400")[-1] == "OK"
     console.raw(b"ATZ\r")
     assert console.command("AT&N8")[-1] == "OK"
-    yield
-    _hang_up(console)
-    console.raw(b"ATZ\r")
+    try:
+        yield
+    finally:
+        _hang_up(console)
+        console.raw(b"ATZ\r")
+        console.command("AT*MODEL=" + before_model)
 
 
 def _hang_up(console):
@@ -88,7 +94,11 @@ def test_far_end_hangs_up(console):
     _call(console, "=1")
     console.ser.reset_input_buffer()
     time.sleep(1.5)
-    received = console.ser.read(console.ser.in_waiting or 1)
+    # Read until it arrives: on the network console (socket://) in_waiting is only 0 or 1.
+    received = b""
+    deadline = time.monotonic() + 1.0
+    while b"NO CARRIER\r\n" not in received and time.monotonic() < deadline:
+        received += console.ser.read(console.ser.in_waiting or 1)
     assert b"NO CARRIER" in received
     assert console.command("AT")[-1] == "OK"  # back in command mode
 

@@ -11,6 +11,44 @@
 #define FW_COMMIT "test"
 #endif
 namespace config {
+bool Commands::value(const char *id, char *out, size_t cap) const {
+    const auto &s = net_.settings();
+    const char *value = nullptr;
+    if (!strcmp(id, "wifi-clock.wifi-toggle"))
+        value = s.enabled ? "ON" : "OFF";
+    else if (!strcmp(id, "wifi-clock.join"))
+        value = *s.ssid ? s.ssid : "not set";
+    else if (!strcmp(id, "wifi-clock.network-status"))
+        value = net_.stateText();
+    else if (!strcmp(id, "wifi-clock.network-name"))
+        value = s.host;
+    else if (!strcmp(id, "wifi-clock.ntp-server"))
+        value = s.ntp;
+    else if (!strcmp(id, "wifi-clock.time-zone"))
+        value = s.tz;
+    else if (!strcmp(id, "wifi-clock.ip-configuration")) {
+        if (s.dhcp)
+            value = "DHCP";
+        else {
+            char ip[16], mask[16], gateway[16], dns[16];
+            netcfg::formatIp(s.ip, ip, sizeof ip);
+            netcfg::formatIp(s.mask, mask, sizeof mask);
+            netcfg::formatIp(s.gateway, gateway, sizeof gateway);
+            netcfg::formatIp(s.dns, dns, sizeof dns);
+            snprintf(out, cap, "%s, %s, %s, %s", ip, mask, gateway, dns);
+            return true;
+        }
+    } else if (!strcmp(id, "updates-reset.ota-policy-window"))
+        value = device_.policy() == devicecfg::Policy::kAlways ? "ALWAYS" : "DEMAND";
+    else if (!strcmp(id, "debug.verbosity")) {
+        snprintf(out, cap, "%u", log_.level);
+        return true;
+    }
+    if (!value)
+        return false;
+    snprintf(out, cap, "%s", value);
+    return true;
+}
 namespace {
 Commands *attached = nullptr;
 bool query(const char *s) {
@@ -102,6 +140,7 @@ atcmd::Reply Commands::command(atcmd::Port &p, const char *name, const char *arg
         {"DIAL", &Commands::dial},
         {"REFERENCE", &Commands::reference},
         {"ABOUT", &Commands::about},
+        {"GITHUB", &Commands::github},
         {"EXPORT", &Commands::exportCommand},
         {"LOG", &Commands::logCommand},
         {"CALLLOG", &Commands::callLog},
@@ -192,6 +231,8 @@ atcmd::Reply Commands::profileControl(atcmd::Port &p, const char *args) {
 atcmd::Reply Commands::bookClear(atcmd::Port &, const char *args) {
     return !*args && book_.clear() ? atcmd::Reply::kOk : atcmd::Reply::kError;
 }
+// The same signature as every handler in the table above.
+// cppcheck-suppress constParameterReference
 atcmd::Reply Commands::dial(atcmd::Port &p, const char *args) {
     if (*args != '=' || !args[1] || !p.link()) {
         return atcmd::Reply::kError;
@@ -202,6 +243,7 @@ atcmd::Reply Commands::reference(atcmd::Port &p, const char *args) {
     if (!query(args)) {
         return atcmd::Reply::kError;
     }
+    p.beginInfo();
     p.line("AT / A/ repeat; D/DT/DP dial; DS0-3 stored dial; ATA answer; ATH hang up");
     p.line("+++ guarded escape; ATO resume; ATI0-7,9 inquiry; +FCLASS=0 modem");
     p.line("B E F L M Q V X; P/T dial mode; S0-S63=value or ? (S1 live ring count)");
@@ -214,11 +256,28 @@ atcmd::Reply Commands::about(atcmd::Port &p, const char *args) {
     if (!query(args)) {
         return atcmd::Reply::kError;
     }
+    p.beginInfo();
     p.printf("USR Modem Emulator v%s (%s)\r\n", FW_VERSION, FW_COMMIT);
-    p.line("USRobotics command behavior; replica project by Jon Edney.");
+    p.line("Copyright 2026 Jon Edney.");
+    p.line(kProjectUrl);
+    p.line("");
+    p.line(
+        "We respectfully acknowledge US Robotics' trademarks, copyrights and other intellectual "
+        "property rights in its names, logos, designs and original materials. Those rights "
+        "remain with their respective owners. This tribute is neither affiliated with nor "
+        "authorised, sponsored or endorsed by US Robotics.");
+    p.line("");
+    p.line("3rd Party Libraries and Projects:");
     for (const char *credit : kCredits) {
         p.line(credit);
     }
+    return atcmd::Reply::kOk;
+}
+atcmd::Reply Commands::github(atcmd::Port &p, const char *args) {
+    if (!query(args))
+        return atcmd::Reply::kError;
+    p.beginInfo();
+    p.line(kProjectUrl);
     return atcmd::Reply::kOk;
 }
 atcmd::Reply Commands::exportCommand(atcmd::Port &p, const char *args) {
@@ -241,6 +300,7 @@ atcmd::Reply Commands::logCommand(atcmd::Port &p, const char *args) {
             return atcmd::Reply::kError;
         }
     }
+    p.beginInfo();
     p.printf("Log level %u, capacity %u bytes%s\r\n", log_.level, unsigned(log_.capacity()),
              log_.capacity() < 256 * 1024 ? " (reduced capacity)" : " PSRAM");
     p.printf("Bytes %u-%u of %u; AT*LOG=offset,count reads up to 8192 bytes.\r\n", offset,
@@ -256,6 +316,7 @@ atcmd::Reply Commands::callLog(atcmd::Port &p, const char *args) {
     if (!query(args)) {
         return atcmd::Reply::kError;
     }
+    p.beginInfo();
     p.printf("Call history: %u/50 (configured time zone, result, seconds, TX/RX payload)\r\n",
              unsigned(history_.size()));
     for (size_t i = 0; i < history_.size(); ++i) {
@@ -274,6 +335,7 @@ atcmd::Reply Commands::exportConfig(atcmd::Port &p) {
     const auto &m = p.modem();
     // This is deliberately an explicit allowlist. No password storage or generic
     // NVS/debug dump is consulted. Network credentials must be entered separately.
+    p.beginInfo();
     p.print("ATQ0V1S3=13S4=10\r\n");
     for (unsigned t = 0; t < 2; ++t) {
         profileExport(p, m.nvram().tmpl[t]);
@@ -293,7 +355,7 @@ atcmd::Reply Commands::exportConfig(atcmd::Port &p) {
         const auto &e = book_.at(i);
         if (*e.number && safe(e.host)) {
             p.printf("AT*PHONEBOOK=%s,%s,%u,%s,%lu\r\n", e.number, e.host, e.port,
-                     e.raw ? "RAW" : "TELNET", static_cast<unsigned long>(e.speed));
+                     calls::protocolName(e.protocol), static_cast<unsigned long>(e.speed));
         }
     }
     p.printf("AT*MODEL=%lu\r\nAT*THROTTLE=%s\r\nAT*ANSWERPORT=%s\r\n",
@@ -317,6 +379,7 @@ atcmd::Reply Commands::exportConfig(atcmd::Port &p) {
     p.printf("AT*WIFI=%s\r\nAT*OTA=%s\r\nATY%u\r\n", s.enabled ? "ON" : "OFF",
              device_.policy() == devicecfg::Policy::kAlways ? "ALWAYS" : "DEMAND", m.nvram().y);
     hardware_.command(p, "WEBEXPORT", "");
+    hardware_.command(p, "NETCONSOLEEXPORT", "");
     hardware_.command(p, "CLIENTEXPORT", "");
     hardware_.command(p, "INTERNETEXPORT", "");
     profileExport(p, m.active());

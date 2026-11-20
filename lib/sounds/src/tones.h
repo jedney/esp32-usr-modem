@@ -1,4 +1,4 @@
-// Generated tones (project brief 6.4): UK dial, busy and ring tones, DTMF, UK pulse-dial
+// Generated tones (spec 3.4): UK dial, busy and ring tones, DTMF, UK pulse-dial
 // clicks, plain test tones and a frequency sweep. Each is a Source that fills a buffer
 // of 16-bit mono samples at full scale; the caller applies the volume (volume.h).
 //
@@ -33,7 +33,7 @@ struct ToneSpec {
     Cadence cadence;
 };
 
-// UK tones (decided, Q39).
+// UK tones.
 extern const ToneSpec kUkDialTone;  // 350 + 450 Hz, continuous
 extern const ToneSpec kUkBusyTone;  // 400 Hz, 0.375 s on / 0.375 s off
 extern const ToneSpec kUkRingTone;  // 400 + 450 Hz, 0.4 on, 0.2 off, 0.4 on, 2.0 off

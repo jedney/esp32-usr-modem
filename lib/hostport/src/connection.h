@@ -1,4 +1,4 @@
-// The far end of a call, as the host port sees it. Kinds: Telnet/raw TCP calls
+// The far end of a call, as the host port sees it. Kinds: Telnet, raw TCP and SSH calls
 // (`calls::TcpConnection`), PPP/SLIP (`internet::Engine`), the configuration screen
 // (`config::Terminal`), the client tests (`clienttest::Service`), and the AT*TESTCALL echo
 // call below.
@@ -23,6 +23,10 @@ public:
     virtual bool localService() const { return false; }
     virtual bool binaryService() const { return false; }
     virtual void escaped() {}
+    virtual void terminalSize(unsigned columns, unsigned rows) {
+        (void)columns;
+        (void)rows;
+    }
     virtual void poll(uint32_t nowMs) { (void)nowMs; }
 };
 

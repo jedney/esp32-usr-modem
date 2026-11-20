@@ -1,0 +1,6 @@
+{
+  "name": "hwtest",
+  "description": "Hardware-test helpers: LED names and patterns, update-progress lights and the argument parsing of the AT*HW... commands; hardware-independent (spec 2.4, 3.13)",
+  "frameworks": "*",
+  "platforms": "*"
+}

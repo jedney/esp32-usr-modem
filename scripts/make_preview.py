@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Make a single-file preview of the web interface, running in demo mode.
 
-    python scripts/make_preview.py            # writes web/preview.html
+    python scripts/make_preview.py            # writes web/preview.html and web/preview-login.html
 
 Open the file in any browser: no modem or web server needed. Everything (scripts, CSS,
 fonts) is inlined; the page's JavaScript modules are loaded through an import map of
@@ -33,6 +33,8 @@ def strip_source_map(text: str) -> str:
 def main(out: pathlib.Path) -> None:
     runpy.run_path(str(ROOT / "scripts/generate_ui.py"))["main"]([])
     html = (SRC / "index.html").read_text(encoding="utf-8")
+    html = html.replace('src="usr-logo.png"',
+                        f'src="{data_url("image/png", (SRC / "usr-logo.png").read_bytes())}"')
 
     style = (SRC / "style.css").read_text(encoding="utf-8")
     for weight in (400, 700):
@@ -40,13 +42,19 @@ def main(out: pathlib.Path) -> None:
         style = style.replace(f"url('{font.name}')", f"url('{data_url('font/woff2', font.read_bytes())}')")
 
     modules = {
+        "usr-menubar": (SRC / "menubar.js").read_text(encoding="utf-8").replace("'./ui-commands.js'", "'usr-ui-commands'"),
+        "usr-menu-view": (SRC / "menu-view.js").read_text(encoding="utf-8").replace("'./ui-commands.js'", "'usr-ui-commands'").replace("'./menubar.js'", "'usr-menubar'"),
+        "usr-command-channel": (SRC / "command-channel.js").read_text(encoding="utf-8"),
         "usr-xterm": strip_source_map((VENDOR / "xterm.mjs").read_text(encoding="utf-8")),
         "usr-status": (SRC / "status.js").read_text(encoding="utf-8"),
         "usr-ui-data": (SRC / "ui-data.js").read_text(encoding="utf-8"),
-        "usr-demo": (SRC / "demo.js").read_text(encoding="utf-8").replace("'./ui-data.js'", "'usr-ui-data'"),
+        "usr-ui-commands": (SRC / "ui-commands.js").read_text(encoding="utf-8"),
+        "usr-demo": (SRC / "demo.js").read_text(encoding="utf-8").replace("'./ui-data.js'", "'usr-ui-data'").replace("'./ui-commands.js'", "'usr-ui-commands'"),
         "usr-upload": (SRC / "upload.js").read_text(encoding="utf-8"),
         "usr-upload-flow": (SRC / "upload_flow.js").read_text(encoding="utf-8").replace("'./upload.js'", "'usr-upload'"),
         "usr-geometry": (SRC / "geometry.js").read_text(encoding="utf-8"),
+        "usr-idle": (SRC / "idle.js").read_text(encoding="utf-8"),
+        "usr-toast": (SRC / "toast.js").read_text(encoding="utf-8"),
         "usr-link": (SRC / "link.js").read_text(encoding="utf-8").replace("'./status.js'", "'usr-status'"),
     }
     app = (SRC / "app.js").read_text(encoding="utf-8")
@@ -55,6 +63,9 @@ def main(out: pathlib.Path) -> None:
     app = app.replace("'./upload_flow.js'", "'usr-upload-flow'")
     app = app.replace("'./link.js'", "'usr-link'")
     app = app.replace("'./geometry.js'", "'usr-geometry'")
+    app = app.replace("'./idle.js'", "'usr-idle'").replace("'./toast.js'", "'usr-toast'")
+    app = app.replace("'./menubar.js'", "'usr-menubar'").replace("'./menu-view.js'", "'usr-menu-view'")
+    app = app.replace("'./command-channel.js'", "'usr-command-channel'")
     import_map = {"imports": {k: data_url("text/javascript", v.encode()) for k, v in modules.items()}}
 
     # The modem's Content-Security-Policy forbids inline scripts; the preview needs them.
@@ -62,15 +73,41 @@ def main(out: pathlib.Path) -> None:
     html = html.replace('<link rel="stylesheet" href="xterm.css">',
                         f"<style>{(VENDOR / 'xterm.css').read_text(encoding='utf-8')}</style>")
     html = html.replace('<link rel="stylesheet" href="style.css">', f"<style>{style}</style>")
+    html = html.replace('<link rel="stylesheet" href="menubar.css">',
+                        f"<style>{(SRC / 'menubar.css').read_text(encoding='utf-8')}</style>")
+    for name in ("idle", "toast"):
+        html = html.replace(f'<script type="module" src="{name}.js"></script>',
+                            f'<script type="module">import "usr-{name}";</script>')
+    html = html.replace(
+        '<script type="module" src="ui-commands.js"></script>',
+        '<script type="module">import "usr-ui-commands";</script>',
+    )
     html = html.replace(
         '<script type="module" src="app.js"></script>',
         f'<script type="importmap">{json.dumps(import_map)}</script>\n'
         f"<script>window.USR_MODEM_DEMO = true;</script>\n"
         f'<script type="module">{app}</script>',
     )
-    html = html.replace("<title>USR Modem</title>", "<title>USR Modem (preview)</title>")
+    html = html.replace("<title>Web Terminal</title>", "<title>Web Terminal (preview)</title>")
     out.write_text(html, encoding="utf-8")
-    print(f"Preview: {out} ({out.stat().st_size / 1024:.0f} KB). Phonebook 4 simulates a call; D stays unavailable.")
+    print(f"Preview: {out} ({out.stat().st_size / 1024:.0f} KB). Synthetic terminal; no device services connected.")
+    login_preview(out.with_name("preview-login.html"), style)
+
+
+def login_preview(out: pathlib.Path, style: str) -> None:
+    """The login page as it looks before login. Its form has nowhere to post in a preview."""
+    html = (SRC / "login.html").read_text(encoding="utf-8")
+    html = html.replace('src="usr-logo.png"',
+                        f'src="{data_url("image/png", (SRC / "usr-logo.png").read_bytes())}"')
+    html = re.sub(r'<meta http-equiv="Content-Security-Policy"[^>]*>\s*', "", html, flags=re.S)
+    html = html.replace('<link rel="stylesheet" href="style.css">', f"<style>{style}</style>")
+    html = html.replace('<link rel="stylesheet" href="menubar.css">',
+                        f"<style>{(SRC / 'menubar.css').read_text(encoding='utf-8')}</style>")
+    html = html.replace('<script type="module" src="login.js"></script>',
+                        f'<script type="module">{(SRC / "login.js").read_text(encoding="utf-8")}</script>')
+    html = html.replace("<title>Log in · Web Terminal</title>", "<title>Log in · Web Terminal (preview)</title>")
+    out.write_text(html, encoding="utf-8")
+    print(f"Preview: {out} ({out.stat().st_size / 1024:.0f} KB). Login page only.")
 
 
 if __name__ == "__main__":

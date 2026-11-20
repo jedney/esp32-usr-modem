@@ -1,5 +1,7 @@
 #pragma once
 #include "connection.h"
+#include "phonebook.h"
+#include "ssh_client.h"
 #include "telnet.h"
 
 namespace calls {
@@ -31,20 +33,46 @@ public:
     virtual void close() = 0;
     virtual const char *peer() const { return "unknown"; }
 };
+// How the bytes of a call are carried. SshOrTelnet is a direct dial to port 22: the call
+// is SSH when the server opens with an SSH greeting, otherwise Telnet.
+enum class Mode : uint8_t { Telnet, Raw, Ssh, SshOrTelnet };
 class TcpConnection : public hostport::Connection {
 public:
-    explicit TcpConnection(Socket &socket) : socket_(socket) {}
-    void begin(bool raw);
+    // How long a port-22 call waits for the server's first bytes before it is Telnet.
+    static constexpr uint32_t kSniffMs = 3000;
+    // ssh: the client for SSH calls; without one, SSH falls back to Telnet.
+    explicit TcpConnection(Socket &socket, ssh::Client *ssh = nullptr)
+        : socket_(socket), ssh_(ssh) {}
+    // host is shown in the SSH password prompt.
+    void begin(Mode mode, const char *host = "");
     size_t space() const override;
     size_t write(const uint8_t *data, size_t len) override;
     size_t read(uint8_t *buf, size_t cap) override;
     bool isOpen() const override;
     void close() override;
     void poll(uint32_t nowMs) override;
+    void terminalSize(unsigned columns, unsigned rows) override;
+    // The far end has answered: at once for Telnet and raw calls, after the key exchange
+    // for SSH, and once a port-22 call knows what it is.
+    bool ready() const;
+    // Why an SSH call ended, or "".
+    const char *reason() const;
+    // What the call turned out to be.
+    Protocol protocol() const;
 
 private:
+    void decide(uint32_t now);
+    void startSsh();
+    void pollSsh();
     Socket &socket_;
+    ssh::Client *ssh_;
     Telnet telnet_;
-    bool raw_ = false;
+    Mode mode_ = Mode::Telnet;
+    bool sshStarted_ = false, openSeen_ = false;
+    uint32_t openAt_ = 0;
+    uint8_t held_[16] = {};
+    size_t heldSize_ = 0;
+    char host_[64] = {};
+    unsigned columns_ = 80, rows_ = 24;
 };
 }  // namespace calls

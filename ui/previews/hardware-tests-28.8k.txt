@@ -1,25 +1,20 @@
-╔══════════════════════════════════════════════════════════════════════════════╗
-║  USRobotics          Sportster 28.8k Series                                  ║
-║ ──────────────────────────────────────────────────────────────────────────── ║
-║  MAIN  >  HARDWARE TESTS                                                     ║
-║  KEY   OPTION                                                                ║
-║  >  [1]   Guided tests                                                       ║
-║     [2]   Pin map                                                            ║
-║     [3]   Board information                                                  ║
-║     [4]   Files                                                              ║
-║     [5]   LEDs                                                               ║
-║     [6]   Amplifier                                                          ║
-║     [7]   Test volume                                                        ║
-║     [8]   Tone / sweep                                                       ║
-║     [9]   DTMF                                                               ║
-║     [A]   Pulse                                                              ║
-║     [B]   Potentiometer                                                      ║
-║     [C]   RS232 lines                                                        ║
-║     [D]   Loopback                                                           ║
-║     [E]   Bridge                                                             ║
-║     [F]   Output signal                                                      ║
-║  UP/DOWN Select  ENTER Open  ESC Back  Q Back                                ║
-║  F1 Help  F2 Main  |  Model: 28.8k  Link: UNKNOWN                            ║
-║  All actions depend on existing project services.                            ║
-║  Command > █                                                                 ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+Hardware Tests
+Illustration only: current values appear on the modem.
+
+A. Guided tests
+B. Pin map
+C. Board information
+D. Files
+E. Indicator lights
+F. Speaker amplifier
+G. Test volume
+H. Test tone or frequency sweep
+I. Touch-tone digits
+J. Pulse-dial digits
+K. Volume knob readings
+L. RS232 control lines
+M. Serial loopback test
+N. Serial port bridge
+O. Set an RS232 output
+
+X. Back / Q. Exit; Esc goes back.

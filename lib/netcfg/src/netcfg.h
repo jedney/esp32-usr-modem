@@ -1,16 +1,15 @@
-// Wi-Fi and clock controller (project brief 5.4, 6.6, 6.7): keeps the modem on the saved
+// Wi-Fi and clock controller (spec 2.4, 3.6, 3.7): keeps the modem on the saved
 // network, retries when it drops, runs AT*WIFIJOIN and AT*WIFISCAN, starts mDNS and NTP
 // once connected, and decides the Wi-Fi lights and the console notices.
 //
 // The radio itself is behind Radio (the board's is hw::EspRadio in lib/hw; the unit
 // tests use a fake). No Arduino dependencies: unit-tested on the PC.
 //
-// Lights (decided by Jon, 24 Oct):
-//   Wi-Fi state                          on-board RGB LED    front ARQ LED
-//   no network set up                    red                 off
-//   network saved, connecting/retrying   flashing green      blinking
-//   connected                            green               on
-//   switched off (AT*WIFI=OFF)           off                 off
+// Front ARQ LED (the S3 board's own RGB LED is not used: it can't be seen in the case):
+//   no network set up                    off
+//   network saved, connecting/retrying   blinking
+//   connected                            on
+//   switched off (AT*WIFI=OFF)           off
 
 #pragma once
 
@@ -74,7 +73,6 @@ public:
     virtual void mac(uint8_t out[6]) = 0;
 };
 
-enum class Rgb : uint8_t { kOff, kRed, kGreen };
 enum class Arq : uint8_t { kOff, kBlink, kOn };  // hostport::WifiLed kOff/kConnecting/kConnected
 
 enum class JoinResult : uint8_t { kNone, kRunning, kJoined, kFailed };
@@ -84,7 +82,6 @@ class Net {
 public:
     static constexpr uint32_t kJoinTimeoutMs = 20000;     // AT*WIFIJOIN gives up
     static constexpr uint32_t kAttemptTimeoutMs = 30000;  // a background attempt gives up
-    static constexpr uint32_t kFlashMs = 500;             // RGB flash and ARQ blink
     static constexpr size_t kScanMax = 20;
     static constexpr size_t kNoticeMax = 96;
 
@@ -104,7 +101,6 @@ public:
     const char *stateText() const;
 
     // --- Lights ------------------------------------------------------------------------
-    Rgb rgb(uint32_t nowMs) const;  // with the flashing applied
     Arq arq() const;
 
     // --- Changes (saved at once; false if not valid or not saved) -----------------------

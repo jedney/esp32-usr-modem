@@ -1,4 +1,4 @@
-// AT command parser (project brief 6.2, 6.6, 6.7, 6.8), following USR Sportster 33.6
+// AT command parser (spec 3.2, 3.6, 3.7, 3.8), following USR Sportster 33.6
 // behaviour:
 //   - "AT" or "at" (not mixed) starts a command line; S3 ends it, S5 deletes a character
 //     (DEL works too); E sets echo. "A/" repeats the last line at once, with no Enter.
@@ -30,7 +30,7 @@ public:
     virtual ~Sink() = default;
     virtual void write(const char *data, size_t len) = 0;
     // Output nobody on this port asked for (RING). A serial port drops it at once when it
-    // has no room (STA-01); by default it is written like any other output.
+    // has no room; by default it is written like any other output.
     virtual void writeUnsolicited(const char *data, size_t len) { write(data, len); }
 };
 
@@ -170,6 +170,7 @@ public:
     // A visible line prompt for Y/N confirmation; uses the same cancellation rules.
     void askConfirmation(const char *prompt, SecretHandler fn, void *ctx);
     bool cancelPrompt();  // timeout: wipe the pending input and send ERROR
+    void discardInput();  // closed terminal: cancel work and forget partial/repeat lines
     // The final result comes later, through finish(). Meanwhile typing is not a command;
     // any key (not LF) cancels: `cancel` is called and ERROR sent.
     void wait(CancelHandler cancel, void *ctx, Result cancelResult = Result::kError,
@@ -180,6 +181,7 @@ public:
     bool busy() const { return state_ == State::kSecret || state_ == State::kWait; }
     // Nothing typed since the last result: an unsolicited message can be printed.
     bool lineEmpty() const { return state_ == State::kIdle; }
+    uint32_t errorCount() const { return errorCount_; }
 
     Modem &modem() { return modem_; }
     uint32_t baud() const { return baud_; }
@@ -208,6 +210,7 @@ private:
     Sink *redirected_ = nullptr;
     bool readable_ = false;
     uint32_t directWrites_ = 0;
+    uint32_t errorCount_ = 0;  // Command failures, including when Q1 suppresses their text.
     bool browser_ = false;
     uint8_t clientBackspace_ = 0;
     uint32_t baud_;

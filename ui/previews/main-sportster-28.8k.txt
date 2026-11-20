@@ -1,25 +1,10 @@
-╔══════════════════════════════════════════════════════════════════════════════╗
-║         █   █ █████ ████        █             █     █                        ║
-║         █   █ █     █   █  ███  █      ███  █████        ████  ████          ║
-║         █   █ █████ ████  █   █ ████  █   █   █     █   █     ██             ║
-║         █   █     █ █  █  █   █ █   █ █   █   █     █   █        ██          ║
-║         █████ █████ █   █  ███  ████   ███    ██    █    ████ ████           ║
-║                        ─── Sportster 28.8k Series ───                        ║
-╠════════════════════ [ MODEM CONFIGURATION - MAIN MENU ] ═════════════════════╣
-║ > [1] Status                         │   [7] Wi-Fi and Clock                 ║
-║   [2] Phonebook                      │   [8] Updates and Reset               ║
-║   [3] Settings                       │   [9] Export Configuration            ║
-║   [4] Sounds                         │   [A] About                           ║
-║   [5] Debug                          │   [B] Hardware Tests                  ║
-║   [6] Call History                   │   [C] Client Tests                    ║
-║                                      │   [D] Command Reference               ║
-║                                                                              ║
-╠══════════════════════════════════════════════════════════════════════════════╣
-║  ARROWS: navigate / switch column    ENTER: select    Q: quit                ║
-║  [C] Client Tests - serial client diagnostics                                ║
-╠══════════════════════════ [ HELP / DEVICE STATUS ] ══════════════════════════╣
-║  F1 Help  F2 Status  F3 Phonebook  F4 Settings  F10 Exit                     ║
-║  Model: 28.8k  |  Profile: --  |  Link: UNKNOWN                              ║
-║  Reference layout only. Device information is not connected.                 ║
-║  Command > █                                                                 ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+Sportster 28.8k Series - Configuration
+Illustration only: current values appear on the modem.
+
+A. Status
+B. Phone Book
+C. Call History
+D. Settings
+E. Help
+
+X. Back / Q. Exit; Esc goes back.

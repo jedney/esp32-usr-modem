@@ -1,9 +1,11 @@
 // Modem settings: see modemcfg.h.
 #include "modemcfg.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstring>
 #include <initializer_list>
+#include <iterator>
 
 namespace modemcfg {
 
@@ -59,7 +61,7 @@ void factorySRegs(uint8_t *s) {
     s[9] = 6;    // carrier detect time, 0.1 s
     s[10] = 14;  // carrier loss wait, 0.1 s
     s[11] = 70;  // DTMF tone duration, ms
-    s[12] = 50;  // escape guard time, 1/50 s (1 s, brief 6.2)
+    s[12] = 50;  // escape guard time, 1/50 s (1 s, spec 3.2)
     s[21] = 10;  // break length, 10 ms
     s[22] = 17;  // XON
     s[23] = 19;  // XOFF
@@ -110,12 +112,7 @@ int findSetting(char prefix, char letter) {
 }
 
 bool isHostRate(uint32_t baud) {
-    for (uint32_t r : kHostRates) {
-        if (r == baud) {
-            return true;
-        }
-    }
-    return false;
+    return std::find(std::begin(kHostRates), std::end(kHostRates), baud) != std::end(kHostRates);
 }
 
 bool settingAllows(Setting s, unsigned value) {
@@ -178,6 +175,19 @@ const char *modelName(uint32_t speed) {
     }
 }
 
+const char *productName(uint32_t speed) {
+    switch (speed) {
+        case 28800:
+            return "US Robotics Sportster 28.8k";
+        case 33600:
+            return "US Robotics Sportster 33.6k";
+        case 56000:
+            return "US Robotics Sportster 56k";
+        default:
+            return "US Robotics Sportster 14.4k";
+    }
+}
+
 Profile factoryProfile(unsigned n) {
     Profile p = {};
     p.v[kB] = 0;
@@ -187,21 +197,21 @@ Profile factoryProfile(unsigned n) {
     p.v[kM] = 1;
     p.v[kQ] = 0;
     p.v[kV] = 1;
-    p.v[kX] = 4;     // all result codes (Sportster default; Jon, v0.4)
+    p.v[kX] = 4;     // all result codes (Sportster default)
     p.v[kTone] = 1;  // tone dialling (the Sportster ships with pulse)
-    p.v[kAmpA] = 0;  // plain CONNECT result (Q34)
-    p.v[kAmpB] = 1;  // speed stays as detected from "AT" (Sportster default; Jon, v0.5)
-    p.v[kAmpC] = 1;  // brief 6.2, Q33
-    p.v[kAmpD] = 2;  // brief 6.2, Q33
+    p.v[kAmpA] = 0;  // plain CONNECT result
+    p.v[kAmpB] = 1;  // speed stays as detected from "AT" (Sportster default)
+    p.v[kAmpC] = 1;  // spec 3.2
+    p.v[kAmpD] = 2;  // spec 3.2
     p.v[kAmpG] = 0;
-    p.v[kAmpH] = 1;  // brief 6.2, Q33
+    p.v[kAmpH] = 1;  // spec 3.2
     p.v[kAmpI] = 0;
     p.v[kAmpK] = 1;
     p.v[kAmpM] = 4;
-    p.v[kAmpN] = 8;  // 14400 default; higher speeds remain selectable (Jon, v0.8)
-    p.v[kAmpP] = 1;  // UK pulse ratio (brief 6.4: UK tones)
-    p.v[kAmpR] = 2;  // brief 6.2, Q33
-    p.v[kAmpS] = 0;  // fixed (brief 6.2)
+    p.v[kAmpN] = 8;  // 14400 default; higher speeds remain selectable
+    p.v[kAmpP] = 1;  // UK pulse ratio (spec 3.4: UK tones)
+    p.v[kAmpR] = 2;  // spec 3.2
+    p.v[kAmpS] = 0;  // fixed (spec 3.2)
     p.v[kAmpT] = 5;
     p.v[kAmpU] = 0;
     p.v[kAmpY] = 1;
@@ -318,19 +328,13 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
     if (memcmp(in, kMagic, 4) != 0) {
         return LoadResult::kBadMagic;
     }
-    const uint8_t version = in[4];
-    if (version < 1 || version > kLayoutVersion) {
+    if (in[4] != kLayoutVersion) {
         return LoadResult::kBadVersion;
     }
-    const size_t size = version == 1   ? kBlobSizeV1
-                        : version == 2 ? kBlobSizeV2
-                        : version == 3 ? kBlobSizeV3
-                        : version == 4 ? kBlobSizeV4
-                                       : kBlobSize;
-    if (len != size) {
+    if (len != kBlobSize) {
         return LoadResult::kBadSize;
     }
-    if (crc32(in, size - 4) != getU32(in + size - 4)) {
+    if (crc32(in, kBlobSize - 4) != getU32(in + kBlobSize - 4)) {
         return LoadResult::kBadCrc;
     }
     Nvram n = {};
@@ -340,7 +344,6 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
         return LoadResult::kBadValue;
     }
     for (Profile &t : n.tmpl) {
-        t.lineExplicit = version < 3;  // preserve old saved speed; its provenance is unknown
         memcpy(t.v, p, kSettingCount);
         p += kSettingCount;
         memcpy(t.s, p, kSRegCount);
@@ -362,59 +365,41 @@ LoadResult deserialize(const uint8_t *in, size_t len, Nvram *out) {
         phone[kPhoneLen] = '\0';
         p += kPhoneLen;
     }
-    if (version == 1) {
-        // v0.4 stored &B with the brief's first meaning (0 = detect). Since v0.5 &B has
-        // the Sportster meaning, and the speed is always detected unless AT*BAUD is set.
-        for (Profile &t : n.tmpl) {
-            t.v[kAmpB] = 1;
-        }
-        n.hostBaud = 0;
-        *out = n;
-        return LoadResult::kMigrated;
-    }
     n.hostBaud = getU32(p);
     p += 4;
     if (n.hostBaud != 0 && !isHostRate(n.hostBaud)) {
         return LoadResult::kBadValue;
     }
-    if (version >= 3) {
-        for (Profile &t : n.tmpl) {
-            if (*p > 1) {
-                return LoadResult::kBadValue;
-            }
-            t.lineExplicit = *p++ != 0;
-        }
-        n.model = getU32(p);
-        p += 4;
-        if (!validModel(n.model) || *p > 1) {
+    for (Profile &t : n.tmpl) {
+        if (*p > 1) {
             return LoadResult::kBadValue;
         }
-        n.throttle = *p++ != 0;
+        t.lineExplicit = *p++ != 0;
     }
-    if (version >= 4) {
-        if (*p >= kAnswerPortCount) {
-            return LoadResult::kBadValue;
-        }
-        n.answerPort = static_cast<AnswerPort>(*p++);
+    n.model = getU32(p);
+    p += 4;
+    if (!validModel(n.model) || *p > 1) {
+        return LoadResult::kBadValue;
     }
-    if (version >= 5) {
-        n.ringDelayMs = getU32(p);
-        p += 4;
-        n.connectDelayMs = getU32(p);
-        if (n.ringDelayMs > kMaxCallDelayMs || n.connectDelayMs > kMaxCallDelayMs) {
-            return LoadResult::kBadValue;
-        }
+    n.throttle = *p++ != 0;
+    if (*p >= kAnswerPortCount) {
+        return LoadResult::kBadValue;
+    }
+    n.answerPort = static_cast<AnswerPort>(*p++);
+    n.ringDelayMs = getU32(p);
+    p += 4;
+    n.connectDelayMs = getU32(p);
+    if (n.ringDelayMs > kMaxCallDelayMs || n.connectDelayMs > kMaxCallDelayMs) {
+        return LoadResult::kBadValue;
     }
     *out = n;
-    return version < kLayoutVersion ? LoadResult::kMigrated : LoadResult::kOk;
+    return LoadResult::kOk;
 }
 
 const char *loadResultText(LoadResult r) {
     switch (r) {
         case LoadResult::kOk:
             return "saved settings";
-        case LoadResult::kMigrated:
-            return "saved settings (converted from an older firmware's format)";
         case LoadResult::kEmpty:
             return "factory settings (nothing saved yet)";
         case LoadResult::kBadVersion:

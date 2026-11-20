@@ -21,6 +21,7 @@ struct Hooks {
     }
 USR_CONFIG_COMMAND(CONFIG)
 USR_CONFIG_COMMAND(WEB)
+USR_CONFIG_COMMAND(NETCONSOLE)
 USR_CONFIG_COMMAND(INTERNET)
 USR_CONFIG_COMMAND(STYLE)
 USR_CONFIG_COMMAND(SIZE)
@@ -40,6 +41,7 @@ USR_CONFIG_COMMAND(RESTOREEND)
 USR_CONFIG_COMMAND(DIAL)
 USR_CONFIG_COMMAND(REFERENCE)
 USR_CONFIG_COMMAND(ABOUT)
+USR_CONFIG_COMMAND(GITHUB)
 USR_CONFIG_COMMAND(SOUNDS)
 USR_CONFIG_COMMAND(PLAY)
 USR_CONFIG_COMMAND(LOG)
@@ -66,8 +68,9 @@ public:
              "outgoing ringback ms (default 1500; ? or =?); saved", atcmd::cmdRingDelay, false},
             {"CONNECTDELAY", "AT*CONNECTDELAY=<0-60000>",
              "pre-CONNECT delay ms (default 250; ? or =?); saved", atcmd::cmdConnectDelay, false},
-            {"PHONEBOOK", "AT*PHONEBOOK[?]|=<number>,<host>,<port>,<TELNET|RAW>[,<speed>]",
-             "list/save 64 phonebook entries", hooks.cmdPhonebook, false},
+            {"PHONEBOOK", "AT*PHONEBOOK[?]|=<number>,<host>,<port>,<TELNET|RAW|SSH>[,<speed>]",
+             "list/save 64 phonebook entries; SSH is basic, hobby use only", hooks.cmdPhonebook,
+             false},
             {"PHONEDELETE", "AT*PHONEDELETE=<number>", "delete a phonebook entry",
              hooks.cmdPhoneDelete, false},
             {"HELP", "AT*HELP", "this list", hooks.cmdHelp, false},
@@ -83,7 +86,8 @@ public:
             DEVICECFG_STAR_COMMANDS,
             {"HW", "AT*HW...", "hardware tests (AT*HW? lists them)", hooks.cmdHw, true},
 
-            {"CONFIG", "AT*CONFIG[?]", "open local configuration", registryCONFIG, false},
+            {"CONFIG", "AT*CONFIG[?]", "open local letter menu; Enter confirms; Esc/X back",
+             registryCONFIG, false},
             {"TEST", "AT*TEST <test|SUMMARY|SET=charset,cols,rows,bs|APPLY|RESET>",
              "serial client diagnostics; saved per port", registryTEST, false},
             {"SX", "AT*SX=<source>[,SUM|CRC|1K[,bytes]]", "XMODEM download; TEST/LOG/HSxxxxx.WAV",
@@ -94,12 +98,14 @@ public:
             {"RY", "AT*RY", "YMODEM upload; validate and discard", registryRY, false},
             {"RZ", "AT*RZ", "ZMODEM upload; validate and discard", registryRZ, false},
             {"WEB", "AT*WEB[?]|=<ON|OFF>", "web listener; saved immediately", registryWEB, false},
+            {"NETCONSOLE", "AT*NETCONSOLE[?]|=<ON|OFF>",
+             "network console on TCP port 2001; saved immediately", registryNETCONSOLE, false},
             {"INTERNET", "AT*INTERNET[?]|=IP,local,peer|=DNS,AUTO|ip|=HANGUP",
              "PPP/SLIP settings, status and local hang-up", registryINTERNET, false},
-            {"STYLE", "AT*STYLE=<ANSI|CP437|PLAIN>", "terminal style, local session", registrySTYLE,
-             false},
-            {"SIZE", "AT*SIZE[?]|=<1-132>,<1-50>", "terminal cells, local session", registrySIZE,
-             false},
+            {"STYLE", "AT*STYLE=<ANSI|PLAIN|CP437|UTF8>",
+             "list colour; browser BBS encoding CP437/UTF8", registrySTYLE, false},
+            {"SIZE", "AT*SIZE[?]|=<columns>,<rows>", "transport size; browser dimensions feed NAWS",
+             registrySIZE, false},
             {"STATUS", "AT*STATUS", "status and live panel", registrySTATUS, false},
             {"SETTING", "AT*SETTING[?]|=<modem command>", "active/profile settings; &W saves",
              registrySETTING, false},
@@ -114,7 +120,9 @@ public:
             {"DIAL", "AT*DIAL=<number|host:port>", "dial using shared call engine", registryDIAL,
              false},
             {"REFERENCE", "AT*REFERENCE", "AT and AT* reference", registryREFERENCE, false},
-            {"ABOUT", "AT*ABOUT", "version and licensing record", registryABOUT, false},
+            {"ABOUT", "AT*ABOUT", "version, copyright, third-party projects and URLs",
+             registryABOUT, false},
+            {"GITHUB", "AT*GITHUB", "project repository URL", registryGITHUB, false},
             {"SOUNDS", "AT*SOUNDS", "list generated tones and WAVs", registrySOUNDS, false},
             {"PLAY", "AT*PLAY=<name|speed>", "play a sound; any key cancels", registryPLAY, false},
             {"LOG", "AT*LOG[?]|=<0|1|2|CLEAR|offset,count>", "structured debug ring", registryLOG,

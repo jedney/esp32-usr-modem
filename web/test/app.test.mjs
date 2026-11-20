@@ -1,0 +1,114 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {loadApp, ok, status, AUTH} from './app-harness.mjs';
+
+test('page auto-opens once, gates input, reconnects on demand and disconnects idle calls', async t => {
+    let historyOk = true;
+    const app = await loadApp(t, path => path === 'api/auth' ? ok(AUTH)
+        : path === 'api/boot' ? (historyOk ? ok({}, 'Recent console output\r\n') : status(503)) : ok());
+    const {element, sockets, fetches, listeners, timers, intervals, menuOptions} = app;
+    const term = app.term;
+    const ws = sockets[0]; ws.open();
+    ws.message({t:'call',state:'idle',model:'US Robotics Sportster 14.4k'});
+    assert.equal(element('model-name').textContent,'US Robotics Sportster 14.4k');
+    assert.equal(document.title,'Web Terminal - US Robotics Sportster 14.4k');
+    assert.equal(term.options.disableStdin, true);
+    ws.message({t:'access', edit:false, state:'read-only'});
+    assert.deepEqual(ws.sent, ['{"t":"open"}']);
+    assert.equal(element('session-disconnected').hidden, false);
+    element('screen').onclick(); // Repeated clicks while opening must not queue an automatic retry.
+    assert.deepEqual(ws.sent, ['{"t":"open"}']);
+    ws.message({t:'access',edit:false,state:'read-only'});
+    assert.deepEqual(ws.sent, ['{"t":"open"}']); // A refusal must never loop or steal another session.
+    element('screen').onclick();
+    assert.equal(ws.sent.filter(s => s === '{"t":"open"}').length, 2);
+    ws.message({t: 'access', edit: true, state: 'terminal'});
+    assert.equal(term.options.disableStdin, false);
+    assert.equal(element('session-disconnected').hidden, true);
+    assert.equal(element('no-call').hidden, false);
+    assert.equal(element('hangup').hidden, true);
+    assert.equal(menuOptions.state().busy, true);
+    ws.message({t:'ready', idle:true, rx:0});
+    assert.equal(menuOptions.state().busy, false);
+    ws.message({t:'call',state:'idle',model:'US Robotics Sportster 28.8k'});
+    assert.equal(element('model-name').textContent,'US Robotics Sportster 28.8k');
+    assert.equal(document.title,'Web Terminal - US Robotics Sportster 28.8k');
+    const beforeHistory = ws.sent.length;
+    await element('recent-console-history').onclick();
+    assert.equal(term.writes.at(-1), 'Recent console output\r\n');
+    assert.equal(fetches.at(-1).path, 'api/boot');
+    assert.equal(fetches.at(-1).options.cache, 'no-store');
+    assert.equal(ws.sent.length, beforeHistory);
+    historyOk = false;
+    await element('recent-console-history').onclick();
+    assert.ok(element('toasts').children.some(el => el.textContent.includes('Could not read recent console history')));
+    assert.equal(menuOptions.run('AT*MODEL=28800\r'), true);
+    assert.deepEqual(ws.sent.at(-1), new TextEncoder().encode('AT*MODEL=28800\r'));
+    assert.equal(menuOptions.state().busy, true);
+    ws.message({t:'ready', idle:true, rx:15});
+    assert.equal(menuOptions.state().busy, false);
+    const runTimers = app.runTimers;
+    runTimers(100);
+    assert.ok(term.cols > 132 && term.rows > 50);
+    assert.ok(ws.sent.includes(JSON.stringify({t: 'size', cols: term.cols, rows: term.rows})));
+    element('screen').clientWidth = 3000;
+    listeners.get('resize')(); runTimers(100);
+    assert.equal(JSON.parse(ws.sent.at(-1)).cols, term.cols);
+    const keys = '\x08\x7f\r\x1b[A\x1b[B\x1b[C\x1b[D\x1bOP\x1b[15~';
+    term.data(keys);
+    assert.deepEqual(ws.sent.at(-1), new TextEncoder().encode(keys));
+    term.binary('\xff'); assert.deepEqual(ws.sent.at(-1), new Uint8Array([255]));
+    term.data('x'.repeat(1600));
+    while ([...timers.values()].includes(10)) runTimers(10);
+    assert.ok(ws.sent.filter(s => s instanceof Uint8Array).every(s => s.length <= 512));
+    // No call and a serial call cannot arm the idle guard, even while this terminal is open.
+    const pollIdle = intervals.find(i => i.ms === 1000 && !i.fn.name).fn;
+    app.time = 900000; pollIdle();
+    assert.ok(!ws.sent.includes('{"t":"hangup"}'));
+    ws.message({t: 'call', state: 'connected', browser: false});
+    assert.equal(element('no-call').hidden, true);
+    assert.equal(element('hangup').hidden, false);
+    assert.equal(element('hangup').disabled, true);
+    app.time = 1800000; pollIdle(); assert.ok(!ws.sent.includes('{"t":"hangup"}'));
+    ws.message({t: 'call', state: 'connected', browser: true, host: 'Demo BBS'});
+    assert.equal(element('hangup').disabled, false);
+    app.time += 240000; pollIdle(); assert.equal(element('idle-guard').hidden, false);
+    listeners.get('pointermove')(); assert.equal(element('idle-guard').hidden, true);
+    app.time += 240000; pollIdle(); assert.equal(element('idle-guard').hidden, false);
+    // BBS output is deliberately absent from the activity sources.
+    ws.onmessage({data: new TextEncoder().encode('Still here from the BBS').buffer});
+    app.time += 60000; pollIdle();
+    assert.ok(ws.sent.includes('{"t":"hangup"}'));
+    assert.equal(ws.readyState, 3);
+    assert.equal(term.options.disableStdin, true);
+    assert.equal(element('session-disconnected').hidden, false);
+    assert.ok(element('toasts').children.some(el => el.textContent === 'Terminal closed'));
+    for (let n = 0; n < 10; n++) await Promise.resolve();
+    const next = sockets[1]; next.open();
+    next.message({t:'access',edit:false,state:'read-only'});
+    assert.deepEqual(next.sent, []); // A restored transport must not reclaim the terminal.
+    element('screen').onclick();
+    assert.deepEqual(next.sent, ['{"t":"open"}']);
+    next.message({t:'access',edit:false,state:'read-only'});
+    assert.equal(element('session-disconnected').hidden, false);
+    let resumed = false;
+    menuOptions.ensureTerminal(() => { resumed = true; });
+    next.message({t:'access',edit:true,state:'terminal'});
+    assert.equal(resumed, false);
+    next.message({t:'ready',idle:true,rx:0});
+    assert.equal(resumed, true);
+    assert.equal(element('session-disconnected').hidden, true);
+    next.onclose(); // Reboot/link loss disables input and keeps terminal bytes unreplayed.
+    assert.equal(element('session-disconnected').hidden, false);
+    assert.equal(term.options.disableStdin,true);
+    resumed = false;
+    menuOptions.ensureTerminal(() => { resumed = true; });
+    runTimers(1000);
+    for (let n = 0; n < 10; n++) await Promise.resolve();
+    const restored = sockets[2]; restored.open();
+    restored.message({t:'access',edit:false,state:'read-only'});
+    assert.deepEqual(restored.sent,['{"t":"open"}']); // The offline click requested this retry.
+    restored.message({t:'access',edit:true,state:'terminal'});
+    restored.message({t:'ready',idle:true,rx:0});
+    assert.equal(resumed,true);
+});

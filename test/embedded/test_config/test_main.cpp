@@ -25,9 +25,10 @@ void test_idle_menu_has_no_periodic_display_output() {
     modem.begin();
     hostport::CallSlot slot;
     hostport::Session session(modem, sink, 115200, slot);
-    auto *terminal = new config::Terminal(session, false);
     uint8_t bytes[256];
-    for (const char *style : {"ANSI", "CP437", "PLAIN"}) {
+    for (const char *style : {"ANSI", "PLAIN"}) {
+        // A new screen per style: its clock starts at 0, as the polls below assume.
+        auto *terminal = new config::Terminal(session, false);
         TEST_ASSERT_TRUE(terminal->setStyle(style));
         TEST_ASSERT_TRUE(terminal->open());
         std::string frame;
@@ -36,25 +37,45 @@ void test_idle_menu_has_no_periodic_display_output() {
             frame.append(reinterpret_cast<const char *>(bytes), n);
         }
         size_t position = 0;
-        for (const char *label : {"About", "Hardware Tests", "Client Tests", "Command Reference"}) {
+        for (const char *label : {"Status", "Phone Book", "Call History", "Settings", "Help"}) {
             position = frame.find(label, position);
             TEST_ASSERT_NOT_EQUAL(std::string::npos, position);
             position += strlen(label);
         }
-        // Under five seconds: no serial geometry probe is due.
+        // An idle list never polls terminal geometry or repaints.
         terminal->poll(2100);
         TEST_ASSERT_EQUAL(0, terminal->read(bytes, sizeof bytes));
         terminal->poll(4200);
         TEST_ASSERT_EQUAL(0, terminal->read(bytes, sizeof bytes));
-        const uint8_t down[] = {27, '[', 'B'};
-        for (uint8_t c : down)
-            terminal->write(&c, 1);
+        const uint8_t settings = 'd';
+        terminal->write(&settings, 1);
         TEST_ASSERT_GREATER_THAN(0, terminal->read(bytes, sizeof bytes));
         while (terminal->read(bytes, sizeof bytes)) {
         }
+        terminal->poll(6000);
+        TEST_ASSERT_EQUAL(0, terminal->read(bytes, sizeof bytes));
+        TEST_ASSERT_TRUE(terminal->resize(20, 8));
+        TEST_ASSERT_EQUAL(0, terminal->read(bytes, sizeof bytes));
+        const uint8_t general = 'a';
+        terminal->write(&general, 1);
+        while (terminal->read(bytes, sizeof bytes)) {
+        }
+        const uint8_t model = 'c';
+        terminal->write(&model, 1);
+        frame.clear();
+        while ((n = terminal->read(bytes, 1)))
+            frame.append(reinterpret_cast<const char *>(bytes), n);
+        TEST_ASSERT_NOT_EQUAL(std::string::npos, frame.find("A. US Robotics Sportster 14.4k"));
+        const uint8_t escape = 27;
+        terminal->write(&escape, 1);
+        terminal->poll(6100);
+        frame.clear();
+        while ((n = terminal->read(bytes, sizeof bytes)))
+            frame.append(reinterpret_cast<const char *>(bytes), n);
+        TEST_ASSERT_NOT_EQUAL(std::string::npos, frame.find("Edit cancelled"));
         terminal->close();
+        delete terminal;
     }
-    delete terminal;
 }
 void test_psram_log_capacity_and_wrap() {
     char *memory = static_cast<char *>(ps_malloc(256 * 1024));
@@ -70,8 +91,7 @@ void test_psram_log_capacity_and_wrap() {
 }
 void test_atomic_history_files_reload_and_capacity() {
     TEST_ASSERT_TRUE(LittleFS.begin(false));
-    hw::FileStore store("/v010-test-history.bin", "/v010-test-history.tmp",
-                        "/v010-test-history.bak");
+    hw::FileStore store("/test-history.bin", "/test-history.tmp", "/test-history.bak");
     TEST_ASSERT_TRUE(store.erase());
     auto *history = new config::History(store);
     TEST_ASSERT_TRUE(history->begin());
@@ -88,7 +108,7 @@ void test_atomic_history_files_reload_and_capacity() {
     TEST_ASSERT_EQUAL(2, history->at(0).duration);
     TEST_ASSERT_EQUAL(51, history->at(49).duration);
     delete history;
-    File damaged = LittleFS.open("/v010-test-history.bin", "w");
+    File damaged = LittleFS.open("/test-history.bin", "w");
     TEST_ASSERT_TRUE(bool(damaged));
     damaged.print("broken");
     damaged.close();
@@ -97,6 +117,13 @@ void test_atomic_history_files_reload_and_capacity() {
     TEST_ASSERT_EQUAL(50, history->at(49).duration);
     delete history;
     TEST_ASSERT_TRUE(store.erase());
+}
+// AT*FACTORY must finish without a file system: an unmounted store has nothing to erase.
+void test_file_store_erase_without_file_system_succeeds() {
+    hw::FileStore store("/test-history.bin", "/test-history.tmp", "/test-history.bak");
+    LittleFS.end();
+    TEST_ASSERT_TRUE(store.erase());
+    TEST_ASSERT_TRUE(LittleFS.begin(false));
 }
 void test_numeric_dns_probe_and_cancel_without_network_peer() {
     hw::NetProbe probe;
@@ -130,6 +157,7 @@ void setup() {
     RUN_TEST(test_idle_menu_has_no_periodic_display_output);
     RUN_TEST(test_psram_log_capacity_and_wrap);
     RUN_TEST(test_atomic_history_files_reload_and_capacity);
+    RUN_TEST(test_file_store_erase_without_file_system_succeeds);
     RUN_TEST(test_numeric_dns_probe_and_cancel_without_network_peer);
     RUN_TEST(test_preview_streams_and_shuts_down_amp);
     UNITY_END();

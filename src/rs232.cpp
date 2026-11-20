@@ -9,6 +9,7 @@
 #include <Arduino.h>
 
 #include "autobaud.h"
+#include "console_out.h"
 #include "devicecfg.h"
 #include "hw.h"
 #include "input_buffer.h"
@@ -24,7 +25,7 @@ using hostport::Mode;
 // Results and echo for the computer. The UART has only its 128-byte FIFO (kHostTxBuffer),
 // and with &R2 it stops sending while the computer holds RTS off. SinkGate decides how
 // long to wait: never for RING, once (bounded) for a reply, then not at all until the
-// computer reads again (STA-01).
+// computer reads again.
 class UartSink : public atcmd::Sink, private hostport::SinkGate::Device {
 public:
     void write(const char *data, size_t len) override { send(data, len, false); }
@@ -50,7 +51,7 @@ private:
 
 constexpr size_t kMaxRuns = 2048;  // a full command line at 10 edges per character
 autobaud::Run *runs = nullptr;     // in PSRAM
-bool captureFailed = false;        // speed detection couldn't start: fixed speed (5.5-13)
+bool captureFailed = false;        // speed detection couldn't start: fixed speed
 
 atcmd::Modem *modemPtr = nullptr;
 UartSink sink;
@@ -85,7 +86,7 @@ void startCapture() {
         return;
     }
     captureFailed = true;
-    Serial.printf(
+    consoleout::printf(
         "RS232: speed detection could not start. The port stays at %lu bps; "
         "AT*BAUD sets another speed.\r\n",
         static_cast<unsigned long>(currentBaud));
@@ -175,7 +176,7 @@ void readCommandInput(uint32_t nowMs) {
     if (input.size())
         return;
     // Typed passwords pass through these buffers (and the capture's edge times): wipe
-    // what was used (SEC-07e).
+    // what was used.
     uint8_t buf[512];
     if (capturing()) {
         flushUart();  // the capture has the same bytes, decoded at the right speed
@@ -218,7 +219,7 @@ void readOnlineInput(uint32_t nowMs) {
         fromComputer += n;
         input.append(buf, n);
         input.poll(*sess, nowMs);
-        devicecfg::wipe(buf, n);  // input can contain passwords (SEC-07e)
+        devicecfg::wipe(buf, n);  // input can contain passwords
     }
 }
 
@@ -248,7 +249,7 @@ void begin(atcmd::Modem &modem, hostport::CallSlot &slot) {
     startPort();
     // Listen for the speed from now, not from the first poll(): that poll discards the
     // UART's copy of what arrived before, so a command sent while setup() still ran (the
-    // Wi-Fi wait, the banner) was lost without a reply (found on the bench, v2.17).
+    // Wi-Fi wait, the banner) was lost without a reply.
     if (capturing()) {
         startCapture();
     }

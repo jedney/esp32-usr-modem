@@ -4,14 +4,13 @@
 #include <Arduino.h>
 #include <ESPmDNS.h>
 #include <WiFi.h>
-#include <esp_sntp.h>
+#include <esp_mac.h>
+#include <esp_netif_sntp.h>
 #include <esp_wifi.h>
 #include <sys/time.h>
 
 #include <cstdio>
 #include <cstring>
-
-#include "pins.h"
 
 namespace hw {
 
@@ -22,13 +21,15 @@ namespace {
 
 // Written by the Wi-Fi event task (core 0) and by loop() (core 1). The state and its reason
 // change together under linkLock, and the event handler only makes the moves that make sense
-// from the state loop() left (5.5-02): a late "got IP" from a connection that leave() or
+// from the state loop() left: a late "got IP" from a connection that leave() or
 // off() has already ended can no longer bring the link back up.
 portMUX_TYPE linkLock = portMUX_INITIALIZER_UNLOCKED;
 LinkState linkState = LinkState::kOff;  // guarded by linkLock
 Reason linkReason = Reason::kNone;      // guarded by linkLock
-volatile int64_t syncedAt = 0;
-volatile bool scanFinished = false;
+// Written by the TCP/IP task, read by loop(). 64 bits are two stores on this CPU, so the
+// lock stops a read from seeing half of an update.
+portMUX_TYPE syncLock = portMUX_INITIALIZER_UNLOCKED;
+int64_t syncedAt = 0;  // guarded by syncLock
 
 void setLink(LinkState state, Reason reason) {
     portENTER_CRITICAL(&linkLock);
@@ -37,9 +38,8 @@ void setLink(LinkState state, Reason reason) {
     portEXIT_CRITICAL(&linkLock);
 }
 
-// Our own scan limit. The core's scanNetworks() gives up after 20 x the channel time (6 s),
-// which the first scan after the radio starts can take longer than; its results then
-// turn up as the answer to the next scan.
+// Our own scan limit; the first scan after the radio starts takes the longest. Arduino's
+// own limit (60 s) is longer, so this one always decides.
 constexpr uint32_t kScanLimitMs = 15000;
 bool scanning = false;
 uint32_t scanStartedAt = 0;
@@ -57,8 +57,7 @@ Reason mapReason(uint8_t r, bool wasUp) {
             return wasUp ? Reason::kLost : Reason::kWrongPassword;
         case WIFI_REASON_NO_AP_FOUND:
             return wasUp ? Reason::kLost : Reason::kNotFound;
-        case WIFI_REASON_AUTH_EXPIRE:
-        case WIFI_REASON_ASSOC_EXPIRE:
+        case WIFI_REASON_AUTH_EXPIRE:  // IDF 6: also covers the old ASSOC_EXPIRE
         case WIFI_REASON_CONNECTION_FAIL:
             return wasUp ? Reason::kLost : Reason::kNoAnswer;
         default:
@@ -97,17 +96,17 @@ void onWifiEvent(arduino_event_id_t event, arduino_event_info_t info) {
             portEXIT_CRITICAL(&linkLock);
             break;
         }
-        case ARDUINO_EVENT_WIFI_SCAN_DONE:
-            // The core has already copied the results (WiFi.SSID(i) ...) before this runs.
-            scanFinished = true;
-            break;
         default:
             break;
     }
 }
 
+// the SNTP callback type fixes the parameter
+// cppcheck-suppress constParameterCallback
 void onTimeSync(struct timeval *tv) {
+    portENTER_CRITICAL(&syncLock);
     syncedAt = tv->tv_sec;
+    portEXIT_CRITICAL(&syncLock);
 }
 
 void start() {
@@ -116,8 +115,7 @@ void start() {
     }
     started = true;
     WiFi.persistent(false);  // no ESP-IDF copy of the network or password in flash
-    WiFi.onEvent(onWifiEvent);
-    sntp_set_time_sync_notification_cb(onTimeSync);
+    Network.onEvent(onWifiEvent);
 }
 
 IPAddress toIp(uint32_t v) {
@@ -225,20 +223,13 @@ bool EspRadio::scanStart() {
     if (scanning) {
         // A scan the caller gave up on (a cancelled AT*WIFISCAN) is still running: join it
         // rather than stop it. Stopping posts a "scan done" event which could arrive after
-        // the new scan began and end it at once with a short list (5.5-03).
+        // the new scan began and end it at once with a short list.
         scanStartedAt = millis();
         return true;
     }
-    WiFi.scanDelete();
-    // Started here rather than with WiFi.scanNetworks() (see kScanLimitMs). The core
-    // still collects the results when the scan ends, for WiFi.SSID(i) and the rest.
-    wifi_scan_config_t cfg = {};
-    cfg.show_hidden = false;
-    cfg.scan_type = WIFI_SCAN_TYPE_ACTIVE;
-    cfg.scan_time.active.min = 0;
-    cfg.scan_time.active.max = 300;
-    scanFinished = false;
-    if (esp_wifi_scan_start(&cfg, false) != ESP_OK) {
+    // Active scan in the background, 0-300 ms per channel, hidden networks left out.
+    WiFi.setScanActiveMinTime(0);
+    if (WiFi.scanNetworks(true, false, false, 300) != WIFI_SCAN_RUNNING) {
         scanning = false;
         return false;
     }
@@ -251,16 +242,17 @@ int EspRadio::scanResult(netcfg::ScanEntry *out, int max) {
     if (!scanning) {
         return -2;
     }
-    if (!scanFinished) {
+    const int16_t n = WiFi.scanComplete();
+    if (n == WIFI_SCAN_RUNNING) {
         if (millis() - scanStartedAt < kScanLimitMs) {
             return -1;
         }
         esp_wifi_scan_stop();
+        WiFi.scanDelete();
         scanning = false;
         return -2;
     }
     scanning = false;
-    const int16_t n = WiFi.scanComplete();
     if (n < 0) {
         return -2;
     }
@@ -280,7 +272,12 @@ void EspRadio::startServices(const netcfg::Settings &s) {
     mdnsStop();
     mdnsRunning = MDNS.begin(s.host);
     snprintf(ntpServer, sizeof ntpServer, "%s", s.ntp);
-    configTime(0, 0, ntpServer);  // the clock runs in UTC; netcfg::tz does the local time
+    // The clock runs in UTC (the default time zone); netcfg::tz does the local time.
+    esp_netif_sntp_deinit();  // a new join starts SNTP again with the current server
+    esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG(ntpServer);
+    config.wait_for_sync = false;
+    config.sync_cb = onTimeSync;
+    esp_netif_sntp_init(&config);
 }
 
 int64_t EspRadio::utcNow() {
@@ -289,44 +286,19 @@ int64_t EspRadio::utcNow() {
 }
 
 int64_t EspRadio::lastSync() {
-    return syncedAt;
+    portENTER_CRITICAL(&syncLock);
+    const int64_t at = syncedAt;
+    portEXIT_CRITICAL(&syncLock);
+    return at;
 }
 
 void EspRadio::mac(uint8_t out[6]) {
     WiFi.macAddress(out);
 }
 
-// --- On-board RGB LED -----------------------------------------------------------------------
-
-namespace {
-bool rgbKnown = false;
-uint8_t rgbLast[3] = {0, 0, 0};
-constexpr uint8_t kRgbLevel = 24;  // of 255: plenty for a status light, not dazzling
-}  // namespace
-
-void rgbSet(uint8_t r, uint8_t g, uint8_t b) {
-    if (rgbKnown && rgbLast[0] == r && rgbLast[1] == g && rgbLast[2] == b) {
-        return;
-    }
-    neopixelWrite(pins::kRgbLed, r, g, b);
-    rgbLast[0] = r;
-    rgbLast[1] = g;
-    rgbLast[2] = b;
-    rgbKnown = true;
-}
-
-void rgbShow(netcfg::Rgb colour) {
-    switch (colour) {
-        case netcfg::Rgb::kRed:
-            rgbSet(kRgbLevel, 0, 0);
-            break;
-        case netcfg::Rgb::kGreen:
-            rgbSet(0, kRgbLevel, 0);
-            break;
-        case netcfg::Rgb::kOff:
-        default:
-            rgbSet(0, 0, 0);
-            break;
+void wifiMac(uint8_t out[6]) {
+    if (esp_read_mac(out, ESP_MAC_WIFI_STA) != ESP_OK) {
+        memset(out, 0, 6);
     }
 }
 

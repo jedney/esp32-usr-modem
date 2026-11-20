@@ -26,7 +26,7 @@ const char *portName(unsigned port) {
     return port < kPortCount ? names[port] : "CONSOLE";
 }
 namespace {
-constexpr uint8_t kLayout = 2;
+constexpr uint8_t kLayout = 1;
 constexpr size_t kHeader = 6, kRecord = 8;
 constexpr size_t kBody = kHeader + kPortCount * kRecord, kBlob = kBody + 4;
 }  // namespace

@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "description": "USRobotics Sportster ANSI BBS theme. Four runtime-selected models. Exact accent colours required when truecolour supported.",
-  "active_model_source": "AT*MODEL (existing state/service; argument and output syntax unknown)",
+  "description": "Sportster model colours for the wrapping configuration list and web interface.",
+  "active_model_source": "AT*MODEL=14400|28800|33600|56000",
   "models": [
     {
       "id": "sportster-14.4k",
@@ -51,30 +51,16 @@
   },
   "typography": {
     "family": "monospace; prefer IBM VGA / CP437-inspired licensed font when available; fallback to ui-monospace, Consolas, monospace",
-    "style": "fixed character-cell widths, mostly single weight; ANSI block decoration for header",
+    "style": "Plain monospace text with optional ANSI colour",
     "text_case": "use uppercase for section headers and key hints; title case for menu items"
   },
   "terminal": {
-    "canonical_compact": {
-      "columns": 80,
-      "rows": 25,
-      "reserved_last_column": false,
-      "requirements": "No auto-wrap or scrolling; every visible row exactly <= 80 display cells; every screen exactly 25 visible rows"
-    },
-    "wide": {
-      "min_columns": 120,
-      "recommended_columns": 132,
-      "recommended_rows": 45,
-      "mode": "two-column framed cards and richer Phonebook split view"
-    },
-    "intermediate": {
-      "columns": "81–119",
-      "mode": "compact or reduced-column layout chosen by measured cells; never use 120-column layout blindly"
-    },
-    "below_80x25": "Use safe clipped/scrollable minimal view with explicit short-terminal notice. Never overflow or promise full fidelity.",
-    "color": "Use ANSI 24-bit RGB when supported, 256/16-colour approximation otherwise; monochrome must remain legible",
-    "glyph": "Use box-drawing and block glyphs if terminal supports single-cell widths, else ASCII +-| fallback",
-    "safe_rightmost_column": "Never print a newline after the final cell if it would cause terminal scrolling; render through existing terminal API."
+    "layout": "Wrapping lines, no cursor positioning or size-dependent layout",
+    "styles": [
+      "ANSI",
+      "PLAIN"
+    ],
+    "glyph": "ASCII text; no box drawing"
   },
   "roles": {
     "logo": "logo_red",

@@ -1,6 +1,6 @@
-// Checks the GPIO pin map (lib/hw/src/pins.h): it is the map Electronics confirmed (Q89,
-// rev B), and it avoids the S3 board's reserved pins (project brief 5.2), so a
-// pin change, by accident or one that would break the board, fails before upload.
+// Checks the GPIO pin map (lib/hw/src/pins.h): it is the current map, and it
+// avoids the S3 board's reserved pins (spec 2.5), so a pin change, by accident or
+// one that would break the board, fails before upload.
 // Run with: pio test -e native
 #include <unity.h>
 
@@ -12,10 +12,10 @@
 void setUp() {}
 void tearDown() {}
 
-// The confirmed map (Q89, rev B; replaces rev A, Q76). The numbers come from .env.example
+// The current map. The numbers come from .env.example
 // (scripts/pin_config.py); a changed map fails this test unless USR_MODEM_PINS_OVERRIDDEN=1 says it
-// is on purpose. If Electronics changes the board, change .env.example and these numbers together.
-void test_pin_map_is_the_confirmed_one() {
+// is on purpose. If the board changes, change .env.example and these numbers together.
+void test_pin_map_is_the_current_one() {
 #if !USR_MODEM_PINS_DEFAULT
 #if USR_MODEM_PINS_OVERRIDE_OK
     TEST_IGNORE_MESSAGE("pins overridden on purpose (USR_MODEM_PINS_OVERRIDDEN=1)");
@@ -46,7 +46,7 @@ void test_pin_map_is_the_confirmed_one() {
 }
 
 void test_pin_map_avoids_reserved_pins() {
-    // Strapping 0/3/45/46, PSRAM 35-37, USB 19/20, console 43/44, RGB LED 47 (brief 5.2)
+    // Strapping 0/3/45/46, PSRAM 35-37, USB 19/20, console 43/44, board RGB LED 47 (spec 2.5)
     const int reserved[] = {0, 3, 45, 46, 35, 36, 37, 19, 20, 43, 44, 47};
     int used[] = {pins::kRxd,     pins::kTxd,     pins::kCts,     pins::kRts,     pins::kDtr,
                   pins::kDcd,     pins::kRi,      pins::kI2sBclk, pins::kI2sLrc,  pins::kI2sDin,
@@ -82,7 +82,7 @@ void test_pin_map_avoids_reserved_pins() {
 
 int main(int, char **) {
     UNITY_BEGIN();
-    RUN_TEST(test_pin_map_is_the_confirmed_one);
+    RUN_TEST(test_pin_map_is_the_current_one);
     RUN_TEST(test_pin_map_avoids_reserved_pins);
     return UNITY_END();
 }

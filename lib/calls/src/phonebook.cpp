@@ -1,7 +1,9 @@
 #include "phonebook.h"
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <iterator>
 
 namespace calls {
 namespace {
@@ -57,14 +59,12 @@ bool Phonebook::valid(const Entry &e) {
     snprintf(quoted, sizeof quoted, "\"%s\"", e.host);
     dialstring::Result host = dialstring::classify(quoted);
     return host.kind == dialstring::Kind::Host && strcmp(host.host, e.host) == 0 && e.port != 0 &&
-           validSpeed(e.speed);
+           unsigned(e.protocol) < kProtocolCount && validSpeed(e.speed);
 }
 bool Phonebook::begin() {
     loaded_ = true;
     healthy_ = false;
-    for (auto &e : entries_) {
-        e = Entry{};
-    }
+    std::fill(std::begin(entries_), std::end(entries_), Entry{});
     size_t size = store_.load(blob_, sizeof blob_);
     if (size) {
         if (size < 9 || size > kSize || (size - 9) % kRecordSize != 0 ||
@@ -82,10 +82,10 @@ bool Phonebook::begin() {
                 p += 64;
                 e.port = p[0] | (uint16_t(p[1]) << 8);
                 p += 2;
-                if (*p > 1) {
+                if (*p >= kProtocolCount) {
                     ok = false;
                 }
-                e.raw = *p++ != 0;
+                e.protocol = static_cast<Protocol>(*p++);
                 e.speed = get32(p);
                 p += 4;
                 if (*e.number && !valid(e)) {
@@ -104,9 +104,7 @@ bool Phonebook::begin() {
                 return true;
             }
         }
-        for (auto &e : entries_) {
-            e = Entry{};
-        }
+        std::fill(std::begin(entries_), std::end(entries_), Entry{});
     }
     strcpy(entries_[0].number, "1");
     strcpy(entries_[0].host, "www.amigaretro.com");
@@ -134,7 +132,7 @@ bool Phonebook::save() {
         p += 64;
         *p++ = e.port & 255;
         *p++ = e.port >> 8;
-        *p++ = e.raw ? 1 : 0;
+        *p++ = static_cast<uint8_t>(e.protocol);
         put32(p, e.speed);
         p += 4;
     }
@@ -195,9 +193,7 @@ bool Phonebook::clear() {
     if (!store_.save(blob_, 9)) {
         return false;
     }
-    for (auto &e : entries_) {
-        e = Entry{};
-    }
+    std::fill(std::begin(entries_), std::end(entries_), Entry{});
     healthy_ = true;
     return true;
 }
@@ -208,7 +204,7 @@ atcmd::Reply Phonebook::command(atcmd::Port &port, const char *args, bool deleti
         for (const auto &e : entries_) {
             if (*e.number) {
                 port.printf("%s,%s,%u,%s,%u", e.number, e.host, unsigned(e.port),
-                            e.raw ? "RAW" : "TELNET", unsigned(e.speed));
+                            protocolName(e.protocol), unsigned(e.speed));
                 port.newline();
             }
         }
@@ -265,10 +261,16 @@ atcmd::Reply Phonebook::command(atcmd::Port &port, const char *args, bool deleti
             *p -= 'a' - 'A';
         }
     }
-    if (strcmp(fields[3], "TELNET") != 0 && strcmp(fields[3], "RAW") != 0) {
+    bool known = false;
+    for (unsigned i = 0; i < kProtocolCount && !known; ++i) {
+        if (strcmp(fields[3], protocolName(static_cast<Protocol>(i))) == 0) {
+            e.protocol = static_cast<Protocol>(i);
+            known = true;
+        }
+    }
+    if (!known) {
         return Reply::kError;
     }
-    e.raw = strcmp(fields[3], "RAW") == 0;
     if (count == 5 && !decimal(fields[4], 56000, e.speed)) {
         return Reply::kError;
     }

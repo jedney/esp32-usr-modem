@@ -1,0 +1,6 @@
+{
+  "name": "sounds",
+  "description": "Generated UK call tones, DTMF, pulse clicks and test tones, the handshake recording catalogue, WAV parsing and the volume rules; hardware-independent (spec 2.3, 3.4)",
+  "frameworks": "*",
+  "platforms": "*"
+}

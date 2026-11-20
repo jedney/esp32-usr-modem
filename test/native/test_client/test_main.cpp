@@ -75,7 +75,7 @@ void test_port_profiles_persist_and_rollback() {
     TEST_ASSERT_FALSE(damaged.begin());
     TEST_ASSERT_EQUAL(80, damaged.get(1).columns);
 }
-void test_usb_profile_is_separate_and_old_layout_loads_defaults() {
+void test_usb_profile_is_separate_and_unknown_layout_loads_defaults() {
     Memory memory;
     Settings settings(memory);
     TEST_ASSERT_TRUE(settings.save(kUsbPort, {Charset::Cp437, 100, 40, 127}));
@@ -90,24 +90,24 @@ void test_usb_profile_is_separate_and_old_layout_loads_defaults() {
     TEST_ASSERT_EQUAL_STRING("USB", portName(kUsbPort));
     TEST_ASSERT_EQUAL_STRING("RS232", portName(kRs232Port));
     TEST_ASSERT_EQUAL_STRING("CONSOLE", portName(kConsolePort));
-    // A layout 1 record (two ports, before v2.0) is not converted: defaults apply.
-    uint8_t old[26] = {'U', 'S', 'R', 'C', 1, 0};
-    for (unsigned i = 0; i < 2; ++i) {
-        uint8_t *r = old + 6 + i * 8;
+    // A record with another layout number and a good CRC is not read: defaults apply.
+    uint8_t other[30] = {'U', 'S', 'R', 'C', 2, 0};
+    for (unsigned i = 0; i < kPortCount; ++i) {
+        uint8_t *r = other + 6 + i * 8;
         r[0] = 2;
         r[1] = 132;
         r[3] = 50;
         r[5] = 127;
     }
-    uint32_t crc = crc32(old, 22);
+    uint32_t crc = crc32(other, 26);
     for (unsigned i = 0; i < 4; ++i)
-        old[22 + i] = crc >> (8 * i);
-    memory.bytes.assign(old, old + sizeof old);
-    Settings legacy(memory);
-    TEST_ASSERT_FALSE(legacy.begin());
+        other[26 + i] = crc >> (8 * i);
+    memory.bytes.assign(other, other + sizeof other);
+    Settings unknown(memory);
+    TEST_ASSERT_FALSE(unknown.begin());
     for (unsigned port = 0; port < kPortCount; ++port) {
-        TEST_ASSERT_EQUAL(80, legacy.get(port).columns);
-        TEST_ASSERT_EQUAL(8, legacy.get(port).backspace);
+        TEST_ASSERT_EQUAL(80, unknown.get(port).columns);
+        TEST_ASSERT_EQUAL(8, unknown.get(port).backspace);
     }
 }
 void test_settings_validation() {
@@ -351,7 +351,7 @@ void test_batch_lost_ack_keeps_counts_and_crc_stable() {
         TEST_ASSERT_EQUAL_HEX32(sender.statistics().crc, receiver.statistics().crc);
     }
 }
-// --- TG-03: hostile X/Y/ZMODEM input, table driven ----------------------------------------------
+// --- Hostile X/Y/ZMODEM input, table driven ----------------------------------------------
 using Bytes = std::vector<uint8_t>;
 // A receiver under test. send() puts bytes in and collects what the receiver says back,
 // letting it speak between writes (it holds input while its output is not yet read).
@@ -811,7 +811,7 @@ void test_zmodem_hostile_headers_are_nakked_ignored_or_cancel() {
             TEST_ASSERT_FALSE_MESSAGE(rx.t.running(), c.name);
     }
 }
-// --- 5.5-10: only real progress keeps a transfer alive; ZFIN without "OO" is a success ---------
+// --- Only real progress keeps a transfer alive; ZFIN without "OO" is a success ---------
 void test_noise_from_the_peer_does_not_postpone_the_retry_budget() {
     for (Protocol protocol : {Protocol::Xcrc, Protocol::Y, Protocol::Z}) {
         Rx rx(protocol);
@@ -854,7 +854,7 @@ void test_zmodem_receiver_finishes_when_oo_after_zfin_is_missing() {
     quick.send(Bytes{'O', 'O'});
     TEST_ASSERT_EQUAL(int(Outcome::Success), int(quick.t.statistics().outcome));
 }
-// --- 5.5-11: the size probe finds its reply after an echoed query ------------------------------
+// --- The size probe finds its reply after an echoed query ------------------------------
 void test_size_probe_finds_the_reply_after_an_echoed_query() {
     Memory memory;
     Settings settings(memory);
@@ -872,7 +872,7 @@ int main() {
     UNITY_BEGIN();
     RUN_TEST(test_crc_independent_vectors);
     RUN_TEST(test_port_profiles_persist_and_rollback);
-    RUN_TEST(test_usb_profile_is_separate_and_old_layout_loads_defaults);
+    RUN_TEST(test_usb_profile_is_separate_and_unknown_layout_loads_defaults);
     RUN_TEST(test_settings_validation);
     RUN_TEST(test_failed_display_does_not_replace_client_charset);
     RUN_TEST(test_x_checksum_roundtrip);

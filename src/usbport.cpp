@@ -4,8 +4,12 @@
 #include <Arduino.h>
 
 #include "input_buffer.h"
+#include "modemcfg.h"
+#include "serial_state.h"
 #include "sink_gate.h"
+#include "usb_names.h"
 #include "usb_port.h"
+#include "wifi_radio.h"
 
 namespace usbport {
 
@@ -15,7 +19,7 @@ constexpr uint32_t kDefaultBaud = 115200;  // reported until the PC sets a speed
 
 // Direct writes (results the Session sends straight to the sink). Like the RS232 port,
 // SinkGate decides how long to wait: a program that has the port open but stops reading
-// must not stop the modem (STA-01). Nothing is sent while the port is closed.
+// must not stop the modem. Nothing is sent while the port is closed.
 class UsbSink : public atcmd::Sink, private hostport::SinkGate::Device {
 public:
     void write(const char *data, size_t len) override { send(data, len, false); }
@@ -36,7 +40,17 @@ private:
     hostport::SinkGate gate_;
 };
 
+// DCD, DSR and RI to the PC.
+class UsbLines : public hostport::SerialStateSender::Port {
+public:
+    bool send(const hostport::SerialState &s) override {
+        return hw::usbSendSerialState(s.dcd, s.dsr, s.ri);
+    }
+};
+
 UsbSink sink;
+UsbLines lines;
+hostport::SerialStateSender lineSender;
 hostport::InputBuffer input;
 hostport::Session *sess = nullptr;  // made once at boot
 uint32_t fromComputer = 0;
@@ -93,12 +107,16 @@ void writeOutput() {
 }  // namespace
 
 void begin(atcmd::Modem &modem, hostport::CallSlot &slot) {
-    hw::usbBegin();
+    uint8_t mac[6];
+    hw::wifiMac(mac);
+    char serial[hostport::kUsbSerialLength + 1];
+    hostport::usbSerialNumber(mac, serial);
+    hw::usbBegin(modemcfg::productName(modem.model()), "US Robotics", serial);
     sess = new hostport::Session(modem, sink, kDefaultBaud, slot);
     reportedBaud = kDefaultBaud;
 }
 
-void poll(uint32_t nowMs) {
+void poll(uint32_t nowMs, bool ri) {
     if (sess == nullptr) {
         return;
     }
@@ -108,6 +126,9 @@ void poll(uint32_t nowMs) {
         writeOutput();
     }
     sess->tick(nowMs, hw::usbDtr());
+    if (hw::usbStarted()) {
+        lineSender.poll(lines, hw::usbMounted(), hw::usbDtr(), sess->dcd(), ri);
+    }
 }
 
 hostport::Session &session() {

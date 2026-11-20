@@ -1,17 +1,24 @@
 // Browser trust boundaries. No Arduino, sockets or filesystem dependencies.
 #pragma once
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <string>
 #include "modemcfg.h"
 
 namespace webinterface {
+constexpr size_t kTerminalInputBytes = 2048;
+constexpr size_t kTerminalOutputBytes = 16384;
+constexpr size_t kTerminalFrameBytes = 1024 * 1024;
 class Crypto {
 public:
     virtual ~Crypto() = default;
     virtual bool random(uint8_t *out, size_t len) = 0;
-    virtual bool md5(const std::string &text, char out[33]) = 0;
+    virtual bool sha256(const uint8_t *data, size_t len, uint8_t out[32]) = 0;
 };
+// 16 random bytes as 32 lower-case hex digits: session ids, CSRF tokens and tickets.
+bool makeToken(Crypto &crypto, char out[33]);
 bool equalSecret(const std::string &a, const std::string &b);
 bool allowedHost(const std::string &value, const std::string &name, const std::string &ip);
 bool allowedOrigin(const std::string &value, const std::string &name, const std::string &ip);
@@ -20,84 +27,79 @@ std::string terminalUtf8(const uint8_t *bytes, size_t len, bool cp437);
 // Strict bounded geometry envelope, distinct from terminal input.
 bool terminalSize(const std::string &message, unsigned &columns, unsigned &rows);
 int compareVersions(const std::string &a, const std::string &b);  // -2 = invalid
-// One HTTP request per connection (WebSocket upgrade is the exception). Reject
-// duplicate security headers before IDF's first-value-only header lookup.
+// Opening a socket does not own the terminal. Only an explicit open may claim it.
+class TerminalOwner {
+public:
+    bool open(uint32_t id, bool available) {
+        if (!id || (!owns(id) && (owner_ || !available)))
+            return false;
+        owner_ = id;
+        return true;
+    }
+    bool owns(uint32_t id) const { return id && id == owner_; }
+    void close(uint32_t id) {
+        if (owns(id)) {
+            owner_ = 0;
+            hangup_ = false;
+        }
+    }
+    bool requestHangup(uint32_t id) {
+        if (!owns(id))
+            return false;
+        hangup_ = true;
+        return true;
+    }
+    bool takeHangup(uint32_t id) {
+        if (!owns(id) || !hangup_)
+            return false;
+        hangup_ = false;
+        return true;
+    }
+
+private:
+    uint32_t owner_ = 0;
+    bool hangup_ = false;
+};
+// Largest request header (request line and fields) the web server takes. The HTTP server's
+// own header limit (httpd_config_t::max_req_hdr_len) is set to the same value.
+constexpr size_t kMaxHeader = 4096;
+// Checks the raw bytes of a connection before the HTTP server parses them; the bytes pass
+// through unchanged. One HTTP request per connection (a WebSocket upgrade is the exception:
+// its frames follow). Duplicate security headers (Host, Origin, Cookie, Content-Length,
+// Upgrade, X-*) are refused because the server's header lookup returns only the first value;
+// Transfer-Encoding and a body longer than its Content-Length are refused too.
 class HeaderGate {
 public:
     bool accept(const uint8_t *data, size_t len);
     bool complete() const { return complete_; }
     bool websocket() const { return websocket_; }
-    const std::string &host() const { return host_; }
-    const std::string &origin() const { return origin_; }
-    const std::string &target() const { return target_; }
-    const std::string &filtered() const { return filtered_; }
-    size_t headerLength() const { return headerLength_; }
 
 private:
     std::string head_;
-    std::string host_, origin_, target_;
-    std::string filtered_;
-    size_t headerLength_ = 0;
     bool complete_ = false, websocket_ = false, bad_ = false;
     size_t remaining_ = 0;
 };
 
-// Result of checking an Authorization header.
-//   kMissing: no usable Digest header (first request, or malformed)
-//   kStale:   correct password, but the nonce expired, was replaced or was replayed;
-//             the next challenge says stale=true so the browser retries silently
-//   kWrong:   wrong password or response, or any Digest attempt in the second after one
-//             (the lock-out; answered at once, the password is not checked)
-enum class Check : uint8_t { kOk, kMissing, kStale, kWrong };
-
-class Auth {
-public:
-    explicit Auth(Crypto &crypto) : crypto_(crypto) {}
-    void reset();
-    std::string challenge(uint32_t now, bool stale = false);
-    Check check(const std::string &header, const std::string &method, const std::string &uri,
-                const char *ha1, uint32_t now);
-    bool verify(const std::string &header, const std::string &method, const std::string &uri,
-                const char *ha1, uint32_t now) {
-        return check(header, method, uri, ha1, now) == Check::kOk;
-    }
-    bool token(char out[33]);
-    // True for kLockOutMs after a wrong response. Attempts in that time are refused
-    // without extending it, so a guesser gets one try a second and the server task
-    // never sleeps (SEC-02; replaces the old one-second delay).
-    bool lockedOut(uint32_t now) const { return wrong_ && now - wrongAt_ < kLockOutMs; }
-    static constexpr uint32_t kLockOutMs = 1000;
-
-private:
-    struct Nonce {
-        std::string value;
-        uint32_t at = 0, count = 0;
-    };
-    Crypto &crypto_;
-    Nonce nonce_[8];
-    unsigned next_ = 0;
-    bool wrong_ = false;
-    uint32_t wrongAt_ = 0;
-};
-
+// Single-use WebSocket tickets, each bound to the login session that asked for it.
 class Tickets {
 public:
-    explicit Tickets(Auth &auth) : auth_(auth) {}
+    explicit Tickets(Crypto &crypto) : crypto_(crypto) {}
     void reset();
-    std::string issue(uint32_t now);
-    bool consume(const std::string &token, uint32_t now);
+    std::string issue(uint32_t session, uint32_t now);
+    uint32_t consume(const std::string &token, uint32_t now);  // its session, or 0
+    void revoke(uint32_t session);
 
 private:
-    Auth &auth_;
+    Crypto &crypto_;
     struct Ticket {
         std::string value;
-        uint32_t at = 0;
+        uint32_t at = 0, session = 0;
     };
     Ticket ticket_[4];
     unsigned next_ = 0;
 };
 
-// A separate namespace avoids migrating Sportster profiles for a web-only flag.
+// The web-only flag, saved apart from the Sportster profiles.
 class Settings {
 public:
     explicit Settings(modemcfg::Store &store) : store_(store) {}
@@ -117,9 +119,7 @@ public:
     size_t space() const { return N - count_; }
     size_t size() const { return count_; }
     void clear() {
-        for (auto &b : bytes_) {
-            b = 0;
-        }
+        std::fill(std::begin(bytes_), std::end(bytes_), uint8_t{0});
         head_ = count_ = 0;
     }
     bool push(const uint8_t *data, size_t len) {
@@ -130,6 +130,11 @@ public:
             bytes_[(head_ + count_++) % N] = data[i];
         }
         return true;
+    }
+    size_t append(const uint8_t *data, size_t len) {
+        size_t n = len < space() ? len : space();
+        push(data, n);
+        return n;
     }
     size_t pop(uint8_t *data, size_t cap) {
         size_t n = count_ < cap ? count_ : cap;

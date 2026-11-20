@@ -1,1 +1,7 @@
-{"name":"internet","version":"0.13.0","frameworks":"*","platforms":"*","dependencies":[{"name":"calls"},{"name":"netcfg"}]}
+{
+  "name": "internet",
+  "description": "PPP and SLIP Internet dial-up on a private /30 with NAT, and its settings (spec 3.6)",
+  "frameworks": "*",
+  "platforms": "*",
+  "dependencies": [{"name": "calls"}, {"name": "modemcfg"}, {"name": "netcfg"}]
+}

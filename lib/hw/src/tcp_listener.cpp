@@ -25,8 +25,11 @@ bool TcpListener::begin(uint16_t port) {
     return true;
 }
 bool TcpListener::accept() {
+    return accept(socket_);
+}
+bool TcpListener::accept(TcpSocket &into) {
     int peer = fd_ < 0 ? -1 : lwip_accept(fd_, nullptr, nullptr);
-    return peer >= 0 && socket_.adopt(peer);
+    return peer >= 0 && into.adopt(peer);
 }
 void TcpListener::reject() {
     int peer = fd_ < 0 ? -1 : lwip_accept(fd_, nullptr, nullptr);

@@ -1,4 +1,4 @@
-// AT*HW... hardware-test commands (project brief 6.14). They exist to check the
+// AT*HW... hardware-test commands (spec 3.13). They exist to check the
 // electronics as they are built: each LED, the amplifier and speaker, the volume pot,
 // the RS232 handshake lines and data path. Pins come from lib/hw/src/pins.h.
 #include "hwconsole.h"
@@ -62,7 +62,7 @@ bool fromBrowser() {
 void testDelay(uint32_t ms) {
     uint32_t start = millis();
     do {
-        hw::feedWatchdog();  // a test can run for minutes inside one loop pass (STA-06)
+        hw::feedWatchdog();  // a test can run for minutes inside one loop pass
         term->service();
         ::delay(ms < 5 ? ms : 5);
     } while (millis() - start < ms);
@@ -87,7 +87,7 @@ int readKey() {
 }
 
 // True when the running test must end: the terminal has gone, or no key came for
-// hwtest::kIdleTimeoutMs. Every "any key" loop checks this (STA-03).
+// hwtest::kIdleTimeoutMs. Every "any key" loop checks this.
 bool mustStop() {
     if (!term->connected()) {
         return true;
@@ -112,7 +112,7 @@ bool keyPressed() {
     return true;
 }
 
-// The RS232 line, loopback and bridge tests use the port itself (Q79): they run only on
+// The RS232 line, loopback and bridge tests use the port itself: they run only on
 // the USB console, with no call up, and the RS232 session is suspended meanwhile.
 bool canTakePort(const char *what) {
     if (term->isRs232()) {
@@ -212,7 +212,7 @@ bool play(tones::Source &src) {
 // --- Pin map -----------------------------------------------------------------------------
 
 void printPins() {
-    out().print("GPIO pin map (lib/hw/src/pins.h) - confirmed (rev B)\r\n");
+    out().print("GPIO pin map (lib/hw/src/pins.h)\r\n");
     out().print("RS232 (DCE; asserted = LOW at the GPIO):\r\n");
     out().printf("  RXD out  GPIO%-2d  DB9 2   UART1 TX\r\n", pins::kRxd);
     out().printf("  TXD in   GPIO%-2d  DB9 3   UART1 RX\r\n", pins::kTxd);
@@ -229,8 +229,7 @@ void printPins() {
     for (uint8_t i = 0; i < hwtest::kLedCount; ++i) {
         out().printf(" %s=GPIO%d", hwtest::ledName(i), pins::kLeds[i]);
     }
-    out().printf("\r\nOn board: RGB LED GPIO%d; console UART0 GPIO%d/%d\r\n", pins::kRgbLed,
-                 pins::kConsoleTx, pins::kConsoleRx);
+    out().printf("\r\nOn board: console UART0 GPIO%d/%d\r\n", pins::kConsoleTx, pins::kConsoleRx);
 }
 
 // --- Info and files ----------------------------------------------------------------------
@@ -668,7 +667,10 @@ void runBridge(uint32_t baud) {
     hw::lineSet(OutSignal::kDCD, true);
     out().printf("Bridge: console <-> RS232 at %lu 8N1, CTS and DCD on. Ctrl-X ends.\r\n",
                  static_cast<unsigned long>(baud));
-    drainInput();
+    // Browser input following the AT command is already bridge payload. Keep
+    // prefetched paste bytes; serial terminals still need their CR/LF drained.
+    if (!term->isBrowser())
+        drainInput();
     HardwareSerial &u = hw::uart();
     bool dtr = hw::dtrAsserted();
     bool rts = hw::rtsAsserted();
@@ -765,7 +767,9 @@ void runGuided() {
             tones::DtmfSource dtmf("0123456789*#");
             tones::PulseSource pulse("21");
             tones::ToneSource busy(tones::kUkBusyTone, 2250);
-            tones::Source *seq[] = {&t1, &sw, &dial, &dtmf, &pulse, &busy};
+            // play() fills from each source, so the sources stay writable
+            // cppcheck-suppress constVariable
+            tones::Source *const seq[] = {&t1, &sw, &dial, &dtmf, &pulse, &busy};
             for (tones::Source *s : seq) {
                 if (!play(*s)) {
                     break;

@@ -30,6 +30,9 @@ void test_source_built_sdk_preserves_board_memory() {
 void test_real_netif_nat_lifecycle_and_repeated_cleanup() {
     // Reuse netcfg's saved settings; the normal radio disables IDF credential copies.
     wifi.begin(millis());
+    if (!wifi.settings().enabled || !wifi.settings().hasNetwork()) {
+        TEST_IGNORE_MESSAGE("No Wi-Fi network saved: join one with AT*WIFIJOIN first");
+    }
     const uint32_t start = millis();
     while (!wifi.up() && millis() - start < 15000) {
         wifi.tick(millis());

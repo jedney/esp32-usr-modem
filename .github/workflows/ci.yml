@@ -21,7 +21,7 @@ jobs:
     outputs:
       version: ${{ steps.check.outputs.version }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - id: check
         name: Check VERSION and CHANGES.md
         run: |
@@ -32,49 +32,54 @@ jobs:
     name: Unit tests (PC)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
-          python-version: "3.12"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6
+          python-version: "3.14"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: ~/.platformio
           key: pio-native-${{ hashFiles('platformio.ini') }}
-      - run: pip install platformio==6.2.0 pytest==9.1.1
+      - name: GCC 14 (the native tests and the interop peers are C++26)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq g++-14
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 140 --slave /usr/bin/g++ g++ /usr/bin/g++-14
+          g++ --version | head -1
+      - run: pip install platformio==6.2.0 pytest==9.2.0
       - run: python scripts/generate_ui.py --check
       - run: python -m unittest discover -s ui/tests -v
       - run: pio test -e native
       - run: python -m pytest test/scripts -q
       - name: Independent X/Y/ZMODEM interoperability
         run: |
-          sudo apt-get update -qq
           sudo apt-get install -y lrzsz
           mkdir -p .pio
-          g++ -std=c++17 -Wall -Wextra -Ilib/clienttest/src -Ilib/calls/src test/interop/client_peer.cpp lib/clienttest/src/transfer.cpp -o .pio/client-peer
+          g++ -std=gnu++26 -Wall -Wextra -Ilib/clienttest/src -Ilib/calls/src test/interop/client_peer.cpp lib/clienttest/src/transfer.cpp -o .pio/client-peer
           python3 test/interop/run_lrzsz.py --peer .pio/client-peer
       - name: Independent PPP interoperability
         run: |
           sudo apt-get install -y ppp
           sudo modprobe ppp_generic
           if [ ! -e /dev/ppp ]; then sudo mknod /dev/ppp c 108 0; fi
-          g++ -std=c++17 -Wall -Wextra -Ilib/internet/src -Ilib/calls/src -Ilib/hostport/src -Ilib/modemcfg/src -Ilib/netcfg/src test/interop/internet_peer.cpp lib/internet/src/internet.cpp lib/internet/src/internet_settings.cpp lib/modemcfg/src/modemcfg.cpp lib/netcfg/src/net_settings.cpp lib/netcfg/src/net_tz.cpp -o .pio/internet-peer
+          g++ -std=gnu++26 -Wall -Wextra -Ilib/internet/src -Ilib/calls/src -Ilib/hostport/src -Ilib/modemcfg/src -Ilib/netcfg/src test/interop/internet_peer.cpp lib/internet/src/internet.cpp lib/internet/src/internet_settings.cpp lib/modemcfg/src/modemcfg.cpp lib/netcfg/src/net_settings.cpp lib/netcfg/src/net_tz.cpp -o .pio/internet-peer
           sudo python3 test/interop/run_pppd.py --peer .pio/internet-peer
 
   lint:
     name: Lint (cppcheck, clang-format)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
-          python-version: "3.12"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6
+          python-version: "3.14"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: ~/.platformio
           key: pio-check-${{ hashFiles('platformio.ini') }}
       - run: pip install platformio==6.2.0
       - name: cppcheck
-        run: pio check -e native --fail-on-defect=medium --fail-on-defect=high
+        run: pio check -e native --fail-on-defect=low
       - name: clang-format
         run: |
           files=$(git ls-files '*.cpp' '*.h')
@@ -84,10 +89,10 @@ jobs:
     name: Web interface tests and preview
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
         with:
-          node-version: "22"
+          node-version: "26"
       - name: Unit tests
         working-directory: web
         run: npm test
@@ -95,7 +100,7 @@ jobs:
         run: |
           python3 scripts/build_web.py
           python3 scripts/make_preview.py
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: web-preview-${{ github.sha }}
           path: web/preview.html
@@ -106,23 +111,31 @@ jobs:
     runs-on: ubuntu-latest
     needs: version
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
-          python-version: "3.12"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6
+          python-version: "3.14"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: ~/.platformio
           key: pio-s3-${{ hashFiles('platformio.ini') }}
+      # Components from the ESP component registry (TinyUSB, LittleFS and Arduino's own),
+      # pinned by dependencies.lock. The component manager checks each one's hash.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: managed_components
+          key: idf-components-${{ hashFiles('dependencies.lock', 'idf_component.yml', 'components/*/idf_component.yml') }}
       - run: pip install platformio==6.2.0
       - run: pio run -e s3
+      - name: Components match dependencies.lock
+        run: git diff --exit-code -- dependencies.lock
       - name: LittleFS image (web files)
         run: pio run -e s3 -t buildfs
       - name: Validate image identities and manifest
         run: python scripts/image_manifest.py .pio/build/s3
       - name: Firmware size report
         run: pio run -e s3 -t size | tail -5
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: usr-modem-v${{ needs.version.outputs.version }}-${{ github.sha }}
           path: |

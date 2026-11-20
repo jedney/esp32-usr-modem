@@ -1,5 +1,5 @@
 // Unit tests for the hardware-test helpers, generated tones and volume scaling
-// (project brief 5.3, 6.4, 6.14). Run with: pio test -e native
+// (spec 2.3, 3.4, 3.13). Run with: pio test -e native
 #include <unity.h>
 
 #include <cmath>
@@ -22,6 +22,8 @@ std::vector<int16_t> render(tones::Source &src, size_t maxSamples) {
         size_t chunk = maxSamples - got < 256 ? maxSamples - got : 256;
         size_t n = src.fill(out.data() + got, chunk);
         got += n;
+        // a finite source returns fewer samples at its end
+        // cppcheck-suppress knownConditionTrueFalse
         if (n < chunk) {
             break;
         }
@@ -95,6 +97,26 @@ void test_chase_sweeps_there_and_back() {
     for (uint32_t i = 0; i < sizeof expected; ++i) {
         TEST_ASSERT_EQUAL_HEX8(expected[i], hwtest::chaseMask(i));
     }
+}
+
+void test_progress_fills_from_the_left() {
+    TEST_ASSERT_EQUAL_HEX8(0x00, hwtest::progressMask(0, 700));
+    TEST_ASSERT_EQUAL_HEX8(0x01, hwtest::progressMask(1, 700));
+    TEST_ASSERT_EQUAL_HEX8(0x01, hwtest::progressMask(116, 700));
+    TEST_ASSERT_EQUAL_HEX8(0x03, hwtest::progressMask(117, 700));
+    TEST_ASSERT_EQUAL_HEX8(0x0F, hwtest::progressMask(350, 700));
+    TEST_ASSERT_EQUAL_HEX8(0x3F, hwtest::progressMask(699, 700));
+    TEST_ASSERT_EQUAL_HEX8(0x7F, hwtest::progressMask(700, 700));
+}
+
+void test_progress_edge_cases() {
+    TEST_ASSERT_EQUAL_HEX8(0x00, hwtest::progressMask(0, 0));
+    TEST_ASSERT_EQUAL_HEX8(0x00, hwtest::progressMask(5, 0));
+    TEST_ASSERT_EQUAL_HEX8(0x7F, hwtest::progressMask(900, 700));
+    // No overflow near the top of the 32-bit range.
+    TEST_ASSERT_EQUAL_HEX8(0x3F, hwtest::progressMask(0xFFFFFFFEu, 0xFFFFFFFFu));
+    TEST_ASSERT_EQUAL_HEX8(0x7F, hwtest::progressMask(0xFFFFFFFFu, 0xFFFFFFFFu));
+    TEST_ASSERT_EQUAL_HEX8(0x07, hwtest::progressMask(0x7FFFFFFFu, 0xFFFFFFFFu));
 }
 
 void test_arg_start_accepts_equals_or_space() {
@@ -295,7 +317,7 @@ void test_speaker_levels_and_pot_stay_within_full_scale() {
     }
 }
 
-// No volume cap: full volume is full scale (CLS0361 2 W speaker, decisions log 7 Nov 2026).
+// No volume cap: full volume is full scale (CLS0361 2 W speaker; see docs/DECISIONS.md).
 void test_output_gain_is_clamped_with_no_cap() {
     TEST_ASSERT_EQUAL_FLOAT(1.0f, volume::outputGain(1.0f));
     TEST_ASSERT_EQUAL_FLOAT(1.0f, volume::outputGain(5.0f));
@@ -303,6 +325,32 @@ void test_output_gain_is_clamped_with_no_cap() {
     TEST_ASSERT_EQUAL_FLOAT(0.0f, volume::outputGain(-1.0f));
     TEST_ASSERT_EQUAL_INT16(32767, volume::scale(32767, volume::outputGain(1.0f)));
     TEST_ASSERT_EQUAL_INT16(-32768, volume::scale(-32768, volume::outputGain(1.0f)));
+}
+
+float rmsDbfs(const std::vector<int16_t> &samples, float gain) {
+    double sum = 0.0;
+    for (int16_t s : samples) {
+        double v = static_cast<double>(s) * gain / 32768.0;
+        sum += v * v;
+    }
+    return static_cast<float>(10.0 * std::log10(sum / static_cast<double>(samples.size())));
+}
+
+// The generated call tones (dial, ring, DTMF) play at the handshake recordings' RMS,
+// about -16.5 dBFS; two-tone sounds are -6 dBFS RMS at full scale. Single tones (busy,
+// carrier) come out 3 dB above that. The test and calibration tones are not scaled.
+void test_call_tones_match_the_handshake_recordings() {
+    const float gain = volume::callToneGain();
+    TEST_ASSERT_TRUE(gain > 0.0f && gain < 1.0f);
+    tones::ToneSource dial(tones::kUkDialTone, 1000);
+    tones::DtmfSource dtmf("5");
+    auto dialSamples = render(dial, 16000);
+    auto dtmfSamples = render(dtmf, 1600);
+    TEST_ASSERT_FLOAT_WITHIN(0.5f, -6.0f, rmsDbfs(dialSamples, 1.0f));
+    TEST_ASSERT_FLOAT_WITHIN(0.5f, -16.5f, rmsDbfs(dialSamples, gain));
+    TEST_ASSERT_FLOAT_WITHIN(0.5f, -16.5f, rmsDbfs(dtmfSamples, gain));
+    tones::ToneSource busy(400.0f, 0.0f, 1000);
+    TEST_ASSERT_FLOAT_WITHIN(0.5f, -13.5f, rmsDbfs(render(busy, 16000), gain));
 }
 
 void test_level_curve_mute_monotonic_and_top() {
@@ -412,6 +460,8 @@ int main(int, char **) {
     RUN_TEST(test_led_names_match_web_protocol_bits);
     RUN_TEST(test_parse_led);
     RUN_TEST(test_chase_sweeps_there_and_back);
+    RUN_TEST(test_progress_fills_from_the_left);
+    RUN_TEST(test_progress_edge_cases);
     RUN_TEST(test_arg_start_accepts_equals_or_space);
     RUN_TEST(test_word_is_and_rest);
     RUN_TEST(test_parse_uint_ranges);
@@ -430,6 +480,7 @@ int main(int, char **) {
     RUN_TEST(test_sweep_rises_in_frequency);
     RUN_TEST(test_speaker_levels_and_pot_stay_within_full_scale);
     RUN_TEST(test_output_gain_is_clamped_with_no_cap);
+    RUN_TEST(test_call_tones_match_the_handshake_recordings);
     RUN_TEST(test_level_curve_mute_monotonic_and_top);
     RUN_TEST(test_pot_level_dead_zones);
     RUN_TEST(test_scale_rounds_and_clips);

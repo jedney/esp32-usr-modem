@@ -1,11 +1,10 @@
-// GPIO pin map (project brief 5.2, 6.14).
+// GPIO pin map (spec 2.5, 3.13).
 //
-// *** Rev B (project brief Q89), replacing the rev A map confirmed in Q76. ***
 // The pin NUMBERS are not in the source: scripts/pin_config.py reads USR_MODEM_PIN_* from
-// .env.example (the rev B defaults), then .env, then the environment, and passes them to
-// the compiler. Every driver and test reads its pins from this file.
+// .env.example (the defaults), then .env, then the environment, and passes them to the
+// compiler. Every driver and test reads its pins from this file.
 // test/native/test_pins locks in the .env.example values, so a pin can't change by accident.
-// The header layout below describes the rev B defaults.
+// The header layout below describes the defaults.
 //
 // Board: ESP32-S3 N16R8 DevKitC-1 clone (ePartners ST8002). Header J1 = left (L), J3 =
 // right (R); pin 1 is at the antenna end.
@@ -17,17 +16,18 @@
 //          R4-R10 RS232 [1 RXD, 2 TXD, 42 CTS, 41 RTS, 40 DTR, 39 DCD, 38 RI]
 //          R11-13 (37 36 35) | R14 (0) | R15 (45) | R16 48 | R17 (47) | R18 21
 //          R19 (20) | R20 (19) | R21-22 GND (not connected)
-// [ ] = used below; ( ) = not usable (strapping, PSRAM, USB, UART0 console, RGB LED).
+// [ ] = used below; ( ) = not usable (strapping, PSRAM, USB, UART0 console, and 47: the
+// board's own RGB LED, wired on the DevKit but not used).
 // Spare: 8, 9, 18, 21, 48 (18 and 8 are also the nominal pins of the test-only UART2
 // below; nothing is connected to them). 19/20 (native USB) are also wired to the USB-C
-// PD board's D-/D+: from v2.0 they are the USB modem port (TinyUSB, lib/hw/src/usb_port.h),
-// reached through the rear USB-C socket. Amp VIN and GND come from the PD board, not the S3.
+// PD board's D-/D+: they are the USB modem port (TinyUSB, lib/hw/src/usb_port.h), reached
+// through the rear USB-C socket. Amp VIN and GND come from the PD board, not the S3.
 //
 // RS232 goes through two RS232 Pal modules (U1, U2) with a DB9 DCE pinout. The DB9 pins
 // are given beside each signal below.
 //
 // Polarity: the RS232 Pals invert both ways, so on the TTL side an RS232 signal that is
-// asserted (ON, +V on the cable) is LOW at the GPIO (brief 6.2).
+// asserted (ON, +V on the cable) is LOW at the GPIO (spec 3.2).
 
 #pragma once
 
@@ -51,12 +51,11 @@ constexpr int kRts = USR_MODEM_PIN_RTS;  // DB9 7, request to send              
 constexpr int kDtr = USR_MODEM_PIN_DTR;  // DB9 4, data terminal ready            (GPIO)
 // DSR (DB9 6) is hard-wired on from U2 V+ through 1 k: no pin.
 
-// --- Audio: MAX98357A (brief 5.3) --------------------------------------------------------
+// --- Audio: MAX98357A (spec 2.3) --------------------------------------------------------
 constexpr int kI2sLrc = USR_MODEM_PIN_I2S_LRC;
 constexpr int kI2sBclk = USR_MODEM_PIN_I2S_BCLK;
 constexpr int kI2sDin = USR_MODEM_PIN_I2S_DIN;
-constexpr int kAmpSd =
-    USR_MODEM_PIN_AMP_SD;  // HIGH = on (left channel), LOW = shutdown (10 k pull-down)
+constexpr int kAmpSd = USR_MODEM_PIN_AMP_SD;  // HIGH = on (left channel), LOW = shutdown
 
 // --- Volume pot wiper, must be ADC1 (GPIO1-10) because ADC2 can't be used with Wi-Fi ---
 constexpr int kPot = USR_MODEM_PIN_POT;
@@ -65,7 +64,7 @@ constexpr int kPot = USR_MODEM_PIN_POT;
 constexpr int kLeds[7] = {USR_MODEM_PIN_LED_AA, USR_MODEM_PIN_LED_CD, USR_MODEM_PIN_LED_RD,
                           USR_MODEM_PIN_LED_SD, USR_MODEM_PIN_LED_TR, USR_MODEM_PIN_LED_CS,
                           USR_MODEM_PIN_LED_ARQ};
-// GPIO -> resistor -> LED -> GND, so HIGH = lit.
+// GPIO -> LED anode; cathode -> GND, so HIGH = lit.
 constexpr bool kLedActiveHigh = true;
 
 // --- On-board RS232 test only (test/embedded/test_rs232) ---------------------------------
@@ -76,8 +75,6 @@ constexpr int kTestUartTx = USR_MODEM_PIN_TEST_UART_TX;
 constexpr int kTestUartRx = USR_MODEM_PIN_TEST_UART_RX;
 
 // --- On the S3 board itself -------------------------------------------------------------
-constexpr int kRgbLed =
-    USR_MODEM_PIN_RGB_LED;  // WS2812-type RGB LED (Jon, 22 Oct): Wi-Fi status (v0.6)
 constexpr int kConsoleTx =
     USR_MODEM_PIN_CONSOLE_TX;  // UART0 via the onboard USB-serial chip: console only
 constexpr int kConsoleRx = USR_MODEM_PIN_CONSOLE_RX;

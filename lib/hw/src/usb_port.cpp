@@ -1,7 +1,7 @@
 // The USB modem port: see usb_port.h.
 //
-// The USB device comes from Arduino's TinyUSB layer (USB.begin, esp32-hal-tinyusb), built
-// from .pio/network-deps/arduino_tinyusb. Arduino's USBCDC class is not used: it copies
+// The USB device comes from Arduino's TinyUSB layer (USB.begin, esp32-hal-tinyusb), with
+// TinyUSB from components/arduino_tinyusb. Arduino's USBCDC class is not used: it copies
 // incoming data into a queue that drops bytes when full, and it reboots into the
 // bootloader when a program sets 1200 baud or toggles DTR/RTS in a certain order. Here
 // the CDC interface is registered directly and TinyUSB's CDC functions are polled, so
@@ -19,15 +19,27 @@ namespace {
 
 constexpr uint8_t kItf = 0;
 bool started = false;
+// The CDC interface's name: the product name, so the COM port carries the model's name too
+// (Windows shows it as the port's bus-reported description). Arduino keeps the pointer, not
+// a copy, so it must stay valid while the device runs; usbBegin's caller passes a constant.
+const char *interfaceName = "USB modem";
 
-// The CDC-ACM interface pair, as Arduino's USBCDC registers it (endpoints 0x85
-// notification, 0x03 out, 0x84 in, 64 bytes at full speed). Adapted from Arduino-ESP32
-// 2.0.17 cores/esp32/USBCDC.cpp load_cdc_descriptor(), Copyright 2015-2020 Espressif
-// Systems (Shanghai) PTE LTD, Apache-2.0. Changed: the interface name.
+// The CDC-ACM interface pair (endpoints 0x03 out, 0x84 in; tinyusb_enable_interface()
+// reserves them for USB_INTERFACE_CDC). The notification endpoint is not Arduino's 0x85:
+// the S3's USB core has transmit FIFOs only for IN endpoints 0 to 4, so a notification
+// queued on 0x85 never leaves and the endpoint stays busy. A free IN endpoint with a FIFO
+// is taken instead (0x83 with only this interface). Adapted from Arduino-ESP32 3.3.12
+// cores/esp32/USBCDC.cpp load_cdc_descriptor(), Copyright 2015-2020 Espressif Systems
+// (Shanghai) PTE LTD, Apache-2.0. Changed: the interface name, the notification endpoint
+// and its size, and the line layout.
+constexpr uint8_t kNotifySize = 16;  // one SERIAL_STATE notification is 10 bytes
+
 uint16_t loadDescriptor(uint8_t *dst, uint8_t *itf) {
-    uint8_t name = tinyusb_add_string_descriptor("USR Modem");
+    uint8_t name = tinyusb_add_string_descriptor(interfaceName);
+    uint8_t notify = tinyusb_get_free_in_endpoint();
+    notify = notify ? (0x80 | notify) : 0x85;  // none free: DCD, DSR and RI don't reach the PC
     uint8_t descriptor[TUD_CDC_DESC_LEN] = {
-        TUD_CDC_DESCRIPTOR(*itf, name, 0x85, 64, 0x03, 0x84, 64)};
+        TUD_CDC_DESCRIPTOR(*itf, name, notify, kNotifySize, 0x03, 0x84, CFG_TUD_ENDPOINT_SIZE)};
     *itf += 2;
     memcpy(dst, descriptor, TUD_CDC_DESC_LEN);
     return TUD_CDC_DESC_LEN;
@@ -35,15 +47,21 @@ uint16_t loadDescriptor(uint8_t *dst, uint8_t *itf) {
 
 }  // namespace
 
-bool usbBegin() {
+bool usbBegin(const char *product, const char *manufacturer, const char *serial) {
     if (started) {
         return true;
+    }
+    if (product != nullptr) {
+        interfaceName = product;
     }
     if (tinyusb_enable_interface(USB_INTERFACE_CDC, TUD_CDC_DESC_LEN, loadDescriptor) != ESP_OK) {
         return false;
     }
-    USB.manufacturerName("USR Modem Emulator project");
-    USB.productName("USR Modem Emulator");
+    // Arduino copies the strings when the device starts; the vendor and product IDs stay
+    // Arduino's (Espressif's).
+    USB.manufacturerName(manufacturer);
+    USB.productName(product);
+    USB.serialNumber(serial);
     started = USB.begin();
     return started;
 }
@@ -74,9 +92,9 @@ uint32_t usbBaud() {
 }
 
 // Read, available and flush only while a computer has configured the device. TinyUSB then
-// queues the next OUT transfer, and on an endpoint a bus reset has closed (nothing on the
-// rear USB-C, or a power-only lead) its ESP32-S3 driver divides by a packet size of 0 and
-// the modem crash-loops (found on the bench, v2.17).
+// queues the next OUT transfer, and queuing one on an endpoint a bus reset has closed
+// (nothing on the rear USB-C, or a power-only lead) is not safe: an earlier ESP32-S3
+// driver divided by that endpoint's packet size of 0 and the modem crash-looped.
 size_t usbAvailable() {
     return usbMounted() ? tud_cdc_n_available(kItf) : 0;
 }
@@ -103,6 +121,17 @@ size_t usbWrite(const uint8_t *data, size_t length) {
 
 bool usbTxDrained() {
     return !usbDtr() || tud_cdc_n_write_available(kItf) >= CFG_TUD_CDC_TX_BUFSIZE;
+}
+
+bool usbSendSerialState(bool dcd, bool dsr, bool ri) {
+    if (!usbMounted()) {
+        return false;
+    }
+    cdc_notify_uart_state_t state = {};
+    state.bRxCarrier = dcd ? 1 : 0;
+    state.bTxCarrier = dsr ? 1 : 0;
+    state.bRingSignal = ri ? 1 : 0;
+    return tud_cdc_n_notify_uart_state(kItf, &state);
 }
 
 void usbDiscardInput() {

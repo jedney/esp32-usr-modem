@@ -1,7 +1,13 @@
-// PPP/SLIP framing adapted from Bo Zimmerman's Zimodem, Apache-2.0,
-// revision a534e5129d88b8b09aa01fe17498d5cd5368569e, zpppmode/zslipmode.
+// PPP/SLIP framing adapted from Zimodem, Copyright 2022-2026 Bo Zimmerman
+// (revision a534e5129d88b8b09aa01fe17498d5cd5368569e, zpppmode/zslipmode).
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy at http://www.apache.org/licenses/LICENSE-2.0
+// Unless required by applicable law or agreed to in writing, software distributed
+// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+// specific language governing permissions and limitations under the License.
 // Modified for USR Modem: bounded portable codecs, RFC negotiation and lifecycle.
-// Original attribution and licence: credits/zimodem/LICENSE and NOTICE.
 #pragma once
 #include "byte_queue.h"
 #include "connection.h"
@@ -31,6 +37,8 @@ public:
     void stop(Reason reason);
     bool isOpen() const override { return open_; }
     bool binaryService() const override { return true; }
+    // cppcheck follows one fresh queue; its space changes as bytes come and go
+    // cppcheck-suppress knownConditionTrueFalse
     size_t space() const override { return open_ && !closing_ && tx_.space() >= 4096 ? 256 : 0; }
     size_t write(const uint8_t *data, size_t length) override;
     size_t read(uint8_t *data, size_t capacity) override;
@@ -59,7 +67,7 @@ private:
     calls::ByteQueue<16384> tx_;
     uint8_t rx_[kMtu + 8] = {}, ip_[kMtu] = {};
     // Replies are built here, not on the stack: the Arduino loop task, which runs the engine,
-    // had 420 bytes of its 8 KB left after the PPP tests (v2.17 bench). control() copies
+    // had 420 bytes of its 8 KB left after the PPP tests. control() copies
     // reply_ or nak_ into packet_, so the three never overlap.
     uint8_t packet_[kMtu] = {}, reply_[kMtu] = {}, nak_[kMtu] = {};
     size_t rxLength_ = 0;

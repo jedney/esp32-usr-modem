@@ -15,9 +15,12 @@
 namespace hw {
 
 // --- Front-panel LEDs ------------------------------------------------------------------
-// Bit i = hwtest::Led i (AA bit 0 ... ARQ bit 6), as in web/PROTOCOL.md.
+// Bit i = hwtest::Led i (AA bit 0 ... ARQ bit 6), as in web/README.md.
 void ledsSet(uint8_t mask);
 uint8_t ledsMask();
+// Firmware-update progress: the LEDs fill from AA to ARQ (hwtest::progressMask). Writes the
+// pins only when the mask changes, so it can be called for every chunk.
+void ledsProgress(uint32_t done, uint32_t total);
 
 // --- Amplifier shutdown pin --------------------------------------------------------------
 enum class AmpMode : uint8_t { kAuto, kOn, kOff };  // Auto: on only while a sound plays
@@ -42,7 +45,7 @@ constexpr uint16_t kPotMax = 4095;
 uint16_t potRaw();  // 0..4095, average of 16 readings
 uint32_t potMillivolts();
 
-// --- RS232 handshake lines (active-low at the GPIO, brief 6.2) --------------------------
+// --- RS232 handshake lines (active-low at the GPIO, spec 3.2) --------------------------
 void linesBegin();  // outputs deasserted, inputs with pull-ups
 bool dtrAsserted();
 bool rtsAsserted();
@@ -55,7 +58,7 @@ void uartBegin(uint32_t baud);
 void uartEnd();
 HardwareSerial &uart();
 
-// --- RS232 host port (v0.5): UART1 with its flow-control pins ------------------------------
+// --- RS232 host port: UART1 with its flow-control pins ------------------------------
 // UART1's RTS output drives our CTS (DB25 5) and its CTS input reads the computer's RTS
 // (DB25 4); both are active-low at the GPIO, which matches the MAX3232's inversion.
 constexpr size_t kHostRxBuffer = 8192;
@@ -82,14 +85,14 @@ bool captureActive();
 // Copies the next finished burst. Returns the number of runs (0 if none is waiting).
 size_t captureRead(autobaud::Run *runs, size_t cap);
 
-// --- Task watchdog (STA-06) --------------------------------------------------------------
+// --- Task watchdog --------------------------------------------------------------
 
 // The main loop is watched from the end of setup() (enableLoopWDT(); the core feeds it
 // before every loop() pass). An operation that keeps one pass longer than the time-out
 // (CONFIG_ESP_TASK_WDT_TIMEOUT_S) calls this as it goes. From another task it does nothing.
 void feedWatchdog();
 // The least free stack `task` has had since it started, in bytes; -1 if there is no task
-// of that name (5.5-08).
+// of that name.
 int stackHeadroom(const char *task);
 
 }  // namespace hw

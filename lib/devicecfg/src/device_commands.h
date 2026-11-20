@@ -45,7 +45,7 @@ atcmd::Reply cmdFactory(atcmd::Port &port, const char *args);
 
 // clang-format off
 #define DEVICECFG_STAR_COMMANDS \
-    {"PASS", "AT*PASS[=<text>]", "replace device password (8-32 printable characters)", \
+    {"PASS", "AT*PASS[=<text>]", "generate and show once, or set device password (8-32 characters)", \
      devicecfg::cmdPass, false, true}, \
     {"OTA", "AT*OTA[?] | AT*OTA=<ALWAYS|DEMAND|ON|OFF>", "OTA policy; ON opens 10 minutes", \
      devicecfg::cmdOta, false}, \

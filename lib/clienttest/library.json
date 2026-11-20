@@ -1,1 +1,7 @@
-{"name":"clienttest","version":"0.12.0","build":{"includeDir":"src"},"dependencies":{"hostport":"*","modemcfg":"*","calls":"*"}}
+{
+  "name": "clienttest",
+  "description": "Client Tests: display, size, keys, throughput, cable and X/Y/ZMODEM transfers on the serial ports, and the per-port client settings (spec 3.12)",
+  "frameworks": "*",
+  "platforms": "*",
+  "dependencies": [{"name": "calls"}, {"name": "hostport"}, {"name": "modemcfg"}]
+}

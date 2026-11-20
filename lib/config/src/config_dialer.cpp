@@ -13,15 +13,16 @@ bool Dialer::start(hostport::Session &session, const char *text, bool pulse) {
         return false;
     }
     session_ = &session;
-    menu_ = &session == &console_                  ? &consoleMenu_
-            : usb_ && usbMenu_ && &session == usb_ ? usbMenu_
-                                                   : &hostMenu_;
+    menu_ = browser_ && browserMenu_ && &session == browser_ ? browserMenu_
+            : &session == &console_                          ? &consoleMenu_
+            : usb_ && usbMenu_ && &session == usb_           ? usbMenu_
+                                                             : &hostMenu_;
     pulse_ = pulse;
     dtrOn_ = session.dtrOn();
     since_ = clock_();
     stage_ = 1;
     session.port().wait(cancelWait, this, atcmd::Result::kNoCarrier);
-    auto &p = session.port().modem().active();
+    const auto &p = session.port().modem().active();
     if (p.get(modemcfg::kM) == 0 || p.get(modemcfg::kM) == 3) {
         connect();
     } else if (!sound_.start(calls::SoundStage::kDial, "123", pulse_, 14400, p)) {
@@ -61,7 +62,7 @@ void Dialer::poll() {
         return;
     }
     uint32_t now = clock_();
-    auto &p = session_->port().modem().active();
+    const auto &p = session_->port().modem().active();
     sound_.poll(now, p);
     if ((dtrOn_ && !session_->dtrOn() && p.get(modemcfg::kAmpD) >= 2) || sound_.failed()) {
         session_->port().finish(atcmd::Reply::kError);

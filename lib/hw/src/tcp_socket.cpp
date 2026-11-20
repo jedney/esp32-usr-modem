@@ -9,21 +9,15 @@
 namespace hw {
 using calls::SocketState;
 namespace {
-// SEC-01: a peer that vanishes without a FIN or RST (cable pulled, router crash) must not
-// hold the call for ever. Idle 60 s, then 6 probes 10 s apart: a dead peer ends the call
-// (NO CARRIER) after about 2 minutes. lwIP counts these options in seconds.
-constexpr int kKeepIdleSeconds = 60;
-constexpr int kKeepIntervalSeconds = 10;
-constexpr int kKeepCount = 6;
-
-void tuneSocket(int fd) {
+// Keepalive as TcpSocket::KeepAlive says (tcp_socket.h).
+void tuneSocket(int fd, const TcpSocket::KeepAlive &keep) {
     const int yes = 1;
     lwip_setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof yes);
     lwip_setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof yes);
-    lwip_setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &kKeepIdleSeconds, sizeof kKeepIdleSeconds);
-    lwip_setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &kKeepIntervalSeconds,
-                    sizeof kKeepIntervalSeconds);
-    lwip_setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &kKeepCount, sizeof kKeepCount);
+    lwip_setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &keep.idleSeconds, sizeof keep.idleSeconds);
+    lwip_setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &keep.intervalSeconds,
+                    sizeof keep.intervalSeconds);
+    lwip_setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &keep.count, sizeof keep.count);
 }
 }  // namespace
 
@@ -33,17 +27,17 @@ bool TcpSocket::adopt(int fd) {
         return false;
     }
     fd_ = fd;
-    sockaddr_in peer = {};
-    socklen_t len = sizeof peer;
-    if (lwip_getpeername(fd_, reinterpret_cast<sockaddr *>(&peer), &len) == 0) {
-        ip4addr_ntoa_r(reinterpret_cast<const ip4_addr_t *>(&peer.sin_addr), peer_, sizeof peer_);
+    sockaddr_in remote = {};
+    socklen_t len = sizeof remote;
+    if (lwip_getpeername(fd_, reinterpret_cast<sockaddr *>(&remote), &len) == 0) {
+        ip4addr_ntoa_r(reinterpret_cast<const ip4_addr_t *>(&remote.sin_addr), peer_, sizeof peer_);
     }
     int flags = fcntl(fd_, F_GETFL, 0);
     if (flags < 0 || fcntl(fd_, F_SETFL, flags | O_NONBLOCK) < 0) {
         close();
         return false;
     }
-    tuneSocket(fd_);
+    tuneSocket(fd_, keepAlive_);
     state_ = SocketState::kOpen;
     return true;
 }
@@ -93,15 +87,17 @@ void TcpSocket::found(uint32_t address) {
 void TcpSocket::lookup(const char *host) {
     resolved_[0] = 0;
     state_ = SocketState::kResolving;
-    ip_addr_t address;
-    if (ipaddr_aton(host, &address) && IP_IS_V4(&address)) {
-        found(ip4_addr_get_u32(ip_2_ip4(&address)));
+    ip_addr_t ip;
+    if (ipaddr_aton(host, &ip) && IP_IS_V4(&ip)) {
+        found(ip4_addr_get_u32(ip_2_ip4(&ip)));
         return;
     }
     if (pending_.load() >= 4) {
         state_ = SocketState::kDnsError;
         return;
     }
+    // lwIP hands the request to resolved(), which deletes it; cppcheck cannot follow the void *
+    // cppcheck-suppress [unreadVariable,unusedAllocatedMemory,constVariablePointer]
     Request *request = new (std::nothrow) Request{this, generation_.load()};
     if (!request) {
         state_ = SocketState::kDnsError;
@@ -110,13 +106,13 @@ void TcpSocket::lookup(const char *host) {
     ++pending_;
     // DNS cache and callbacks belong to lwIP's TCP/IP core.
     LOCK_TCPIP_CORE();
-    err_t result = dns_gethostbyname(host, &address, resolved, request);
+    err_t result = dns_gethostbyname(host, &ip, resolved, request);
     UNLOCK_TCPIP_CORE();
     if (result != ERR_INPROGRESS) {
         --pending_;
         delete request;
-        if (result == ERR_OK && IP_IS_V4(&address)) {
-            found(ip4_addr_get_u32(ip_2_ip4(&address)));
+        if (result == ERR_OK && IP_IS_V4(&ip)) {
+            found(ip4_addr_get_u32(ip_2_ip4(&ip)));
         } else {
             state_ = SocketState::kDnsError;
         }
@@ -135,7 +131,7 @@ void TcpSocket::connectAddress(uint32_t address) {
         state_ = SocketState::kFailed;
         return;
     }
-    tuneSocket(fd_);
+    tuneSocket(fd_, keepAlive_);
     sockaddr_in endpoint = {};
     endpoint.sin_family = AF_INET;
     endpoint.sin_port = htons(port_);
@@ -164,10 +160,10 @@ void TcpSocket::poll() {
     if (fd_ < 0) {
         portENTER_CRITICAL(&dnsLock_);
         unsigned result = dnsState_.exchange(0);
-        uint32_t address = address_.load();
+        uint32_t ip = address_.load();
         portEXIT_CRITICAL(&dnsLock_);
         if (result == 1) {
-            found(address);
+            found(ip);
         } else if (result == 2) {
             state_ = SocketState::kDnsError;
         }

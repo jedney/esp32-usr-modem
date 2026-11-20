@@ -8,7 +8,7 @@
   "windows": {
     "options": {
       "env": {
-        "PATH": "${env:USERPROFILE}\\.platformio\\penv\\Scripts;${env:PATH}"
+        "PATH": "${env:LOCALAPPDATA}\\Python\\bin;${env:USERPROFILE}\\.platformio\\penv\\Scripts;${env:PATH}"
       }
     }
   },
@@ -64,6 +64,13 @@
       "problemMatcher": []
     },
     {
+      "label": "Modem: network console",
+      "type": "shell",
+      "command": "pio device monitor -e s3 --port socket://usr-modem.local:2001",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
       "label": "Modem: on-board tests",
       "type": "shell",
       "command": "pio test -e s3",
@@ -97,7 +104,7 @@
     {
       "label": "Modem: lint (cppcheck)",
       "type": "shell",
-      "command": "pio check -e native",
+      "command": "pio check -e native --fail-on-defect=low",
       "problemMatcher": []
     },
     {

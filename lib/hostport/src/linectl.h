@@ -1,4 +1,4 @@
-// Host port line rules (project brief 6.2): the "+++" escape with guard time, DTR
+// Host port line rules (spec 3.2): the "+++" escape with guard time, DTR
 // debouncing and what a DTR drop does (&D), DCD (&C) and flow control (&H &I &R).
 // Behaviour follows the USR Sportster technical reference.
 //

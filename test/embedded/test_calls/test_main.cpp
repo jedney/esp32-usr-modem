@@ -47,20 +47,20 @@ void test_phonebook_in_scratch_nvs() {
     TEST_ASSERT_TRUE(book->begin());
     calls::Entry entry = *book->find("1");
     strcpy(entry.number, "02");
-    entry.raw = true;
+    entry.protocol = calls::Protocol::Raw;
     entry.speed = 56000;
     TEST_ASSERT_TRUE(book->put(entry));
     delete book;
     book = new calls::Phonebook(store);
     TEST_ASSERT_TRUE(book->begin());
     TEST_ASSERT_EQUAL_STRING("www.amigaretro.com", book->find("1")->host);
-    TEST_ASSERT_TRUE(book->find("02")->raw);
+    TEST_ASSERT_EQUAL(int(calls::Protocol::Raw), int(book->find("02")->protocol));
     TEST_ASSERT_EQUAL_UINT32(56000, book->find("02")->speed);
     TEST_ASSERT_TRUE(book->remove("02"));
     delete book;
     TEST_ASSERT_TRUE(store.erase());
 }
-// STA-08: a full phonebook (64 entries, 5,321 bytes in one blob) must save, change and
+// A full phonebook (64 entries, 5,321 bytes in one blob) must save, change and
 // shrink with the modem's other settings in NVS too. NVS writes the new blob before it
 // frees the old one, so a change needs room for both. The NVS figures are printed for
 // the decisions log.
@@ -76,7 +76,7 @@ const OtherSetting kOtherSettings[] = {
     {"clients", 64},
     {"internet", 160},
     {"diagnostics", 3},
-    {"phy", 1904},  // the radio's calibration data (ESP32-S3, ESP-IDF 4.4)
+    {"phy", 1904},  // the radio's calibration data
 };
 constexpr size_t kOtherCount = sizeof kOtherSettings / sizeof kOtherSettings[0];
 
@@ -102,10 +102,10 @@ void printNvs(const char *when) {
 void eraseScratch() {
     for (size_t i = 0; i < kOtherCount; ++i) {
         char ns[16];
-        snprintf(ns, sizeof ns, "v17o%u", unsigned(i));
+        snprintf(ns, sizeof ns, "scratch_o%u", unsigned(i));
         hw::NvsStore(ns, "cfg").erase();
     }
-    hw::NvsStore("v17book", "cfg").erase();
+    hw::NvsStore("scratch_book", "cfg").erase();
 }
 calls::Entry longEntry(unsigned i) {
     calls::Entry e;
@@ -123,14 +123,14 @@ void test_full_phonebook_fits_beside_the_other_settings() {
     for (size_t i = 0; i < kOtherCount; ++i) {
         if (usedEntries(kOtherSettings[i].ns) == 0) {
             char ns[16];
-            snprintf(ns, sizeof ns, "v17o%u", unsigned(i));
+            snprintf(ns, sizeof ns, "scratch_o%u", unsigned(i));
             static uint8_t fill[2048];
             memset(fill, 0x5a, sizeof fill);
             TEST_ASSERT_TRUE(hw::NvsStore(ns, "cfg").save(fill, kOtherSettings[i].size));
         }
     }
     printNvs("with the other settings");
-    hw::NvsStore store("v17book", "cfg");
+    hw::NvsStore store("scratch_book", "cfg");
     auto *book = new calls::Phonebook(store);  // 6 KB: on the heap, not the loop stack
     TEST_ASSERT_TRUE(book->begin());           // the factory entry
     for (unsigned i = 1; i < calls::kPhonebookCount; ++i) {

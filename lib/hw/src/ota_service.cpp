@@ -41,11 +41,17 @@ void OtaService::poll(uint32_t now, bool wifiUp, bool idle, const char *hostname
             // before writing the upload; an NVS failure must prevent installation.
             if (!device_.markUsed()) {
                 Update.abort();
+            } else if (authenticated_) {
+                authenticated_();
             }
         });
         // ArduinoOTA receives the whole image inside handle(), in the loop task: feed the
-        // watchdog after every chunk (STA-06).
-        ota_->onProgress([](unsigned int, unsigned int) { hw::feedWatchdog(); });
+        // watchdog after every chunk. The panel LEDs are not refreshed meanwhile, so they
+        // show the progress; after a failure the next refresh restores them.
+        ota_->onProgress([](unsigned int done, unsigned int total) {
+            hw::feedWatchdog();
+            hw::ledsProgress(done, total);
+        });
         ota_->begin();
     }
     ota_->handle();

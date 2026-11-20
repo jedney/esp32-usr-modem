@@ -1,4 +1,4 @@
-// One serial port's session (project brief 6.2): the RS232 port and the USB console each
+// One serial port's session (spec 3.2): the RS232 port and the USB console each
 // have one. It owns the port's AT parser and moves between three modes:
 //   command        -> bytes from the computer go to the AT parser
 //   online         -> bytes go to the call; "+++" with guard time escapes
@@ -68,7 +68,7 @@ public:
     uint32_t payloadReceived() const { return payloadReceived_; }
     bool startLocal(Connection &connection);
 
-    // Starts a call on `conn` (AT*TESTCALL now, ATD from v0.8): sends CONNECT and goes
+    // Starts a call on `conn` (AT*TESTCALL, ATD): sends CONNECT and goes
     // online. False if this or another port already has a call.
     bool startCall(Connection &conn, uint32_t operationalSpeed = 0, uint32_t reportSpeed = 0,
                    const void *reservation = nullptr, bool answered = false);
@@ -78,6 +78,9 @@ public:
     void setDialer(Dialer *dialer) { dialer_ = dialer; }
     void setBaudControl(BaudControl *control) { baudControl_ = control; }
     bool dial(const char *text, bool pulse) override;
+    void resize(unsigned columns, unsigned rows);
+    unsigned columns() const { return columns_; }
+    unsigned rows() const { return rows_; }
     uint32_t lineSpeed() const { return lineSpeed_; }
     uint32_t reportedSpeed() const { return reportSpeed_; }
 
@@ -131,6 +134,7 @@ private:
     bool xoff_ = false;
     uint32_t now_ = 0;
     uint32_t payloadSent_ = 0, payloadReceived_ = 0;
+    unsigned columns_ = 80, rows_ = 24;
     uint8_t echo_[256] = {};  // F0: online data echoed back to the computer
     size_t echoLen_ = 0;
 };

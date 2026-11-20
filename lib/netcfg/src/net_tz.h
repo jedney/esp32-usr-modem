@@ -1,4 +1,4 @@
-// Time zones for the clock (project brief 6.8, Q59): Pacific/Auckland by default,
+// Time zones for the clock (spec 3.8): Pacific/Auckland by default,
 // configurable with AT*TZ.
 //
 // The ESP32 has no time-zone database, so zones are POSIX rules (as in the TZ variable):
@@ -47,7 +47,7 @@ const char *zoneRule(size_t i);
 // Offset from UTC (seconds) and the zone abbreviation in force at `utc`.
 int32_t offsetAt(const Rule &r, int64_t utc, const char **abbrev = nullptr);
 
-// offsetAt() for a caller that asks on every loop pass (the web status, PERF-02): worked
+// offsetAt() for a caller that asks on every loop pass (the web status): worked
 // out again only in a new minute (offsets change on whole minutes) or for another rule.
 class OffsetCache {
 public:

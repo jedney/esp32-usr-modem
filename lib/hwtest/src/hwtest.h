@@ -1,4 +1,4 @@
-// Hardware-test helpers (project brief 6.14): LED names, test patterns and the argument
+// Hardware-test helpers (spec 3.13): LED names, test patterns and the argument
 // parsing shared by the AT*HW... console commands.
 //
 // No Arduino dependencies: this module is unit-tested on the PC.
@@ -10,7 +10,7 @@
 
 namespace hwtest {
 
-// Front-panel LEDs, in the bit order of the web page's `led` message (web/PROTOCOL.md).
+// Front-panel LEDs, in the bit order of the web page's `led` message (web/README.md).
 enum Led : uint8_t { kAA = 0, kCD, kRD, kSD, kTR, kCS, kARQ, kLedCount };
 
 // "AA", "CD", ... "ARQ".
@@ -23,7 +23,12 @@ int parseLed(const char *s);
 // LED mask for one step of a back-and-forth sweep: AA, CD ... ARQ, CS ... CD, AA, ...
 uint8_t chaseMask(uint32_t step);
 
-// RS232 handshake outputs the tests can drive (DSR is hard-wired on, brief 5.1).
+// LED mask for a firmware update `done` of `total` bytes through: the LEDs fill from AA
+// (left) to ARQ (right). AA lights with the first byte, CD to CS one per sixth of the
+// update, and ARQ only when done >= total.
+uint8_t progressMask(uint32_t done, uint32_t total);
+
+// RS232 handshake outputs the tests can drive (DSR is hard-wired on, spec 2.2).
 enum class OutSignal : uint8_t { kDCD, kRI, kCTS };
 const char *outSignalName(OutSignal s);
 bool parseOutSignal(const char *s, OutSignal *out);
@@ -47,7 +52,7 @@ bool parseOnOff(const char *s, bool *on);
 // --- Time-out and call rules -------------------------------------------------------------
 
 // An interactive test ("any key stops", prompts, bridge) ends after this long with no key,
-// so a closed terminal or a forgotten test can't hold the modem for ever (WP-03, STA-03).
+// so a closed terminal or a forgotten test can't hold the modem for ever.
 constexpr uint32_t kIdleTimeoutMs = 5u * 60u * 1000u;
 
 // True when `timeoutMs` or more has passed since `lastMs`. Safe when millis() wraps.

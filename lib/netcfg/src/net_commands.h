@@ -1,8 +1,8 @@
-// AT* Wi-Fi and clock commands (project brief 6.6, 6.8): AT*WIFI, AT*WIFISCAN,
+// AT* Wi-Fi and clock commands (spec 3.6, 3.8): AT*WIFI, AT*WIFISCAN,
 // AT*WIFIJOIN, AT*WIFIFORGET, AT*WIFIIP, AT*HOSTNAME, AT*TIME, AT*TZ, AT*NTP.
 //
 // The Wi-Fi password is typed at a masked prompt (AT*WIFIJOIN) and is never printed:
-// AT*WIFI? shows only "set" / "not set" (Q46). A join or a scan sends its result later,
+// AT*WIFI? shows only "set" / "not set". A join or a scan sends its result later,
 // so the other port keeps working meanwhile; any key cancels it.
 //
 // No Arduino dependencies: unit-tested on the PC with a fake radio.

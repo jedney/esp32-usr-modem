@@ -1,4 +1,4 @@
-"""The USB modem port (v2.0): the S3's native USB, carried by the rear USB-C socket.
+"""The USB modem port: the S3's native USB, carried by the rear USB-C socket.
 
 Run with --usb-port (the TinyUSB serial port, e.g. COM21). The cross-port tests also
 need --rs232-port. No console port is needed: everything is driven from USB and RS232.
@@ -64,6 +64,20 @@ def test_usb_port_answers_at_commands(usb_idle):
     assert usb.command("AT*ANSWERPORT=?")[0] == "RS232,USB,CONSOLE,AUTO"
 
 
+def test_usb_serial_number_is_the_wifi_mac(usb_idle):
+    """The PC sees the Wi-Fi MAC (as AT*WIFI? shows it) as the USB serial number."""
+    from serial.tools import list_ports
+
+    usb = usb_idle
+    macs = [line.split(":", 1)[1].strip() for line in usb.command("AT*WIFI?")
+            if line.startswith("MAC:")]
+    require(len(macs) == 1 and re.fullmatch(r"([0-9A-F]{2}:){5}[0-9A-F]{2}", macs[0]),
+            "AT*WIFI? shows no MAC line")
+    ports = [p for p in list_ports.comports() if p.device == usb.ser.port]
+    require(len(ports) == 1, "The USB port is not in the PC's port list")
+    assert ports[0].serial_number == macs[0].replace(":", "")
+
+
 def test_usb_echo_call_carries_a_large_block_and_escapes(usb_idle):
     usb = usb_idle
     usb.ser.write(b"AT*TESTCALL\r")
@@ -114,6 +128,62 @@ def test_usb_1200_baud_and_line_toggles_do_not_reboot(usb_idle):
     assert usb.command("AT")[-1] == "OK"
     status = "\n".join(usb.command("AT*STATUS"))
     require("USB: open (DTR on)" in status, "USB port not open after the toggles")
+
+
+def line_becomes(read, wanted, timeout=2.0):
+    """True once read() == wanted; the notification takes a few ms to reach the driver."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if read() == wanted:
+            return True
+        time.sleep(0.02)
+    return read() == wanted
+
+
+@contextlib.contextmanager
+def amp_c_restored(usb):
+    """Puts back the &C setting the test changes."""
+    match = re.search(r"&C(\d)", "\n".join(usb.command("ATI4")))
+    try:
+        yield
+    finally:
+        usb.command("AT&C%s" % (match.group(1) if match else "1"))
+
+
+def test_usb_dsr_is_on(usb_idle):
+    usb = usb_idle
+    require(line_becomes(lambda: usb.ser.dsr, True), "DSR off on the USB port")
+
+
+def test_usb_dcd_follows_amp_c_and_the_call(usb_idle):
+    usb = usb_idle
+    with amp_c_restored(usb):
+        assert usb.command("AT&C1")[-1] == "OK"
+        require(line_becomes(lambda: usb.ser.cd, False), "DCD on at idle with &C1")
+        assert usb.command("AT&C0")[-1] == "OK"
+        require(line_becomes(lambda: usb.ser.cd, True), "DCD off at idle with &C0")
+        assert usb.command("AT&C1")[-1] == "OK"
+        require(line_becomes(lambda: usb.ser.cd, False), "DCD stayed on after &C1")
+        usb.ser.write(b"AT*TESTCALL\r")
+        wait_for(usb, b"CONNECT")
+        require(line_becomes(lambda: usb.ser.cd, True), "DCD off during a call")
+        time.sleep(1.2)
+        usb.ser.write(b"+++")
+        wait_for(usb, b"OK", timeout=4)
+        require(usb.ser.cd, "DCD off in online-command mode")
+        assert usb.command("ATH")[-1] == "OK"
+        require(line_becomes(lambda: usb.ser.cd, False), "DCD still on after the hang-up")
+
+
+def test_usb_dcd_is_sent_again_when_the_port_reopens(usb_idle):
+    usb = usb_idle
+    with amp_c_restored(usb):
+        assert usb.command("AT&C0")[-1] == "OK"
+        usb.ser.close()
+        usb.ser.open()
+        usb.ser.dtr = True
+        require(line_becomes(lambda: usb.ser.cd, True), "DCD lost when the port reopened")
+        read_for(usb, 0.2)
 
 
 def test_usb_and_rs232_share_one_call(usb_idle, rs232):
@@ -182,6 +252,32 @@ def test_auto_answer_prefers_rs232_when_both_have_dtr(usb_idle, rs232):
         finally:
             connection.close()
         wait_for(rs232, b"NO CARRIER")
+
+
+def test_usb_ri_follows_the_ring_cadence(usb_idle):
+    """RI comes on and goes off with each ring of a call that isn't answered."""
+    usb = usb_idle
+    with answer_setup(usb) as address:
+        assert usb.command("ATS0=0")[-1] == "OK"  # let it ring; answer_setup puts S0 back
+        require(not usb.ser.ri, "RI on before the call")
+        connection = call_in(address)
+        changes = []
+        try:
+            deadline = time.monotonic() + 4.5  # more than one 3 s ring period
+            last = False
+            while time.monotonic() < deadline:
+                now = usb.ser.ri
+                if now != last:
+                    changes.append(now)
+                    last = now
+                time.sleep(0.02)
+        finally:
+            connection.close()
+        require(changes[:4] == [True, False, True, False],
+                "RI did not follow the ring cadence: %r" % changes)
+        wait_for(usb, b"RING")
+        read_for(usb, 0.5)
+        require(line_becomes(lambda: usb.ser.ri, False), "RI stayed on after the caller left")
 
 
 def test_usb_unplug_during_a_call_frees_the_modem(usb_idle, request):

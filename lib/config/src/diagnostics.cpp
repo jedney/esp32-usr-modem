@@ -52,7 +52,7 @@ bool History::save() {
     uint8_t *p = blob_;
     memcpy(p, "USRC", 4);
     p += 4;
-    *p++ = 2;
+    *p++ = 1;
     *p++ = static_cast<uint8_t>(count_);
     for (size_t i = 0; i < count_; ++i) {
         const auto &r = records_[i];
@@ -61,8 +61,7 @@ bool History::save() {
         put(p, r.sent, 4);
         put(p, r.received, 4);
         put(p, r.result, 2);
-        const auto kind = r.raw ? calls::Kind::Raw : r.kind;
-        *p++ = (r.incoming ? 1 : 0) | (uint8_t(kind) << 1);
+        *p++ = (r.incoming ? 1 : 0) | (uint8_t(r.kind) << 1);
         memcpy(p, r.host, 64);
         p += 64;
         memcpy(p, r.number, 12);
@@ -78,8 +77,8 @@ bool History::begin() {
     if (!n) {
         return true;
     }
-    if (n < 10 || memcmp(blob_, "USRC", 4) || (blob_[4] != 1 && blob_[4] != 2) ||
-        blob_[5] > kCount || n != 10 + size_t(blob_[5]) * kRecordSize) {
+    if (n < 10 || memcmp(blob_, "USRC", 4) || blob_[4] != 1 || blob_[5] > kCount ||
+        n != 10 + size_t(blob_[5]) * kRecordSize) {
         return false;
     }
     const uint8_t *crc = blob_ + n - 4;
@@ -94,12 +93,11 @@ bool History::begin() {
         r.sent = get(p, 4);
         r.received = get(p, 4);
         r.result = get(p, 2);
-        if (*p > (blob_[4] == 1 ? 3 : 7)) {
+        if ((*p >> 1) > uint8_t(calls::Kind::Ssh)) {
             return false;
         }
         r.incoming = (*p & 1) != 0;
         r.kind = calls::Kind(*p++ >> 1);
-        r.raw = r.kind == calls::Kind::Raw;
         memcpy(r.host, p, 64);
         p += 64;
         memcpy(r.number, p, 12);

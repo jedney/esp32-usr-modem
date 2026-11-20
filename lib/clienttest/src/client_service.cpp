@@ -56,7 +56,7 @@ bool Service::start(const char *command, const char *args, uint32_t now) {
         if (strlen(nested) < 2 || (nested[2] && nested[2] != '=') ||
             (nested[0] != 'S' && nested[0] != 'R') || !strchr("XYZ", nested[1]))
             return false;
-        char name[3] = {nested[0], nested[1], 0};
+        const char name[3] = {nested[0], nested[1], 0};
         return start(name, nested + 2, now);
     }
     output_.clear();
@@ -244,6 +244,8 @@ void Service::summary() {
         "HS9600.WAV/HS14400.WAV/HS28800.WAV/HS33600.WAV/HS56000.WAV; ALL batch.\r\n");
 }
 size_t Service::space() const {
+    // cppcheck follows one fresh queue; its space changes as bytes come and go
+    // cppcheck-suppress knownConditionTrueFalse
     if (!open_ || (finished_ && !hold_) || output_.space() < 512)
         return 0;
     if (mode_ == Mode::Transfer && !finished_)
@@ -302,7 +304,7 @@ void Service::byte(uint8_t b) {
         input_[length_++] = b;
         input_[length_] = 0;
         // Look at every ESC [ in the buffer: a terminal that echoes our query puts an
-        // "ESC [ 6 n" in front of the real reply (5.5-11).
+        // "ESC [ 6 n" in front of the real reply.
         for (char *reply = strstr(input_, "\x1b["); reply; reply = strstr(reply + 1, "\x1b[")) {
             unsigned rows, cols;
             int used = 0;
@@ -449,7 +451,7 @@ void Service::poll(uint32_t now) {
         if (mode_ == Mode::Cable) {
             if (rts != lastRts_ || dtr != lastDtr_)
                 format("DTR=%u RTS=%u DSR=1\r\n", dtr, rts);
-            unsigned step = std::min(6u, (now - start_) / 1000);
+            unsigned step = std::min<uint32_t>(6, (now - start_) / 1000);
             if (!cableStep_ || step + 1 != cableStep_) {
                 platform_.restore();
                 if (step < 6)
@@ -466,7 +468,8 @@ void Service::poll(uint32_t now) {
                 return;
             format("bytes=%lu ms=%lu cps=%lu RTS-pauses=%lu paused-ms=%lu%s\r\n",
                    static_cast<unsigned long>(bytes_), static_cast<unsigned long>(now - start_),
-                   static_cast<unsigned long>(uint64_t(bytes_) * 1000 / std::max(1u, now - start_)),
+                   static_cast<unsigned long>(uint64_t(bytes_) * 1000 /
+                                              std::max<uint32_t>(1, now - start_)),
                    static_cast<unsigned long>(pauses_), static_cast<unsigned long>(pausedMs_),
                    port_ == kRs232Port ? "" : " (host-cable signals unavailable)");
             if (!platform_.drained())

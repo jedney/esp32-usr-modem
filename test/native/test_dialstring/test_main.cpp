@@ -1,4 +1,4 @@
-// Unit tests for the dial-string rules (project brief 6.3). Run with: pio test -e native
+// Unit tests for the dial-string rules (spec 3.3). Run with: pio test -e native
 #include <unity.h>
 
 #include "dialstring.h"

@@ -20,7 +20,7 @@ enum class IncomingStage : uint8_t { kIdle, kRinging, kHandshake, kOnline };
 modemcfg::AnswerPort pickAnswerPort(modemcfg::AnswerPort setting, bool rs232Dtr, bool usbDtr);
 class Incoming : public hostport::Session::Answerer {
 public:
-    // An unanswered call is dropped after this many rings (SEC-01; about 24 s). S0 above it
+    // An unanswered call is dropped after this many rings (about 24 s). S0 above it
     // answers on this ring.
     static constexpr uint8_t kMaxRings = 8;
     static constexpr uint32_t kRingPeriodMs = 3000;
@@ -39,7 +39,7 @@ public:
           host_(host),
           clock_(clock),
           network_(network) {}
-    // The USB modem port's session (v2.0). Without one, USB is never chosen.
+    // The USB modem port's session. Without one, USB is never chosen.
     void setUsb(hostport::Session *usb) { usb_ = usb; }
     void poll(bool available = true);
     bool answer(hostport::Session &session) override;

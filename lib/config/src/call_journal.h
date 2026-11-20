@@ -9,6 +9,7 @@ public:
     CallJournal(History &history, Log &log, Clock clock, Utc utc)
         : history_(history), log_(log), clock_(clock), utc_(utc) {}
     void started(bool incoming, const calls::Entry &target) override;
+    void kindKnown(calls::Kind kind) override { record_.kind = kind; }
     void connected(hostport::Session &session) override;
     void ended(atcmd::Result result) override;
     bool active() const { return active_; }

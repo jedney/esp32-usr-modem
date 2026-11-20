@@ -4,16 +4,29 @@
 
 namespace calls {
 constexpr size_t kPhonebookCount = 64;
-enum class Kind : uint8_t { Telnet, Raw, Ppp, Slip };
+enum class Kind : uint8_t { Telnet, Raw, Ppp, Slip, Ssh };
 inline const char *kindName(Kind kind) {
-    static const char *const names[] = {"TELNET", "RAW", "PPP", "SLIP"};
-    return unsigned(kind) < 4 ? names[unsigned(kind)] : "Unknown";
+    static const char *const names[] = {"TELNET", "RAW", "PPP", "SLIP", "SSH"};
+    return unsigned(kind) < 5 ? names[unsigned(kind)] : "Unknown";
+}
+// How a phonebook destination is reached. SSH is basic and for hobby use only: the
+// server's host key is not checked (lib/ssh).
+enum class Protocol : uint8_t { Telnet, Raw, Ssh };
+constexpr unsigned kProtocolCount = 3;
+inline const char *protocolName(Protocol protocol) {
+    static const char *const names[] = {"TELNET", "RAW", "SSH"};
+    return unsigned(protocol) < kProtocolCount ? names[unsigned(protocol)] : "Unknown";
+}
+inline Kind kindOf(Protocol protocol) {
+    return protocol == Protocol::Raw   ? Kind::Raw
+           : protocol == Protocol::Ssh ? Kind::Ssh
+                                       : Kind::Telnet;
 }
 struct Entry {
     char number[12] = {};
     char host[64] = {};
     uint16_t port = 23;
-    bool raw = false;
+    Protocol protocol = Protocol::Telnet;
     uint32_t speed = 0;        // 0: no per-entry override
     Kind kind = Kind::Telnet;  // runtime call metadata; not a phonebook storage field
 };

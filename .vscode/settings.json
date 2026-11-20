@@ -7,7 +7,6 @@
   "files.insertFinalNewline": true,
   "files.eol": "\n",
   "files.associations": {
-    "*.ino": "cpp",
     "*.h": "cpp"
   },
   "[cpp]": {
@@ -37,7 +36,7 @@
   },
   "search.exclude": {
     ".pio": true,
-    "3d-model": true
+    "managed_components": true
   },
   "python.terminal.useEnvFile": true,
   "cmake.configureOnOpen": false,

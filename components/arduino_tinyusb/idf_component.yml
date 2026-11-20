@@ -1,0 +1,8 @@
+# TinyUSB from the IDF component registry: Espressif's release of TinyUSB 0.21.0 with
+# their fixes for the ESP32 USB controller (DWC2). dependencies.lock (committed) records
+# the exact version and its hash. Public, so the Arduino core, which links this component,
+# also gets TinyUSB's headers and its CFG_TUSB_MCU setting.
+dependencies:
+  espressif/tinyusb:
+    version: "==0.21.0~6"
+    require: public

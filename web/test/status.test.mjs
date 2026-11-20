@@ -37,6 +37,8 @@ test('call status labels', () => {
         { label: 'Connected · Telnet · 33600', cls: 'up' });
     assert.equal(S.describeCall({ state: 'connected', dir: 'in', mode: 'raw' }).label,
         'Connected (incoming) · Raw');
+    assert.equal(S.describeCall({ state: 'connected', mode: 'ssh', speed: 28800 }).label,
+        'Connected · SSH · 28800');
     assert.equal(S.describeCall({ state: 'ppp' }).label, 'Internet (PPP)');
     assert.equal(S.describeCall({ state: 'bogus' }).label, 'Unknown');
     assert.equal(S.describeCall(null).label, 'Unknown');
@@ -85,4 +87,56 @@ test('messages from the modem', () => {
     assert.equal(S.parseMessage('not json'), null);
     assert.equal(S.parseMessage('{"m":5}'), null);
     assert.equal(S.parseMessage('5'), null);
+});
+
+test('access state and browser call identity guard input and idle timeout', () => {
+    assert.equal(S.terminalAccess({edit: true, state: 'terminal'}), true);
+    assert.equal(S.terminalAccess({edit: true, state: 'read-only'}), false);
+    assert.equal(S.terminalAccess({edit: false, state: 'terminal'}), false);
+    assert.equal(S.browserCallConnected({state: 'connected', browser: true}, true), true);
+    for (const call of [{state: 'connected'}, {state: 'connected', browser: false},
+        {state: 'dialling', browser: true}, {state: 'idle'}]) {
+        assert.equal(S.browserCallConnected(call, true), false);
+    }
+    assert.equal(S.browserCallConnected({state: 'connected', browser: true}, false), false);
+});
+
+test('event toasts cover access, call identity and reason, loss and restore without duplicates', () => {
+    const messages = [], events = S.createStatusEvents(text => messages.push(text));
+    events.link('connecting'); events.link('offline'); events.link('online');
+    assert.deepEqual(messages, []);
+    events.access({edit: false, state: 'read-only'}, true);
+    assert.match(messages.at(-1), /Another browser has the terminal/);
+    events.access({edit: true, state: 'terminal'});
+    assert.equal(messages.at(-1), 'Terminal opened');
+    const call = {state: 'connected', host: 'Amiga Retro', number: '1', browser: true};
+    events.call(call); events.call({...call, speed: 14400});
+    assert.equal(messages.filter(s => s.startsWith('Connected')).length, 1);
+    assert.equal(messages.at(-1), 'Connected to Amiga Retro');
+    events.away(); events.call({state: 'idle'});
+    assert.equal(messages.at(-1), 'Disconnected: Hung up because you were away');
+    events.call({state: 'connected', number: '42'}); events.call({state: 'idle', reason: 'No carrier'});
+    assert.equal(messages.at(-1), 'Disconnected: No carrier');
+    events.link('offline'); events.link('offline'); events.link('connecting'); events.link('online');
+    assert.deepEqual(messages.slice(-2), ['Link lost', 'Link restored']);
+    events.access({edit: false, state: 'read-only'});
+    assert.equal(messages.at(-1), 'Terminal closed');
+});
+
+test('command refusal spans frames but BBS output and read-only bytes never create it', () => {
+    const messages = [], events = S.createStatusEvents(text => messages.push(text));
+    const bytes = text => new TextEncoder().encode(text);
+    events.output(bytes('ERROR\r\n'));
+    assert.equal(messages.length, 0);
+    events.access({edit: true, state: 'terminal'});
+    events.output(bytes('\r\nER')); events.output(bytes('ROR\r\n'));
+    assert.equal(messages.at(-1), 'Command refused');
+    const refusals = messages.length;
+    events.output(bytes('4\r\n'));
+    assert.equal(messages.length, refusals + 1);
+    events.call({state: 'connected'});
+    const before = messages.length;
+    events.output(bytes('ERROR\r\n')); assert.equal(messages.length, before);
+    events.disconnected(); events.call({state: 'idle'});
+    assert.equal(messages.filter(s => s.startsWith('Disconnected')).length, 0);
 });

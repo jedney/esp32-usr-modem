@@ -5,6 +5,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <initializer_list>
 
 namespace atcmd {
 
@@ -82,9 +83,6 @@ Modem::Modem(modemcfg::Store &store, const StarCommand *star, size_t starCount)
 modemcfg::LoadResult Modem::begin() {
     modemcfg::LoadResult r = modemcfg::loadNvram(store_, &nvram_);
     active_ = modemcfg::powerOnProfile(nvram_);
-    if (r == modemcfg::LoadResult::kMigrated) {
-        modemcfg::saveNvram(store_, nvram_);  // in the current format from now on
-    }
     return r;
 }
 
@@ -282,6 +280,9 @@ void Port::beginInfo() {
 }
 
 void Port::result(Result r) {
+    if (!unsolicited_ && r == Result::kError) {
+        ++errorCount_;
+    }
     if (readable_) {
         Profile display = modem_.active();
         display.v[modemcfg::kQ] = 0;
@@ -521,6 +522,21 @@ void Port::askConfirmation(const char *prompt, SecretHandler fn, void *ctx) {
     maskSecret_ = false;
 }
 
+void Port::discardInput() {
+    if (state_ == State::kWait)
+        feed('\x03');
+    cancelPrompt();
+    state_ = State::kIdle;
+    len_ = 0;
+    overflow_ = privateLine_ = false;
+    privateStart_ = 0;
+    repeatAllowed_ = false;
+    for (auto *buffer : {&line_, &last_}) {
+        volatile char *p = *buffer;
+        for (size_t i = 0; i < sizeof line_; ++i)
+            p[i] = 0;
+    }
+}
 bool Port::cancelPrompt() {
     if (state_ != State::kSecret) {
         return false;
@@ -910,7 +926,7 @@ bool Port::runAmpersand(const char *&p, bool *stop) {
 }
 
 bool Port::runPlus(const char *&p) {
-    // Only +FCLASS: data mode (0) is the only class; fax classes give ERROR (brief 6.6, Q32).
+    // Only +FCLASS: data mode (0) is the only class; fax classes give ERROR (spec 3.6).
     if (!startsWith(p, "FCLASS")) {
         return false;
     }

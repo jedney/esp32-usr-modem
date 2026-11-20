@@ -2,6 +2,9 @@
 #include <cstring>
 
 namespace calls {
+static_assert(sizeof(Entry::host) == sizeof(dialstring::Result::host),
+              "a dialled host name must fit a phonebook entry");
+
 bool Outgoing::start(hostport::Session &session, const char *text, bool pulse) {
     // ATH followed by ATD can arrive in one serial burst, before poll() observes
     // the old Session closing. Finish that lifecycle before replacing its target.
@@ -20,8 +23,8 @@ bool Outgoing::start(hostport::Session &session, const char *text, bool pulse) {
         strcpy(target.host, r.host);
         target.port = r.port;
     } else {
-        return false;
-    }  // future reserved-number services are not TCP destinations
+        return false;  // special numbers (configuration screen, PPP, SLIP) are not TCP calls
+    }
     if (slot_.busy()) {
         session.port().result(atcmd::Result::kBusy);
         return true;
@@ -39,6 +42,13 @@ bool Outgoing::start(hostport::Session &session, const char *text, bool pulse) {
         return false;
     }
     target_ = target;
+    // A direct dial to port 22 tries SSH and falls back to Telnet; an entry uses its type.
+    const bool direct = r.kind != dialstring::Kind::Phonebook;
+    mode_ = direct ? (target.port == 22 ? Mode::SshOrTelnet : Mode::Telnet)
+            : target.protocol == Protocol::Raw ? Mode::Raw
+            : target.protocol == Protocol::Ssh ? Mode::Ssh
+                                               : Mode::Telnet;
+    memcpy(name_, target.host, sizeof name_);
     session_ = &session;
     profile_ = modem_.active();
     ringDelayMs_ = modem_.ringDelayMs();
@@ -55,15 +65,17 @@ bool Outgoing::start(hostport::Session &session, const char *text, bool pulse) {
         return true;
     }
     reportSpeed_ = target_.speed || profile_.lineExplicit ? lineSpeed_ : modem_.model();
-    // Dial the number the user entered, never the digits in a phonebook expansion.
-    // A hostname has no number, so its digits come from its IP address (see poll).
-    setDigits(r.kind == dialstring::Kind::Host ? "" : text);
+    // Hostnames and speed dials sound the final IPv4 address, never a phonebook slot
+    // or digits embedded in a hostname. Numeric IP dial strings retain their digits.
+    const bool resolveDigits =
+        r.kind == dialstring::Kind::Host || r.kind == dialstring::Kind::Phonebook;
+    setDigits(resolveDigits ? "" : text);
     session.port().wait(cancelWait, this, atcmd::Result::kNoCarrier);
     if (profile_.get(modemcfg::kM) == 0 || profile_.get(modemcfg::kM) == 3) {
         connect(clock_());
     } else {
         stage_ = CallStage::kDial;
-        if (r.kind == dialstring::Kind::Host) {
+        if (resolveDigits) {
             // Look the name up while the dial tone plays.
             lookup_ = true;
             since_ = clock_();
@@ -109,7 +121,7 @@ void Outgoing::connect(uint32_t now) {
     stage_ = CallStage::kConnecting;
     since_ = now;
     socket_.begin(target_.host, target_.port);
-    connection_.begin(target_.raw);
+    connection_.begin(mode_, name_);
 }
 void Outgoing::connected() {
     session_->port().finish(atcmd::Reply::kDone);
@@ -119,6 +131,7 @@ void Outgoing::connected() {
     }
     stage_ = CallStage::kOnline;
     if (observer_) {
+        observer_->kindKnown(kindOf(connection_.protocol()));
         observer_->connected(*session_);
     }
     sound_.stop();
@@ -143,6 +156,11 @@ void Outgoing::finish(atcmd::Result result) {
     endObservation(result);
     if (session_) {
         session_->port().finish(atcmd::Reply::kDone);
+        const char *why = connection_.reason();  // an SSH call that failed before CONNECT
+        if (*why) {
+            session_->port().beginInfo();
+            session_->port().line(why);
+        }
         if (session_->callUp()) {
             session_->hangUp();
         }
@@ -234,6 +252,7 @@ void Outgoing::poll() {
         stage_ != CallStage::kConnectDelay) {
         return;
     }
+    connection_.terminalSize(session_->columns(), session_->rows());
     connection_.poll(now);
     SocketState state = socket_.state();
     if (state == SocketState::kDnsError) {
@@ -262,7 +281,7 @@ void Outgoing::poll() {
                                                 : atcmd::Result::kNoAnswer);
         return;
     }
-    if (stage_ == CallStage::kConnecting && state == SocketState::kOpen) {
+    if (stage_ == CallStage::kConnecting && state == SocketState::kOpen && connection_.ready()) {
         if (silent) {
             connected();
             return;

@@ -1,4 +1,4 @@
-// Unit tests for the host port logic (brief 5.4, 6.2): speed detection from "AT", 8N1
+// Unit tests for the host port logic (spec 2.4, 3.2): speed detection from "AT", 8N1
 // decoding of captured waveforms, the +++ escape, DTR/DCD rules, flow control, the
 // session modes and the front-panel LED rules. Run with: pio test -e native
 #include <unity.h>
@@ -8,13 +8,19 @@
 #include <string>
 #include <vector>
 
+#define FAKES_STORE
+#define FAKES_SINK
+#include "../support/fakes.h"
 #include "autobaud.h"
 #include "connection.h"
 #include "hwtest.h"
+#include "input_buffer.h"
 #include "linectl.h"
 #include "panel.h"
+#include "serial_state.h"
 #include "session.h"
 #include "sink_gate.h"
+#include "usb_names.h"
 
 using autobaud::Run;
 using modemcfg::Profile;
@@ -419,39 +425,10 @@ void test_echo_connection() {
 
 // --- Session ------------------------------------------------------------------------------
 
-class MemStore : public modemcfg::Store {
-public:
-    size_t load(uint8_t *buf, size_t cap) override {
-        size_t n = len < cap ? len : cap;
-        memcpy(buf, data, n);
-        return n;
-    }
-    bool save(const uint8_t *d, size_t n) override {
-        memcpy(data, d, n);
-        len = n;
-        return true;
-    }
-    bool erase() override {
-        len = 0;
-        return true;
-    }
-    uint8_t data[1024] = {};
-    size_t len = 0;
-};
-
-class StrSink : public atcmd::Sink {
-public:
-    void write(const char *d, size_t n) override { s.append(d, n); }
-    std::string take() {
-        std::string r = s;
-        s.clear();
-        return r;
-    }
-    std::string s;
-};
+using StrSink = fakes::TextSink;
 
 struct Rig {
-    MemStore store;
+    fakes::MemoryStore store;
     atcmd::Modem modem{store, nullptr, 0};
     CallSlot slot;
     StrSink out;
@@ -653,6 +630,80 @@ void test_session_full_call_holds_the_rest() {
     r.fromCall();
     TEST_ASSERT_EQUAL(EchoConnection::kSize, r.s.hostSpace());
 }
+void test_browser_pump_retains_input_and_disconnect_forgets_commands() {
+    Rig r;
+    r.s.port().setBrowser(true);
+    r.call();
+    std::vector<uint8_t> full(EchoConnection::kSize, 'a');
+    r.s.fromHost(full.data(), full.size(), r.now);
+    InputBuffer input;
+    const uint8_t tail[] = {'b', 'c'};
+    input.append(tail, sizeof tail);
+    input.poll(r.s, r.now, true);
+    TEST_ASSERT_EQUAL(sizeof tail, input.size());
+    r.fromCall();
+    input.poll(r.s, r.now, true);
+    TEST_ASSERT_EQUAL(0, input.size());
+    TEST_ASSERT_EQUAL_STRING("bc", r.fromCall().c_str());
+    r.s.hangUp();
+    r.send("ATQ1");
+    r.s.port().discardInput();
+    r.out.take();
+    r.send("\rAT\r");
+    TEST_ASSERT_NOT_NULL(strstr(r.out.take().c_str(), "OK"));
+    TEST_ASSERT_EQUAL(0, r.modem.active().get(modemcfg::kQ));
+    r.s.port().discardInput();
+    r.send("A/");
+    TEST_ASSERT_NOT_NULL(strstr(r.out.take().c_str(), "ERROR"));
+}
+void test_session_keeps_terminal_size_before_and_during_call() {
+    class SizedEcho : public EchoConnection {
+    public:
+        unsigned columns = 0, rows = 0;
+        void terminalSize(unsigned c, unsigned r) override {
+            columns = c;
+            rows = r;
+        }
+    } echo;
+    Rig r;
+    r.s.resize(160, 60);
+    echo.open(0, 0);
+    TEST_ASSERT_TRUE(r.s.startCall(echo));
+    TEST_ASSERT_EQUAL(160, echo.columns);
+    TEST_ASSERT_EQUAL(60, echo.rows);
+    r.s.resize(255, 511);
+    TEST_ASSERT_EQUAL(255, echo.columns);
+    TEST_ASSERT_EQUAL(511, echo.rows);
+    r.s.resize(65536, 0);
+    TEST_ASSERT_EQUAL(255, echo.columns);
+}
+void test_interactive_handler_can_read_prefetched_input() {
+    InputBuffer input;
+    class InteractiveSink : public atcmd::Sink {
+    public:
+        explicit InteractiveSink(InputBuffer &input) : input_(input) {}
+        void write(const char *data, size_t len) override {
+            output.append(data, len);
+            if (output.find("OK\r\n") != std::string::npos && tail.empty()) {
+                uint8_t bytes[32];
+                size_t n = input_.read(bytes, sizeof bytes);
+                tail.assign(reinterpret_cast<const char *>(bytes), n);
+            }
+        }
+        InputBuffer &input_;
+        std::string output, tail;
+    } sink(input);
+    fakes::MemoryStore store;
+    atcmd::Modem modem(store, nullptr, 0);
+    modem.begin();
+    CallSlot slot;
+    Session session(modem, sink, 115200, slot);
+    const std::string bytes = "AT\rtest-controls";
+    input.append(reinterpret_cast<const uint8_t *>(bytes.data()), bytes.size());
+    input.poll(session, 0, true);
+    TEST_ASSERT_EQUAL_STRING("test-controls", sink.tail.c_str());
+    TEST_ASSERT_EQUAL(0, input.size());
+}
 
 void test_session_atz_hangs_up() {
     Rig r;
@@ -740,7 +791,7 @@ void test_panel_ring_and_wifi() {
     TEST_ASSERT_EQUAL_HEX8(mask(hwtest::kARQ), p.update(in, Panel::kWifiBlinkMs));
 }
 
-// --- Sink gate (STA-01): a port nobody reads never stops the modem ------------------------
+// --- Sink gate: a port nobody reads never stops the modem ------------------------
 // A fake port with a fake clock. pause() is the only thing that moves time; the computer
 // frees one byte of room every `drainEveryMs` (0 = never reads).
 
@@ -899,7 +950,7 @@ void test_call_slot_says_who_holds_it() {
     TEST_ASSERT_FALSE(slot.heldBy(&b));
 }
 
-// --- TG-06: the 2^32 ms clock wrap, throttle rates, S3/S5 limits -------------------------------
+// --- The 2^32 ms clock wrap, throttle rates, S3/S5 limits -------------------------------
 constexpr uint32_t kNearWrap = 0xffffff00u;  // 256 ms before the clock wraps to 0
 
 void test_escape_guard_times_hold_across_the_clock_wrap() {
@@ -1033,6 +1084,133 @@ void test_s5_zero_and_127_erase_one_character_on_the_host_port() {
         TEST_ASSERT_EQUAL(3, r.modem.active().get(modemcfg::kX));
     }
 }
+// --- USB serial state (DCD, DSR, RI notifications) ---------------------------------------
+
+class FakeStatePort : public SerialStateSender::Port {
+public:
+    std::vector<SerialState> sent;
+    bool busy = false;
+    bool send(const SerialState &state) override {
+        if (busy) {
+            return false;
+        }
+        sent.push_back(state);
+        return true;
+    }
+};
+
+SerialState lines(bool dcd, bool dsr, bool ri) {
+    SerialState s;
+    s.dcd = dcd;
+    s.dsr = dsr;
+    s.ri = ri;
+    return s;
+}
+
+void test_serial_state_sent_on_configure_and_on_change_only() {
+    FakeStatePort port;
+    SerialStateSender sender;
+    sender.poll(port, false, false, true, false);  // not configured: nothing goes
+    TEST_ASSERT_EQUAL(0, port.sent.size());
+    // Port closed (DTR off): still sent, as some programs open the port without DTR.
+    sender.poll(port, true, false, false, false);
+    TEST_ASSERT_EQUAL(1, port.sent.size());
+    TEST_ASSERT_TRUE(port.sent[0] == lines(false, true, false));  // DSR always on
+    sender.poll(port, true, false, false, false);
+    TEST_ASSERT_EQUAL(1, port.sent.size());  // no change, nothing sent
+    sender.poll(port, true, false, true, false);
+    TEST_ASSERT_EQUAL(2, port.sent.size());
+    TEST_ASSERT_TRUE(port.sent[1] == lines(true, true, false));
+    sender.poll(port, true, false, false, false);
+    TEST_ASSERT_EQUAL(3, port.sent.size());
+    TEST_ASSERT_TRUE(port.sent[2] == lines(false, true, false));
+}
+
+void test_serial_state_sent_again_when_a_program_opens_the_port() {
+    FakeStatePort port;
+    SerialStateSender sender;
+    sender.poll(port, true, false, true, false);
+    TEST_ASSERT_EQUAL(1, port.sent.size());
+    sender.poll(port, true, true, true, false);  // DTR on: the same state again
+    TEST_ASSERT_EQUAL(2, port.sent.size());
+    TEST_ASSERT_TRUE(port.sent[1] == lines(true, true, false));
+    sender.poll(port, true, true, true, false);
+    sender.poll(port, true, false, true, false);  // DTR off: nothing to send
+    TEST_ASSERT_EQUAL(2, port.sent.size());
+    sender.poll(port, true, true, true, false);  // opened again
+    TEST_ASSERT_EQUAL(3, port.sent.size());
+}
+
+void test_serial_state_sent_again_after_the_computer_configures_again() {
+    FakeStatePort port;
+    SerialStateSender sender;
+    sender.poll(port, true, true, true, false);
+    sender.poll(port, false, false, true, false);  // unplugged or reset
+    sender.poll(port, true, true, true, false);
+    TEST_ASSERT_EQUAL(2, port.sent.size());
+    TEST_ASSERT_TRUE(port.sent[1] == lines(true, true, false));
+}
+
+void test_serial_state_busy_endpoint_keeps_the_newest_state() {
+    FakeStatePort port;
+    SerialStateSender sender;
+    sender.poll(port, true, true, false, false);
+    port.busy = true;
+    sender.poll(port, true, true, true, false);   // DCD on: can't go now
+    sender.poll(port, true, true, false, false);  // back off before it went
+    TEST_ASSERT_EQUAL(1, port.sent.size());
+    port.busy = false;
+    sender.poll(port, true, true, false, false);
+    TEST_ASSERT_EQUAL(1, port.sent.size());  // the computer already has DCD off
+    port.busy = true;
+    sender.poll(port, true, true, true, false);
+    port.busy = false;
+    sender.poll(port, true, true, true, false);
+    TEST_ASSERT_EQUAL(2, port.sent.size());
+    TEST_ASSERT_TRUE(port.sent[1] == lines(true, true, false));
+}
+
+void test_serial_state_short_ring_still_reaches_the_computer() {
+    FakeStatePort port;
+    SerialStateSender sender;
+    sender.poll(port, true, true, false, false);
+    port.busy = true;
+    sender.poll(port, true, true, false, true);  // RI on for one pass, can't go
+    port.busy = false;
+    sender.poll(port, true, true, false, false);  // RI is off again by now
+    TEST_ASSERT_EQUAL(2, port.sent.size());
+    TEST_ASSERT_TRUE(port.sent[1] == lines(false, true, true));  // still sent as on
+    sender.poll(port, true, true, false, false);
+    TEST_ASSERT_EQUAL(3, port.sent.size());
+    TEST_ASSERT_TRUE(port.sent[2] == lines(false, true, false));  // then off
+    sender.poll(port, true, true, false, false);
+    TEST_ASSERT_EQUAL(3, port.sent.size());
+}
+
+// The USB serial number is the Wi-Fi MAC as 12 upper-case hex digits, no separators.
+void test_usb_serial_number_is_the_mac_in_hex() {
+    const uint8_t mac[6] = {0x0A, 0xB1, 0x00, 0xFF, 0x3C, 0x7d};
+    char out[hostport::kUsbSerialLength + 1];
+    memset(out, 'x', sizeof out);
+    hostport::usbSerialNumber(mac, out);
+    TEST_ASSERT_EQUAL_STRING("0AB100FF3C7D", out);
+}
+
+void test_serial_state_ring_cadence_sends_each_edge() {
+    FakeStatePort port;
+    SerialStateSender sender;
+    const bool cadence[] = {false, true, true, false, true, false, false};
+    for (bool ri : cadence) {
+        sender.poll(port, true, true, false, ri);
+    }
+    TEST_ASSERT_EQUAL(5, port.sent.size());  // first state, on, off, on, off
+    TEST_ASSERT_FALSE(port.sent[0].ri);
+    TEST_ASSERT_TRUE(port.sent[1].ri);
+    TEST_ASSERT_FALSE(port.sent[2].ri);
+    TEST_ASSERT_TRUE(port.sent[3].ri);
+    TEST_ASSERT_FALSE(port.sent[4].ri);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_call_slot_says_who_holds_it);
@@ -1072,6 +1250,9 @@ int main() {
     RUN_TEST(test_session_local_echo_f0);
     RUN_TEST(test_session_xon_xoff_from_computer);
     RUN_TEST(test_session_full_call_holds_the_rest);
+    RUN_TEST(test_browser_pump_retains_input_and_disconnect_forgets_commands);
+    RUN_TEST(test_session_keeps_terminal_size_before_and_during_call);
+    RUN_TEST(test_interactive_handler_can_read_prefetched_input);
     RUN_TEST(test_session_atz_hangs_up);
     RUN_TEST(test_session_amp_c0_dcd_always_on);
     RUN_TEST(test_panel_mirrors_lines);
@@ -1095,5 +1276,12 @@ int main() {
     RUN_TEST(test_throttle_credit_is_the_same_across_the_clock_wrap);
     RUN_TEST(test_s3_zero_and_127_end_the_line_on_the_host_port);
     RUN_TEST(test_s5_zero_and_127_erase_one_character_on_the_host_port);
+    RUN_TEST(test_serial_state_sent_on_configure_and_on_change_only);
+    RUN_TEST(test_serial_state_sent_again_when_a_program_opens_the_port);
+    RUN_TEST(test_serial_state_sent_again_after_the_computer_configures_again);
+    RUN_TEST(test_serial_state_busy_endpoint_keeps_the_newest_state);
+    RUN_TEST(test_serial_state_short_ring_still_reaches_the_computer);
+    RUN_TEST(test_serial_state_ring_cadence_sends_each_edge);
+    RUN_TEST(test_usb_serial_number_is_the_mac_in_hex);
     return UNITY_END();
 }

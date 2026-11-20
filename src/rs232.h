@@ -1,4 +1,4 @@
-// The RS232 host port (project brief 6.2): UART1 through the MAX3232s, with speed
+// The RS232 host port (spec 3.2): UART1 through the MAX3232s, with speed
 // detection from "AT", flow control, DTR/DCD and the port's AT session.
 #pragma once
 
@@ -18,7 +18,7 @@ uint32_t baud();       // the port's current speed
 bool detecting();      // speed from "AT" (AT*BAUD=AUTO)
 void applyHostBaud();  // after AT*BAUD changes
 
-// The hardware tests take the port over (brief 6.14, Q79): suspend stops the session and
+// The hardware tests take the port over (spec 3.13): suspend stops the session and
 // frees UART1 and the handshake lines; resume starts them again.
 void suspend();
 void resume();

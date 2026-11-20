@@ -1,0 +1,30 @@
+# Settings for the USB modem port (lib/hw/src/usb_port.cpp). The Arduino core reads the
+# same names: CONFIG_TINYUSB_ENABLED makes it link this component and build its USB layer
+# (USB.begin, esp32-hal-tinyusb.c), and CONFIG_TINYUSB_CDC_ENABLED builds its CDC glue.
+# Only the CDC class is offered; the other Arduino USB classes stay out of the build.
+menu "USB modem port (TinyUSB)"
+
+    config TINYUSB_ENABLED
+        bool "TinyUSB device stack on the native USB port"
+        depends on SOC_USB_OTG_SUPPORTED
+        default y
+
+    config TINYUSB_CDC_ENABLED
+        bool "CDC-ACM serial interface"
+        depends on TINYUSB_ENABLED
+        default y
+
+    config TINYUSB_CDC_RX_BUFSIZE
+        int "CDC receive buffer (bytes)"
+        depends on TINYUSB_CDC_ENABLED
+        default 512
+        help
+            Data from the computer waits here until the modem reads it. When it is
+            full, TinyUSB stops accepting packets and the computer holds off.
+
+    config TINYUSB_CDC_TX_BUFSIZE
+        int "CDC transmit buffer (bytes)"
+        depends on TINYUSB_CDC_ENABLED
+        default 1024
+
+endmenu
